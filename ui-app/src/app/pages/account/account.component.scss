@@ -1,0 +1,174 @@
+// S9 Account (6.4): one column, max 720; tabs under the chapter card, tracklist rows below.
+:host {
+  display: block;
+  min-height: 100dvh;
+}
+
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 var(--gutter) var(--s8);
+}
+
+.tabs {
+  margin: var(--s3) 0 0;
+}
+
+.status {
+  margin: var(--s3) 0 0;
+  padding: var(--s2) var(--s3);
+  background: var(--live-soft);
+  color: var(--live-ink);
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  padding: var(--s4) 0;
+}
+
+.me {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s4);
+  padding-bottom: var(--s4);
+  border-bottom: 1px solid var(--line);
+
+  p {
+    margin: 2px 0 0;
+  }
+}
+
+.who {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.av {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border: 2px solid var(--ink);
+
+  &--i {
+    display: grid;
+    place-items: center;
+    background: var(--ink);
+    color: var(--paper);
+    font: 400 32px/1 var(--font-display);
+  }
+}
+
+.profile h3 {
+  margin: var(--s2) 0 0;
+}
+
+.lnk {
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s3);
+
+  p {
+    margin: 0;
+    max-width: 52ch;
+  }
+
+  .sd-btn {
+    flex: none;
+  }
+}
+
+.fresh {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s2);
+  padding: var(--s3);
+  border: 2px solid var(--ink);
+  background: var(--paper-2);
+
+  sd-url-chip {
+    align-self: stretch;
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
+.empty {
+  margin: 0;
+  padding: var(--s5) 0;
+  color: var(--ink-2);
+}
+
+.off {
+  margin: 0;
+  padding: var(--s3);
+  border-left: 2px solid var(--warn-ink);
+  background: var(--warn-soft);
+  color: var(--ink);
+}
+
+// Beta keys (admins): the form wraps, every row wraps — nothing scrolls sideways on a phone.
+.beta-new {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--s3);
+
+  .fld {
+    display: flex;
+    flex: 1 1 220px;
+    flex-direction: column;
+    gap: var(--s1);
+    min-width: 0;
+  }
+
+  input {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 16px;
+  }
+}
+
+.beta-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.beta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s3);
+  padding: var(--s3) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.beta-meta {
+  flex: 1 1 180px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 639px) {
+  .head {
+    flex-direction: column;
+  }
+}

@@ -1,0 +1,49 @@
+<section class="sec">
+  <h2 [id]="uid + '-g'" class="sd-label">Group</h2>
+  <div class="opts" role="group" [attr.aria-labelledby]="uid + '-g'">
+    @for (g of groups(); track g.key) {
+      <button type="button" class="opt" [attr.aria-pressed]="g.key === group()" (click)="groupChange.emit(g.key)">
+        <span>{{ g.label }}</span><span class="n">{{ count(g.count) }}</span>
+      </button>
+    }
+  </div>
+</section>
+
+<section class="sec">
+  <h2 [id]="uid + '-o'" class="sd-label">Owner</h2>
+  <div class="opts" role="group" [attr.aria-labelledby]="uid + '-o'">
+    @for (o of owners(); track o.key) {
+      <button type="button" class="opt" [attr.aria-pressed]="o.key === owner()" (click)="ownerChange.emit(o.key)">
+        <span>{{ o.label }}</span><span class="n">{{ count(o.count) }}</span>
+      </button>
+    }
+  </div>
+</section>
+
+@if (packs().length) {
+  <section class="sec">
+    <h2 [id]="uid + '-p'" class="sd-label">Pack</h2>
+    <label class="sd-sr-only" [attr.for]="uid + '-q'">Find a pack</label>
+    <input [id]="uid + '-q'" class="sd-field find" type="search" placeholder="find a pack" autocomplete="off"
+      spellcheck="false" [value]="packQuery()" (input)="packQuery.set($any($event.target).value)" />
+    <ul class="packs" [attr.aria-labelledby]="uid + '-p'">
+      @for (p of visiblePacks(); track p.key) {
+        <li>
+          <label class="pk">
+            <input type="checkbox" [checked]="isChosen(p.key)" (change)="packToggle.emit(p.key)" />
+            <span class="pn">{{ p.label }}</span><span class="n">{{ count(p.count) }}</span>
+          </label>
+        </li>
+      } @empty {
+        <li class="sd-small none">No pack matches.</li>
+      }
+    </ul>
+    @if (hiddenPacks() > 0) {
+      <button type="button" class="more sd-small" (click)="allPacks.set(true)">all {{ packs().length }} packs</button>
+    }
+  </section>
+}
+
+@if (activeCount() > 0) {
+  <button type="button" class="sd-btn sd-btn--sm clear" (click)="cleared.emit()">Clear filters</button>
+}

@@ -1,0 +1,66 @@
+// PostgreSQL — für NODE_ENV production | integration.
+// Entwicklung: store/prisma-cache/schema.prisma (SQLite).
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma-cache-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("CACHE_DATABASE_URL")
+}
+
+model CacheEntry {
+  key       String @id
+  value     String
+  expiresAt BigInt
+}
+
+model GeoFeature {
+  dogType      String
+  osmType      String
+  osmId        BigInt
+  primaryKey   String?
+  primaryValue String?
+  name         String?
+  hasGeom      Boolean
+  lat          Float?
+  lng          Float?
+  bboxMinLat   Float?
+  bboxMinLng   Float?
+  bboxMaxLat   Float?
+  bboxMaxLng   Float?
+  payload      String
+  updatedAt    BigInt
+
+  @@id([dogType, osmType, osmId])
+  @@index([dogType, primaryKey, primaryValue])
+  @@index([dogType, bboxMinLat, bboxMaxLat])
+}
+
+model FeatureTileMembership {
+  dogType String
+  osmType String
+  osmId   BigInt
+  zoom    Int
+  tileX   Int
+  tileY   Int
+  facet   String
+
+  @@id([dogType, osmType, osmId, zoom, tileX, tileY, facet])
+  @@index([dogType, zoom, tileX, tileY, facet])
+}
+
+model TileCoverage {
+  dogType   String
+  zoom      Int
+  tileX     Int
+  tileY     Int
+  facet     String
+  fetchedAt BigInt
+  expiresAt BigInt
+
+  @@id([dogType, zoom, tileX, tileY, facet])
+  @@index([expiresAt])
+  @@index([dogType, zoom, tileX, tileY])
+}

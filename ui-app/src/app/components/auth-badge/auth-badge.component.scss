@@ -1,0 +1,152 @@
+// Auth badge on the Mixtape tokens: a quiet button on paper, the menu a lifted sheet (6.5 `sd-auth-badge`).
+:host {
+  position: fixed;
+  top: 8px;
+  right: 12px;
+  // Above the top bar, the chapter card and the viewer app bar (50); below drawers, sheets, dialogs (80+).
+  z-index: 60;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink);
+}
+
+@media (min-width: 768px) {
+  :host {
+    top: 10px;
+  }
+}
+
+.auth-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 36px;
+  padding: 0 var(--s3);
+  border: 2px solid var(--ink);
+  background: var(--paper-2);
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+
+  &--loading {
+    width: 36px;
+    padding: 0;
+    cursor: default;
+    opacity: .4;
+  }
+
+  &--login {
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+
+    &:hover {
+      background: var(--paper-3);
+    }
+
+    .g-icon {
+      display: inline-grid;
+      place-items: center;
+      width: 18px;
+      height: 18px;
+      background: var(--ink);
+      color: var(--paper);
+      font-size: 11px;
+    }
+  }
+
+  &--user {
+    position: relative;
+    padding: 0;
+
+    .trigger {
+      all: unset;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--s2);
+      min-height: 32px;
+      padding: 0 var(--s2) 0 0;
+      cursor: pointer;
+    }
+
+    .trigger:focus-visible {
+      outline: 3px solid var(--focus);
+    }
+
+    .avatar {
+      width: 32px;
+      height: 32px;
+      object-fit: cover;
+
+      &--initial {
+        display: inline-grid;
+        place-items: center;
+        background: var(--ink);
+        color: var(--paper);
+        font-weight: 700;
+      }
+    }
+
+    // The name lives in the menu and the tooltip; the trigger stays small.
+    .who {
+      display: none;
+    }
+
+    .caret {
+      color: var(--ink-2);
+      font-size: 11px;
+    }
+  }
+}
+
+@media (max-width: 640px) {
+  .auth-badge--user .caret,
+  .auth-badge--login .label {
+    display: none;
+  }
+
+  .auth-badge--user .trigger {
+    padding: 0;
+  }
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: -2px;
+  min-width: 220px;
+  padding: var(--s1);
+  border: 2px solid var(--ink);
+  background: var(--paper-2);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.menu-row {
+  display: block;
+  width: 100%;
+  padding: var(--s2) var(--s3);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.menu-info {
+  cursor: default;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--s1);
+
+  small {
+    display: block;
+    margin-top: 2px;
+    color: var(--ink-2);
+  }
+}
+
+.menu-action:hover {
+  background: var(--paper-3);
+}

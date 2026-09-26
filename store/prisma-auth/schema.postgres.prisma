@@ -1,0 +1,100 @@
+// Postgres variant for prod/integration. Same models as SQLite schema.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma-auth-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("AUTH_DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(uuid())
+  googleSub   String   @unique
+  email       String   @unique
+  name        String?
+  picture     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model OAuthClient {
+  id            String   @id @default(uuid())
+  clientId      String   @unique
+  clientSecret  String?
+  name          String
+  redirectUris  String
+  createdAt     DateTime @default(now())
+}
+
+model AuthorizationCode {
+  code                 String   @id
+  clientId             String
+  userId               String
+  redirectUri          String
+  codeChallenge        String?
+  codeChallengeMethod  String?
+  scope                String
+  expiresAt            DateTime
+  createdAt            DateTime @default(now())
+}
+
+model AccessToken {
+  jti          String   @id
+  userId       String
+  clientId     String
+  scope        String
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime @default(now())
+}
+
+model RefreshToken {
+  token        String   @id
+  userId       String
+  clientId     String
+  scope        String
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime @default(now())
+}
+
+// Nutzergebundener Key-Store (P4c): Schluessel liegen nur verschluesselt (AES-256-GCM) hier,
+// nie in jsonStore, nie im Klartext; keine Read-API gibt den Wert zurueck.
+model UserKey {
+  id             String    @id @default(uuid())
+  ownerId        String                      // User.id — der Besitzer des Schluessels
+  alias          String                      // z. B. "openai" — im Dog referenziert
+  last4          String                      // maskierte Anzeige, nie mehr
+  ciphertext     String                      // AES-256-GCM, base64
+  iv             String                      // base64
+  authTag        String                      // base64
+  keyVersion     Int       @default(1)       // welcher Master-Key
+  allowedDomains String                      // CSV erlaubter Zieldomains (Egress-Allowlist) — Pflicht, mindestens eine
+  kennelGrants   String?                     // optional: CSV kennelLineageIds, die diesen Key in oeffentlichen Laeufen nutzen duerfen (Entscheidung 8.8)
+  quotaPerDay    Int?                        // Pflicht, sobald kennelGrants gesetzt ist
+  usedToday      Int       @default(0)
+  usedDayStamp   String?                     // YYYY-MM-DD Reset-Marke
+  createdAt      DateTime  @default(now())
+  lastUsedAt     DateTime?
+
+  @@unique([ownerId, alias])
+  @@index([ownerId])
+}
+
+// Beta-Keys (2026-09-26, "ein key ein google user"): mit SLOPDOGS_STAGE=beta (und Auth an) braucht jedes Google-Konto
+// einmal einen Key; ein Key schaltet genau ein Konto frei (usedByUserId unique), laeuft nicht ab, endet durch
+// Einloesen oder Widerruf. Klartext nie gespeichert, nur SHA-256.
+model BetaKey {
+  id           String    @id @default(uuid())
+  codeHash     String    @unique              // SHA-256 des Keys, nie der Klartext
+  last4        String                         // maskierte Anzeige
+  note         String?                        // fuer wen, wozu
+  createdBy    String?                        // E-Mail des Anlegenden; null = lokaler Super-User
+  createdAt    DateTime  @default(now())
+  revokedAt    DateTime?
+  usedByUserId String?   @unique              // das eine Google-Konto, das dieser Key freigeschaltet hat
+  usedAt       DateTime?
+}

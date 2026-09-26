@@ -1,0 +1,15 @@
+<app-auth-badge />
+<router-outlet />
+@let ask = confirm.request();
+<sd-confirm
+  [open]="!!ask"
+  [title]="ask?.title ?? ''"
+  [message]="ask?.message ?? null"
+  [confirmLabel]="ask?.confirmLabel ?? 'Confirm'"
+  [cancelLabel]="ask?.cancelLabel ?? 'Cancel'"
+  [variant]="ask?.variant ?? 'quiet'"
+  (confirmed)="confirm.answer(true)"
+  (dismissed)="confirm.answer(false)" />
+<sd-shortcuts />
+<sd-toast />
+<sd-void-cinema />

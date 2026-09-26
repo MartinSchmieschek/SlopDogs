@@ -1,0 +1,12 @@
+{
+  "tsCode": "var r = parseFloat(QueryRetriever.radius || '800'); if (!isFinite(r) || r < 1) r = 800; if (r < 100) r = r * 1000; var meters = String(Math.min(Math.round(r), 15000)); return { lat: QueryRetriever.lat, lng: QueryRetriever.lng, radius: meters, type: 'walkable' };",
+  "parentsRequired": ["QueryRetriever"],
+  "serializedDogConfig": {
+    "theRun": "var r = parseFloat(QueryRetriever.radius || '800'); if (!isFinite(r) || r < 1) r = 800; if (r < 100) r = r * 1000; var meters = String(Math.min(Math.round(r), 15000)); return { lat: QueryRetriever.lat, lng: QueryRetriever.lng, radius: meters, type: 'walkable' };",
+    "lineageId": "f2e633f2-3cbb-49c2-9b8d-9ae1c25d3216",
+    "parentId": "7fe3fec1-ffda-4a8d-ac3f-c6f84674903e",
+    "displayName": "PhantomMapV2TrailQuery",
+    "parentsRequired": ["QueryRetriever"],
+    "parentsOptional": []
+  }
+}

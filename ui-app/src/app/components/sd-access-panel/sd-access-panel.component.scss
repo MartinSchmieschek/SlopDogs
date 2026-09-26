@@ -1,0 +1,244 @@
+// Access panel (6.4 S8): sections on hairlines, people as tracklist rows, the transfer dialog floats.
+// The panel lives in drawers of different widths (settings 560, preview 440, inspector 420, sheets):
+// it stacks its rows by its own width, not the window's. The container is the inner `.ap` — layout
+// containment would otherwise catch the fixed transfer dialog.
+:host {
+  display: block;
+}
+
+.ap {
+  container: ap / inline-size;
+}
+
+.sec {
+  margin: 0;
+  padding: var(--s3) 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+
+  &:first-child {
+    border-top: 0;
+    padding-top: 0;
+  }
+}
+
+.saving {
+  opacity: .6;
+}
+
+.sk {
+  display: grid;
+  gap: var(--s2);
+
+  .short {
+    width: 40%;
+  }
+}
+
+.err {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  color: var(--danger-ink);
+}
+
+.line {
+  margin: 0 0 var(--s2);
+}
+
+.radio {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s2);
+  min-height: var(--touch);
+  padding: var(--s1) 0;
+  cursor: pointer;
+
+  input {
+    margin: 3px 0 0;
+    accent-color: var(--ink);
+  }
+}
+
+fieldset:disabled .radio {
+  cursor: default;
+}
+
+.everyone {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s1);
+  margin: var(--s2) 0 0;
+}
+
+// A right the role does not carry: an empty label, not a colour.
+.sd-chip.off {
+  background: transparent;
+  color: var(--ink-3);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  text-decoration: line-through;
+}
+
+h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.people {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.person {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto auto 36px;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 52px;
+  padding: var(--s1) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.av {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 700;
+}
+
+.who {
+  min-width: 0;
+
+  .nm,
+  .ml {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.role,
+.kind {
+  width: auto;
+  min-width: 8.5rem;
+  padding-right: var(--s2);
+}
+
+.role-chip {
+  justify-self: start;
+}
+
+.chips {
+  display: flex;
+  gap: 2px;
+}
+
+.x {
+  grid-column: 5;
+}
+
+.rerr {
+  grid-column: 2 / -1;
+  margin: 0;
+}
+
+.add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: var(--s2);
+  margin-top: var(--s3);
+}
+
+.sw {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-height: var(--touch);
+  cursor: pointer;
+}
+
+.own {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s3);
+}
+
+.link-danger {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--danger-ink);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+  }
+}
+
+.ask {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  background: var(--scrim);
+}
+
+.dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: calc(var(--z-dialog) + 1);
+  width: min(440px, calc(100vw - 32px));
+  transform: translate(-50%, -50%);
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s4);
+  background: var(--paper-2);
+
+  .acts {
+    display: flex;
+    gap: var(--s2);
+    margin-top: var(--s2);
+  }
+}
+
+@container ap (max-width: 480px) {
+  .person {
+    grid-template-columns: 32px minmax(0, 1fr) 36px;
+    grid-template-areas: 'av who x' 'av role role' 'av chips chips';
+    row-gap: var(--s1);
+  }
+
+  .av { grid-area: av; align-self: start; }
+  .who { grid-area: who; }
+  .role, .role-chip { grid-area: role; justify-self: start; }
+  .chips { grid-area: chips; }
+  .x { grid-area: x; }
+
+  .add {
+    grid-template-columns: minmax(0, 1fr) auto;
+
+    .sd-field:first-child {
+      grid-column: 1 / -1;
+    }
+  }
+}

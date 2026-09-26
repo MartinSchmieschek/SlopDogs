@@ -1,0 +1,309 @@
+// PostgreSQL — für NODE_ENV production | integration (npm run prisma:sync:integration / :prod).
+// Entwicklung: store/prisma/schema.prisma (SQLite).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Dog {
+  id                   String   @id
+  lineageId            String?
+  parentId             String?
+  displayName          String?
+  type                 String
+  serializedDogConfig   String?
+  name                 String?
+  description          String?
+  dogIds               String?
+  defaultQuery         String?
+  defaultBody          String?
+  emoji                String?
+  task                 String?
+  nodes                String?
+  edges                String?
+  visibility           String?  // "public" | "run-only" | "private"   (P3.5: run-only neu)
+  // NOTE: vmTimeoutMs ist KEIN Persistenz-Feld -- gehoert per-run-call mitgegeben (Welle 12 Korrektur).
+  ownerId              String?  // FK auf User.id. Null = community-editable (legacy / system-owned).
+  editors              String?  // Comma-separated User.id list — additional editors.
+  viewers              String?  // Comma-separated User.id list — additional viewers (private only).
+  runners              String?  // CSV User.id — duerfen ausfuehren/referenzieren, nicht lesen (P3.5)
+  frozen               Boolean  @default(false)   // 8.16: Owner (bei Community der Superuser) friert ein; EDIT fuer alle gesperrt, RUN/READ/Export unveraendert (8.25)
+  createdAt            DateTime? @default(now())
+  updatedAt            DateTime?
+
+  // findLatestVersionsByType filtert nach `type`, die Lineage-Aufloesung
+  // (findByLineage / resolveKennel) nach `lineageId`. Ohne Index ist beides ein
+  // Seq Scan ueber die Tabelle — und die waechst durch die Versionierung monoton.
+  @@index([type])
+  // findByLineageId / findAllVersions filtern ueber `lineageId` OHNE `type` — fuer die
+  // traegt der zusammengesetzte Index unten nicht (falsche Fuehrungsspalte). Der
+  // Einzelindex bleibt deshalb noetig, trotz Schreib-Overhead beim Speichern.
+  @@index([lineageId])
+  // findCandidatesForIds zieht den displayName-Fallback als eigene Abfrage; ohne Index
+  // waere genau das wieder ein Full Scan ueber die Typ-Partition.
+  @@index([displayName])
+  // findByLineage(type, lineageId) filtert auf beiden Spalten — ein Index, der beide
+  // fuehrt, schlaegt zwei Einzelindizes, zwischen denen der Planer waehlen muss.
+  @@index([type, lineageId])
+}
+
+// Aufruf-Zaehler je Kennel-Lineage, Tag (UTC, 'YYYY-MM-DD') und Quelle. Reine Zaehler:
+// keine IP, kein User-Agent, keine Identitaet. Keine FK auf Dog: die lineageId ist dort
+// nicht eindeutig (jede Version traegt sie), und Kennel + Stats duerfen unabhaengig sterben.
+model KennelCallDaily {
+  lineageId  String
+  day        String   // 'YYYY-MM-DD' in UTC — String, damit SQLite und Postgres gleich vergleichen
+  source     String   // public | api-execute | mcp-execute | api-run | mcp-run | mcp-snapshot | mcp-build | swagger | unknown | landing
+  count      Int      @default(0)
+  leadFailed Int      @default(0)   // Laeufe, deren Lead-Dog ein error-Brandzeichen trug
+
+  @@id([lineageId, day, source])
+  @@index([day])                    // 30-Tage-Fenster
+}
+
+// Eine Bewertung je Nutzer und Kennel-Lineage. userId = Auth-User.id (andere DB, keine FK).
+model KennelRating {
+  lineageId String
+  userId    String
+  stars     Int                      // 1..5, in der Anwendung geprueft
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@id([lineageId, userId])
+}
+
+// Dog-Laeufe je Dog-Schluessel, Kennel-Lineage, Tag (UTC) und Quelle (P4b). dogKey = Dog-lineageId oder 'base:<Klasse>'.
+model DogCallDaily {
+  dogKey          String
+  kennelLineageId String
+  day             String
+  source          String
+  count           Int @default(0)
+  ok              Int @default(0)    // ohne Fehler, mindestens ein Fetch oder kein Cache
+  cached          Int @default(0)    // ohne Fehler, nur Cache-Treffer
+  errors          Int @default(0)
+  timeouts        Int @default(0)
+  oom             Int @default(0)
+  cacheHits       Int @default(0)    // Summe getOrFetch-Treffer
+  cacheMisses     Int @default(0)    // Summe getOrFetch-Fetches
+  durationMsSum   Int @default(0)    // Int reicht: 2^31 ms ~ 24 Tage Summe je Zeile und Tag
+  durationMsMax   Int @default(0)
+
+  @@id([dogKey, kennelLineageId, day, source])
+  @@index([day])
+  @@index([kennelLineageId])
+}
+
+// Referenzen der Kopfversionen (P4b): Kennel -> Dog (dogIds) und Dog -> Dog (parents). toKey = lineageId | 'base:<Klasse>' | Rohwert (dangling).
+model DogReference {
+  fromKind    String   // 'kennel' | 'dog'
+  fromKey     String   // Kennel-lineageId bzw. Dog-lineageId
+  toKey       String
+  kind        String   // 'crew' (dogIds) | 'required' | 'optional'
+  position    Int      // Index im Ursprungsarray; 0 bei kind='crew' = Lead
+  fromOwnerId String?  // ownerId des Ursprungs (null = community) — fuer den Crew-Effekt ohne Join
+  resolved    Int      @default(1)   // 0 = Ziel beim Schreiben nicht aufloesbar (dangling)
+
+  @@id([fromKind, fromKey, toKey, kind, position])
+  @@index([toKey])
+  @@index([fromKey])
+}
+
+// ---------------------------------------------------------------------------
+// Postgres-Single-DB-Mode: alle Tabellen liegen in derselben physischen DB.
+// Cache-, JSON-Storage- UND Auth-Schemas (store/prisma-cache,
+// store/prisma-json-storage, store/prisma-auth) erzeugen eigene typisierte
+// Clients, werden aber NICHT mehr separat gepusht (siehe run-prisma-sync.cjs).
+// Das hier ist die einzige Wahrheit fuer die DB-Struktur in Postgres-Mode.
+// Definitionen muessen 1:1 mit den jeweiligen Cache-/JSON-/Auth-Schemas
+// uebereinstimmen.
+//
+// Auth liegt hier mit, weil ein eigenes Postgres-Schema CREATE-Recht auf der
+// Datenbank braeuchte (gehostete Postgres/dbaas verweigert das oft) und zwei
+// getrennte `db push` in dieselbe DB sich gegenseitig Tabellen droppen wuerden.
+// Wer eine bewusst getrennte Auth-DB betreibt (eigener host/db mit vollen
+// Rechten), setzt AUTH_DATABASE_URL dorthin — dann wird Auth wieder separat
+// gepusht (dbEnv.authSharesStoreDatabase() == false). Dev (SQLite) bleibt eh
+// getrennt (store/prisma-auth/schema.prisma, eigene auth.db).
+// ---------------------------------------------------------------------------
+
+model CacheEntry {
+  key       String @id
+  value     String
+  expiresAt BigInt
+}
+
+model GeoAreaCache {
+  id           String @id @default(cuid())
+  discriminant String
+  centerLat    Float
+  centerLng    Float
+  radiusM      Float
+  bboxMinLat   Float
+  bboxMinLng   Float
+  bboxMaxLat   Float
+  bboxMaxLng   Float
+  cacheKey     String
+  payload      String
+  cachedAt     BigInt
+  expiresAt    BigInt
+
+  @@index([discriminant, expiresAt])
+  @@index([discriminant, bboxMinLat, bboxMaxLat, bboxMinLng, bboxMaxLng])
+}
+
+model JsonEntry {
+  key       String @id
+  value     String
+  updatedAt BigInt
+}
+
+model GeoFeature {
+  dogType      String
+  osmType      String
+  osmId        BigInt
+  primaryKey   String?
+  primaryValue String?
+  name         String?
+  hasGeom      Boolean
+  lat          Float?
+  lng          Float?
+  bboxMinLat   Float?
+  bboxMinLng   Float?
+  bboxMaxLat   Float?
+  bboxMaxLng   Float?
+  payload      String
+  updatedAt    BigInt
+
+  @@id([dogType, osmType, osmId])
+  @@index([dogType, primaryKey, primaryValue])
+  @@index([dogType, bboxMinLat, bboxMaxLat])
+}
+
+model FeatureTileMembership {
+  dogType String
+  osmType String
+  osmId   BigInt
+  zoom    Int
+  tileX   Int
+  tileY   Int
+  facet   String
+
+  @@id([dogType, osmType, osmId, zoom, tileX, tileY, facet])
+  @@index([dogType, zoom, tileX, tileY, facet])
+}
+
+model TileCoverage {
+  dogType   String
+  zoom      Int
+  tileX     Int
+  tileY     Int
+  facet     String
+  fetchedAt BigInt
+  expiresAt BigInt
+
+  @@id([dogType, zoom, tileX, tileY, facet])
+  @@index([expiresAt])
+  @@index([dogType, zoom, tileX, tileY])
+}
+
+// ---------------------------------------------------------------------------
+// Auth / OAuth — 1:1 mit store/prisma-auth/schema.postgres.prisma.
+// In Postgres-Single-DB (Auth teilt die Store-DB) liegen diese Tabellen hier in
+// `public` und werden vom Store-Push angelegt; der prisma-auth-Client wird nur
+// generiert (kein eigener Push). Aenderungen hier UND in store/prisma-auth
+// gleich halten. Getrennte Auth-DB: siehe run-prisma-sync.cjs / dbEnv.cjs.
+// ---------------------------------------------------------------------------
+
+model User {
+  id        String   @id @default(uuid())
+  googleSub String   @unique
+  email     String   @unique
+  name      String?
+  picture   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OAuthClient {
+  id           String   @id @default(uuid())
+  clientId     String   @unique
+  clientSecret String?
+  name         String
+  redirectUris String
+  createdAt    DateTime @default(now())
+}
+
+model AuthorizationCode {
+  code                String   @id
+  clientId            String
+  userId              String
+  redirectUri         String
+  codeChallenge       String?
+  codeChallengeMethod String?
+  scope               String
+  expiresAt           DateTime
+  createdAt           DateTime @default(now())
+}
+
+model AccessToken {
+  jti       String    @id
+  userId    String
+  clientId  String
+  scope     String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model RefreshToken {
+  token     String    @id
+  userId    String
+  clientId  String
+  scope     String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+}
+
+// Nutzergebundener Key-Store (P4c): Schluessel liegen nur verschluesselt (AES-256-GCM) hier,
+// nie in jsonStore, nie im Klartext; keine Read-API gibt den Wert zurueck.
+model UserKey {
+  id             String    @id @default(uuid())
+  ownerId        String                      // User.id — der Besitzer des Schluessels
+  alias          String                      // z. B. "openai" — im Dog referenziert
+  last4          String                      // maskierte Anzeige, nie mehr
+  ciphertext     String                      // AES-256-GCM, base64
+  iv             String                      // base64
+  authTag        String                      // base64
+  keyVersion     Int       @default(1)       // welcher Master-Key
+  allowedDomains String                      // CSV erlaubter Zieldomains (Egress-Allowlist) — Pflicht, mindestens eine
+  kennelGrants   String?                     // optional: CSV kennelLineageIds, die diesen Key in oeffentlichen Laeufen nutzen duerfen (Entscheidung 8.8)
+  quotaPerDay    Int?                        // Pflicht, sobald kennelGrants gesetzt ist
+  usedToday      Int       @default(0)
+  usedDayStamp   String?                     // YYYY-MM-DD Reset-Marke
+  createdAt      DateTime  @default(now())
+  lastUsedAt     DateTime?
+
+  @@unique([ownerId, alias])
+  @@index([ownerId])
+}
+
+// Beta-Keys (2026-09-26, "ein key ein google user"): mit SLOPDOGS_STAGE=beta (und Auth an) braucht jedes Google-Konto
+// einmal einen Key; ein Key schaltet genau ein Konto frei (usedByUserId unique), laeuft nicht ab, endet durch
+// Einloesen oder Widerruf. Klartext nie gespeichert, nur SHA-256.
+model BetaKey {
+  id           String    @id @default(uuid())
+  codeHash     String    @unique              // SHA-256 des Keys, nie der Klartext
+  last4        String                         // maskierte Anzeige
+  note         String?                        // fuer wen, wozu
+  createdBy    String?                        // E-Mail des Anlegenden; null = lokaler Super-User
+  createdAt    DateTime  @default(now())
+  revokedAt    DateTime?
+  usedByUserId String?   @unique              // das eine Google-Konto, das dieser Key freigeschaltet hat
+  usedAt       DateTime?
+}

@@ -1,0 +1,74 @@
+.read-props-glass {
+  position: relative;
+  padding: 8px 10px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+}
+
+.read-props-glass--plain {
+  padding: 0;
+  border: 0;
+}
+
+.read-props-clip {
+  overflow: hidden;
+}
+
+.read-props-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.read-props-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.read-props-item + .read-props-item {
+  margin-top: 2px;
+}
+
+.read-props-mark {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+
+.read-props-code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.read-props-empty {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.read-props-fade {
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 18px;
+  height: 24px;
+  background: linear-gradient(to bottom, transparent, var(--paper-2));
+}
+
+.read-props-ellipsis {
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 16px;
+  color: var(--ink-2);
+  background: var(--paper-2);
+}

@@ -1,0 +1,180 @@
+<div class="side-panel">
+  <div class="panel-header">
+    <button
+      type="button"
+      class="lead-star"
+      [class.active]="isCurrentLead"
+      [class.clickable]="leadStarClickable"
+      [disabled]="!isCurrentLead && !leadStarClickable"
+      [attr.aria-pressed]="isCurrentLead"
+      [attr.aria-label]="leadStarTitle"
+      [title]="leadStarTitle"
+      (click)="moveToFirst()">★</button>
+    <h3 class="panel-title">
+      @if (canEditDog && renaming()) {
+        <input
+          class="rename-input sd-field"
+          aria-label="Dog name"
+          [value]="dog.displayName || dog.name"
+          (keydown.enter)="commitRename($event)"
+          (keydown.escape)="renaming.set(false)"
+          (blur)="commitRename($event)"
+          #renameInput />
+      } @else {
+        <app-dog-display
+          [label]="dog.displayName || dog.name"
+          [icon]="dog.icon"
+          variant="stacked"
+          [attr.title]="canEditDog ? 'Double-click to rename' : null"
+          (dblclick)="canEditDog && renaming.set(true)" />
+      }
+    </h3>
+    @if (contextName(); as ctx) {
+      <code class="panel-context" [title]="'In the context as: ' + ctx">{{ ctx }}</code>
+    }
+    @if (accessChip; as chip) {
+      <span class="sd-chip">{{ chip }}</span>
+      @if (dog.version != null) {
+        <span class="sd-chip sd-chip--soft">pinned v{{ dog.version }}</span>
+      }
+    } @else {
+      <span class="sd-chip sd-chip--soft">{{ isSerialized ? 'SerializedDog' : 'BaseDog' }}</span>
+      @if (isSerialized && versions().length > 1) {
+        <span class="sd-chip sd-chip--soft">{{ versions().length }} versions</span>
+      }
+    }
+    @if (showClose) {
+      <button type="button" class="sd-btn sd-btn--icon sd-btn--bare" aria-label="Close" title="Close" (click)="closed.emit()">×</button>
+    }
+  </div>
+
+  @if (dog.error) {
+    <div
+      class="dog-error comfort-error-trigger"
+      role="button"
+      tabindex="0"
+      title="Distant signal"
+      (click)="onComfortVideoClick(dog.error)"
+      (keydown.enter)="onComfortVideoClick(dog.error)"
+      (keydown.space)="$event.preventDefault(); onComfortVideoClick(dog.error)">
+      Error: {{ dog.error }}
+    </div>
+  }
+
+  @if (canEditDog && versions().length > 0 && isSectionActive('code')) {
+    <div class="timeline-header">
+      <app-version-timeline
+        [versions]="timelineVersions()"
+        [currentVersionId]="dog.id"
+        [selectedVersionId]="selectedVersionId()"
+        [pinnedVersionId]="pinnedVersionId"
+        [showPinControls]="!kennelReadOnly"
+        [pinLock]="kennelLock"
+        (versionSelected)="onVersionSelected($event)"
+        (pinToggled)="onPinToggled($event)" />
+    </div>
+  }
+
+  <div class="sections-scroll">
+    <div class="sd-tabs section-tabs" role="tablist" aria-label="Sections">
+      @for (s of availableSections(); track s.id) {
+        <button
+          type="button"
+          class="sd-tab"
+          role="tab"
+          [attr.aria-selected]="isSectionActive(s.id)"
+          (click)="selectSection(s.id)">{{ s.label }}</button>
+      }
+    </div>
+
+    <div class="edit-view">
+      @if (canEditDog) {
+        <div
+          class="panel-section-pane"
+          [class.panel-section-pane--offscreen]="!isSectionActive('code')">
+          <app-dog-side-panel-code-artifact [dog]="editorDog()" [hideHeader]="true" />
+        </div>
+      }
+      <div
+        class="panel-section-pane"
+        [class.panel-section-pane--offscreen]="!isSectionActive('result')">
+        <app-dog-side-panel-result-artifact [result]="dog.result" [hideHeader]="true" />
+      </div>
+      @if (!isRedacted && activeSection() === 'vm') {
+        <app-dog-side-panel-vm-typedef-artifact
+          [typeDef]="dog.vmContextTypeDef"
+          [collapsed]="false"
+          [hideHeader]="true" />
+      }
+      @if (canEditDog && activeSection() === 'parents') {
+        <app-dog-side-panel-parents-artifact
+          [availableParents]="availableParents"
+          [requiredIds]="parentsRequired()"
+          [optionalIds]="parentsOptional()"
+          [hideHeader]="true"
+          (toggleRequired)="toggleParentRequired($event)"
+          (toggleOptional)="toggleParentOptional($event)" />
+      }
+      @if ((activeSection() === 'usage' || activeSection() === 'stats') && insightKey(); as key) {
+        <sd-dog-insight [dogKey]="key" [mode]="activeSection() === 'usage' ? 'usage' : 'stats'" />
+      }
+      @if (!isRedacted && activeSection() === 'acl' && dog.lineageId) {
+        <sd-access-panel entity="node" [entityId]="dog.lineageId" />
+      }
+    </div>
+  </div>
+
+  @if (showKennelNodeComment) {
+    <div class="kennel-node-comment">
+      <label class="sd-label" for="kennel-node-comment">Note in this kennel</label>
+      @if (kennelReadOnly) {
+        <p id="kennel-node-comment" class="kennel-node-comment__text">{{ kennelNodeComment }}</p>
+      } @else {
+        <textarea
+          id="kennel-node-comment"
+          class="sd-textarea kennel-node-comment__input"
+          rows="2"
+          spellcheck="false"
+          placeholder="A note on this dog in this kennel"
+          [disabled]="!!kennelLock"
+          [attr.title]="kennelLock"
+          [value]="kennelNodeComment ?? ''"
+          (input)="onKennelNodeCommentInput($any($event.target).value)"></textarea>
+        <span class="sd-hint">Saved with the kennel.</span>
+      }
+    </div>
+  }
+
+  @if (showSaveBar) {
+    <div class="save-bar-sticky">
+      @if (canEditDog) {
+        <button type="button" class="sd-btn sd-btn--primary sd-btn--sm" (click)="saveCode()" [disabled]="saving()"
+          [attr.aria-busy]="saving()">
+          {{ saving() ? 'Saving…' : 'Save' }}
+        </button>
+        @if (saveError()) {
+          <span
+            class="save-error comfort-error-trigger"
+            role="button"
+            tabindex="0"
+            title="Distant signal"
+            (click)="onComfortVideoClick(saveError() ?? '')"
+            (keydown.enter)="onComfortVideoClick(saveError() ?? '')"
+            (keydown.space)="$event.preventDefault(); onComfortVideoClick(saveError() ?? '')">Error: {{ saveError() }}</span>
+        }
+        @if (saveSuccess()) {
+          <span class="save-success" role="status">Saved.</span>
+        }
+      }
+      <span class="spacer"></span>
+      @if (canRemoveFromKennel) {
+        <button
+          type="button"
+          class="sd-btn sd-btn--danger sd-btn--sm"
+          [disabled]="!!kennelLock"
+          [title]="kennelLock || 'Remove from kennel'"
+          (click)="deleteDog()">Remove from kennel</button>
+      }
+    </div>
+  }
+</div>

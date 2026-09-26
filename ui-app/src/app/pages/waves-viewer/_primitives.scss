@@ -1,0 +1,269 @@
+/*
+ * Style-Primitives — Mixins in der Mixtape-Sprache (ui-app/DESIGN.md), Alias der globalen .sd-*-Klassen.
+ * Konsumenten: @use './tokens' as tk; @use './primitives' as pr;
+ * Niemals globale Klassen exportieren — nur Mixins. Jedes @include kopiert CSS in die Komponente:
+ * nur benutzen, was gebraucht wird; neue Komponenten nehmen direkt .sd-btn, .sd-field, .sd-chip, .sd-tab.
+ */
+@use './tokens' as tk;
+
+/* === Button base: quiet, 2 px Tinte, eckig, Courier 700 13 uppercase === */
+@mixin btn-base($height: tk.$control-h-md) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: tk.$space-2;
+  height: $height;
+  padding: 0 tk.$space-4;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  border-radius: 0;
+  border: 2px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  transition: transform var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out);
+
+  &:hover:not(:disabled) {
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+
+  &:active:not(:disabled) {
+    transform: none;
+    box-shadow: none;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  &:disabled,
+  &[aria-disabled='true'] {
+    opacity: .45;
+    cursor: not-allowed;
+  }
+}
+
+@mixin btn-primary {
+  @include btn-base;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+@mixin btn-secondary {
+  @include btn-base;
+}
+
+@mixin btn-ghost {
+  @include btn-base;
+  border-color: transparent;
+
+  &:hover:not(:disabled) {
+    border-color: var(--ink);
+    box-shadow: none;
+    transform: none;
+  }
+
+  &.is-active,
+  &[aria-pressed='true'] {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+}
+
+/* Nie rot gefuellt: Rahmen und Text in danger-ink. */
+@mixin btn-danger {
+  @include btn-base;
+  border-color: var(--danger-ink);
+  color: var(--danger-ink);
+}
+
+@mixin btn-icon($size: tk.$control-h-md) {
+  @include btn-base($size);
+  width: $size;
+  padding: 0;
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+/* === Input/Textarea: Schreibmaschinenzeile — paper-2, nur 2 px Tinte unten === */
+@mixin input-base {
+  display: block;
+  width: 100%;
+  height: tk.$control-h-md;
+  padding: 0 tk.$space-3;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--paper-2);
+  border: 0;
+  border-bottom: 2px solid var(--ink);
+  border-radius: 0;
+
+  &::placeholder { color: var(--ink-3); }
+
+  &:focus,
+  &:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 0;
+  }
+
+  &:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+  }
+}
+
+@mixin input-code {
+  @include input-base;
+  font-size: 13px;
+}
+
+@mixin textarea-base {
+  @include input-base;
+  height: auto;
+  min-height: 96px;
+  padding: tk.$space-3;
+  line-height: 21px;
+  resize: vertical;
+}
+
+/* === Card / Surface: Blatt auf dem Grund, Haarlinie, kein Schatten === */
+@mixin card {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 0;
+}
+
+/* Schwebend (Drawer, Dialog): 2 px Tinte, der eine harte Schatten. */
+@mixin surface-card {
+  background: var(--paper-2);
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+/* === Label / Form-Field === */
+@mixin field-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin-bottom: tk.$space-1;
+}
+
+@mixin field-helper {
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--ink-2);
+}
+
+/* === Chip: Label-Maker (Tinte, Papier-Schrift) === */
+@mixin chip-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+  padding: 3px 7px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--paper);
+  background: var(--ink);
+  border: 0;
+  border-radius: 0;
+}
+
+/* === Chip als Filter/Knopf: outline, aktiv = Tinte === */
+@mixin chip {
+  display: inline-flex;
+  align-items: center;
+  gap: tk.$space-1;
+  min-height: 32px;
+  padding: 0 tk.$space-3;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: transparent;
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  cursor: pointer;
+
+  &:hover { background: var(--paper-3); }
+
+  &.is-active,
+  &[aria-pressed='true'] {
+    background: var(--ink);
+    color: var(--paper);
+  }
+}
+
+/* === Tab: Label, aktiv = 3 px Tinte unten === */
+@mixin tab {
+  display: inline-flex;
+  align-items: center;
+  gap: tk.$space-2;
+  padding: tk.$space-2 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  background: transparent;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover { color: var(--ink); }
+
+  &.is-active,
+  &[aria-selected='true'] {
+    color: var(--ink);
+    border-bottom-color: var(--ink);
+  }
+}
+
+/* === Status-Dot: eckiger Punkt === */
+@mixin status-dot($size: 8px) {
+  display: inline-block;
+  width: $size;
+  height: $size;
+  border-radius: 0;
+  flex-shrink: 0;
+}
+
+/* === Scrollbar auf Papier === */
+@mixin nice-scrollbar {
+  &::-webkit-scrollbar { width: 10px; height: 10px; }
+  &::-webkit-scrollbar-track { background: var(--paper); }
+  &::-webkit-scrollbar-thumb {
+    background: var(--line-strong);
+    border: 2px solid var(--paper);
+    border-radius: 0;
+    &:hover { background: var(--ink-2); }
+  }
+}

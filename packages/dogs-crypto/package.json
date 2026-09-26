@@ -1,0 +1,29 @@
+{
+  "name": "@slopdogs/dogs-crypto",
+  "version": "0.2.0-beta.0",
+  "description": "Crypto: CoinGecko (Preise, Marktkap, Coin-Details)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MartinSchmieschek/SlopDogs.git",
+    "directory": "packages/dogs-crypto"
+  },
+  "engines": {
+    "node": ">=18.19.0"
+  },
+  "license": "MIT",
+  "private": true,
+  "dependencies": { "@slopdogs/core": "file:../core" },
+  "scripts": { "build": "tsc" },
+  "devDependencies": { "typescript": "^5.0.0" }
+}

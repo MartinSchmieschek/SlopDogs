@@ -1,0 +1,36 @@
+{
+  "name": "@slopdogs/dogs-talking",
+  "version": "0.2.0-beta.0",
+  "description": "TalkingDog und HTML-Layout-Renderer",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MartinSchmieschek/SlopDogs.git",
+    "directory": "packages/dogs-talking"
+  },
+  "engines": {
+    "node": ">=18.19.0"
+  },
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "@slopdogs/core": "file:../core",
+    "@slopdogs/dogs-demo": "file:../dogs-demo"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

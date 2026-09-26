@@ -1,0 +1,58 @@
+<div class="editor-shell">
+  <div class="toolbar">
+    <span class="label">{{ label }}</span>
+
+    <span class="lint" [class.is-invalid]="lintStatus() === 'invalid'" [class.is-empty]="lintStatus() === 'empty'">
+      @switch (lintStatus()) {
+        @case ('valid') {
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span class="lint-text">Valid JSON</span>
+        }
+        @case ('invalid') {
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <span class="lint-text" [title]="lintMessage()">Invalid — {{ lintMessage() }}</span>
+        }
+        @case ('empty') {
+          <span class="lint-text">Empty</span>
+        }
+      }
+    </span>
+
+    <div class="actions">
+      <button type="button"
+              class="btn"
+              [disabled]="lintStatus() !== 'valid'"
+              (click)="format()"
+              title="Pretty-print (2 spaces)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="21" y1="6" x2="3" y2="6" />
+          <line x1="17" y1="12" x2="3" y2="12" />
+          <line x1="13" y1="18" x2="3" y2="18" />
+        </svg>
+        <span>Format</span>
+      </button>
+
+      <button type="button"
+              class="btn btn--ghost"
+              [disabled]="lintStatus() !== 'valid'"
+              (click)="minify()"
+              title="One line">
+        <span>Minify</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="monaco-wrap">
+    <div #container class="monaco-host" [style.min-height.px]="minHeight"></div>
+    @if (monacoLoading()) {
+      <sd-veil label="Loading the editor" />
+    }
+  </div>
+</div>

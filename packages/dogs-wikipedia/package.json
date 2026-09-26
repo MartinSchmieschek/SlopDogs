@@ -1,0 +1,35 @@
+{
+  "name": "@slopdogs/dogs-wikipedia",
+  "version": "0.2.0-beta.0",
+  "description": "Wikipedia Nearby: Artikel in der Naehe per GPS aus dem Void",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MartinSchmieschek/SlopDogs.git",
+    "directory": "packages/dogs-wikipedia"
+  },
+  "engines": {
+    "node": ">=18.19.0"
+  },
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "@slopdogs/core": "file:../core"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

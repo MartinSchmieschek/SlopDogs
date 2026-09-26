@@ -1,0 +1,266 @@
+// Kennel head: the chapter card of S2 (6.4). Layout only; the band switches to the tape-shell tokens.
+:host {
+  --head-bg: var(--ink);
+  display: block;
+  position: relative;
+  z-index: var(--z-sticky);
+}
+
+.band {
+  padding: var(--s2) var(--gutter) var(--s3);
+  background: var(--head-bg);
+  color: var(--ink);
+}
+
+.row1 {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 32px;
+  // The auth badge floats at the right edge (app shell), as on the top bar.
+  padding-right: 116px;
+}
+
+.back {
+  flex: none;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 13px;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.kicker {
+  flex: 1;
+  min-width: 0;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+}
+
+.state.failed {
+  background: var(--danger-ink);
+  color: var(--head-bg);
+}
+
+/* On the ink band paper-2 turns dark (tape-shell tokens): the live chip keeps light text (U8, Lighthouse). */
+.state.sd-chip--live {
+  color: var(--ink);
+}
+
+.slam {
+  animation: sd-slam var(--dur-slow) var(--ease-slam);
+}
+
+.latest {
+  min-height: 28px;
+}
+
+.row2 {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin-top: var(--s2);
+}
+
+.emoji {
+  flex: none;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.name {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding-top: 4px;
+}
+
+.skel {
+  width: 220px;
+  height: 28px;
+}
+
+.meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  color: var(--ink-2);
+}
+
+.url {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+
+  a {
+    color: var(--ink-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 280px;
+  }
+}
+
+.copy,
+.rate {
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 4px;
+  min-width: 32px;
+  min-height: 32px;
+}
+
+.docs {
+  color: var(--ink-2);
+}
+
+.acts {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.run {
+  min-width: 104px;
+}
+
+.running {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  min-height: 36px;
+  padding: 0 var(--s3);
+  border: 2px solid var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.dots {
+  color: var(--ink);
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 29;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% - 8px);
+  right: var(--gutter);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  padding: var(--s1) 0;
+  background: var(--paper-2);
+
+  button {
+    min-height: var(--touch);
+    padding: 0 var(--s3);
+    border: 0;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--paper-3);
+    }
+
+    &:disabled {
+      color: var(--ink-3);
+      cursor: not-allowed;
+    }
+  }
+
+  .danger {
+    color: var(--danger-ink);
+  }
+}
+
+@keyframes sd-slam {
+  from {
+    transform: scale(1.25);
+  }
+}
+
+@media (max-width: 1099px) {
+  .url,
+  .docs {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .band {
+    padding: var(--s1) var(--s3) var(--s2);
+  }
+
+  .kicker {
+    display: none;
+  }
+
+  .row1 {
+    padding-right: 48px;
+  }
+
+  .back {
+    flex: 1;
+  }
+
+  .row2 {
+    flex-wrap: wrap;
+    row-gap: 0;
+    margin-top: var(--s1);
+  }
+
+  .emoji {
+    font-size: 24px;
+  }
+
+  .name {
+    flex: 1;
+  }
+
+  .meta {
+    order: 3;
+    flex-basis: 100%;
+    min-height: 32px;
+  }
+
+  .palette,
+  .run,
+  .running {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slam {
+    animation-duration: .01ms;
+  }
+}

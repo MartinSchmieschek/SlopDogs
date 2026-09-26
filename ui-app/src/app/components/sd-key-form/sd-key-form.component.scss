@@ -1,0 +1,75 @@
+// Add-key sheet (6.4 S9): fields on typewriter lines, domains and grants as removable ink chips.
+.kick {
+  margin: 0 0 2px;
+  color: var(--ink-soft);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  padding: var(--s4);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+  margin: 0 0 var(--s2);
+}
+
+.chip {
+  padding-right: 2px;
+  text-transform: none;
+  letter-spacing: .02em;
+}
+
+.cx {
+  min-width: 20px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--paper);
+  font: 700 13px/1 var(--font-mono);
+  cursor: pointer;
+}
+
+.fold {
+  align-self: flex-start;
+  padding: var(--s1) 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: 700 11px/14px var(--font-mono);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.grants {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--line);
+
+  p {
+    margin: 0;
+  }
+}
+
+.q {
+  margin-top: var(--s2);
+}
+
+.foot {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: var(--s2);
+  margin: 0 calc(-1 * var(--s4)) calc(-1 * var(--s4));
+  padding: var(--s3) var(--s4);
+  border-top: 2px solid var(--ink);
+  background: var(--paper-2);
+}

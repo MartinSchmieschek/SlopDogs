@@ -1,0 +1,150 @@
+<div class="ap">
+@switch (state()) {
+  @case ('loading') {
+    <div class="sk" aria-busy="true" aria-label="Loading access">
+      <span class="sd-skel"></span><span class="sd-skel short"></span><span class="sd-skel"></span>
+    </div>
+  }
+
+  @case ('error') {
+    <p class="sd-small err">{{ loadError() }} <button type="button" class="sd-btn sd-btn--sm" (click)="reload()">Retry</button></p>
+  }
+
+  @case ('hidden') {
+    <section class="sec">
+      <h3 class="sd-label">Visibility</h3>
+      <p class="line"><span class="sd-chip">{{ currentVisibility() === 'run-only' ? 'run only' : currentVisibility() }}</span></p>
+      <p class="sd-small sd-muted">Only the owner and editors see who has access to this {{ noun() }}.</p>
+    </section>
+  }
+
+  @case ('ready') {
+    @if (view(); as v) {
+      <fieldset class="sec" [class.saving]="busy() === 'visibility'" [disabled]="!manage() || !!busy()">
+        <legend class="sd-label">Visibility</legend>
+        @for (o of visibilityOptions; track o.value) {
+          <label class="radio">
+            <input type="radio" [name]="'sd-ap-vis-' + entityId()" [value]="o.value" [checked]="v.visibility === o.value"
+              (change)="setVisibility(o.value)" />
+            <span>{{ o.label }} <span class="sd-muted">— {{ o.hint }}</span></span>
+          </label>
+        }
+        <p class="sd-small everyone">
+          <span class="sd-muted">everyone else</span>
+          @for (r of allRights; track r) {
+            <span class="sd-chip" [class.off]="!everyone().includes($any(r))">{{ r }}</span>
+          }
+        </p>
+        @if (rowError()?.key === 'visibility') { <p class="sd-hint sd-hint--error">{{ rowError()!.text }}</p> }
+      </fieldset>
+
+      <section class="sec">
+        <h3 class="sd-label">People
+          @if (community()) { <span class="sd-chip sd-chip--soft">community</span> }
+        </h3>
+        @if (community()) {
+          <p class="sd-small sd-muted">No owner. Signed-in people read it; only the server's super-user changes it.</p>
+        }
+        <ul class="people" role="list">
+          @for (row of rows(); track row.id) {
+            <li class="person" [class.saving]="busy() === row.id">
+              <span class="av" aria-hidden="true">{{ initial(row) }}</span>
+              <span class="who">
+                <span class="nm">{{ row.label }}</span>
+                @if (row.email && row.email !== row.label) { <span class="sd-small sd-muted ml">{{ row.email }}</span> }
+              </span>
+              @if (manage() && row.role !== 'owner') {
+                <select class="sd-field role" [attr.aria-label]="'Role of ' + row.label" [disabled]="!!busy()"
+                  (change)="setRole(row, $any($event.target).value)">
+                  @for (r of listRoles; track r) {
+                    <option [value]="r" [selected]="r === row.role">{{ r }}</option>
+                  }
+                  <option value="owner">owner (transfer)</option>
+                </select>
+              } @else {
+                <span class="sd-chip role-chip">{{ row.role }}</span>
+              }
+              <span class="chips" [attr.aria-label]="'Rights: ' + rights(row.role).join(', ')">
+                @for (r of allRights; track r) {
+                  <span class="sd-chip" [class.off]="!rights(row.role).includes(r)">{{ r }}</span>
+                }
+              </span>
+              @if (manage() && row.role !== 'owner') {
+                <button type="button" class="sd-btn sd-btn--icon sd-btn--bare x" [attr.aria-label]="'Remove ' + row.label"
+                  title="Remove" [disabled]="!!busy()" (click)="remove(row)">×</button>
+              }
+              @if (rowError()?.key === row.id) { <p class="sd-hint sd-hint--error rerr">{{ rowError()!.text }}</p> }
+            </li>
+          } @empty {
+            <li class="sd-small sd-muted">Nobody listed.</li>
+          }
+        </ul>
+
+        @if (manage()) {
+          <form class="add" [class.saving]="busy() === 'add'" (submit)="$event.preventDefault(); add()">
+            <input class="sd-field" type="email" autocomplete="off" placeholder="name@example.com" aria-label="Email"
+              [value]="newPerson()" (input)="newPerson.set($any($event.target).value)" [disabled]="!!busy()"
+              [attr.aria-invalid]="!!addProblem()" />
+            <select class="sd-field kind" aria-label="Role" [disabled]="!!busy()" (change)="newRole.set($any($event.target).value)">
+              @for (r of listRoles; track r) {
+                <option [value]="r" [selected]="r === newRole()">{{ r }}</option>
+              }
+            </select>
+            <button type="submit" class="sd-btn" [disabled]="!!busy() || !newPerson().trim() || !!addProblem()">Add</button>
+          </form>
+          @if (addProblem()) { <p class="sd-hint sd-hint--error">{{ addProblem() }}</p> }
+          @if (rowError()?.key === 'add') { <p class="sd-hint sd-hint--error">{{ rowError()!.text }}</p> }
+        } @else if (!own()) {
+          <p class="sd-small sd-muted">Only the owner changes who has access.</p>
+        }
+      </section>
+
+      @if (own()) {
+        <section class="sec" [class.saving]="busy() === 'freeze'">
+          <label class="sw">
+            <input type="checkbox" class="sd-switch" [checked]="v.frozen" [disabled]="!!busy()"
+              (change)="toggleFreeze($any($event.target).checked)" />
+            <span class="sd-h2">freeze this {{ noun() }}</span>
+          </label>
+          <p class="sd-small sd-muted">Nobody edits a frozen {{ noun() }}, you included. Runs, ratings and copies keep working.</p>
+          @if (rowError()?.key === 'freeze') { <p class="sd-hint sd-hint--error">{{ rowError()!.text }}</p> }
+        </section>
+
+        @if (!community()) {
+          <section class="sec own">
+            <button type="button" class="sd-btn sd-btn--sm" [disabled]="!manage() || !!busy()" (click)="openTransfer()">Transfer ownership</button>
+            @if (releaseAsk()) {
+              <span class="ask sd-small">Back to community: nobody owns it any more.
+                <button type="button" class="sd-btn sd-btn--sm sd-btn--danger" [disabled]="!!busy()" (click)="release()">Release</button>
+                <button type="button" class="sd-btn sd-btn--sm sd-btn--bare" (click)="releaseAsk.set(false)">Keep</button>
+              </span>
+            } @else {
+              <button type="button" class="link-danger" [disabled]="!manage() || !!busy()" (click)="releaseAsk.set(true)">Release ownership</button>
+            }
+            @if (rowError()?.key === 'release') { <p class="sd-hint sd-hint--error">{{ rowError()!.text }}</p> }
+          </section>
+        }
+      }
+    }
+  }
+}
+</div>
+
+@if (transferOpen()) {
+  <div class="scrim" (click)="transferOpen.set(false)" aria-hidden="true"></div>
+  <form class="dialog sd-lift" role="dialog" aria-modal="true" aria-labelledby="sd-ap-transfer"
+    (submit)="$event.preventDefault(); confirmTransfer()">
+    <h2 id="sd-ap-transfer" class="sd-h1">Transfer ownership</h2>
+    <p class="sd-small">The new owner manages access and can freeze or delete this {{ noun() }}. You lose every right
+      you have as owner; they can add you back.</p>
+    <label class="sd-label" for="sd-ap-to">New owner</label>
+    <input id="sd-ap-to" class="sd-field" type="email" autocomplete="off" placeholder="name@example.com"
+      [value]="transferTo()" (input)="transferTo.set($any($event.target).value)" [disabled]="busy() === 'transfer'" />
+    @if (rowError()?.key === 'transfer') { <p class="sd-hint sd-hint--error">{{ rowError()!.text }}</p> }
+    <div class="acts">
+      <button type="submit" class="sd-btn sd-btn--danger" [disabled]="!transferTo().trim() || busy() === 'transfer'"
+        [attr.aria-busy]="busy() === 'transfer'">{{ busy() === 'transfer' ? 'Transferring…' : 'Transfer' }}</button>
+      <button type="button" class="sd-btn" (click)="transferOpen.set(false)">Cancel</button>
+    </div>
+  </form>
+}

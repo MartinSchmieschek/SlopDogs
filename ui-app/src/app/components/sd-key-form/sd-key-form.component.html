@@ -1,0 +1,92 @@
+<sd-drawer [open]="open()" [width]="480" label="Add a key" initialSnap="full" (closed)="closed.emit()">
+  <div drawer-head>
+    <p class="sd-kicker kick">keys</p>
+    <p class="sd-h1">Add a key</p>
+  </div>
+
+  <form class="form" autocomplete="off" (submit)="$event.preventDefault(); submit()">
+    @if (errors().form) {
+      <sd-banner [text]="errors().form!" />
+    }
+
+    <div class="f">
+      <label class="sd-label" for="sd-kf-alias">Alias</label>
+      <input id="sd-kf-alias" class="sd-field" spellcheck="false" placeholder="openweather" [value]="alias()"
+        (input)="alias.set($any($event.target).value)" [attr.aria-invalid]="!!(aliasHint() || errors().alias)"
+        aria-describedby="sd-kf-alias-h" [disabled]="saving()" />
+      <span id="sd-kf-alias-h" class="sd-hint" [class.sd-hint--error]="!!(aliasHint() || errors().alias)">
+        @if (aliasHint() || errors().alias) {
+          {{ aliasHint() || errors().alias }}
+        } @else if (alias().trim()) {
+          In a dog: <span class="sd-data">{{ aliasRef() }}</span>
+        } @else {
+          Lowercase letters, digits, _ and -. The same alias replaces the old key.
+        }
+      </span>
+    </div>
+
+    <div class="f">
+      <label class="sd-label" for="sd-kf-secret">Value</label>
+      <input id="sd-kf-secret" class="sd-field sd-field--code" type="password" autocomplete="new-password" spellcheck="false"
+        [value]="secret()" (input)="secret.set($any($event.target).value)"
+        [attr.aria-invalid]="!!(secretHint() || errors().secret)" aria-describedby="sd-kf-secret-h" [disabled]="saving()" />
+      <span id="sd-kf-secret-h" class="sd-hint" [class.sd-hint--error]="!!(secretHint() || errors().secret)">
+        {{ secretHint() || errors().secret || 'Shown once. Never again.' }}
+      </span>
+    </div>
+
+    <div class="f">
+      <label class="sd-label" for="sd-kf-dom">Allowed domains</label>
+      @if (domains().length) {
+        <p class="chips">
+          @for (d of domains(); track d) {
+            <span class="sd-chip chip">{{ d }}
+              <button type="button" class="cx" [attr.aria-label]="'Remove ' + d" (click)="removeDomain(d)" [disabled]="saving()">×</button>
+            </span>
+          }
+        </p>
+      }
+      <input id="sd-kf-dom" class="sd-field sd-field--code" spellcheck="false" placeholder="api.example.com"
+        [value]="domainDraft()" (input)="domainDraft.set($any($event.target).value)" (keydown)="onChipKey($event, 'domain')"
+        (blur)="commitDomain()" [attr.aria-invalid]="!!errors().domains" aria-describedby="sd-kf-dom-h" [disabled]="saving()" />
+      <span id="sd-kf-dom-h" class="sd-hint" [class.sd-hint--error]="!!errors().domains">
+        {{ errors().domains || 'The key only goes to these hosts. Enter or comma adds one; *.example.com for subdomains.' }}
+      </span>
+    </div>
+
+    <div class="f grants">
+      <button type="button" class="fold" [attr.aria-expanded]="grantsOpen()" (click)="grantsOpen.set(!grantsOpen())">
+        {{ grantsOpen() ? '▾' : '▸' }} Grant to kennels
+      </button>
+      @if (grantsOpen()) {
+        <p class="sd-small sd-muted">Runs of these kennels may use your key, also when someone else runs them. A daily quota is required.</p>
+        @if (grants().length) {
+          <p class="chips">
+            @for (g of grants(); track g) {
+              <span class="sd-chip chip">{{ g }}
+                <button type="button" class="cx" [attr.aria-label]="'Remove ' + g" (click)="removeGrant(g)" [disabled]="saving()">×</button>
+              </span>
+            }
+          </p>
+        }
+        <label class="sd-label" for="sd-kf-grant">Kennel ID</label>
+        <input id="sd-kf-grant" class="sd-field sd-field--code" spellcheck="false" placeholder="race-map"
+          [value]="grantDraft()" (input)="grantDraft.set($any($event.target).value)" (keydown)="onChipKey($event, 'grant')"
+          (blur)="commitGrant()" [disabled]="saving()" />
+        <label class="sd-label q" for="sd-kf-quota">Quota per day</label>
+        <input id="sd-kf-quota" class="sd-field sd-field--code" inputmode="numeric" placeholder="500" [value]="quota()"
+          (input)="quota.set($any($event.target).value)" [attr.aria-invalid]="!!errors().quota" aria-describedby="sd-kf-quota-h"
+          [disabled]="saving()" />
+        <span id="sd-kf-quota-h" class="sd-hint" [class.sd-hint--error]="!!errors().quota">
+          {{ errors().quota || 'Counted per UTC day across every granted run.' }}
+        </span>
+      }
+    </div>
+
+    <footer class="foot">
+      <button type="submit" class="sd-btn sd-btn--primary" [disabled]="saving()" [attr.aria-busy]="saving()">
+        {{ saving() ? 'Saving…' : 'Save key' }}</button>
+      <button type="button" class="sd-btn" [disabled]="saving()" (click)="closed.emit()">Cancel</button>
+    </footer>
+  </form>
+</sd-drawer>

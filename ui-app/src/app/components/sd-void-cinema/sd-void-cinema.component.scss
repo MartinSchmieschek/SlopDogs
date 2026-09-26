@@ -1,0 +1,84 @@
+// The void cinema: full-screen ink, the video in a paper frame with the landing's orange `.cmd` shadow.
+.cinema {
+  position: fixed;
+  inset: 0;
+  z-index: 200000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s4);
+  padding: max(var(--s7), env(safe-area-inset-top)) var(--gutter) max(var(--s5), env(safe-area-inset-bottom));
+  background: rgba(27, 23, 18, .96);
+  color: var(--paper);
+  cursor: pointer;
+  animation: sd-cinema-in var(--dur-slow) var(--ease-out) both;
+}
+
+.head {
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--paper);
+}
+
+.x {
+  position: absolute;
+  top: var(--s3);
+  right: var(--s3);
+  width: 44px;
+  height: 44px;
+  border: 2px solid var(--paper);
+  background: transparent;
+  color: var(--paper);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.frame {
+  position: relative;
+  width: min(960px, 100%, calc((100dvh - 200px) * 16 / 9));
+  aspect-ratio: 16 / 9;
+  border: 2px solid var(--paper);
+  box-shadow: 6px 6px 0 var(--accent);
+  background: #000;
+
+  iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+}
+
+// As before: a click on the picture closes the cinema too.
+.sheet {
+  position: absolute;
+  inset: 0;
+}
+
+.lines {
+  max-width: 36rem;
+  text-align: center;
+
+  p {
+    font-size: 12px;
+    line-height: 17px;
+    font-style: italic;
+    color: var(--ink-soft);
+  }
+}
+
+@keyframes sd-cinema-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cinema {
+    animation-duration: .01ms;
+  }
+}

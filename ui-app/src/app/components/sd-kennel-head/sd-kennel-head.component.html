@@ -1,0 +1,103 @@
+<header class="band" data-theme="dark">
+  <div class="row1">
+    <a class="back" routerLink="/kennels">‹ kennels</a>
+    <p class="sd-kicker kicker">{{ kicker() }}</p>
+    <span class="chips">
+      @switch (runState()) {
+        @case ('live') {
+          <span class="sd-chip sd-chip--live state slam" role="status">● live@if (duration()) { · {{ duration() }} }</span>
+        }
+        @case ('failed') {
+          <span class="sd-chip state failed" role="status">● failed@if (duration()) { · {{ duration() }} }</span>
+        }
+      }
+      @if (frozen()) {
+        <span class="sd-chip sd-chip--frozen">frozen</span>
+      }
+      @if (landingLocked()) {
+        <span class="sd-chip sd-chip--frozen">landing</span>
+      }
+      @if (runOnly()) {
+        <span class="sd-chip">run only</span>
+      } @else if (readOnly()) {
+        <span class="sd-chip">read only</span>
+      }
+      @if (oldVersion(); as v) {
+        <span class="sd-chip sd-chip--soft">{{ v }}</span>
+        <button type="button" class="sd-btn sd-btn--sm latest" (click)="backToLatest.emit()">Back to latest</button>
+      }
+    </span>
+  </div>
+
+  <div class="row2">
+    <span class="emoji" aria-hidden="true">{{ emoji() }}</span>
+    @if (kennel()) {
+      <h1 class="sd-chapter-title name" [title]="name()">{{ name() }}</h1>
+    } @else {
+      <h1 class="name"><span class="sd-skel skel" aria-hidden="true"></span><span class="sd-sr-only">Loading kennel</span></h1>
+    }
+    <div class="meta">
+      @if (publicUrl()) {
+        <span class="url sd-data">
+          <a [href]="publicUrl()" target="_blank" rel="noopener" title="Open the public page">{{ publicPath() }}</a>
+          <button type="button" class="copy" aria-label="Copy link" title="Copy link" (click)="action.emit('copy-link')">⧉</button>
+        </span>
+      }
+      @if (docsUrl()) {
+        <a class="docs sd-data" [href]="docsUrl()" target="_blank" rel="noopener">docs</a>
+      }
+      <sd-plaque [stats]="stats()" [full]="true" />
+      @if (stats()) {
+        <button type="button" class="rate" title="Ratings" aria-label="Open ratings" (click)="rate.emit()">
+          <sd-stars [stats]="stats()" />
+        </button>
+      }
+    </div>
+    <div class="acts">
+      @if (!paletteHidden()) {
+        <button type="button" class="sd-btn palette" [disabled]="frozen() || landingLocked()" [attr.title]="paletteTitle()"
+          (click)="action.emit('palette')">Dogs</button>
+      }
+      @if (runState() === 'running') {
+        <span class="run running" role="status"><sd-tape-deck [size]="22" /> running</span>
+      } @else {
+        <button type="button" class="sd-btn sd-btn--primary run" (click)="run.emit()">⏵ Run</button>
+      }
+      <button type="button" class="sd-btn sd-btn--icon sd-btn--bare dots" [attr.aria-expanded]="menuOpen()"
+        aria-label="More for this kennel" (click)="toggleMenu($event)">⋯</button>
+    </div>
+  </div>
+</header>
+
+@if (menuOpen()) {
+  <span class="scrim" (click)="menuOpen.set(false)" aria-hidden="true"></span>
+  <span class="menu sd-lift sd-rise" role="group" aria-label="Kennel actions">
+    @if (!runOnly()) {
+      <!-- Settings (S3): editors edit; readers read; frozen/landing show their own read-only banner there. -->
+      <button type="button"
+        [title]="landingLocked() ? landingLockTitle : frozen() ? frozenTitle : rights().edit ? 'Name, access, dogs, defaults' : 'Read only'"
+        (click)="pick('edit')">Settings</button>
+      @if (rights().edit) {
+        <!-- The name changes; the ID (lineageId) stays — links, versions, stars and pins hang on it. -->
+        <button type="button" [disabled]="frozen()" [title]="frozen() ? frozenTitle : 'A new name; the ID and every link stay'"
+          (click)="pick('rename')">Rename</button>
+      }
+    }
+    <button type="button" (click)="pick('open')">Open page</button>
+    <button type="button" (click)="pick('docs')">Docs</button>
+    <button type="button" (click)="pick('copy-link')">Copy link</button>
+    @if (!runOnly()) {
+      <button type="button" (click)="pick('export')">Export</button>
+      <button type="button" (click)="pick('versions')">Versions</button>
+      @if (rights().own) {
+        @if (frozen()) {
+          <button type="button" (click)="pick('unfreeze')">Unfreeze</button>
+          <button type="button" class="danger" disabled [title]="frozenTitle">Delete</button>
+        } @else {
+          <button type="button" (click)="pick('freeze')">Freeze</button>
+          <button type="button" class="danger" (click)="pick('delete')">Delete</button>
+        }
+      }
+    }
+  </span>
+}

@@ -1,0 +1,83 @@
+<div class="scrim" (click)="busy() || cancelled.emit()" aria-hidden="true"></div>
+<form class="sheet" role="dialog" aria-modal="true" aria-labelledby="sd-new-kennel-title"
+  (submit)="$event.preventDefault(); submit()">
+  <span class="grip" aria-hidden="true"></span>
+  <header class="head">
+    <h2 id="sd-new-kennel-title" class="sd-h1">New kennel</h2>
+    <button type="button" class="sd-btn sd-btn--ink sd-btn--icon" aria-label="Close" (click)="cancelled.emit()"
+      [disabled]="busy()">×</button>
+  </header>
+
+  <div class="body">
+    @if (error()) {
+      <sd-banner [text]="error()!" />
+    }
+
+    <div class="f">
+      <label class="sd-label" for="sd-nk-id">ID</label>
+      <input #idBox id="sd-nk-id" class="sd-field" autocomplete="off" spellcheck="false" placeholder="race-map"
+        [value]="id()" (input)="id.set($any($event.target).value)" (blur)="touched.set(true)"
+        [attr.aria-invalid]="!!idProblem() || idMissing()" aria-describedby="sd-nk-id-hint" [disabled]="busy()" />
+      <span id="sd-nk-id-hint" class="sd-hint" [class.sd-hint--error]="!!idProblem() || idMissing()">
+        @if (idProblem()) {
+          {{ idProblem() }}
+        } @else if (idMissing()) {
+          The ID is required.
+        } @else if (publicPath()) {
+          Public address: <span class="sd-data">{{ publicPath() }}</span>
+        } @else {
+          One URL segment: letters, digits, . _ -
+        }
+      </span>
+    </div>
+
+    <div class="f">
+      <label class="sd-label" for="sd-nk-name">Name</label>
+      <input id="sd-nk-name" class="sd-field" autocomplete="off" placeholder="Race map" [value]="name()"
+        (input)="name.set($any($event.target).value)" [disabled]="busy()" />
+    </div>
+
+    <div class="f">
+      <label class="sd-label" for="sd-nk-desc">Description</label>
+      <textarea id="sd-nk-desc" class="sd-textarea" rows="3" [value]="description()"
+        (input)="description.set($any($event.target).value)" [disabled]="busy()"></textarea>
+    </div>
+
+    <div class="f emoji">
+      <span class="sd-label" id="sd-nk-emoji-label">Emoji</span>
+      <button type="button" class="sd-field pick" aria-haspopup="dialog" [attr.aria-expanded]="emojiOpen()"
+        aria-labelledby="sd-nk-emoji-label" (click)="emojiOpen.set(!emojiOpen())" [disabled]="busy()">
+        <span class="glyph">{{ emoji() || '🐕' }}</span>
+        <span class="sd-small sd-muted">{{ emoji() ? 'change' : 'default · pick one' }}</span>
+      </button>
+      @if (emojiOpen()) {
+        <div class="pop sd-lift" role="dialog" aria-label="Pick an emoji">
+          <div class="grid">
+            @for (e of presets; track e) {
+              <button type="button" [class.on]="e === emoji()" [attr.aria-label]="'Emoji ' + e"
+                (click)="pickEmoji(e)">{{ e }}</button>
+            }
+          </div>
+          <button type="button" class="sd-btn sd-btn--sm" (click)="pickEmoji('')">No emoji</button>
+        </div>
+      }
+    </div>
+
+    <fieldset class="f vis">
+      <legend class="sd-label">Visibility</legend>
+      @for (v of visibilities; track v.value) {
+        <label class="radio">
+          <input type="radio" name="sd-nk-vis" [value]="v.value" [checked]="visibility() === v.value"
+            (change)="visibility.set(v.value)" [disabled]="busy()" />
+          <span>{{ v.label }} <span class="sd-muted">— {{ v.hint }}</span></span>
+        </label>
+      }
+    </fieldset>
+  </div>
+
+  <footer class="foot">
+    <button type="submit" class="sd-btn sd-btn--primary sd-btn--lg" [disabled]="!canSubmit()"
+      [attr.aria-busy]="busy()">{{ busy() ? 'Creating…' : 'Create kennel' }}</button>
+    <button type="button" class="sd-btn sd-btn--lg" (click)="cancelled.emit()" [disabled]="busy()">Cancel</button>
+  </footer>
+</form>

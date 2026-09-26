@@ -1,0 +1,22 @@
+.result-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--s2);
+}
+
+.result-html-frame {
+  width: 100%;
+  min-height: 350px;
+  background: #fff; /* fremdes HTML erwartet weissen Grund */
+}
+
+.result-monaco-wrap {
+  position: relative;
+}
+
+.result-monaco-host {
+  width: 100%;
+  min-height: 280px;
+  height: min(420px, 50vh);
+  overflow: hidden;
+}

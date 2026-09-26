@@ -1,0 +1,178 @@
+<sd-drawer [open]="open()" [width]="560" label="Kennel settings" initialSnap="full" (closed)="requestClose()">
+  <div drawer-head class="hd">
+    <button type="button" class="back" (click)="requestClose()">‹ kennel</button>
+    <p class="sd-kicker kick">settings</p>
+    <p class="sd-h1 ttl">{{ kennel()?.emoji || '🐕' }} {{ kennel()?.name || lineage() }}</p>
+  </div>
+
+  <div class="form" [class.locked]="saving()">
+    @switch (view()) {
+      @case ('frozen') {
+        <sd-banner tone="info" [text]="'Frozen by the owner. Nobody edits this kennel until it is unfrozen. Runs, ratings and copies keep working.'">
+          @if (own()) {
+            <button type="button" class="sd-btn sd-btn--sm" [disabled]="unfreezing()" [attr.aria-busy]="unfreezing()"
+              (click)="unfreeze()">{{ unfreezing() ? 'Unfreezing…' : 'Unfreeze' }}</button>
+          }
+        </sd-banner>
+      }
+      @case ('landing') {
+        <sd-banner tone="info" [text]="landingLockTitle" />
+      }
+      @case ('readonly') {
+        <sd-banner tone="info" text="Read only. The owner and editors change these settings." />
+      }
+    }
+    @if (error()) {
+      <sd-banner [text]="error()!" />
+    }
+
+    <fieldset class="grp" [disabled]="!editable() || saving()">
+      <div class="f">
+        <label class="sd-label" for="sd-ks-name">Name</label>
+        @if (editable()) {
+          <input id="sd-ks-name" class="sd-field" autocomplete="off" [value]="name()" (input)="name.set($any($event.target).value)" />
+        } @else {
+          <p id="sd-ks-name" class="text">{{ name() || '—' }}</p>
+        }
+      </div>
+
+      <div class="f">
+        <span class="sd-label">ID</span>
+        <p class="text sd-data">{{ lineage() }} · {{ publicPath() }}</p>
+      </div>
+
+      <div class="f">
+        <label class="sd-label" for="sd-ks-desc">Description</label>
+        @if (editable()) {
+          <textarea id="sd-ks-desc" class="sd-textarea" rows="3" [value]="description()"
+            (input)="description.set($any($event.target).value)"></textarea>
+        } @else {
+          <p id="sd-ks-desc" class="text">{{ description() || 'No description.' }}</p>
+        }
+      </div>
+
+      <div class="f emoji">
+        <span class="sd-label" id="sd-ks-emoji">Emoji</span>
+        @if (editable()) {
+          <button type="button" class="sd-field pick" aria-haspopup="dialog" [attr.aria-expanded]="emojiOpen()"
+            aria-labelledby="sd-ks-emoji" (click)="emojiOpen.set(!emojiOpen())">
+            <span class="glyph">{{ emoji() || '🐕' }}</span>
+            <span class="sd-small sd-muted">{{ emoji() ? 'change' : 'default · pick one' }}</span>
+          </button>
+          @if (emojiOpen()) {
+            <div class="pop sd-lift" role="dialog" aria-label="Pick an emoji">
+              <div class="grid">
+                @for (e of presets; track e) {
+                  <button type="button" [class.on]="e === emoji()" [attr.aria-label]="'Emoji ' + e" (click)="pickEmoji(e)">{{ e }}</button>
+                }
+              </div>
+              <label class="sd-label" for="sd-ks-emoji-own">Or type one</label>
+              <input id="sd-ks-emoji-own" class="sd-field" maxlength="8" autocomplete="off" spellcheck="false"
+                [value]="emoji()" (input)="emoji.set($any($event.target).value)" />
+              <button type="button" class="sd-btn sd-btn--sm" (click)="pickEmoji('')">No emoji</button>
+            </div>
+          }
+        } @else {
+          <p class="text glyph">{{ emoji() || '🐕' }}</p>
+        }
+      </div>
+    </fieldset>
+
+    <section class="grp">
+      <h2 class="sd-h2 cap">Access</h2>
+      <sd-access-panel entity="kennel" [entityId]="lineage()" [visibility]="kennel()?.visibility"
+        (frozenChange)="frozenChange.emit($event)" (ownershipChanged)="ownershipChanged.emit()"
+        (visibilityChange)="visibilityChange.emit($event)" />
+    </section>
+
+    <section class="grp">
+      <h2 class="sd-h2 cap">Dogs · order and lead</h2>
+      <p class="sd-small sd-muted">The first dog is the lead: its result is the public answer.</p>
+      <ol class="dogs" role="list">
+        @for (row of dogRows(); track row.ref; let i = $index; let last = $last) {
+          <li class="dog" [class.ink]="row.pinned !== null">
+            <span class="num sd-data">{{ i + 1 }}</span>
+            <span class="ic" aria-hidden="true">{{ row.icon }}</span>
+            <span class="nm" [title]="row.ref">{{ row.label }}</span>
+            @if (i === 0) { <span class="sd-chip sd-chip--soft">lead</span> }
+            @if (row.pinned !== null) { <span class="sd-chip pin">pinned v{{ row.pinned }}</span> }
+            @if (editable()) {
+              <span class="acts">
+                @if (i > 0) {
+                  <button type="button" class="sd-btn sd-btn--sm sd-btn--bare" (click)="move(i, 'lead')">make lead</button>
+                  <button type="button" class="sd-btn sd-btn--icon sd-btn--bare" [attr.aria-label]="'Move ' + row.label + ' up'" (click)="move(i, 'up')">↑</button>
+                }
+                @if (!last) {
+                  <button type="button" class="sd-btn sd-btn--icon sd-btn--bare" [attr.aria-label]="'Move ' + row.label + ' down'" (click)="move(i, 'down')">↓</button>
+                }
+                <button type="button" class="sd-btn sd-btn--icon sd-btn--bare" [attr.aria-label]="'Remove ' + row.label" (click)="move(i, 'remove')">×</button>
+              </span>
+            }
+          </li>
+        } @empty {
+          <li class="sd-small sd-muted">No dogs yet. Add them from the palette.</li>
+        }
+      </ol>
+    </section>
+
+    <section class="grp">
+      <h2 class="sd-h2 cap">Defaults</h2>
+      <span class="sd-label">Query</span>
+      @if (editable()) {
+        <div class="q">
+          @for (row of query(); track $index; let i = $index) {
+            <div class="qrow">
+              <input class="sd-field sd-field--code" aria-label="Key" placeholder="key" [value]="row.key"
+                (input)="setQuery(i, 'key', $any($event.target).value)" />
+              <span aria-hidden="true">=</span>
+              <input class="sd-field sd-field--code" aria-label="Value" placeholder="value" [value]="row.value"
+                (input)="setQuery(i, 'value', $any($event.target).value)" />
+              <button type="button" class="sd-btn sd-btn--icon sd-btn--bare" aria-label="Remove parameter" (click)="removeQuery(i)">×</button>
+            </div>
+          }
+          <button type="button" class="sd-btn sd-btn--sm add" (click)="addQuery()">+ parameter</button>
+        </div>
+      } @else if (query().length) {
+        <p class="chips">
+          @for (row of query(); track $index) { <span class="sd-chip sd-chip--soft">{{ row.key }}={{ row.value }}</span> }
+        </p>
+      } @else {
+        <p class="text sd-muted">No query defaults.</p>
+      }
+
+      <label class="sd-label body-l" for="sd-ks-body">Body (JSON)</label>
+      @if (editable()) {
+        <textarea id="sd-ks-body" class="sd-textarea sd-field--code body" rows="7" spellcheck="false" placeholder="{}"
+          [value]="body()" (input)="body.set($any($event.target).value)" [attr.aria-invalid]="!!bodyError()"></textarea>
+        @if (bodyError()) { <span class="sd-hint sd-hint--error">{{ bodyError() }}</span> }
+      } @else {
+        <pre id="sd-ks-body" class="text sd-data pre">{{ body() || 'No default body.' }}</pre>
+      }
+    </section>
+
+    <section class="grp ver">
+      <span class="sd-label">Versions</span>
+      <p class="text sd-data">
+        @if (latestVersion()) {
+          {{ versionCount() }} version{{ versionCount() === 1 ? '' : 's' }} · latest {{ latestVersion() }}
+        } @else {
+          No versions yet.
+        }
+        <button type="button" class="sd-btn sd-btn--sm" (click)="openVersions.emit()">Show versions</button>
+      </p>
+      <p class="sd-small sd-muted">Every save makes a new version. Older ones open read-only.</p>
+    </section>
+  </div>
+
+  @if (editable()) {
+    <footer class="foot">
+      <button type="button" class="sd-btn sd-btn--primary" [disabled]="saving() || !!bodyError()"
+        [attr.aria-busy]="saving()" (click)="save()">{{ saving() ? 'Saving…' : 'Save' }}</button>
+      <button type="button" class="sd-btn" [disabled]="saving()" (click)="requestClose()">Cancel</button>
+      <span class="sp"></span>
+      @if (own()) {
+        <button type="button" class="sd-btn sd-btn--danger" [disabled]="saving()" (click)="deleteRequested.emit()">Delete kennel</button>
+      }
+    </footer>
+  }
+</sd-drawer>

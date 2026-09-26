@@ -1,0 +1,36 @@
+{
+  "name": "@slopdogs/dogs-hue",
+  "version": "0.2.0-beta.0",
+  "description": "Philips Hue Playground Base-Dogs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MartinSchmieschek/SlopDogs.git",
+    "directory": "packages/dogs-hue"
+  },
+  "engines": {
+    "node": ">=18.19.0"
+  },
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "@slopdogs/core": "file:../core",
+    "node-hue-api": "^5.0.0-beta.16"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

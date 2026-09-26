@@ -1,0 +1,40 @@
+{
+  "name": "@slopdogs/core",
+  "version": "0.2.0-beta.0",
+  "description": "Kernpaket für das SlopDogs-System - enthält die grundlegenden Komponenten für die Orchestrierung und Ausführung von Data-Processing-Einheiten (Dogs)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./kennelImportTarget": {
+      "types": "./dist/kennelImportTarget.d.ts",
+      "import": "./dist/kennelImportTarget.js",
+      "default": "./dist/kennelImportTarget.js"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MartinSchmieschek/SlopDogs.git",
+    "directory": "packages/core"
+  },
+  "engines": {
+    "node": ">=18.19.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Martin",
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "sucrase": "^3.35.1",
+    "typescript": "^5.0.0",
+    "vm2": "^3.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  }
+}

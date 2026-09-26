@@ -1,0 +1,46 @@
+.edit-section {
+  margin-bottom: var(--s2);
+  overflow: hidden;
+}
+
+.edit-section--no-header .section-body {
+  border-top: none;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s2) var(--s3);
+  cursor: pointer;
+  user-select: none;
+  background: var(--paper-2);
+
+  &:hover {
+    background: var(--paper-3);
+  }
+}
+
+.toggle {
+  font-size: 11px;
+  color: var(--ink-2);
+  width: 12px;
+}
+
+.section-title {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+  color: var(--ink);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.section-body {
+  padding: var(--s3);
+  border-top: 1px solid var(--line);
+}
+
+.section-body.hidden {
+  display: none;
+}

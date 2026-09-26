@@ -1,0 +1,107 @@
+// Filter rail (6.4 S6): label-maker options with counts, ink when active; packs as checkboxes.
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5);
+}
+
+.opts {
+  display: flex;
+  flex-direction: column;
+}
+
+.opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  min-height: max(32px, var(--touch));
+  padding: 0 var(--s2);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--ink);
+  font: 700 11px/14px var(--font-mono);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--paper-3);
+  }
+
+  &[aria-pressed='true'] {
+    background: var(--ink);
+    color: var(--paper);
+
+    .n {
+      color: var(--ink-soft);
+    }
+  }
+}
+
+.n {
+  font-weight: 400;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+
+.find {
+  min-height: 32px;
+  margin-bottom: var(--s2);
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.packs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pk {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: max(28px, var(--touch));
+  cursor: pointer;
+
+  input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--ink);
+  }
+}
+
+.pn {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.none {
+  padding: var(--s1) 0;
+  color: var(--ink-2);
+}
+
+.more {
+  margin-top: var(--s1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.clear {
+  align-self: flex-start;
+}

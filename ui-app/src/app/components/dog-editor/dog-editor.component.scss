@@ -1,0 +1,12 @@
+.editor-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.editor-container {
+  flex: 1;
+  min-height: 300px;
+}

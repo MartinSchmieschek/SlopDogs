@@ -1,0 +1,257 @@
+// Tracklist row (6.2): grid 44px 1fr auto, min-height 56, hairline below, hover paper-3, yours live-soft.
+:host {
+  display: block;
+  // `backwards`, not `both`: a finished row must not keep a stacking context, or the menu sinks below the next row.
+  animation: sd-row-in var(--dur-base) var(--ease-out) backwards;
+  animation-delay: calc(min(var(--i, 0), 12) * 24ms);
+}
+
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto auto;
+  grid-template-areas: 'no main data act';
+  align-items: center;
+  column-gap: var(--s3);
+  min-height: 56px;
+  padding: var(--s2) var(--s2) var(--s2) 0;
+  border-bottom: 1px solid var(--line);
+
+  &:hover {
+    background: var(--paper-3);
+  }
+
+  &.yours {
+    background: var(--live-soft);
+  }
+
+  // The kennel opened last: an ink bar on the left edge plus the `last opened` chip — never colour alone.
+  &.current {
+    box-shadow: inset 4px 0 0 var(--ink);
+  }
+
+  &.menu-on {
+    z-index: 30;
+  }
+}
+
+.no {
+  grid-area: no;
+  justify-self: end;
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1;
+  // --ink-3 on --paper is ~2.5:1 (light) / ~3.3:1 (dark), below WCAG 4.5:1 — --ink-2 clears
+  // it in both themes (~6.3:1 / ~7.5:1). Row order is also aria-hidden here since the list
+  // (role="list"/"listitem" in kennel-list) already conveys position to assistive tech.
+  color: var(--ink-2);
+}
+
+.main {
+  grid-area: main;
+  display: block;
+  min-width: 0;
+  color: var(--ink);
+}
+
+// The rest of the row opens the kennel page: the link stretches over the whole row, the name, `⏵` and `⋯`
+// sit above it as their own targets.
+.open {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  &:focus-visible {
+    outline: none;
+  }
+
+  &:focus-visible::after {
+    outline: 3px solid var(--focus);
+    outline-offset: -3px;
+  }
+}
+
+.line1 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px var(--s2);
+}
+
+.emoji {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.name {
+  position: relative;
+  z-index: 1;
+  color: var(--ink);
+  text-decoration: none;
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 22px;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  padding-top: 2px;
+  overflow-wrap: anywhere;
+
+  &:hover {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+}
+
+.meta {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.data {
+  grid-area: data;
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+}
+
+.when {
+  min-width: 11ch;
+  color: var(--ink-2);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.stars-compact {
+  display: none;
+}
+
+.act {
+  grid-area: act;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+}
+
+.more {
+  position: relative;
+}
+
+// `⋯` shows on hover and keyboard focus; always on touch screens.
+.dots {
+  opacity: 0;
+}
+
+.row:hover .dots,
+.row:focus-within .dots,
+.menu-on .dots {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .dots {
+    opacity: 1;
+  }
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 29;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  padding: var(--s1) 0;
+  background: var(--paper-2);
+
+  button {
+    min-height: var(--touch);
+    padding: 0 var(--s3);
+    border: 0;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--paper-3);
+    }
+
+    &:disabled {
+      color: var(--ink-3);
+      cursor: not-allowed;
+    }
+  }
+
+  .danger {
+    color: var(--danger-ink);
+  }
+}
+
+@media (max-width: 767px) {
+  .row {
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    grid-template-areas:
+      'no main act'
+      'no data act';
+    column-gap: var(--s2);
+    row-gap: 2px;
+  }
+
+  .no {
+    align-self: start;
+    padding-top: 4px;
+  }
+
+  .name {
+    font-size: 18px;
+    line-height: 20px;
+  }
+
+  .data {
+    gap: var(--s3);
+  }
+
+  .when {
+    min-width: 0;
+  }
+
+  .stars-full {
+    display: none;
+  }
+
+  .stars-compact {
+    display: inline-block;
+  }
+}
+
+@keyframes sd-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :host {
+    animation-duration: .01ms;
+    animation-delay: 0ms;
+  }
+}

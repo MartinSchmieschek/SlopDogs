@@ -1,0 +1,58 @@
+<sd-drawer [open]="!!dog()" [width]="width()" label="Dog preview" (closed)="closed.emit()">
+  <div drawer-head class="hd">
+    @if (dog(); as d) {
+      <p class="sd-kicker kick">dog · preview</p>
+      <p class="sd-h1 ttl"><span class="ic" aria-hidden="true">{{ d.runOnly ? '◼' : d.icon || '◇' }}</span>{{ d.name }}</p>
+      <p class="sd-small meta">
+        <span>{{ headMeta() }}</span>
+        <sd-rights-chip class="rc" [right]="d.right" />
+      </p>
+    }
+  </div>
+
+  <nav drawer-tabs class="sd-tabs tabs" role="tablist" aria-label="Dog preview">
+    @for (t of tabs(); track t) {
+      <button type="button" role="tab" class="sd-tab" [attr.aria-selected]="tab() === t" (click)="select(t)">{{ t }}</button>
+    }
+  </nav>
+
+  @if (dog(); as d) {
+    <div class="pane">
+      @switch (tab()) {
+        @case ('overview') {
+          <sd-dog-stats [stats]="d.stats" />
+          @if (d.description) { <p class="desc">{{ d.description }}</p> }
+          <h2 class="sd-label cap">used in</h2>
+          <sd-usage-list [usage]="usage()" [state]="usageState()" [limit]="5" [deps]="true"
+            (retry)="loadUsage()" (more)="select('usage')" />
+        }
+        @case ('usage') {
+          <sd-usage-list [usage]="usage()" [state]="usageState()" (retry)="loadUsage()" />
+        }
+        @case ('access') {
+          <sd-access-panel entity="node" [entityId]="d.key" [visibility]="d.visibility" />
+        }
+        @case ('code') {
+          @switch (codeState()) {
+            @case ('error') {
+              <p class="sd-small err">Couldn't load the code. <button type="button" class="sd-btn sd-btn--sm" (click)="loadCode()">Retry</button></p>
+            }
+            @case ('ready') {
+              @if (codeDog(); as cd) {
+                <div class="code"><app-dog-editor [dog]="cd" [readOnly]="true" /></div>
+              }
+            }
+            @default {
+              <div class="sd-skel code-sk"></div>
+            }
+          }
+        }
+      }
+    </div>
+
+    <footer class="foot">
+      <sd-kennel-picker [dog]="d" [returnTo]="returnTo()" />
+      <span class="sd-small hint">{{ d.runOnly ? 'Pins this version. Output flows, code never.' : d.isBase ? 'Base dogs come with the server.' : 'Adds the latest version.' }}</span>
+    </footer>
+  }
+</sd-drawer>

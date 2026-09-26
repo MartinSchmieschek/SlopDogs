@@ -1,0 +1,18 @@
+// Fachliche JSON-Ablage — SQLite (Entwicklung).
+// PostgreSQL-Variante: schema.postgres.prisma.
+// Bewusst von store/prisma (Nodes/Kennels) und store/prisma-cache (Run-Cache) getrennt.
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma-json-storage-client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("JSON_STORAGE_DATABASE_URL")
+}
+
+model JsonEntry {
+  key       String @id
+  value     String
+  updatedAt BigInt
+}

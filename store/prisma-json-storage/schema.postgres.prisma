@@ -1,0 +1,17 @@
+// PostgreSQL — fuer NODE_ENV production | integration.
+// Entwicklung: store/prisma-json-storage/schema.prisma (SQLite).
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma-json-storage-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("JSON_STORAGE_DATABASE_URL")
+}
+
+model JsonEntry {
+  key       String @id
+  value     String
+  updatedAt BigInt
+}

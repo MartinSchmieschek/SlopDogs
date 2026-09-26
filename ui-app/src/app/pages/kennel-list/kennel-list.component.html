@@ -1,0 +1,81 @@
+<sd-top-bar>
+  <sd-search bar-search label="Search kennels" placeholder="Search kennels" [value]="searchQuery()"
+    (valueChange)="onSearchInput($event)" />
+  <span bar-actions class="new-top">
+    <button type="button" class="sd-btn sd-btn--primary" (click)="openCreate()">+ New</button>
+  </span>
+</sd-top-bar>
+
+<main class="page">
+  <sd-chapter-card [kicker]="kicker()" title="Kennels" [aside]="'sorted by ' + sortLabel()" />
+
+  <div class="tools">
+    <sd-sort [options]="sortOptions" [active]="sortKey()" [dir]="sortDir()" [showMine]="!!authUser()"
+      [mine]="onlyMine()" (keyChange)="onSortKey($event)" (dirToggle)="toggleSortDir()" (mineToggle)="toggleMine()" />
+    <button type="button" class="sd-btn sd-btn--sm import" title="Import a kennel bundle from the clipboard"
+      (click)="importFromClipboard()">Import</button>
+  </div>
+
+  @if (error()) {
+    <sd-banner [text]="error()!">
+      <button type="button" class="sd-btn sd-btn--sm" (click)="retry()">Retry</button>
+    </sd-banner>
+  }
+
+  <div class="stage">
+    @if (showSkeleton()) {
+      <sd-track-skeleton [count]="8" />
+      <sd-veil [retryable]="true" (retry)="retry()" />
+    } @else {
+      <div class="list" role="list" aria-label="Kennels" [attr.aria-busy]="loading()">
+        @for (kennel of kennels(); track kennel.id + '@' + listEpoch(); let i = $index) {
+          <sd-track-row [kennel]="kennel" [index]="i" [staggerIndex]="i % 20" [yours]="isYours(kennel)"
+            [publicHref]="publicHref(kennel)" [current]="kennelRef(kennel) === lastOpened()"
+            (opened)="markOpened(kennel)" (action)="onRowAction(kennel, $event)" />
+        }
+      </div>
+
+      @if (!kennels().length && !loading() && !error()) {
+        @if (isFiltered()) {
+          <div class="empty">
+            @if (appliedQuery()) {
+              <p>Nothing matches "{{ appliedQuery() }}".</p>
+              <button type="button" class="sd-btn" (click)="clearFilters()">Clear search</button>
+            } @else {
+              <p>Nothing matches. You own no kennel yet.</p>
+              <button type="button" class="sd-btn" (click)="clearFilters()">Show all</button>
+            }
+          </div>
+        } @else {
+          <div class="empty">
+            <h2>No tracks yet.</h2>
+            <p class="sd-muted">Your AI writes the first one. Or start by hand.</p>
+            <button type="button" class="sd-btn sd-btn--primary" (click)="openCreate()">+ New kennel</button>
+            <sd-url-chip [text]="mcpCommand" />
+          </div>
+        }
+      }
+
+      @if (hasMore() && !error()) {
+        <div #loadMoreSentinel aria-hidden="true"></div>
+        <p class="status sd-small" aria-live="polite">
+          @if (loadingMore()) {
+            loading more …
+          } @else {
+            <button type="button" class="sd-btn sd-btn--sm" (click)="loadMore()">Load more ({{ total() - kennels().length }})</button>
+          }
+        </p>
+      } @else if (kennels().length > 0 && !error()) {
+        <p class="status sd-small">End of side A · {{ total() }} tracks</p>
+      }
+    }
+  </div>
+</main>
+
+<button type="button" class="sd-btn sd-btn--primary sd-btn--icon fab" aria-label="New kennel" (click)="openCreate()">+</button>
+
+<sd-bottom-bar variant="sides" />
+
+@if (sheetOpen()) {
+  <sd-kennel-sheet [busy]="creating()" [error]="createError()" (submitted)="onCreate($event)" (cancelled)="closeCreate()" />
+}

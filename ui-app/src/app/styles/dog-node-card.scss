@@ -1,0 +1,14 @@
+/* Blatt auf dem Grund (DESIGN.md, Ebene "sheet"): paper-2, Haarlinie, eckig, kein Schatten. */
+.dog-node-card {
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--paper-2);
+  color: var(--ink);
+  box-shadow: none;
+  box-sizing: border-box;
+}
+
+/* SerializedDog (eigener Code): kraeftigere Tintenlinie statt Farbe. */
+.dog-node-card--serialized {
+  border: 2px solid var(--ink);
+}

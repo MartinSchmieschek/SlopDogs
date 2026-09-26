@@ -1,0 +1,47 @@
+// Chapter card: ink band, paper text, Bebas title, data right in #bfb595 (6.2).
+:host {
+  display: block;
+  position: sticky;
+  top: var(--top-bar-h);
+  z-index: var(--z-sticky);
+}
+
+.band {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s4);
+  padding: var(--s3) var(--s4) var(--s3);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.text {
+  min-width: 0;
+}
+
+.kicker {
+  margin-bottom: var(--s1);
+  color: var(--ink-soft);
+}
+
+h1 {
+  padding-top: 2px;
+}
+
+.aside {
+  flex: none;
+  margin: 0;
+  color: var(--ink-soft);
+  text-align: right;
+}
+
+@media (max-width: 639px) {
+  .band {
+    padding: var(--s2) var(--s3);
+  }
+
+  .aside {
+    display: none;
+  }
+}

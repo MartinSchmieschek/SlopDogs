@@ -1,0 +1,93 @@
+@use '../tokens' as tk;
+@use '../primitives' as pr;
+
+:host {
+  display: block;
+  font-family: tk.$font-sans;
+}
+
+.editor-shell {
+  display: flex;
+  flex-direction: column;
+  background: tk.$surface;
+  border: 1px solid tk.$border;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: tk.$space-3;
+  padding: tk.$space-2 tk.$space-3;
+  background: tk.$surface-muted;
+  border-bottom: 1px solid tk.$border;
+}
+
+.label {
+  font-size: tk.$font-xs;
+  line-height: 14px;
+  font-weight: tk.$weight-bold;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: tk.$text-muted;
+}
+
+.lint {
+  display: inline-flex;
+  align-items: center;
+  gap: tk.$space-1;
+  font-size: tk.$font-sm;
+  color: var(--live-ink);
+  margin-right: auto;
+
+  &.is-invalid { color: tk.$danger-500; }
+  &.is-empty { color: tk.$text-muted; }
+
+  .lint-text {
+    max-width: 280px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: tk.$space-1;
+}
+
+.btn {
+  @include pr.btn-secondary;
+  height: tk.$control-h-sm;
+  padding: 0 tk.$space-3;
+  font-size: tk.$font-sm;
+  gap: tk.$space-1;
+
+  &--ghost {
+    border-color: transparent;
+
+    &:hover:not(:disabled) { border-color: var(--ink); box-shadow: none; transform: none; }
+  }
+}
+
+.monaco-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+}
+
+.monaco-host {
+  flex: 1;
+  width: 100%;
+  background: tk.$surface;
+}
+
+@media (max-width: tk.$breakpoint-tablet) {
+  .toolbar {
+    flex-wrap: wrap;
+    gap: tk.$space-2;
+  }
+  .lint { order: 3; flex-basis: 100%; margin: 0; }
+}

@@ -1,0 +1,602 @@
+/*
+ * SlopDogs app styles — the Mixtape inlay (ui-app/DESIGN.md, PLAN P6 6.2).
+ *
+ * Three layers, in this order: tokens (custom properties, fonts), base (reset, type roles),
+ * primitives (button, field, chip, switch, tabs, lift). Component styles are unlayered and
+ * therefore always win over these — components carry layout only, never their own primitives.
+ */
+@layer tokens, base, primitives;
+
+@layer tokens {
+  @font-face {
+    font-family: 'Courier Prime';
+    src: url('/fonts/courier-prime-400.woff2') format('woff2');
+    font-weight: 400;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Courier Prime';
+    src: url('/fonts/courier-prime-700.woff2') format('woff2');
+    font-weight: 700;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Bebas Neue';
+    src: url('/fonts/bebas-neue.woff2') format('woff2');
+    font-weight: 400;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Pirata One';
+    src: url('/fonts/pirata-one-sd.woff2') format('woff2');
+    font-weight: 400;
+    font-display: block;
+  }
+
+  :root {
+    /* Neutrals, ~85 % of every surface. */
+    --paper: #f0e6c8;
+    --paper-2: #f7f0da;
+    --paper-3: #e6dbb8;
+    --ink: #1b1712;
+    --ink-2: #5a5142;
+    --ink-3: #9c917a;
+    --ink-soft: #bfb595;
+    --line: rgba(27, 23, 18, .18);
+    --line-strong: rgba(27, 23, 18, .40);
+    --grid: rgba(27, 23, 18, .14);
+    /* One accent: tape orange. Always a fill with ink on it. */
+    --accent: #ff6a00;
+    --accent-ink: #1b1712;
+    --accent-soft: rgba(255, 106, 0, .16);
+    /* Semantic: teal means live / ok / yours, never decoration. */
+    --live: #117f7f;
+    --live-ink: #0d6666;
+    --live-soft: rgba(17, 127, 127, .12);
+    --warn-ink: #8a5a00;
+    --warn-soft: rgba(138, 90, 0, .12);
+    --danger-ink: #b3261e;
+    --danger-soft: rgba(179, 38, 30, .12);
+    --focus: var(--accent);
+    --scrim: rgba(27, 23, 18, .35);
+
+    --font-display: 'Bebas Neue', Impact, 'Arial Narrow', sans-serif;
+    --font-mono: 'Courier Prime', ui-monospace, monospace;
+    --font-emblem: 'Pirata One', serif;
+
+    --s1: 4px;
+    --s2: 8px;
+    --s3: 12px;
+    --s4: 16px;
+    --s5: 24px;
+    --s6: 32px;
+    --s7: 48px;
+    --s8: 64px;
+    --gutter: clamp(16px, 4vw, 40px);
+    --max-list: 1120px;
+    --touch: 44px;
+    --top-bar-h: 52px;
+
+    --ease-out: cubic-bezier(.16, 1, .3, 1);
+    --ease-slam: cubic-bezier(.22, 1.5, .36, 1);
+    --dur-fast: 120ms;
+    --dur-base: 200ms;
+    --dur-slow: 320ms;
+
+    --z-sticky: 20;
+    --z-drawer: 80;
+    --z-dialog: 100;
+    --z-toast: 200;
+  }
+
+  @media (min-width: 768px) {
+    :root {
+      --touch: 36px;
+      --top-bar-h: 56px;
+    }
+  }
+
+  /* "Tape shell" (8.27 = v2): overrides only, not switched on in v1. */
+  [data-theme='dark'] {
+    --paper: #2a241c;
+    --paper-2: #332c22;
+    --paper-3: #3d352a;
+    --ink: #f0e6c8;
+    --ink-2: #bfb595;
+    --ink-3: #7d735f;
+    --line: rgba(240, 230, 200, .16);
+    --line-strong: rgba(240, 230, 200, .36);
+    --grid: rgba(240, 230, 200, .12);
+    --accent-soft: rgba(255, 106, 0, .22);
+    --live-ink: #4fc1b8;
+    --warn-ink: #e0a53a;
+    --danger-ink: #ff7a70;
+  }
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 21px;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  p {
+    margin: 0;
+  }
+
+  a {
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-color: var(--line-strong);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+
+    &:hover {
+      text-decoration-color: var(--ink);
+    }
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--paper);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--line-strong);
+    border: 2px solid var(--paper);
+
+    &:hover {
+      background: var(--ink-2);
+    }
+  }
+
+  /* Type roles (6.2). 700 only for h1, h2 and label chips. */
+  .sd-chapter-title {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 28px;
+    line-height: 26px;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+  }
+
+  @media (min-width: 768px) {
+    .sd-chapter-title {
+      font-size: 40px;
+      line-height: 36px;
+    }
+  }
+
+  .sd-kicker {
+    font-size: 11px;
+    line-height: 14px;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+  }
+
+  .sd-h1 {
+    font-size: 18px;
+    line-height: 24px;
+    font-weight: 700;
+  }
+
+  .sd-h2 {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+
+  .sd-small {
+    font-size: 12px;
+    line-height: 17px;
+  }
+
+  .sd-data {
+    font-size: 13px;
+    line-height: 19px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sd-muted {
+    color: var(--ink-2);
+  }
+
+  .sd-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* Error text that opens the void cinema (8.18). */
+  .comfort-error-trigger {
+    cursor: pointer;
+  }
+}
+
+@layer primitives {
+  /* sd-button: primary (orange), quiet, ink, danger, icon; sm 32, md 36, lg 44. */
+  .sd-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s2);
+    min-height: max(36px, var(--touch));
+    padding: 0 var(--s4);
+    border: 2px solid var(--ink);
+    border-radius: 0;
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+
+    &:hover:not(:disabled) {
+      transform: translate(-1px, -1px);
+      box-shadow: 3px 3px 0 var(--ink);
+    }
+
+    &:active:not(:disabled) {
+      transform: none;
+      box-shadow: none;
+      background: var(--paper-3);
+    }
+
+    &:disabled,
+    &[aria-disabled='true'] {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    &--primary {
+      background: var(--accent);
+      color: var(--accent-ink);
+
+      &:active:not(:disabled) {
+        background: var(--accent);
+      }
+    }
+
+    &--ink {
+      background: var(--ink);
+      color: var(--paper);
+      border-color: var(--ink);
+
+      &:hover:not(:disabled) {
+        box-shadow: 3px 3px 0 var(--paper);
+      }
+    }
+
+    &--danger {
+      border-color: var(--danger-ink);
+      color: var(--danger-ink);
+    }
+
+    &--sm {
+      min-height: 32px;
+      padding: 0 var(--s3);
+      font-size: 12px;
+    }
+
+    &--lg {
+      min-height: 44px;
+    }
+
+    &--icon {
+      width: max(36px, var(--touch));
+      padding: 0;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    &--bare {
+      border-color: transparent;
+
+      &:hover:not(:disabled) {
+        border-color: var(--ink);
+        box-shadow: none;
+        transform: none;
+      }
+    }
+
+    &[aria-busy='true'] {
+      cursor: progress;
+      opacity: .6;
+    }
+  }
+
+  /* sd-field / sd-textarea: typewriter line — paper-2 fill, 2 px ink underline. */
+  .sd-field,
+  .sd-textarea {
+    display: block;
+    width: 100%;
+    min-height: max(36px, var(--touch));
+    padding: var(--s2) var(--s3);
+    border: 0;
+    border-bottom: 2px solid var(--ink);
+    border-radius: 0;
+    background: var(--paper-2);
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 21px;
+
+    &::placeholder {
+      color: var(--ink-3);
+    }
+
+    &:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 0;
+    }
+
+    &:disabled {
+      opacity: .55;
+    }
+
+    &[aria-invalid='true'],
+    &.is-invalid {
+      border-bottom-color: var(--danger-ink);
+    }
+  }
+
+  .sd-textarea {
+    resize: vertical;
+    min-height: 84px;
+  }
+
+  .sd-field--code {
+    font-size: 13px;
+    line-height: 20px;
+  }
+
+  .sd-label {
+    display: block;
+    margin-bottom: var(--s1);
+    font-size: 11px;
+    line-height: 14px;
+    font-weight: 700;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+  }
+
+  .sd-hint {
+    display: block;
+    margin-top: var(--s1);
+    font-size: 12px;
+    line-height: 17px;
+    color: var(--ink-2);
+
+    &--error {
+      color: var(--danger-ink);
+    }
+  }
+
+  /* sd-chip: the label maker. ink (default), live, soft, outline (filter; active = ink). */
+  .sd-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 20px;
+    padding: 3px 7px;
+    border: 0;
+    border-radius: 0;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 14px;
+    font-weight: 700;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    vertical-align: middle;
+
+    &--live {
+      background: var(--live);
+      color: var(--paper-2);
+      font-size: 12px;
+    }
+
+    &--soft {
+      background: var(--paper-3);
+      color: var(--ink-2);
+    }
+
+    &--frozen {
+      background: var(--paper-3);
+      color: var(--ink);
+    }
+
+    &--outline {
+      min-height: 32px;
+      padding: 0 var(--s3);
+      border: 2px solid var(--ink);
+      background: transparent;
+      color: var(--ink);
+      cursor: pointer;
+
+      &[aria-pressed='true'],
+      &.is-active {
+        background: var(--ink);
+        color: var(--paper);
+      }
+    }
+  }
+
+  /* sd-switch: a checkbox as a typewriter toggle; the ink square slides. */
+  .sd-switch {
+    appearance: none;
+    position: relative;
+    width: 40px;
+    height: 22px;
+    margin: 0;
+    border: 2px solid var(--ink);
+    border-radius: 0;
+    background: var(--paper-2);
+    cursor: pointer;
+    vertical-align: middle;
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 14px;
+      height: 14px;
+      background: var(--ink);
+      transition: transform var(--dur-base) var(--ease-out);
+    }
+
+    &:checked {
+      background: var(--live-soft);
+
+      &::after {
+        transform: translateX(18px);
+        background: var(--live);
+      }
+    }
+
+    &:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+  }
+
+  /* sd-tabs: labels, active = 3 px ink underline. */
+  .sd-tabs {
+    display: flex;
+    gap: var(--s4);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .sd-tab {
+    padding: var(--s2) 0;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    background: none;
+    font-size: 11px;
+    line-height: 14px;
+    font-weight: 700;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    cursor: pointer;
+
+    &[aria-selected='true'],
+    &.is-active {
+      color: var(--ink);
+      border-bottom-color: var(--ink);
+    }
+  }
+
+  /* The one hard shadow: drawers, sheets, dialogs, toasts, the lead card. */
+  .sd-lift {
+    border: 2px solid var(--ink);
+    box-shadow: 4px 4px 0 var(--ink);
+  }
+
+  .sd-hairline {
+    border: 0;
+    border-top: 1px solid var(--line);
+    margin: 0;
+  }
+
+  /* Skeleton bar: a paper-3 block, no shimmer. */
+  .sd-skel {
+    display: block;
+    height: 12px;
+    background: var(--paper-3);
+  }
+
+  /* Motion (U8): floating things arrive — menus, dialogs, toasts rise 4 px, scrims fade. */
+  .sd-rise {
+    animation: sd-rise var(--dur-base) var(--ease-out) both;
+  }
+
+  .sd-fade {
+    animation: sd-fade var(--dur-base) var(--ease-out) both;
+  }
+}
+
+@keyframes sd-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes sd-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Reduced motion: per class, never `*` (6.2). */
+@media (prefers-reduced-motion: reduce) {
+  .sd-btn,
+  .sd-switch::after {
+    transition-duration: .01ms;
+  }
+
+  .sd-rise,
+  .sd-fade {
+    animation-duration: .01ms;
+  }
+}

@@ -1,0 +1,86 @@
+<sd-top-bar>
+  <sd-search bar-search label="Search dogs" placeholder="Search dogs" [value]="searchQuery()"
+    (valueChange)="onSearchInput($event)" />
+</sd-top-bar>
+
+<main class="page">
+  <sd-chapter-card [kicker]="kicker()" title="Dogs" [aside]="'sorted by ' + sortLabel()" />
+
+  <div class="tools">
+    <sd-sort [options]="visibleSortOptions()" [active]="effectiveSort()" [dir]="sortDir()"
+      (keyChange)="onSortKey($event)" (dirToggle)="toggleDir()" />
+    <button type="button" class="sd-chip sd-chip--outline filter-btn" [attr.aria-pressed]="activeFilters() > 0"
+      (click)="sheetOpen.set(true)">Filter{{ activeFilters() ? ' ' + activeFilters() : '' }}</button>
+  </div>
+
+  @if (error()) {
+    <sd-banner [text]="error()!">
+      <button type="button" class="sd-btn sd-btn--sm" (click)="retry()">Retry</button>
+    </sd-banner>
+  }
+
+  <div class="body">
+    <aside class="rail" aria-label="Filters">
+      <sd-filter-rail [groups]="groupCounts()" [group]="filters().group" [owners]="ownerCounts()" [owner]="filters().owner"
+        [packs]="packCounts()" [selectedPacks]="filters().packs" [activeCount]="activeFilters()"
+        (groupChange)="setGroup($event)" (ownerChange)="setOwner($event)" (packToggle)="togglePack($event)"
+        (cleared)="clearFilters()" />
+    </aside>
+
+    <div class="stage">
+      @if (loading() && !all().length) {
+        <sd-track-skeleton [count]="8" />
+        <sd-veil [retryable]="true" (retry)="retry()" />
+      } @else {
+        <div class="list" role="list" aria-label="Dogs" [attr.aria-busy]="loading()">
+          @for (d of shown(); track d.key + '@' + epoch(); let i = $index) {
+            <sd-dog-row [dog]="d" [index]="i" [staggerIndex]="i" [selected]="d.key === selectedKey()" (picked)="open(d)" />
+          }
+        </div>
+
+        @if (!filtered().length && !loading() && !error()) {
+          <div class="empty">
+            @if (isFiltered()) {
+              <p>Nothing matches{{ filters().q ? ' "' + filters().q + '"' : '' }}.</p>
+              @if (activeFilters()) {
+                <button type="button" class="sd-btn" (click)="clearFilters()">Clear filters</button>
+              } @else {
+                <button type="button" class="sd-btn" (click)="clearSearch()">Clear search</button>
+              }
+            } @else {
+              <h2>No dogs yet.</h2>
+              <p class="sd-muted">Base dogs arrive with the server; yours arrive with your first kennel.</p>
+            }
+          </div>
+        }
+
+        @if (filtered().length > shown().length) {
+          <p class="status sd-small">
+            <button type="button" class="sd-btn sd-btn--sm" (click)="more()">Show more ({{ filtered().length - shown().length }})</button>
+          </p>
+        } @else if (filtered().length > 0) {
+          <p class="status sd-small">End of side B · {{ filtered().length }} of {{ all().length }} tracks</p>
+        }
+      }
+    </div>
+  </div>
+</main>
+
+<sd-bottom-bar variant="sides" />
+
+<sd-drawer [open]="sheetOpen()" label="Filters" initialSnap="full" (closed)="sheetOpen.set(false)">
+  <div drawer-head>
+    <p class="sd-kicker fk">side B</p>
+    <p class="sd-h1">Filter{{ activeFilters() ? ' ' + activeFilters() : '' }}</p>
+  </div>
+  @if (sheetOpen()) {
+    <div class="sheet-body">
+      <sd-filter-rail [groups]="groupCounts()" [group]="filters().group" [owners]="ownerCounts()" [owner]="filters().owner"
+        [packs]="packCounts()" [selectedPacks]="filters().packs" [activeCount]="activeFilters()"
+        (groupChange)="setGroup($event)" (ownerChange)="setOwner($event)" (packToggle)="togglePack($event)"
+        (cleared)="clearFilters()" />
+    </div>
+  }
+</sd-drawer>
+
+<sd-dog-preview [dog]="selected()" [width]="previewWidth()" [returnTo]="returnTo()" (closed)="closePreview()" />

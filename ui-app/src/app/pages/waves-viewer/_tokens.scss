@@ -1,0 +1,150 @@
+/*
+ * Waves-Viewer Tokens — nur noch eine Alias-Schicht fuer die alten Waves-Komponenten.
+ * Die Werte zeigen auf die globalen Mixtape-Custom-Properties aus src/styles.scss (ui-app/DESIGN.md).
+ * Neue Komponenten nutzen die Custom Properties (var(--paper), var(--ink), ...) direkt, nicht diese Datei.
+ *
+ * Achtung: Farben sind var()-Ausdruecke — SCSS-Farbfunktionen (rgba(), mix(), darken() ...) gehen damit
+ * nicht. Fuer Transparenz die fertigen Soft-Tokens nehmen (--accent-soft, --live-soft, --danger-soft).
+ * Spacing, Breakpoints und z-Indizes bleiben numerisch (sie laufen durch @media und Rechnungen).
+ */
+
+// === Spacing (4-pt grid) ===
+$space-0: 0;
+$space-1: 4px;
+$space-2: 8px;
+$space-3: 12px;
+$space-4: 16px;
+$space-5: 24px;
+$space-6: 32px;
+$space-7: 48px;
+$space-8: 64px;
+
+// === Radii — Papier hat keine runden Ecken ===
+$radius-xs: 0;
+$radius-sm: 0;
+$radius-md: 0;
+$radius-lg: 0;
+$radius-xl: 0;
+$radius-full: 0;
+
+// === Type-Scale ===
+$font-xs: 11px;
+$font-sm: 12px;
+$font-md: 14px;
+$font-lg: 16px;
+$font-xl: 20px;
+$font-2xl: 26px;
+
+$weight-regular: 400;
+$weight-medium: 400;
+$weight-bold: 700;
+
+$lh-tight: 1.2;
+$lh-base: 1.5;
+$lh-relaxed: 1.6;
+
+$font-sans: var(--font-mono);
+$font-mono: var(--font-mono);
+
+// === Touch / Sizing ===
+$control-h-sm: 32px;
+$control-h-md: 36px;
+$control-h-lg: 44px;
+$tap-min: 44px;
+
+// === Motion ===
+$ease-out: var(--ease-out);
+$ease-in-out: var(--ease-out);
+$dur-fast: var(--dur-fast);
+$dur-base: var(--dur-base);
+$dur-slow: var(--dur-slow);
+
+// === Color Palette (Papier/Tinte-Skala) ===
+$neutral-0:   var(--paper-2);
+$neutral-25:  var(--paper-2);
+$neutral-50:  var(--paper);
+$neutral-75:  var(--paper-3);
+$neutral-100: var(--line);
+$neutral-200: var(--line-strong);
+$neutral-300: var(--ink-soft);
+$neutral-400: var(--ink-3);
+$neutral-500: var(--ink-2);
+$neutral-600: var(--ink-2);
+$neutral-700: var(--ink);
+$neutral-800: var(--ink);
+$neutral-900: var(--ink);
+
+// Akzent — Tape-Orange, immer als Fuellung mit Tinte darauf
+$brand-50:  var(--accent-soft);
+$brand-100: var(--accent-soft);
+$brand-200: var(--accent);
+$brand-300: var(--accent);
+$brand-400: var(--accent);
+$brand-500: var(--accent);
+$brand-600: var(--accent);
+$brand-700: var(--accent-ink);
+$brand-800: var(--accent-ink);
+$brand-soft: var(--accent-soft);
+$brand-focus-ring: var(--focus);
+
+// Semantic colors
+$success-500: var(--live);
+$success-50:  var(--live-soft);
+$success-200: var(--live);
+
+$warning-500: var(--warn-ink);
+$warning-50:  var(--warn-soft);
+$warning-200: var(--warn-ink);
+
+$danger-500:  var(--danger-ink);
+$danger-50:   var(--danger-soft);
+$danger-200:  var(--danger-ink);
+
+$info-500:    var(--ink);
+$info-50:     var(--paper-3);
+
+// === Shadows — keine weichen Schatten; nur schwebende Panels tragen den harten ===
+// "Kein Schatten" als leerer Schatten statt none, damit Listen wie "tk.$shadow-md, 0 0 0 3px ..." gueltig bleiben.
+$shadow-xs: 0 0 0 transparent;
+$shadow-sm: 0 0 0 transparent;
+$shadow-md: 0 0 0 transparent;
+$shadow-lg: 4px 4px 0 var(--ink);
+$shadow-focus: 0 0 0 3px var(--focus);
+
+// === Layout ===
+$breakpoint-tablet: 768px;
+$breakpoint-desktop: 1024px;
+$breakpoint-wide: 1440px;
+
+$z-base: 1;
+$z-canvas: 1;
+$z-overlay: 50;
+$z-drawer: 80;
+$z-modal: 100;
+$z-toast: 200;
+
+// === Semantic role tokens (used by components — never raw scales) ===
+$page-bg:        var(--paper);
+$surface:        var(--paper-2);
+$surface-muted:  var(--paper-3);
+$surface-sunken: var(--paper-3);
+$surface-inverse: var(--ink);
+
+// Canvas — ruled inlay: Creme statt Nachtblau.
+$canvas-bg:        var(--paper);
+$canvas-bg-deep:   var(--paper);
+$canvas-bg-gradient: var(--paper);
+
+$border:         var(--line);
+$border-strong:  var(--line-strong);
+$border-focus:   var(--accent);
+
+$text:           var(--ink);
+$text-muted:     var(--ink-2);
+$text-faint:     var(--ink-3);
+$text-inverse:   var(--paper);
+
+$accent:         var(--accent);
+$accent-hover:   var(--accent);
+$accent-soft:    var(--accent-soft);
+$accent-on:      var(--accent-ink);

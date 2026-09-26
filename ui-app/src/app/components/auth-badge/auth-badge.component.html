@@ -1,0 +1,39 @@
+@if (!isReady()) {
+  <div class="auth-badge auth-badge--loading" aria-hidden="true"></div>
+} @else if (!user()) {
+  <button class="auth-badge auth-badge--login" type="button" aria-label="Sign in" (click)="onLogin()">
+    <span class="g-icon" aria-hidden="true">G</span>
+    <span class="label">Sign in</span>
+  </button>
+} @else {
+  <div class="auth-badge auth-badge--user" [class.is-open]="menuOpen()">
+    <button
+      class="trigger"
+      type="button"
+      (click)="toggleMenu()"
+      [attr.aria-expanded]="menuOpen()"
+      [attr.aria-label]="'Account: ' + (user()!.name || user()!.email)"
+      [title]="user()!.name || user()!.email">
+      @if (user()!.picture) {
+        <img class="avatar" [src]="user()!.picture" [alt]="user()!.name || user()!.email" />
+      } @else {
+        <span class="avatar avatar--initial">{{ initial() }}</span>
+      }
+      <span class="who">{{ user()!.name || user()!.email }}</span>
+      <span class="caret" aria-hidden="true">▾</span>
+    </button>
+    @if (menuOpen()) {
+      <div class="menu sd-rise" role="menu">
+        <div class="menu-row menu-info">
+          <strong>{{ user()!.name || 'Signed in' }}</strong>
+          <small>{{ user()!.email }}</small>
+        </div>
+        <a class="menu-row menu-action" role="menuitem" routerLink="/account" (click)="closeMenu()">Account</a>
+        <a class="menu-row menu-action" role="menuitem" routerLink="/account" [queryParams]="{ tab: 'keys' }" (click)="closeMenu()">Keys</a>
+        <button class="menu-row menu-action" type="button" role="menuitem" (click)="onLogout()">
+          Sign out
+        </button>
+      </div>
+    }
+  </div>
+}
