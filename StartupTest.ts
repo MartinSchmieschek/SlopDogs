@@ -6685,28 +6685,34 @@ export class StartupTest {
     }
 
     /**
-     * P5: der Landing-Seed ist idempotent (kennelExists-Guard) und legt einen oeffentlichen Community-Kennel an:
-     * Lead, Inhalt, Skin C (Mixtape) — sonst nichts.
+     * P5: der Landing-Seed ist SELBSTHEILEND — ein zweiter Lauf ersetzt die Landing (Kennel + eigene Dogs),
+     * statt sie zu ueberspringen: danach genau eine Kennel-Version, drei frisch gebaute Dogs (neue lineageIds),
+     * public und Community, ohne dass Landing-Dogs global akkumulieren.
      */
     private async testLandingSeedIdempotent(nodesStore: IStore, kennelsStore: IStore): Promise<void> {
-        const testName = 'P5: Landing-Seed idempotent, public, Community';
+        const testName = 'P5: Landing-Seed selbstheilend (ersetzt, dupliziert nicht), public, Community';
         try {
             const landingDogs = async () => (await nodesStore.findByType(SerializedDog.name))
                 .filter((row: any) => String(row.displayName ?? '').startsWith('SlopdogsLanding')).length;
-            const versionsBefore = (await kennelsStore.findByLineage('KennelConfig', SLOPDOGS_LANDING_KENNEL_ID)).length;
+            const parseIds = (k: any): string[] => (typeof k.dogIds === 'string' ? JSON.parse(k.dogIds) : k.dogIds) || [];
+            const before = await kennelsStore.findByLineage('KennelConfig', SLOPDOGS_LANDING_KENNEL_ID);
+            if (before.length < 1) throw new Error('Kennel slopdogs-landing fehlt nach dem Boot-Seed');
+            const beforeIds = parseIds(before[0]);
             const dogsBefore = await landingDogs();
-            if (versionsBefore < 1) throw new Error('Kennel slopdogs-landing fehlt nach dem Boot-Seed');
+
             await seedSlopdogsLandingKennel(nodesStore, kennelsStore);
-            const versionsAfter = (await kennelsStore.findByLineage('KennelConfig', SLOPDOGS_LANDING_KENNEL_ID)).length;
-            if (versionsAfter !== versionsBefore || (await landingDogs()) !== dogsBefore) {
-                throw new Error(`zweiter Seed hat geschrieben: Versionen ${versionsBefore}->${versionsAfter}, Dogs ${dogsBefore}->${await landingDogs()}`);
-            }
-            const rows = await kennelsStore.findByLineage('KennelConfig', SLOPDOGS_LANDING_KENNEL_ID);
-            const first = rows.sort((a: any, b: any) => String(a.createdAt).localeCompare(String(b.createdAt)))[0];
-            const dogIds: string[] = typeof first.dogIds === 'string' ? JSON.parse(first.dogIds) : first.dogIds;
-            if (first.visibility !== 'public' || first.ownerId) throw new Error(`Sichtbarkeit ${first.visibility}, Owner ${first.ownerId}`);
-            // Der Seed ist idempotent: ein Kennel aus dem alten Vier-Look-Seed (7 dogIds) bleibt, bis die Instanz geleert ist.
-            if (dogIds.length !== 3 && dogIds.length !== 7) throw new Error(`dogIds: ${dogIds.join(',')}`);
+
+            const after = await kennelsStore.findByLineage('KennelConfig', SLOPDOGS_LANDING_KENNEL_ID);
+            if (after.length !== 1) throw new Error(`nach Reseed nicht genau eine Kennel-Version: ${after.length}`);
+            const kennel = after[0];
+            const afterIds = parseIds(kennel);
+            if (afterIds.length !== 3) throw new Error(`dogIds: ${afterIds.join(',')}`);
+            if (kennel.visibility !== 'public' || kennel.ownerId) throw new Error(`Sichtbarkeit ${kennel.visibility}, Owner ${kennel.ownerId}`);
+            // selbstheilend: neu gebaut -> andere Dog-lineageIds als vorher.
+            if (afterIds.join() === beforeIds.join()) throw new Error('Reseed hat nicht neu gebaut (gleiche dogIds)');
+            // kein Zuwachs: die eigenen drei ersetzt, keine Duplikate global.
+            const dogsAfter = await landingDogs();
+            if (dogsAfter !== dogsBefore) throw new Error(`Landing-Dogs akkumuliert: ${dogsBefore}->${dogsAfter}`);
             this.addResult(testName, true);
         } catch (error) {
             this.addResult(testName, false, String(error));
