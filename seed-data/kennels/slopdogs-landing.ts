@@ -3,7 +3,6 @@ import path from 'path';
 import { randomUUID } from 'crypto';
 import { IStore } from '../../store/IStore';
 import { SerializedDog } from '@slopdogs/core';
-import { kennelExists } from '../seed-helpers';
 
 /** Der absolute Standard fuer `/`: greift, wenn LANDING_KENNEL_IDS leer ist oder keiner der gelisteten Kennels laeuft (PLAN P5). */
 export const SLOPDOGS_LANDING_KENNEL_ID = 'slopdogs-landing';
@@ -56,13 +55,26 @@ async function saveLandingDog(store: IStore, dog: {
 }
 
 /**
- * Der Landing-Kennel (PLAN P5): `/` liefert seine Lead-Ausgabe. Idempotent wie jeder Seed — steht der
- * Kennel schon, bleibt er unberuehrt (die Instanz wird regelmaessig geleert; danach legt der Boot ihn neu an).
+ * Der Landing-Kennel (PLAN P5): `/` liefert seine Lead-Ausgabe. SELBSTHEILEND — steht der Kennel schon,
+ * wird genau diese Lineage (Kennel + ihre eigenen Dogs) geloescht und frisch aus den Repo-Quellen gebaut.
+ * So zieht jeder Boot die aktuelle content.js/skin_c.js, statt einen alten Stand ueber den kennelExists-Guard
+ * haengen zu lassen. Geloescht wird nur, was dieser Kennel referenziert — keine fremden Dogs.
  * `kennelId` nur fuer Tests (ein frischer Kennel aus den Repo-Quellen neben dem gespeicherten).
  */
 export async function seedSlopdogsLandingKennel(nodesStore: IStore, kennelsStore: IStore, kennelId: string = SLOPDOGS_LANDING_KENNEL_ID): Promise<void> {
-    const existing = await kennelExists(kennelsStore, kennelId);
-    if (existing) return;
+    const priorKennels = await kennelsStore.findByLineage('KennelConfig', kennelId);
+    if (priorKennels.length) {
+        const dogLineages = new Set<string>();
+        for (const row of priorKennels as Array<{ id: string; dogIds?: unknown }>) {
+            const ids = typeof row.dogIds === 'string' ? JSON.parse(row.dogIds || '[]') : (row.dogIds || []);
+            for (const id of ids as unknown[]) if (id) dogLineages.add(String(id));
+            await kennelsStore.delete(row.id);
+        }
+        for (const lineage of dogLineages) {
+            for (const dogRow of await nodesStore.findByLineageId(lineage)) await nodesStore.delete(dogRow.id);
+        }
+        console.log(`[seed] ${kennelId}: bestehende Landing entfernt — wird neu gebaut.`);
+    }
 
     const source = SlopdogsLandingSource.locate();
     if (!source) {
