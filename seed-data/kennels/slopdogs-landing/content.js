@@ -113,6 +113,15 @@ return {
     commandHighlight: 'https://<host>/mcp',
     copy: { idle: 'copy', done: 'copied' },
     lede: 'Add it to any MCP client. Then ask your AI.',
+    // Cursor one-click: the deeplink carries the MCP url base64-encoded, so it is the live host and not
+    // the <host> placeholder (Cursor opens "Add MCP server"). `raw` is the bare endpoint any client pastes.
+    clients: {
+      cursor: {
+        label: 'Add to Cursor',
+        deeplink: 'cursor://anysphere.cursor-mcp/install?name=slopdogs&config=eyJ1cmwiOiJodHRwczovL3Nsb3Bkb2dzLm9ucmVuZGVyLmNvbS9tY3AifQ=='
+      },
+      raw: { label: 'any client', url: 'https://<host>/mcp' }
+    },
     aside: 'If it misses, ask again.',
     verse: 'khra'
   },
