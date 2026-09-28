@@ -43,8 +43,8 @@ return {
   },
   what: {
     n: '01', label: 'what is it',
-    headline: ['Your AI writes.', 'SlopDogs runs.'],
-    lede: 'Dogs are small blocks of code your AI writes; a kennel is what it assembles from them. SlopDogs keeps the kennel running, live, at a public URL.',
+    headline: ['MySpace for', 'your AI slop.'],
+    lede: 'Your AI writes, SlopDogs runs. Dogs are small blocks of code your AI writes; a kennel is what it assembles from them — kept running, live, at a public URL.',
     chain: [
       { kind: 'dog', label: 'dog' }, { kind: 'dog', label: 'dog' }, { kind: 'dog', label: 'dog' },
       { kind: 'kennel', label: 'kennel' },
@@ -153,8 +153,8 @@ return {
       dogHref: '/kennels?q=',
       sizes: ['wide', 'big', 'small', 'mid', 'small', 'strip'],
       lists: [
-        { key: 'topByCalls30d', kind: 'kennel', label: 'most called · 30 days', empty: 'No kennel has been called yet.' },
         { key: 'topByRating', kind: 'kennel', label: 'top rated', empty: 'No stars given yet.' },
+        { key: 'topByCalls30d', kind: 'kennel', label: 'most called · 30 days', empty: 'No kennel has been called yet.' },
         { key: 'provenDogs', kind: 'dog', label: 'proven dogs', empty: 'No dog has earned the badge yet.' }
       ],
       words: { calls: 'calls', call: 'call', reuse: 'kennels', reuseOne: 'kennel', proven: 'proven dog' },
