@@ -1,5 +1,6 @@
 import { IStore } from './store/IStore';
 import { kennelExists } from './seed-data/seed-helpers';
+import { isAllowedRedirectUri } from './mcp/auth/clients';
 import {
     SerializedDog,
     ISerializedDogConfig,
@@ -372,6 +373,7 @@ export class StartupTest {
             await this.testWorkerFetchBlocksPrivateNetworks(nodesStore, kennelsController as KennelController, baseDogsMap);
             await this.testDogWorkerHasNoServerEnv(nodesStore, kennelsController as KennelController, baseDogsMap);
             await this.testDogWorkerHasNoFilesystem(nodesStore, kennelsController as KennelController, baseDogsMap);
+            this.testRedirectUriPolicy();
 
             // P5: Landing — / ist der Kennel slopdogs-landing (Memo je Look, Quelle landing, statischer Fallback)
             await this.testLandingSeedIdempotent(nodesStore, kennelsStore);
@@ -6668,6 +6670,42 @@ export class StartupTest {
         } finally {
             try { fs.unlinkSync(secretFile); } catch { /* ignore */ }
             try { if (fs.existsSync(targetWrite)) fs.unlinkSync(targetWrite); } catch { /* ignore */ }
+        }
+    }
+
+    /**
+     * Sicherheit/DCR: die redirect_uri-Policy der Dynamic Client Registration akzeptiert native Apps
+     * (Cursor & Co.) nach RFC 8252 — Loopback und eigenes App-Schema (cursor://…) — laesst https zu und
+     * sperrt im Browser ausfuehrbare Schemata (javascript:, data:, file:) aus. Regressionsschutz fuer den
+     * Cursor-Connect-Bug ("Invalid redirect_uri: cursor://...").
+     */
+    private testRedirectUriPolicy(): void {
+        const testName = 'DCR: redirect_uri-Policy (native App/Loopback ja, gefaehrliche Schemata nein)';
+        try {
+            const allowed = [
+                'cursor://anysphere.cursor-mcp/oauth/callback',
+                'https://claude.ai/api/mcp/auth_callback',
+                'http://127.0.0.1:8787/callback',
+                'http://localhost:8787/callback',
+                'http://[::1]:5599/cb',
+                'com.example.app:/oauth',
+            ];
+            const denied: unknown[] = [
+                'javascript:alert(1)',
+                'data:text/html,x',
+                'file:///etc/passwd',
+                'http://evil.example.com/steal', // http, aber kein Loopback
+                '',
+                123,
+                null,
+            ];
+            const wrong: string[] = [];
+            for (const uri of allowed) if (!isAllowedRedirectUri(uri)) wrong.push(`abgelehnt statt erlaubt: ${uri}`);
+            for (const uri of denied) if (isAllowedRedirectUri(uri as any)) wrong.push(`erlaubt statt abgelehnt: ${String(uri)}`);
+            if (wrong.length) throw new Error(wrong.join('; '));
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
         }
     }
 

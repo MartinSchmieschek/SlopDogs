@@ -1,6 +1,6 @@
 {
   "name": "slopdogs",
-  "version": "0.2.0-beta.0",
+  "version": "0.2.0-beta.1",
   "description": "SlopDogs — dogs hunt data: Kennels, Waves, Serialized TypeScript in the void. Express, Angular, Prisma.",
   "main": "main.ts",
   "workspaces": [
