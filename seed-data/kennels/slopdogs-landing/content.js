@@ -43,7 +43,7 @@ return {
   },
   what: {
     n: '01', label: 'what is it',
-    headline: ['MySpace for', 'your AI slop.'],
+    headline: ['MySpace for', 'AI slop.'],
     lede: 'Your AI writes, SlopDogs runs. Dogs are small blocks of code your AI writes; a kennel is what it assembles from them — kept running, live, at a public URL.',
     chain: [
       { kind: 'dog', label: 'dog' }, { kind: 'dog', label: 'dog' }, { kind: 'dog', label: 'dog' },
