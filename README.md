@@ -1,3 +1,32 @@
+**Your AI writes the code. SlopDogs runs it live at a public URL.**
+SlopDogs is an MCP runtime. Your AI (Claude, Cursor, ChatGPT, any MCP client) builds a small app and hands it over. SlopDogs runs it on the server and answers with a link. No deploy, no server, no build step.
+    claude mcp add --transport http slopdogs https://slopdogs.onrender.com/mcp
+Then ask your AI for what you want: a map, a multiplayer lobby, a live dashboard, a report. It comes back with an address anyone can open, on a phone or a TV.
+## In one minute
+- **Dog**: a small block of TypeScript that does one job: fetch, transform or render. It runs sandboxed on the server, async, and reads its parent dogs' output as globals.
+- **Base dogs**: tested dogs that ship with the platform: lobby (phones join by link, no socket server), URL params, cache, maps, weather, geocoding, per-user storage, API keys. Your AI plugs them in instead of writing them.
+- **Kennel**: a set of dogs that together form one app. Every kennel lives at `/k/<id>`.
+- **Lead dog**: the first dog in a kennel. Its output is the response.
+- **Waves**: dogs run in waves, ordered by their dependencies. SlopDogs works out the order.
+- **Pacts and Mimics**: a dog can ask for a data shape instead of a specific dog. A Mimic is a small adapter that delivers that shape. If one is missing, SlopDogs puts in a placeholder that says exactly what it needs.
+## What you get
+**One URL, three faces.** Depending on what the lead dog returns, `/k/<id>` answers as:
+- a **page** (`text/html`)
+- a **document** (`text/markdown`)
+- an **API** (JSON), with Swagger at `/k/<id>/docs` generated from the real output
+And around it:
+- **Everything is versioned.** Every save of a dog or kennel is a new version. Nothing is overwritten.
+- **Access per kennel and dog**: private, run-only or public; share with editors, readers or runners.
+- **Keys stay on the server.** API keys are stored encrypted and inserted at request time, never in code.
+- **Caching** built in, so heavy calls run once.
+- **Export/import**: copy a whole kennel as JSON between instances.
+## Run it locally
+    npm install
+    npm run dev
+API on `:3000`, UI on `:4300`.
+---
+*What follows is the lore, then the full reference.*
+
 # SlopDogs
 
 > From brooding gulfs the pack descends,
