@@ -1,6 +1,6 @@
 **Your AI writes the code. SlopDogs runs it live at a public URL.**
 SlopDogs is an MCP runtime. Your AI (Claude, Cursor, ChatGPT, any MCP client) builds a small app and hands it over. SlopDogs runs it on the server and answers with a link. No deploy, no server, no build step.
-    claude mcp add --transport http slopdogs https://slopdogs.onrender.com/mcp
+    claude mcp add --transport http slopdogs https://slopdogs.onrender.com/mcp (currently restricted by Beta keys)
 Then ask your AI for what you want: a map, a multiplayer lobby, a live dashboard, a report. It comes back with an address anyone can open, on a phone or a TV.
 ## In one minute
 - **Dog**: a small block of TypeScript that does one job: fetch, transform or render. It runs sandboxed on the server, async, and reads its parent dogs' output as globals.
@@ -9,6 +9,24 @@ Then ask your AI for what you want: a map, a multiplayer lobby, a live dashboard
 - **Lead dog**: the first dog in a kennel. Its output is the response.
 - **Waves**: dogs run in waves, ordered by their dependencies. SlopDogs works out the order.
 - **Pacts and Mimics**: a dog can ask for a data shape instead of a specific dog. A Mimic is a small adapter that delivers that shape. If one is missing, SlopDogs puts in a placeholder that says exactly what it needs.
+## See it running
+Every link below is a kennel: Wiched by user, written by an AI, run by SlopDogs, live after minutes.
+**Phones as controllers, the TV as the screen**
+- [Gun Deck](https://slopdogs.onrender.com/k/gundeck): a pirate cannon crew. Each phone does one drill step with its own gesture.
+- [Geschichtenbühne](https://slopdogs.onrender.com/k/geschichten-buehne): animated places for storytelling. The TV shows the stage, the phone triggers scenes.
+**Reports**
+- [Testbericht: Antwortzeiten](https://slopdogs.onrender.com/k/testbericht-antwortzeiten?channelId=wvbr3kbn1c): a measured report with chart, method and limits, written and published as a kennel.
+**Live together**
+- [Pizza-Ofen Scope](https://slopdogs.onrender.com/k/pizza-ofen-scope): a shared oven timer with an oscilloscope and sound.
+- [Void Storm Vote](https://slopdogs.onrender.com/k/voidStorms-vote): a group vote with a live ranking, fed by live game data.
+**Maps and live data**
+- [Rennkarte](https://slopdogs.onrender.com/k/rennkarte): a multiplayer hiking map with rain radar, wind field and spoken distance to the other runners.
+- [Puls der Erde](https://slopdogs.onrender.com/k/earth-pulse?q=Berlin): everything about one place, including weather, sun, air, species, landmarks, news and transit, on one map. Change `?q=` to any city.
+**The same kennel as an API**
+- [Address Lookup](https://slopdogs.onrender.com/k/address-lookup?address=Brandenburger+Tor%2C+Berlin): an address in, then coordinates, weather, air, sun, transit and Wikipedia out, as JSON.
+- [Void Storms JSON](https://slopdogs.onrender.com/k/voidStormsJson) and its generated [Swagger](https://slopdogs.onrender.com/k/voidStormsJson/docs).
+**Just for show**
+- [David vs. Goliath](https://slopdogs.onrender.com/k/david-vs-goliath-kampf): an animated 3D battle.
 ## What you get
 **One URL, three faces.** Depending on what the lead dog returns, `/k/<id>` answers as:
 - a **page** (`text/html`)
