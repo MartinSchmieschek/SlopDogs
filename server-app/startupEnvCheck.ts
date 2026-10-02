@@ -256,6 +256,11 @@ export const ENV_CATALOG: readonly EnvVarSpec[] = [
         defaultValue: '64', consequence: 'Default',
     },
     {
+        name: 'DOG_WORKER_GLOBAL_LIMIT', section: 'operations', since: 'P8',
+        purpose: 'Globaler Deckel: gleichzeitige Dog-Isolate ueber ALLE Laeufe (Default auf 512 MB RAM ausgelegt)',
+        defaultValue: '2', consequence: 'Default',
+    },
+    {
         name: 'SLOPDOGS_VM_TIMEOUT_MS', section: 'operations', since: 'P2',
         purpose: 'Timeout je SerializedDog-Lauf im Worker (ms); Override je MCP-Aufruf per vmTimeoutMs',
         defaultValue: '10000', consequence: 'Default',

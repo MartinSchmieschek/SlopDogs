@@ -285,6 +285,40 @@ function resolveDogWorkerYoungHeapMb(maxHeapMb: number): number {
 }
 
 /**
+ * Globaler Deckel ueber ALLE Laeufe/Requests zusammen: so viele Dog-Isolate duerfen GLEICHZEITIG leben.
+ * WAVE_CONCURRENCY deckelt nur INNERHALB eines Laufs — ohne diesen globalen Deckel addieren sich die
+ * Isolate mehrerer paralleler Requests ungebremst (je ~DOG_WORKER_MAX_HEAP_MB + Baseline) und sprengen
+ * ein 512-MB-Budget: genau der intermittierende OOM. Default auf 512 MB ausgelegt (2 Isolate ~ 160 MB).
+ * Mehr RAM -> DOG_WORKER_GLOBAL_LIMIT hochsetzen.
+ */
+const DEFAULT_DOG_WORKER_GLOBAL_LIMIT = 2;
+function resolveDogWorkerGlobalLimit(): number {
+    const configured = Number(process.env.DOG_WORKER_GLOBAL_LIMIT);
+    return Number.isInteger(configured) && configured > 0 ? configured : DEFAULT_DOG_WORKER_GLOBAL_LIMIT;
+}
+
+let activeDogWorkers = 0;
+const dogWorkerWaiters: Array<() => void> = [];
+
+/** Einen globalen Worker-Slot belegen — blockiert (Backpressure), bis einer frei ist. */
+async function acquireDogWorkerSlot(): Promise<void> {
+    if (activeDogWorkers < resolveDogWorkerGlobalLimit()) {
+        activeDogWorkers++;
+        return;
+    }
+    // Kein Slot frei: anstellen. Beim release wird uns ein Slot DIREKT uebergeben (die Zahl bleibt),
+    // deshalb hier nicht noch einmal hochzaehlen.
+    await new Promise<void>((resolve) => dogWorkerWaiters.push(resolve));
+}
+
+/** Einen Slot freigeben — wartet jemand, erbt er ihn direkt (Zahl bleibt), sonst sinkt die Zahl. */
+function releaseDogWorkerSlot(): void {
+    const next = dogWorkerWaiters.shift();
+    if (next) next();
+    else activeDogWorkers = Math.max(0, activeDogWorkers - 1);
+}
+
+/**
  * Worker source -- a tiny script inlined via `new Worker(code, { eval: true })`.
  * Runs the spirit's incantation inside its own isolate, far from the captain's heart.
  * fetch/console live in the worker realm (fetch behind the private-network blocklist, 8.9;
@@ -1185,6 +1219,9 @@ export class SerializedDog<T> extends Dog<T> {
             throw new Error(cloneTestError);
         }
 
+        // Globaler Worker-Deckel: wartet hier, bis ein Isolate-Slot frei ist (Backpressure statt OOM).
+        // Freigabe im finally unten — exakt einmal, nachdem der Worker terminiert wurde (settle()).
+        await acquireDogWorkerSlot();
         try {
             return await new Promise<T>((resolve, reject) => {
                 // No workerData -- payload goes via postMessage AFTER spawn so any clone failure
@@ -1322,6 +1359,8 @@ export class SerializedDog<T> extends Dog<T> {
             throw err instanceof Error
                 ? err
                 : new Error(typeof err === 'string' ? err : String(err));
+        } finally {
+            releaseDogWorkerSlot();
         }
     }
 
