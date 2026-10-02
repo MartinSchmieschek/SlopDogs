@@ -650,6 +650,26 @@ export class KennelRunHandler {
         res.status(404).json({ error: 'kennel_not_found' });
     }
 
+    /** Bevorzugt der Aufrufer HTML (echter Browser) gegenueber JSON? API/MCP/curl: nein. */
+    private prefersHtml(req: any): boolean {
+        return typeof req.accepts === 'function' && req.accepts(['json', 'html']) === 'html';
+    }
+
+    /**
+     * Unbekannter ODER privater Kennel. Ein anonymer Browser wird zur Login-Seite geschickt (returnTo zurueck
+     * hierher), damit er sich anmelden kann statt einen nackten 404 zu sehen — einheitlich fuer beide Faelle,
+     * damit die Existenz weiterhin nicht leakt (nach dem Login ist es wieder 404 bei fehlendem Zugriff). Alle
+     * anderen (eingeloggt, oder API/MCP/curl) bekommen den 404 wie bisher.
+     */
+    private sendKennelGateOrNotFound(req: any, res: any): void {
+        if (!req.ctx?.user && this.prefersHtml(req)) {
+            const back = req.originalUrl || publicKennelPath(req.params.id);
+            res.redirect(302, '/login?returnTo=' + encodeURIComponent(back));
+            return;
+        }
+        this.sendKennelNotFound(res);
+    }
+
     /**
      * HEAD /k/:id — gibt es den Kennel und darf ich ihn ausfuehren? Antwort ohne Lauf, ohne
      * Zaehlung, nicht an der Public-Bremse (die bremst nur GET/POST).
@@ -673,7 +693,7 @@ export class KennelRunHandler {
             const config = await this.loadKennelConfig(kennelId, req.query.version);
             access = config ? accessOf(config as any, req.ctx) : 'none';
             if (!config || access === 'none') {
-                this.sendKennelNotFound(res);
+                this.sendKennelGateOrNotFound(req, res);
                 return;
             }
 
