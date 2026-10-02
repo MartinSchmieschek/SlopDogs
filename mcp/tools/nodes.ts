@@ -61,7 +61,7 @@ export function getNodeTools(): ToolDef[] {
                     },
                     search: {
                         type: 'string',
-                        description: 'case-insensitive substring match on name, displayName and description',
+                        description: 'case-insensitive substring match on name, displayName and description. Search by the OUTCOME you want, not a class name. A hit is twofold: a dog you may reuse (a BaseDog, or a frozen / version-pinned SerializedDog) AND a scent — when you should not reuse it directly (a non-frozen SerializedDog), its `description` tells you how to build the thing yourself. So read the descriptions of hits even when you write your own.',
                     },
                     sort: {
                         type: 'string',
