@@ -48,3 +48,6 @@ store/generated/
 store/prisma-json-storage/json-storage.db
 .cursor/skills/slopdogs-api-workflow/SKILL.md
 store/prisma-auth/auth.db
+
+# Cursor IDE local config — not part of the repo
+.cursor/
