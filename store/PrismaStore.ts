@@ -207,14 +207,29 @@ export class PrismaStore implements IStore, IKennelStatsStore, IDogStatsStore {
    * Die Zeilen laufen durch DENSELBEN Mapper wie findByType — die Rueckgabeform ist
    * ununterscheidbar. Die Fenster-Spalte `rn` faellt dabei heraus.
    */
-  public async findLatestByType(type: string): Promise<Array<any>> {
+  public async findLatestByType(type: string, search?: string): Promise<Array<any>> {
+    // Optionaler DB-Vorfilter: nur Zeilen, in denen das Schlagwort irgendwo sitzt — displayName/name/
+    // description (Spalten) ODER serializedDogConfig (dort steht die SerializedDog-Beschreibung, die NICHT
+    // in der description-Spalte liegt). Das ist eine Obermenge der echten Treffer; der Aufrufer schaerft
+    // praezise nach (identische Semantik), zieht aber nicht mehr die ganze Tabelle ueber die Leitung.
+    // LOWER(...) LIKE haelt es case-insensitiv und portabel (SQLite + Postgres).
+    const term = typeof search === 'string' ? search.trim().toLowerCase() : '';
+    const like = term ? `%${term}%` : '';
+    const filter = like
+      ? Prisma.sql`AND (
+          LOWER(COALESCE("displayName", '')) LIKE ${like}
+          OR LOWER(COALESCE("name", '')) LIKE ${like}
+          OR LOWER(COALESCE("description", '')) LIKE ${like}
+          OR LOWER(COALESCE("serializedDogConfig", '')) LIKE ${like}
+        )`
+      : Prisma.empty;
     const rows = await this.prisma.$queryRaw<any[]>(Prisma.sql`
       SELECT * FROM (
         SELECT *, ROW_NUMBER() OVER (
           PARTITION BY COALESCE("lineageId", "id")
           ORDER BY ("createdAt" IS NULL), "createdAt" DESC, "id" DESC
         ) AS rn
-        FROM "Dog" WHERE "type" = ${type}
+        FROM "Dog" WHERE "type" = ${type} ${filter}
       ) t WHERE rn = 1
     `);
     return rows.map((r: any) => this.formatTypeRow(r));

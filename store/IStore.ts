@@ -21,7 +21,7 @@ export interface IStore {
    * erst durch den Prozess reisen.
    * @param type - The entity type (e.g. SerializedDog.name)
    */
-  findLatestByType(type: string): Promise<Array<any>>;
+  findLatestByType(type: string, search?: string): Promise<Array<any>>;
 
   /**
    * From the many incarnations that drift through branching time, retrieve only the newest —

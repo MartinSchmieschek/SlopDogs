@@ -137,12 +137,12 @@ export abstract class AbstractController<T extends IEntity = IEntity> {
      * Haul up only the newest incarnation of each spirit — one per lineageId lineage.
      * Fer versioned entities this avoids flooding the manifest with every past life.
      */
-    async listLatest(): Promise<IControllerResponse<T[]>> {
+    async listLatest(search?: string): Promise<IControllerResponse<T[]>> {
         try {
             // Die Masse faellt schon in der DB weg (ein Fenster-Query je Lineage) — frueher
             // lief parseEntity ueber JEDE jemals gespeicherte Version, nur damit der Dedup
             // danach fast alles wegwirft.
-            const results = await this.store.findLatestByType(this.entityType);
+            const results = await this.store.findLatestByType(this.entityType, search);
             const all = results.map((r: any) => {
                 const parsed = this.parseEntity(r.serializedDogConfig || r);
                 if (r.id) parsed.id = r.id;

@@ -83,7 +83,11 @@ export function getNodeTools(): ToolDef[] {
                 },
             },
             handler: async (args, ctx, deps) => {
-                const result = await deps.nodesController.listLatest();
+                // DB-Vorfilter: bei einem Suchwort zieht die DB nur noch die Treffer-Obermenge (statt der
+                // ganzen Tabelle); der In-Memory-Filter unten schaerft praezise nach. BaseDogs liegen nicht
+                // in der DB und werden weiterhin im Speicher gefiltert.
+                const searchArg = typeof args.search === 'string' ? args.search : undefined;
+                const result = await deps.nodesController.listLatest(searchArg);
                 if (!result.ok) return fail(result.error ?? 'list failed');
                 // W17 (8.17): run-only dogs are listed too — without their code (W6).
                 const visibleSerialized = filterRunnable(result.data ?? [], ctx);
