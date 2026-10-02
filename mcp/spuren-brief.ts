@@ -4,7 +4,11 @@
  */
 
 /** Injected at MCP `initialize` — every agent sees this without reading the full skill resource. */
-export const SPUREN_AGENTEN_ANWEISUNG_KURZ = `## Spuren — Agenten-Pflicht (kurz)
+export const SPUREN_AGENTEN_ANWEISUNG_KURZ = `## Entdecken — die Meute ist keine Volkszählung
+
+Reuse BaseDogs (the kit — they come first in \`list_nodes\`). Streunen the rest: most calls, best ratings, what lands (\`list_nodes {sort:'proven'}\`, \`{usage:'top'}\`, \`{search:'<keyword>'}\`). Do not count the pack — never page the whole \`list_nodes\`.
+
+## Spuren — Agenten-Pflicht (kurz)
 
 Nach jeder Pack-Änderung (\`build_kennel\`, \`create_kennel\`, \`update_kennel\`), bevor du „fertig“ meldest: \`task\` + \`nodes[]\` persistieren. **Wunsch festhalten, nicht Vertrag** — JSON-Shape lebt im Code.
 

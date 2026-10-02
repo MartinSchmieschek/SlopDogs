@@ -47,7 +47,7 @@ export function getNodeTools(): ToolDef[] {
         {
             name: 'list_nodes',
             description:
-                'Lists nodes visible to the current user — the discovery surface: start here to find out what exists. Returns a paged window with metadata only (no tsCode), including each entry\'s `description` and its wiring contract `parentsRequired` / `parentsOptional` (bare class names, exactly the syntax build_kennel expects). Hunters (BaseDogs), Pacts and Breeds (SerializedDogs/MimicDogs) share the same listing; Pacts are flagged `isPact: true` and carry `pactTypeDef` when they declare a shape — a Pact is a contract, fulfil it with a MimicDog (dogs[].imitates) or a providing dog, never call it directly. Default limit=50, cap=200. Filter via type, search by name/displayName/description substring (case-insensitive). Run-only dogs (you may run them, not read them) are listed too, with `tsCodePreview: null`; use their `id` (a version GUID) to reference them in a kennel. Reuse before you write (fixed rule): for every part you need, first list_nodes {search: "<keyword>", sort: "proven"} — battle-tested dogs first (usage x reliability x reuse x kennel stars); a fitting, reliable dog (proven badge or reliability >= 0.8) goes in by its lineageId, write only what is missing (build_kennel answers with hints[] when a new dog looks like a proven one); every node carries `stats` {calls {total, last30d, ranked30d, failures, failures30d, cached30d, avgDurationMs, maxDurationMs, kennelsRun30d}, reuse {kennelsDirect, kennelsTransitive, kennelsForeign, owners, dependents}, proven {score, badge, reliability}} — failures = runs that ended in error, timeout or oom (all days), failures30d the same in the last 30 days. Find dogs by how they run with `usage` ("top", "never_used", "never_worked", "failing", "dormant"), `minReliability` (0..1) and `sort: "failures30d"` — e.g. `{search: "geocode", usage: "top"}` or `{usage: "failing", sort: "failures30d", dir: "desc"}`. Reused dogs change: a lineageId runs the newest version (which may be the better one); the old version stays — pin its version GUID (get_node_versions) or copy it. Every Hunter (BaseDog) also carries `pack` (the package it comes from, e.g. `dogs-weather`; `core` for built-ins) — the same value GET /api/nodes returns.',
+                'Lists nodes visible to the current user — a ranked sample of the pack, NOT a census: BaseDogs (the kit) come first, reuse those; streunen the rest by ranking (sort: "proven", most calls, best ratings) and take what lands — do not page the whole pack. Returns a paged window with metadata only (no tsCode), including each entry\'s `description` and its wiring contract `parentsRequired` / `parentsOptional` (bare class names, exactly the syntax build_kennel expects). Hunters (BaseDogs), Pacts and Breeds (SerializedDogs/MimicDogs) share the same listing; Pacts are flagged `isPact: true` and carry `pactTypeDef` when they declare a shape — a Pact is a contract, fulfil it with a MimicDog (dogs[].imitates) or a providing dog, never call it directly. Default limit=50, cap=200. Filter via type, search by name/displayName/description substring (case-insensitive). Run-only dogs (you may run them, not read them) are listed too, with `tsCodePreview: null`; use their `id` (a version GUID) to reference them in a kennel. Reuse before you write (fixed rule): for every part you need, first list_nodes {search: "<keyword>", sort: "proven"} — battle-tested dogs first (usage x reliability x reuse x kennel stars); a fitting, reliable dog (proven badge or reliability >= 0.8) goes in by its lineageId, write only what is missing (build_kennel answers with hints[] when a new dog looks like a proven one); every node carries `stats` {calls {total, last30d, ranked30d, failures, failures30d, cached30d, avgDurationMs, maxDurationMs, kennelsRun30d}, reuse {kennelsDirect, kennelsTransitive, kennelsForeign, owners, dependents}, proven {score, badge, reliability}} — failures = runs that ended in error, timeout or oom (all days), failures30d the same in the last 30 days. Find dogs by how they run with `usage` ("top", "never_used", "never_worked", "failing", "dormant"), `minReliability` (0..1) and `sort: "failures30d"` — e.g. `{search: "geocode", usage: "top"}` or `{usage: "failing", sort: "failures30d", dir: "desc"}`. Reused dogs change: a lineageId runs the newest version (which may be the better one); the old version stays — pin its version GUID (get_node_versions) or copy it. Every Hunter (BaseDog) also carries `pack` (the package it comes from, e.g. `dogs-weather`; `core` for built-ins) — the same value GET /api/nodes returns.',
             inputSchema: {
                 type: 'object',
                 additionalProperties: false,
@@ -188,13 +188,22 @@ export function getNodeTools(): ToolDef[] {
                 const rawOffset = typeof args.offset === 'number' ? args.offset : 0;
                 const offset = Math.max(0, Math.floor(rawOffset));
                 const paged = filtered.slice(offset, offset + limit);
+                const hasMore = offset + paged.length < total;
+
+                // Streunen, don't census (issue #5): a filterless listing with more behind it nudges the
+                // caller to sample by ranking instead of paging the whole pack.
+                const unfiltered = !args.search && !args.usage && !args.type && args.provenOnly !== true;
+                const hint = unfiltered && hasMore
+                    ? 'This is a ranked sample, not a census. BaseDogs (the kit) come first — reuse those; streunen the rest with {sort:"proven"}, {usage:"top"} or {search:"<keyword>"}. Do not page the whole pack.'
+                    : undefined;
 
                 return ok({
                     nodes: paged,
                     total,
                     offset,
                     limit,
-                    hasMore: offset + paged.length < total,
+                    hasMore,
+                    ...(hint ? { hint } : {}),
                 });
             },
         },
