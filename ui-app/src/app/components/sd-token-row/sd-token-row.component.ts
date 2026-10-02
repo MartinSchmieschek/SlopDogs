@@ -14,9 +14,19 @@ import type { IPersonalToken } from '../../services/token.service';
     <div class="row" role="listitem" [class.busy]="busy()" [class.dead]="token().status !== 'active'">
       <span class="n">{{ number() }}</span>
       <span class="main">
-        <span class="l1"><span class="sd-data id">{{ token().jti.slice(0, 8) }}…</span>
+        <span class="l1"><span class="name">{{ token().name || 'unnamed' }}</span>
           <span class="sd-chip" [class.sd-chip--live]="token().status === 'active'" [class.sd-chip--soft]="token().status !== 'active'">{{ token().status }}</span></span>
-        <span class="sd-small sd-muted l2">created {{ day(token().createdAt) }} · {{ token().status === 'revoked' ? 'revoked ' + day(token().revokedAt) : 'expires ' + day(token().expiresAt) }}</span>
+        <span class="sd-small sd-muted l2"><span class="sd-data id">{{ token().jti.slice(0, 8) }}…</span> · created {{ day(token().createdAt) }} · {{ token().status === 'revoked' ? 'revoked ' + day(token().revokedAt) : 'expires ' + day(token().expiresAt) }}</span>
+        <span class="sd-small sd-muted l3">
+          {{ token().useCount > 0 ? 'used ' + token().useCount + '× · last ' + when(token().lastUsedAt) : 'never used' }}
+          @if (token().calls.length) {
+            <details class="calls"><summary>last {{ token().calls.length }} calls</summary>
+              <ul>@for (c of recentFirst(); track $index) {
+                <li>{{ when(c.at) }} {{ c.method }} <span class="sd-data">{{ c.path }}</span></li>
+              }</ul>
+            </details>
+          }
+        </span>
       </span>
       @if (token().status === 'active') {
         @if (asking()) {
@@ -38,8 +48,14 @@ import type { IPersonalToken } from '../../services/token.service';
     .n { font: 400 20px/1 var(--font-display); color: var(--ink-3); }
     .main { min-width: 0; }
     .l1, .l2 { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .l3 { display: block; }
     .id { margin-right: var(--s2); }
+    .name { font-weight: 700; margin-right: var(--s2); }
     .ask { display: flex; gap: var(--s1); }
+    .calls { margin-top: 2px; white-space: normal; }
+    .calls summary { cursor: pointer; }
+    .calls ul { margin: 4px 0 0; padding-left: 16px; }
+    .calls li { overflow-wrap: anywhere; }
   `],
 })
 export class SdTokenRowComponent {
@@ -54,4 +70,11 @@ export class SdTokenRowComponent {
   day(iso: string | null): string {
     return iso ? String(iso).slice(0, 10) : '—';
   }
+
+  when(iso: string | null): string {
+    return iso ? String(iso).slice(0, 16).replace('T', ' ') : '—';
+  }
+
+  /** The ring buffer is stored oldest-first; show the newest call at the top. */
+  readonly recentFirst = computed(() => [...(this.token().calls ?? [])].reverse());
 }

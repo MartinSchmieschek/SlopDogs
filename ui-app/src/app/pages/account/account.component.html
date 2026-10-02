@@ -43,8 +43,13 @@
           <div class="head">
             <p class="sd-small sd-muted">Personal access tokens act as you, for a year or until you revoke them. Send one as
               <span class="sd-data">Authorization: Bearer &lt;token&gt;</span>.</p>
-            <button type="button" class="sd-btn sd-btn--primary" [disabled]="tokenBusy() === 'new'" [attr.aria-busy]="tokenBusy() === 'new'"
-              (click)="newToken()">{{ tokenBusy() === 'new' ? 'Making…' : '+ New token' }}</button>
+            <div class="sd-token-new">
+              <input type="text" class="sd-input" maxlength="100" autocomplete="off" aria-label="token name"
+                placeholder="name (e.g. Cursor, my-gpt)" [value]="tokenName()"
+                (input)="tokenName.set($any($event.target).value)" [disabled]="tokenBusy() === 'new'" />
+              <button type="button" class="sd-btn sd-btn--primary" [disabled]="tokenBusy() === 'new'" [attr.aria-busy]="tokenBusy() === 'new'"
+                (click)="newToken()">{{ tokenBusy() === 'new' ? 'Making…' : '+ New token' }}</button>
+            </div>
           </div>
 
           @if (freshToken(); as fresh) {

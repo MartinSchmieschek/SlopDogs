@@ -63,6 +63,7 @@ export class AccountComponent {
   readonly tokens = signal<IPersonalToken[]>([]);
   readonly tokensState = signal<ListState>('idle');
   readonly freshToken = signal<INewPersonalToken | null>(null);
+  readonly tokenName = signal('');
   readonly tokenBusy = signal<string | null>(null);
   readonly tokenError = signal<string | null>(null);
 
@@ -135,10 +136,11 @@ export class AccountComponent {
     if (this.tokenBusy()) return;
     this.tokenBusy.set('new');
     this.tokenError.set(null);
-    this.tokensApi.create().subscribe({
+    this.tokensApi.create(this.tokenName().trim()).subscribe({
       next: (r) => {
         this.tokenBusy.set(null);
         this.freshToken.set(r.token);
+        this.tokenName.set('');
         const { jwt: _value, ...listed } = r.token;
         this.tokens.update((list) => [listed, ...list]);
       },
