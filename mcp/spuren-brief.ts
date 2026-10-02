@@ -4,9 +4,9 @@
  */
 
 /** Injected at MCP `initialize` — every agent sees this without reading the full skill resource. */
-export const SPUREN_AGENTEN_ANWEISUNG_KURZ = `## Entdecken — die Meute ist keine Volkszählung
+export const SPUREN_AGENTEN_ANWEISUNG_KURZ = `## Entdecken — schnüffeln, keine Volkszählung
 
-Reuse BaseDogs (the kit — they come first in \`list_nodes\`). Streunen the rest: most calls, best ratings, what lands (\`list_nodes {sort:'proven'}\`, \`{usage:'top'}\`, \`{search:'<keyword>'}\`). Do not count the pack — never page the whole \`list_nodes\`.
+Sniff the pack by scent, don't count it: \`list_nodes {search:'<keyword>'}\` (matches name & description), page it. **BaseDogs** (the kit) are fixed — reuse directly. A **SerializedDog** only when \`frozen\` or pinned to its version GUID (a bare lineageId runs the newest version, which can change); otherwise its \`description\` is a scent — a hint on how to build. Never page the whole \`list_nodes\`.
 
 ## Spuren — Agenten-Pflicht (kurz)
 
