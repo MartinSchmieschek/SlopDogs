@@ -35,13 +35,25 @@ function patStatus(t: { revokedAt: Date | null; expiresAt: Date }, now: Date): P
     return 'active';
 }
 
-function tokenJson(t: { jti: string; createdAt: Date; expiresAt: Date; revokedAt: Date | null }) {
+function parseRecentCalls(raw: string | null): Array<{ at: string; method: string; path: string }> {
+    if (!raw) return [];
+    try { const p = JSON.parse(raw); return Array.isArray(p) ? p : []; } catch { return []; }
+}
+
+function tokenJson(t: {
+    jti: string; name?: string | null; createdAt: Date; expiresAt: Date; revokedAt: Date | null;
+    lastUsedAt?: Date | null; useCount?: number; recentCalls?: string | null;
+}) {
     return {
         jti: t.jti,
+        name: t.name ?? null,
         createdAt: t.createdAt.toISOString(),
         expiresAt: t.expiresAt.toISOString(),
         revokedAt: t.revokedAt ? t.revokedAt.toISOString() : null,
         status: patStatus(t, new Date()),
+        lastUsedAt: t.lastUsedAt ? t.lastUsedAt.toISOString() : null,
+        useCount: t.useCount ?? 0,
+        calls: parseRecentCalls(t.recentCalls ?? null),
     };
 }
 
@@ -81,6 +93,9 @@ export function createPersonalTokensRouter(prisma: PrismaClient): Router {
         const userId = requireSession(req, res);
         if (!userId) return;
 
+        const rawName = (req.body as any)?.name;
+        const name = typeof rawName === 'string' && rawName.trim() ? rawName.trim().slice(0, 100) : null;
+
         const access = await issueAccessToken({
             userId,
             clientId: PAT_CLIENT_ID,
@@ -94,6 +109,7 @@ export function createPersonalTokensRouter(prisma: PrismaClient): Router {
                 clientId: PAT_CLIENT_ID,
                 scope: 'default',
                 expiresAt: access.expiresAt,
+                name,
             },
         });
 
@@ -103,10 +119,14 @@ export function createPersonalTokensRouter(prisma: PrismaClient): Router {
                 ok: true,
                 token: {
                     jti: created.jti,
+                    name: created.name ?? null,
                     jwt: access.jwt,
                     createdAt: created.createdAt.toISOString(),
                     expiresAt: created.expiresAt.toISOString(),
                     status: 'active',
+                    lastUsedAt: null,
+                    useCount: 0,
+                    calls: [],
                 },
             });
             return;
@@ -195,22 +215,40 @@ td.id{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:#a0
 `;
 
 function renderListPage(
-    tokens: Array<{ jti: string; expiresAt: Date; revokedAt: Date | null; createdAt: Date }>,
+    tokens: Array<{
+        jti: string; name?: string | null; expiresAt: Date; revokedAt: Date | null; createdAt: Date;
+        lastUsedAt?: Date | null; useCount?: number; recentCalls?: string | null;
+    }>,
     fresh: string | null,
 ): string {
     const now = new Date();
+    const fmt = (d: Date | string) => escapeHtml(new Date(d).toISOString().slice(0, 16).replace('T', ' '));
     const rows = tokens.length === 0
-        ? '<tr><td colspan="4" class="empty">No tokens yet — create one below.</td></tr>'
+        ? '<tr><td colspan="5" class="empty">No tokens yet — create one below.</td></tr>'
         : tokens.map((t) => {
             const st = patStatus(t, now);
             const status = st === 'active'
                 ? '<span class="pill pill-ok">active</span>'
                 : `<span class="pill pill-rev">${st}</span>`;
+            const count = t.useCount ?? 0;
+            const used = count > 0
+                ? `${count}× · last ${t.lastUsedAt ? fmt(t.lastUsedAt) : '—'}`
+                : '<span class="muted">never used</span>';
+            const calls = parseRecentCalls(t.recentCalls ?? null);
+            const callsDetail = calls.length
+                ? '<details style="margin-top:4px"><summary class="muted">last ' + calls.length + ' calls</summary>'
+                  + '<ul style="margin:6px 0 0;padding-left:16px;font-size:.82em">'
+                  + calls.slice().reverse().map((c) =>
+                      `<li><span class="muted">${fmt(c.at)}</span> ${escapeHtml(String(c.method))} <code>${escapeHtml(String(c.path))}</code></li>`).join('')
+                  + '</ul></details>'
+                : '';
             return [
                 '<tr>',
-                `<td class="id">${escapeHtml(t.jti.slice(0, 8))}…</td>`,
+                `<td><strong>${t.name ? escapeHtml(t.name) : '<span class="muted">unnamed</span>'}</strong>`
+                  + `<div class="id muted">${escapeHtml(t.jti.slice(0, 8))}…</div></td>`,
                 `<td>${status}</td>`,
-                `<td class="muted">expires ${escapeHtml(t.expiresAt.toISOString().slice(0, 10))}</td>`,
+                `<td class="muted">${escapeHtml(t.expiresAt.toISOString().slice(0, 10))}</td>`,
+                `<td>${used}${callsDetail}</td>`,
                 t.revokedAt
                     ? '<td></td>'
                     : `<td><form method="POST" action="/auth/tokens/${escapeHtml(t.jti)}/revoke" style="display:inline">`
@@ -241,11 +279,12 @@ function renderListPage(
         'Custom GPT API Key fields, or scripts. The full OAuth dance is for clients that ',
         'auto-discover (Cursor, Claude.ai Connectors). This is the manual fast lane.</p>',
         freshBlock,
-        '<form method="POST" action="/auth/tokens">',
+        '<form method="POST" action="/auth/tokens" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">',
+        '<input type="text" name="name" maxlength="100" autocomplete="off" placeholder="name (e.g. Cursor, my-gpt)" style="flex:1 1 200px;min-width:0;padding:9px 11px;border:2px solid #1c1712;border-radius:6px;font:inherit"/>',
         '<button class="btn" type="submit">+ Generate new token</button>',
         '</form></div>',
         '<div class="card"><table>',
-        '<thead><tr><th>JTI</th><th>Status</th><th>Expires</th><th></th></tr></thead>',
+        '<thead><tr><th>Name</th><th>Status</th><th>Expires</th><th>Used</th><th></th></tr></thead>',
         `<tbody>${rows}</tbody>`,
         '</table></div></div></body></html>',
     ].join('');

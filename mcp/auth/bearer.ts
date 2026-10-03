@@ -37,6 +37,10 @@ export async function tryResolveBearerUser(
     if (row.revokedAt) return null;
     if (row.expiresAt.getTime() < Date.now()) return null;
 
+    // Nutzungsspur, nicht blockierend (fire-and-forget): Zaehler + letzter Zeitpunkt + Ringpuffer der
+    // letzten Calls auf der Token-Zeile. Per Design begrenzt (max RECENT_CALLS_MAX), keine wachsende Tabelle.
+    void recordTokenUse(prisma, row, req);
+
     const user = await prisma.user.findUnique({
         where: { id: claims.sub },
         select: { id: true, email: true, name: true },
@@ -48,4 +52,34 @@ export async function tryResolveBearerUser(
         clientId: claims.aud,
         scope: claims.scope,
     };
+}
+
+/** Wie viele der letzten Calls je Token behalten werden — der Ringpuffer bleibt klein und begrenzt. */
+const RECENT_CALLS_MAX = 20;
+
+/**
+ * Nutzungsspur eines Tokens fortschreiben: useCount hoch (atomar), lastUsedAt gesetzt, und der Call
+ * (Zeit/Methode/Pfad) an den Ringpuffer recentCalls gehaengt, auf die letzten RECENT_CALLS_MAX gekuerzt.
+ * Bewusst fire-and-forget und best-effort: ein Fehler hier darf nie eine Anfrage scheitern lassen, und
+ * ein unter Nebenlauf verlorener Ringpuffer-Eintrag ist hinnehmbar (useCount bleibt via increment korrekt).
+ */
+async function recordTokenUse(
+    prisma: PrismaClient,
+    row: { jti: string; recentCalls: string | null },
+    req: Request,
+): Promise<void> {
+    try {
+        let calls: Array<{ at: string; method: string; path: string }> = [];
+        try {
+            const parsed = row.recentCalls ? JSON.parse(row.recentCalls) : [];
+            if (Array.isArray(parsed)) calls = parsed;
+        } catch { /* kaputter Puffer -> frisch anfangen */ }
+        const path = String(req.originalUrl || req.path || '').split('?')[0].slice(0, 200);
+        calls.push({ at: new Date().toISOString(), method: String(req.method || ''), path });
+        if (calls.length > RECENT_CALLS_MAX) calls = calls.slice(-RECENT_CALLS_MAX);
+        await prisma.accessToken.update({
+            where: { jti: row.jti },
+            data: { useCount: { increment: 1 }, lastUsedAt: new Date(), recentCalls: JSON.stringify(calls) },
+        });
+    } catch { /* best-effort: Nutzungsspur darf nie eine Anfrage blockieren */ }
 }

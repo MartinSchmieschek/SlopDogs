@@ -172,3 +172,21 @@
     flex-direction: column;
   }
 }
+
+// PAT-Erstellung: Name-Eingabe neben dem Button (6.6 — Tokens benennbar).
+.sd-token-new {
+  display: flex;
+  gap: var(--s1, 8px);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.sd-input {
+  flex: 1 1 200px;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 2px solid var(--ink, #1c1712);
+  border-radius: 6px;
+  font: inherit;
+  background: var(--bg, #fff);
+  color: inherit;
+}

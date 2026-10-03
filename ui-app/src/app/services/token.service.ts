@@ -4,13 +4,24 @@ import { Observable } from 'rxjs';
 
 export type PersonalTokenStatus = 'active' | 'revoked' | 'expired';
 
+/** One recorded use of a token — the newest-first ring buffer the server keeps per token. */
+export interface IPersonalTokenCall {
+  at: string;
+  method: string;
+  path: string;
+}
+
 /** A personal access token as the list shows it — never its value. */
 export interface IPersonalToken {
   jti: string;
+  name: string | null;
   createdAt: string;
   expiresAt: string;
   revokedAt: string | null;
   status: PersonalTokenStatus;
+  lastUsedAt: string | null;
+  useCount: number;
+  calls: IPersonalTokenCall[];
 }
 
 /** A fresh token: the value comes exactly once, in this answer. */
@@ -32,8 +43,9 @@ export class TokenService {
     return this.http.get<{ ok: true; tokens: IPersonalToken[] }>('/auth/tokens', JSON_ONLY);
   }
 
-  create(): Observable<{ ok: true; token: INewPersonalToken }> {
-    return this.http.post<{ ok: true; token: INewPersonalToken }>('/auth/tokens', {}, JSON_ONLY);
+  create(name?: string): Observable<{ ok: true; token: INewPersonalToken }> {
+    const body = name && name.trim() ? { name: name.trim() } : {};
+    return this.http.post<{ ok: true; token: INewPersonalToken }>('/auth/tokens', body, JSON_ONLY);
   }
 
   revoke(jti: string): Observable<{ ok: true; jti: string; status: PersonalTokenStatus }> {

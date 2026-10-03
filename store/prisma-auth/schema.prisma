@@ -53,6 +53,10 @@ model AccessToken {
   expiresAt    DateTime
   revokedAt    DateTime?
   createdAt    DateTime @default(now())
+  name         String?
+  lastUsedAt   DateTime?
+  useCount     Int       @default(0)
+  recentCalls  String?
 }
 
 model RefreshToken {
