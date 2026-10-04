@@ -40,6 +40,7 @@ import { KennelStatsService } from '../services/KennelStatsService';
 import type { IDogStatsStore, IKennelStatsStore } from '../store/IKennelStatsStore';
 import type { DogReferenceIndex } from '../services/DogReferenceIndex';
 import { DogStatsService } from '../services/DogStatsService';
+import { startMemoryHeartbeat } from '../api/utils/memoryLog';
 import { BaseDogPacks } from '../services/BaseDogPacks';
 import type { BaseDogInfo } from '../mcp/tools/types';
 import type { HttpFrontEndBinder, HttpFrontEndContext } from './httpFrontEndTypes';
@@ -404,6 +405,9 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
             authPrisma.$disconnect(),
         ]);
     };
+
+    // Speicher-Heartbeat: periodischer Grundstand im Log (gated, siehe memoryLog.ts).
+    startMemoryHeartbeat();
 
     return { app, serveBuiltAngular, runStartupTests, disconnect, keyStore };
 }

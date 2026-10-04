@@ -43,6 +43,7 @@ function clientWantsJson(req: any): boolean {
     return false;
 }
 import { generateVersionId, generateLineageId } from '../utils/versioning';
+import { memSnapshot, logKennelRun } from '../utils/memoryLog';
 
 /** Ein adoptierbarer MimicDog, aus einer rohen Store-Zeile geschaelt. */
 interface MimicCandidate {
@@ -166,6 +167,9 @@ export class KennelRunHandler {
         if (source === 'unknown' && isRuntimeLogVerbose()) {
             console.warn(`[KennelRunHandler] Lauf ohne Quelle (${lineageId}) — zaehlt als unknown`, new Error('attribution').stack);
         }
+        const memBefore = memSnapshot();
+        const startedAt = Date.now();
+        let waveCount: number | undefined;
         let leadFailed = false;
         const keyRun = new KeyRunState();
         try {
@@ -214,6 +218,7 @@ export class KennelRunHandler {
             // P4c: jeder im Lauf benutzte Schluessel-Wert faellt hier aus result, error und vmContext;
             // die Waves tragen ihren Lauf mit, damit Antwort und Snapshot noch einmal scrubben koennen.
             const waves = convertSeasonToWaves(season, config, keyRun);
+            waveCount = (waves as any).wave?.length;
             KeyRunState.attach(waves, keyRun);
             // Ein Lead, der gar nicht in den Waves steht (durfte nicht laufen), ist so gescheitert
             // wie einer mit error-Brandzeichen — die Handler antworten dann `lead_failed`.
@@ -226,6 +231,10 @@ export class KennelRunHandler {
             throw keyRun.scrubError(err);                                    // P4c: kein Wert in Text oder Stack
         } finally {
             this.deps.callCounter.record(lineageId, source, leadFailed);     // genau ein record je begonnenem Lauf
+            logKennelRun({
+                kennelId: lineageId, source, dogCount: config.dogIds?.length, waveCount,
+                durationMs: Date.now() - startedAt, before: memBefore, after: memSnapshot(),
+            });
         }
     }
 
