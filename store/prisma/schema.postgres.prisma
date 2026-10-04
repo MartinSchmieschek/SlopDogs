@@ -258,6 +258,13 @@ model AccessToken {
   expiresAt DateTime
   revokedAt DateTime?
   createdAt DateTime  @default(now())
+  // Muss mit store/prisma-auth/schema.postgres.prisma in Sync bleiben: dieselbe Tabelle in derselben DB,
+  // und der Content-Push (db push --accept-data-loss) ist autoritativ — fehlt eine Spalte hier, droppt er
+  // sie, auch wenn das Auth-Schema sie kennt (das war der PAT-500er).
+  name        String?
+  lastUsedAt  DateTime?
+  useCount    Int       @default(0)
+  recentCalls String?
 }
 
 model RefreshToken {
