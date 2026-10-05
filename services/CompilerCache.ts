@@ -1,4 +1,4 @@
-import * as ts from 'typescript';
+import type * as ts from 'typescript';
 import * as path from 'path';
 
 /**
@@ -31,6 +31,22 @@ export class CompilerCache {
     /** Wenn false (int/prod nach loadPrecomputed), wird kein ts.createProgram zur Laufzeit aufgerufen. */
     private static useLiveCompiler: boolean = true;
 
+    /** Einmal geladenes typescript-Modul; bleibt in int/prod (precomputed) null. */
+    private static tsLoaded: typeof import('typescript') | null = null;
+
+    /**
+     * Lädt den TypeScript-Compiler erst beim ersten Live-Kompilieren bzw. im Build-Schritt.
+     * Bewusst lazy statt statischem Import: in int/prod (nach loadPrecomputed) wird nie live
+     * kompiliert, der statische Import kostete dort trotzdem ~16 MB Heap. Dog-Code transpiliert
+     * sucrase, nicht typescript. Typen kommen per `import type` und kosten zur Laufzeit nichts.
+     */
+    private static tsModule(): typeof import('typescript') {
+        if (!this.tsLoaded) {
+            this.tsLoaded = require('typescript') as typeof import('typescript');
+        }
+        return this.tsLoaded;
+    }
+
     /**
      * Lädt vorbereitete Type-Definitions aus dem Build-Output und unterbindet Live-Kompilierung.
      * Wird beim Startup von main.ts in NODE_ENV=production|integration aufgerufen.
@@ -51,6 +67,7 @@ export class CompilerCache {
      * @returns An object bearing the program and checker, plundered from the abyss.
      */
     private static createProgram(): { program: ts.Program; checker: ts.TypeChecker } {
+        const ts = CompilerCache.tsModule();
         const configPath = ts.findConfigFile(process.cwd(), ts.sys.fileExists, 'tsconfig.json');
         if (!configPath) throw new Error('tsconfig.json not found');
         const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
@@ -68,6 +85,7 @@ export class CompilerCache {
      * @returns True if the member be public, false if it lurks in the deep.
      */
     private static isPublic(node: ts.Declaration): boolean {
+        const ts = CompilerCache.tsModule();
         const flags = ts.getCombinedModifierFlags(node);
         return !(flags & (ts.ModifierFlags.Private | ts.ModifierFlags.Protected));
     }
@@ -85,6 +103,7 @@ export class CompilerCache {
         type: ts.Type,
         collected: Set<string>
     ): void {
+        const ts = CompilerCache.tsModule();
         if (type.isUnion()) {
             for (const t of type.types) {
                 this.collectReferencedTypes(checker, t, collected);
@@ -168,6 +187,7 @@ export class CompilerCache {
         sourceFile: ts.SourceFile,
         name: string
     ): ts.InterfaceDeclaration | null {
+        const ts = CompilerCache.tsModule();
         let found: ts.InterfaceDeclaration | null = null;
         const visit = (node: ts.Node) => {
             if (found) return;
@@ -193,6 +213,7 @@ export class CompilerCache {
         sourceFile: ts.SourceFile,
         name: string
     ): ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.EnumDeclaration | null {
+        const ts = CompilerCache.tsModule();
         let found: ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.EnumDeclaration | null = null;
         const visit = (node: ts.Node) => {
             if (found) return;
@@ -233,8 +254,15 @@ export class CompilerCache {
         return null;
     }
 
-    /** A printer forged in the void, stripping comments as one strips barnacles from a cursed hull. */
-    private static readonly pactPrinter = ts.createPrinter({ removeComments: true });
+    private static pactPrinterInstance: ts.Printer | null = null;
+
+    /** A printer forged in the void, stripping comments as one strips barnacles from a cursed hull. Lazy wie tsModule(). */
+    private static get pactPrinter(): ts.Printer {
+        if (!this.pactPrinterInstance) {
+            this.pactPrinterInstance = this.tsModule().createPrinter({ removeComments: true });
+        }
+        return this.pactPrinterInstance;
+    }
 
     /**
      * Prints an enum declaration and appends a return-type alias — the enum's
@@ -243,6 +271,7 @@ export class CompilerCache {
      * @returns The printed enum text with its Return type alias appended.
      */
     private static enumNodeToPactDef(node: ts.EnumDeclaration): string {
+        const ts = CompilerCache.tsModule();
         const text = this.pactPrinter.printNode(ts.EmitHint.Unspecified, node, node.getSourceFile()).trim();
         const name = node.name.text;
         return `${text}\ntype ${name}Return = ${name};`;
@@ -262,6 +291,7 @@ export class CompilerCache {
         node: ts.TypeAliasDeclaration,
         program: ts.Program
     ): string {
+        const ts = CompilerCache.tsModule();
         const name = node.name.text;
         const symbol = checker.getSymbolAtLocation(node.name);
         if (!symbol) {
@@ -287,6 +317,7 @@ export class CompilerCache {
 
     /** Aus Property-Typ-AST (z. B. `preset?: LandmarksOverpassFacet[]`) Enum-Namen sammeln. */
     private static collectEnumNamesFromTypeNode(node: ts.TypeNode | undefined, out: Set<string>): void {
+        const ts = CompilerCache.tsModule();
         if (!node) return;
         if (ts.isTypeReferenceNode(node)) {
             const tn = node.typeName;
@@ -316,6 +347,7 @@ export class CompilerCache {
      * @param out - The set accumulating discovered enum names from the deep.
      */
     private static collectReferencedEnumNamesFromInterface(iface: ts.InterfaceDeclaration, out: Set<string>): void {
+        const ts = CompilerCache.tsModule();
         for (const member of iface.members) {
             if (ts.isPropertySignature(member) && member.type) {
                 this.collectEnumNamesFromTypeNode(member.type, out);
@@ -335,6 +367,7 @@ export class CompilerCache {
         program: ts.Program,
         iface: ts.InterfaceDeclaration
     ): string {
+        const ts = CompilerCache.tsModule();
         const names = new Set<string>();
         this.collectReferencedEnumNamesFromInterface(iface, names);
         const blocks: string[] = [];
@@ -363,6 +396,7 @@ export class CompilerCache {
         program: ts.Program,
         checker: ts.TypeChecker
     ): string {
+        const ts = CompilerCache.tsModule();
         const decl = this.findNamedTypeDeclaration(program, symbolName);
         if (!decl) {
             throw new Error(
@@ -450,6 +484,7 @@ export class CompilerCache {
         checker: ts.TypeChecker,
         node: ts.InterfaceDeclaration
     ): string {
+        const ts = CompilerCache.tsModule();
         const name = node.name.text;
         const members: string[] = [];
 
@@ -544,6 +579,7 @@ export class CompilerCache {
         program: ts.Program,
         checker: ts.TypeChecker
     ): IClassTypeResult | null {
+        const ts = CompilerCache.tsModule();
         try {
             const members: Record<string, string> = {};
             const referencedTypeNames = new Set<string>();
@@ -668,6 +704,7 @@ export class CompilerCache {
         pactReturnTypes: Record<string, string>;
         classTypes: Record<string, IClassTypeResult>;
     } {
+        const ts = CompilerCache.tsModule();
         const { program, checker } = this.createProgram();
 
         const sourceTypeNames = new Set<string>();
