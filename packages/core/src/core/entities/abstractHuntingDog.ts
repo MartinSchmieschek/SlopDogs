@@ -29,6 +29,15 @@ export abstract class Dog<Y> implements IHuntingDog<Y>{
         return this.result
     }
 
+    /**
+     * Dieselbe Beute OHNE Lese-Spur. Durch den Tracking-Proxy eines Laufs (createTrackedDog) gelesen,
+     * wertet der Proxy diesen Getter auf dem echten Dog aus — der Rohwert, kein neuer Proxy. Fuer interne
+     * Ablagen, die den Lauf ueberleben (Kontext-Cache, Aliasse): ein Proxy dort hielte die Season fest.
+     */
+    get untrackedCollected(): Y|undefined{
+        return this.result
+    }
+
     /** A brief description of what this hound does. Override in subclasses to speak yer purpose. */
     get description(): string | undefined {
         return undefined;

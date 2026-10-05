@@ -52,7 +52,7 @@ export class WebSocketChannelRetriever extends Dog<ChannelState> {
         super();
         if (!WebSocketChannelRetriever.hub) {
             throw new Error(
-                "WebSocketChannelRetriever: hub not initialised — WebSocketChannelRetriever.initService(hub) muss vor `new WebSocketChannelRetriever()` aufgerufen werden.",
+                "WebSocketChannelRetriever: hub not initialised — WebSocketChannelRetriever.initService(hub) must be called before `new WebSocketChannelRetriever()`.",
             );
         }
     }

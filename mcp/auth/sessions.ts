@@ -1,9 +1,11 @@
 // Cookie-based session middleware for the browser login flow.
 // Stores PKCE state during the OAuth round-trip, then the resolved userId after callback.
-// Memory store is fine for single-instance Render — for horizontal scaling, swap to Postgres/Redis later.
+// Speicher: BoundedSessionStore im Prozess (Obergrenze SESSION_STORE_MAX, Pending-Sitzungen ohne
+// userId verfallen nach SESSION_PENDING_TTL_MS) — fuer horizontale Skalierung spaeter Postgres/Redis.
 
 import session from 'express-session';
 import type { RequestHandler } from 'express';
+import { BoundedSessionStore } from './BoundedSessionStore';
 
 declare module 'express-session' {
     interface SessionData {
@@ -40,6 +42,7 @@ export function createSessionMiddleware(): RequestHandler {
     return session({
         secret,
         name: 'slopdogs.sid',
+        store: BoundedSessionStore.fromEnv(),
         resave: false,
         saveUninitialized: false,
         cookie: {
