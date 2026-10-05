@@ -201,6 +201,21 @@ export const ENV_CATALOG: readonly EnvVarSpec[] = [
         defaultValue: 'true in integration/production, sonst false', consequence: 'Default nach NODE_ENV',
     },
     {
+        name: 'SESSION_STORE_MAX', section: 'operations', since: 'P9',
+        purpose: 'Hoechstzahl gehaltener Sessions im Prozess-Speicher; darueber gehen zuerst unangemeldete (Login angefangen), dann die aeltesten',
+        defaultValue: '10000', consequence: 'Default',
+    },
+    {
+        name: 'SESSION_PENDING_TTL_MS', section: 'operations', since: 'P9',
+        purpose: 'Lebensdauer einer Session ohne Login (nur PKCE/Beta-Key aus /auth/google/login) seit dem letzten Zugriff',
+        defaultValue: '900000 (15 min)', consequence: 'Default',
+    },
+    {
+        name: 'TRUST_PROXY_HOPS', section: 'operations', since: 'P9',
+        purpose: 'Proxy-Hops vor der App (express trust proxy): macht req.ip zur Client-IP fuer die Sperre je Quelle; zu hoch = X-Forwarded-For faelschbar, zu niedrig = alle Anonymen eine Quelle',
+        defaultValue: '1 in integration/production, sonst 0', consequence: 'Default nach NODE_ENV',
+    },
+    {
         name: 'CORS_ALLOWED_ORIGINS', section: 'operations', since: 'vor P1',
         purpose: 'Erlaubte Browser-Origins, kommagetrennt (hat Vorrang)',
         defaultValue: 'dev: localhost/127.0.0.1; deployed: gleicher Host', consequence: 'Default-Regel',
@@ -232,8 +247,13 @@ export const ENV_CATALOG: readonly EnvVarSpec[] = [
     },
     {
         name: 'HEAVY_REQUEST_QUEUE_TIMEOUT_MS', section: 'operations', since: 'vor P1',
-        purpose: 'Wartebudget der Heavy-Schlange, danach 503',
-        defaultValue: '20000', consequence: 'Default',
+        purpose: 'Wartebudget der Heavy-Schlange (Anfragen warten und laufen seriell weiter), erst danach 503 + Retry-After',
+        defaultValue: '120000', consequence: 'Default',
+    },
+    {
+        name: 'HEAVY_REQUEST_QUEUE_MAX', section: 'operations', since: 'P9',
+        purpose: 'Obergrenze der Heavy-Schlange (inkl. MCP-Laeufe); darueber sofort 503 + Retry-After',
+        defaultValue: '50', consequence: 'Default',
     },
     {
         name: 'MAX_CONCURRENT_PUBLIC_RUNS', section: 'operations', since: 'P1',
@@ -242,8 +262,28 @@ export const ENV_CATALOG: readonly EnvVarSpec[] = [
     },
     {
         name: 'PUBLIC_RUN_QUEUE_TIMEOUT_MS', section: 'operations', since: 'P1',
-        purpose: 'Wartebudget der Public-Schlange, danach 503 + Retry-After',
-        defaultValue: '20000', consequence: 'Default',
+        purpose: 'Wartebudget der Public-Schlange (Anfragen warten und laufen seriell weiter), erst danach 503 + Retry-After',
+        defaultValue: '120000', consequence: 'Default',
+    },
+    {
+        name: 'PUBLIC_RUN_QUEUE_MAX', section: 'operations', since: 'P9',
+        purpose: 'Obergrenze der Public-Schlange; darueber sofort 503 + Retry-After',
+        defaultValue: '50', consequence: 'Default',
+    },
+    {
+        name: 'RUNS_PER_SOURCE_MAX_INFLIGHT', section: 'operations', since: 'P9',
+        purpose: 'Kennel-Laeufe je Quelle (user:<id> bzw. Client-IP) gleichzeitig, aktiv + wartend; darueber 429 + Retry-After',
+        defaultValue: '2', consequence: 'Default',
+    },
+    {
+        name: 'RUNS_PER_SOURCE_PER_MINUTE', section: 'operations', since: 'P9',
+        purpose: 'Token-Bucket je Quelle: Kennel-Laeufe pro Minute (Nachfuellrate); darueber 429 + Retry-After',
+        defaultValue: '20', consequence: 'Default',
+    },
+    {
+        name: 'RUNS_PER_SOURCE_BURST', section: 'operations', since: 'P9',
+        purpose: 'Token-Bucket je Quelle: so viele Laeufe duerfen direkt hintereinander starten',
+        defaultValue: '6', consequence: 'Default',
     },
     {
         name: 'WAVE_CONCURRENCY', section: 'operations', since: 'vor P1',
@@ -267,7 +307,7 @@ export const ENV_CATALOG: readonly EnvVarSpec[] = [
     },
     {
         name: 'MEMORY_SOFT_LIMIT_MB', section: 'operations', since: 'P8',
-        purpose: 'RSS-Schwelle: neue Dog-Isolate werden darueber mit Fehler abgewiesen statt den Container OOM-killen zu lassen',
+        purpose: 'RSS-Schwelle: darueber versucht der Waechter vor einem neuen Dog-Isolate GC, wartet auf das Ende anderer Isolate und weist erst dann ab',
         defaultValue: '85 % von MEMORY_LIMIT_MB', consequence: 'Default',
     },
     {
@@ -276,16 +316,36 @@ export const ENV_CATALOG: readonly EnvVarSpec[] = [
         defaultValue: 'auto (AN im Betrieb)', consequence: 'Default',
     },
     {
+        name: 'MEMORY_GUARD_WAIT_MS', section: 'operations', since: 'P9',
+        purpose: 'So lange wartet ein Dog ueber dem Soft-Limit auf das Ende anderer Isolate, bevor er abgewiesen wird (0 = sofort abweisen)',
+        defaultValue: '30000', consequence: 'Default',
+    },
+    {
+        name: 'MEMORY_GUARD_GC_MIN_INTERVAL_MS', section: 'operations', since: 'P9',
+        purpose: 'Mindestabstand zwischen zwei GC-Versuchen des Waechters (global.gc, --expose-gc im Startskript)',
+        defaultValue: '2000', consequence: 'Default',
+    },
+    {
         name: 'SLOPDOGS_VM_TIMEOUT_MS', section: 'operations', since: 'P2',
         purpose: 'Timeout je SerializedDog-Lauf im Worker (ms); Override je MCP-Aufruf per vmTimeoutMs',
         defaultValue: '10000', consequence: 'Default',
         aliases: ['DATADOGS_VM_TIMEOUT_MS'],
     },
     {
+        name: 'SLOPDOGS_VM_TIMEOUT_MAX_MS', section: 'operations', since: 'P9',
+        purpose: 'Obergrenze jedes Dog-Timeouts, auch des per MCP gereichten vmTimeoutMs',
+        defaultValue: '60000', consequence: 'Default',
+    },
+    {
         name: 'SLOPDOGS_MCP_RATE_LIMIT', section: 'operations', since: 'P2',
         purpose: 'MCP-Requests je Identitaet und Minute',
         defaultValue: '120', consequence: 'Default',
         aliases: ['DATADOGS_MCP_RATE_LIMIT'],
+    },
+    {
+        name: 'SNAPSHOT_CACHE_MAX_MB', section: 'operations', since: 'P9',
+        purpose: 'Obergrenze (geschaetzte MB) aller Snapshots von refresh_kennel_snapshot/build_kennel im Prozess-Speicher; aelteste fallen zuerst',
+        defaultValue: '64', consequence: 'Default',
     },
     {
         name: 'CACHE_PRUNE_INTERVAL_MS', section: 'operations', since: 'vor P1',

@@ -25,6 +25,10 @@ import {
     unregisterVmGlobalCapability,
     DOG_OOM_MARKER,
     DOG_TIMEOUT_MARKER,
+    DOG_MEMPRESSURE_MARKER,
+    DogWorkerGate,
+    type MemoryProbe,
+    resolveVmTimeoutMs,
     type DogRunReport,
     type ICacheHandler,
 } from '@slopdogs/core';
@@ -34,6 +38,11 @@ import { KennelController } from './api/KennelController';
 import { ControllerRegistry, ConfigRouteHandler } from './api/routes/ConfigRouteHandler';
 import { TypeDefBuilder } from './services/TypeDefBuilder';
 import { HeavyRequestLimiter } from './server-app/heavyRequestLimiter';
+import { RunAdmission, RunGates, SourceRunGate } from './server-app/runAdmission';
+import { McpRunAdmission } from './mcp/tools/types';
+import { LeadOutcome } from './services/LeadOutcome';
+import { BoundedSessionStore } from './mcp/auth/BoundedSessionStore';
+import { ApproxHeapSize } from './mcp/snapshots/ApproxHeapSize';
 import { EventEmitter } from 'events';
 import { CompilerCache } from './services/CompilerCache';
 import { KennelRunHandler } from './api/routes/KennelRunHandler';
@@ -251,6 +260,18 @@ export class StartupTest {
             // Gate: zweite Schleuse fuer oeffentliche Kennel-Laeufe
             await this.testPublicLimiterCoversPublicPaths();
             await this.testPublicLimiterQueuesAndReleases();
+            // P9: Lauf-Zulassung (Leck, seriell statt 503, Obergrenze, Sperre je Quelle) und Speicher-Halter
+            await this.testGateHangUpInQueueKeepsSlot();
+            await this.testGateSerialWithinBudget();
+            await this.testGateQueueMaxRejects();
+            await this.testGateSourceLimits();
+            await this.testSnapshotCacheByteLimit();
+            await this.testSnapshotCacheEvictsOnMutation();
+            await this.testSnapshotCacheRejectsOversizedEntry();
+            await this.testApproxHeapSizeDedupeAndDepth();
+            await this.testSessionStoreRoundTrip();
+            await this.testSessionStorePendingTtl();
+            await this.testSessionStoreMaxPrefersPending();
 
             // P3: /k/, Segment-Regel, Alt-Weiche, HEAD ohne Lauf, Swagger unter /k, Routentabelle
             await this.testKennelIdRule();
@@ -317,6 +338,7 @@ export class StartupTest {
             // Fixes vor P4
             await this.testKennelRenameViaRest(kennelsController as KennelController);
             await this.testTrailingLineCommentRuns(nodesStore, kennelsController as KennelController, baseDogsMap);
+            await this.testLeadFailureIsNot200(nodesStore, kennelsController as KennelController, baseDogsMap);
             await this.testNewAutoMimicTakesKennelOwner(nodesStore, kennelsController as KennelController, baseDogsMap);
 
             // P4: Aufrufe, Sterne, Suche, Landing-API
@@ -335,6 +357,9 @@ export class StartupTest {
             // P4b: Dog-Aufrufe, Wiederverwendung, Bewaehrt
             await this.testDogRunObserverOncePerDog(baseDogsMap);
             await this.testDogRunClassification(baseDogsMap);
+            await this.testMemoryGuardBackpressure();
+            await this.testWorkerSlotReleasedOnExit(baseDogsMap);
+            await this.testAliasContextHoldsNoProxy(baseDogsMap);
             await this.testDogCacheStatsWrapper(baseDogsMap);
             await this.testDogStatsKeyOf(baseDogsMap);
             const dogStatsStore = this.dogStatsStoreOf(kennelsStore);
@@ -1549,11 +1574,694 @@ export class StartupTest {
             await new Promise<void>((resolve) => setTimeout(resolve, 300));
             if (r4.passed) throw new Error('der vierte Request darf nie durch');
             if (r4.res.statusCode !== 503) throw new Error(`erwartet 503, erhalten ${r4.res.statusCode}`);
-            if (r4.res.headers['retry-after'] !== '1') throw new Error(`Retry-After erwartet 1, erhalten ${r4.res.headers['retry-after']}`);
+            if (r4.res.headers['retry-after'] !== '10') throw new Error(`Retry-After erwartet 10, erhalten ${r4.res.headers['retry-after']}`);
+            if (r4.res.body?.reason !== 'queue_timeout' || !/^Server busy/.test(r4.res.body?.message ?? '')) throw new Error(`Rumpf ${JSON.stringify(r4.res.body)}`);
 
             this.addResult(testName, true);
         } catch (error) {
             this.addResult(testName, false, String(error));
+        }
+    }
+
+
+    /** Fake-Response fuer die Schleuse: EventEmitter mit destroyed-Zustand und einmaligem 'close' wie Node. */
+    private gateResponse(): any {
+        const res: any = new EventEmitter();
+        res.statusCode = 200;
+        res.headers = {} as Record<string, string>;
+        res.destroyed = false;
+        res.setHeader = (k: string, v: string) => { res.headers[k.toLowerCase()] = v; };
+        res.status = (code: number) => { res.statusCode = code; return res; };
+        res.json = (body: any) => { res.body = body; return res; };
+        res.hangUp = () => { res.destroyed = true; res.emit('close'); };
+        res.finishNow = () => { res.emit('finish'); res.emit('close'); };
+        return res;
+    }
+
+    /** Montiert eine Schleuse und liefert eine fire()-Funktion, die einen Request durchschickt. */
+    private gateHarness(limiter: HeavyRequestLimiter): (path?: string, req?: Record<string, any>) => { passed: boolean; res: any } {
+        let middleware: any = null;
+        limiter.applyTo({ use: (mw: any) => { middleware = mw; } } as any);
+        if (typeof middleware !== 'function') throw new Error('applyTo hat keine Middleware montiert');
+        return (path = '/x', req = {}) => {
+            const res = this.gateResponse();
+            const state = { passed: false, res };
+            middleware({ path, method: 'GET', ...req }, res, () => { state.passed = true; });
+            return state;
+        };
+    }
+
+    /**
+     * Test P9 A1: Wer in der Schlange auflegt, verlaesst sie sofort und erbt keinen Platz. Frueher erbte der
+     * Tote den Platz und gab ihn nie zurueck — bei 1 Platz war die Schleuse danach fuer immer zu.
+     */
+    private async testGateHangUpInQueueKeepsSlot(): Promise<void> {
+        const testName = 'P9 A1: Auflegen in der Schlange verliert keinen Platz';
+        try {
+            const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+            const limiter = new HeavyRequestLimiter({ name: 'public', paths: [/^\/x$/], maxConcurrent: 1, queueTimeoutMs: 5_000 });
+            const fire = this.gateHarness(limiter);
+            const a = fire();
+            const b = fire();
+            await tick();
+            if (!a.passed || b.passed) throw new Error('A muss durch, B muss warten');
+            b.res.hangUp();
+            await tick();
+            if (limiter.admission.stats().waiting !== 0) throw new Error('B steht nach dem Auflegen noch in der Schlange');
+            a.res.finishNow();
+            await tick();
+            if (b.passed) throw new Error('der Aufgelegte B darf nie durchgelassen werden');
+            if (limiter.admission.stats().active !== 0) throw new Error(`active ${limiter.admission.stats().active} statt 0 — Platz geleckt`);
+            const c = fire();
+            await tick();
+            if (!c.passed) throw new Error('C muss sofort durch — der Platz ist frei');
+            // Bereits geschlossene Antwort (Abbruch waehrend Session/Auth): kein Platz, kein next().
+            c.res.finishNow();
+            const gone = this.gateResponse();
+            gone.destroyed = true;
+            let passedGone = false;
+            let mw: any = null;
+            limiter.applyTo({ use: (m: any) => { mw = m; } } as any);
+            mw({ path: '/x', method: 'GET' }, gone, () => { passedGone = true; });
+            await tick();
+            if (passedGone || limiter.admission.stats().active !== 0) throw new Error('geschlossene Antwort hat einen Platz bekommen');
+            // finish UND close am selben Request geben genau einmal frei.
+            const d = fire();
+            const e = fire();
+            await tick();
+            d.res.finishNow();
+            await tick();
+            if (!e.passed) throw new Error('E muss nach D durch');
+            e.res.finishNow();
+            await tick();
+            if (limiter.admission.stats().active !== 0) throw new Error('doppelte Freigabe oder Leck');
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        }
+    }
+
+    /** Test P9 A2: parallele Anfragen warten und laufen seriell — keine 503 innerhalb des Budgets. */
+    private async testGateSerialWithinBudget(): Promise<void> {
+        const testName = 'P9 A2: Schleuse arbeitet Wartende seriell ab statt 503';
+        try {
+            const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+            const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+            const limiter = new HeavyRequestLimiter({ name: 'public', paths: [/^\/x$/], maxConcurrent: 1, queueTimeoutMs: 2_000 });
+            const fire = this.gateHarness(limiter);
+            const reqs = [fire(), fire(), fire(), fire()];
+            await tick();
+            for (let i = 0; i < reqs.length; i++) {
+                const passedNow = reqs.filter((r) => r.passed).length;
+                if (passedNow !== i + 1) throw new Error(`Schritt ${i}: ${passedNow} durch statt ${i + 1}`);
+                await sleep(50);
+                reqs[i].res.finishNow();
+                await tick();
+            }
+            if (reqs.some((r) => r.res.statusCode === 503)) throw new Error('503 innerhalb des Budgets');
+            if (limiter.admission.stats().active !== 0) throw new Error('Platz nicht zurueck');
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        }
+    }
+
+    /** Test P9 A3: volle Schlange -> sofort 503 + Retry-After (queue_full), englischer Text. */
+    private async testGateQueueMaxRejects(): Promise<void> {
+        const testName = 'P9 A3: Schlangen-Obergrenze -> sofort 503 + Retry-After';
+        try {
+            const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+            const limiter = new HeavyRequestLimiter({ name: 'public', paths: [/^\/x$/], maxConcurrent: 1, queueTimeoutMs: 5_000, queueMax: 2 });
+            const fire = this.gateHarness(limiter);
+            const reqs = [fire(), fire(), fire()];
+            const over = fire();
+            await tick();
+            if (over.passed || over.res.statusCode !== 503) throw new Error(`erwartet 503, erhalten ${over.res.statusCode}`);
+            if (!over.res.headers['retry-after']) throw new Error('Retry-After fehlt');
+            if (over.res.body?.reason !== 'queue_full' || !/run queue is full/.test(over.res.body?.message ?? '')) {
+                throw new Error(`Rumpf ${JSON.stringify(over.res.body)}`);
+            }
+            for (const r of reqs) r.res.hangUp();
+            await tick();
+            if (limiter.admission.stats().active !== 0 || limiter.admission.stats().waiting !== 0) throw new Error('Reste in der Schleuse');
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        }
+    }
+
+    /**
+     * Test P9 A4: Sperre je Quelle — 429 bei zu vielen gleichzeitigen Laeufen und bei leerem Token-Bucket
+     * (Retry-After = Sekunden bis zum naechsten Token); andere Quellen laufen weiter; UI-Pfade zaehlen nicht;
+     * leere Quellen verfallen beim Fegen.
+     */
+    private async testGateSourceLimits(): Promise<void> {
+        const testName = 'P9 A4: Sperre je Quelle (429 Inflight/Rate, Raeumung)';
+        try {
+            const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+            let now = 1_000_000;
+            const sources = new SourceRunGate({ maxInflight: 2, perMinute: 6, burst: 3, now: () => now });
+            const limiter = new HeavyRequestLimiter({
+                name: 'public', paths: [/^\/(k|list)$/], maxConcurrent: 10, queueTimeoutMs: 5_000,
+                sourcePaths: [/^\/k$/], sourceGate: sources,
+            });
+            const fire = this.gateHarness(limiter);
+            const alice = { ip: '203.0.113.7', ctx: { user: null, isSuperUser: false } };
+            const bob = { ip: '198.51.100.9', ctx: { user: null, isSuperUser: false } };
+
+            const a1 = fire('/k', alice);
+            const a2 = fire('/k', alice);
+            const a3 = fire('/k', alice);
+            await tick();
+            if (!a1.passed || !a2.passed) throw new Error('die ersten zwei Laeufe muessen durch');
+            if (a3.res.statusCode !== 429 || a3.res.body?.reason !== 'source_concurrency') throw new Error(`Inflight: ${a3.res.statusCode} ${JSON.stringify(a3.res.body)}`);
+            if (!a3.res.headers['retry-after']) throw new Error('Retry-After fehlt (Inflight)');
+            if (!/Too many concurrent runs from your client \(max 2\)/.test(a3.res.body.message)) throw new Error(`Text: ${a3.res.body.message}`);
+            const b1 = fire('/k', bob);
+            const list = fire('/list', alice);
+            await tick();
+            if (!b1.passed) throw new Error('eine andere Quelle darf nicht blockiert sein');
+            if (!list.passed) throw new Error('UI-Pfad darf nicht unter die Sperre je Quelle fallen');
+
+            a1.res.finishNow();
+            a2.res.finishNow();
+            await tick();
+            // Bucket: burst 3, a1+a2 haben 2 Token gekostet (a3 keins) -> noch eins, dann leer.
+            const a4 = fire('/k', alice);
+            await tick();
+            if (!a4.passed) throw new Error('drittes Token muss reichen');
+            a4.res.finishNow();
+            await tick();
+            const a5 = fire('/k', alice);
+            await tick();
+            if (a5.res.statusCode !== 429 || a5.res.body?.reason !== 'source_rate') throw new Error(`Rate: ${a5.res.statusCode} ${JSON.stringify(a5.res.body)}`);
+            if (a5.res.headers['retry-after'] !== '10') throw new Error(`Retry-After ${a5.res.headers['retry-after']} statt 10 (6/min = 1 Token je 10 s)`);
+            if (!/Too many runs from your client: limit 6 per minute/.test(a5.res.body.message)) throw new Error(`Text: ${a5.res.body.message}`);
+            now += 10_000;
+            const a6 = fire('/k', alice);
+            await tick();
+            if (!a6.passed) throw new Error('nach 10 s muss ein Token nachgefuellt sein');
+            a6.res.finishNow();
+            b1.res.finishNow();
+            list.res.finishNow();
+            await tick();
+
+            if (sources.stats().trackedSources !== 2) throw new Error(`${sources.stats().trackedSources} Quellen statt 2`);
+            now += 60_000;
+            sources.sweepNow();
+            if (sources.stats().trackedSources !== 0) throw new Error(`nach dem Fegen noch ${sources.stats().trackedSources} Quellen`);
+            if (sources.stats().rejectedConcurrencySinceBoot !== 1 || sources.stats().rejectedRateSinceBoot !== 1) throw new Error(`Zaehler ${JSON.stringify(sources.stats())}`);
+
+            // Obergrenze verfolgter Quellen: neue Quellen verdraengen leere, der Zustand waechst nicht.
+            const capped = new SourceRunGate({ maxInflight: 1, perMinute: 60, burst: 1, maxTrackedSources: 5, now: () => now });
+            for (let i = 0; i < 50; i++) {
+                const entered = capped.enter(`ip:10.0.0.${i}`);
+                if (entered.ok) entered.pass.leave();
+            }
+            if (capped.stats().trackedSources > 5) throw new Error(`${capped.stats().trackedSources} Quellen trotz Obergrenze 5`);
+
+            // MCP: dieselbe Zulassung, Ablehnung als Tool-Fehler mit demselben Text.
+            const gates = new RunGates(
+                new RunAdmission({ name: 'heavy', maxConcurrent: 4, queueTimeoutMs: 1_000, queueMax: 5 }),
+                new RunAdmission({ name: 'public', maxConcurrent: 4, queueTimeoutMs: 1_000, queueMax: 5 }),
+                new SourceRunGate({ maxInflight: 1, perMinute: 60, burst: 5 }),
+            );
+            const user: AuthCtx = { user: { id: 'u-p9', email: 'p9@test', name: null }, isSuperUser: false };
+            const first = McpRunAdmission.request({ runGates: gates } as any, user);
+            const granted = await first.granted();
+            if (!granted.ok) throw new Error('erster MCP-Lauf muss zugelassen sein');
+            const second = McpRunAdmission.request({ runGates: gates } as any, user);
+            const refused = second.immediateFailure;
+            if (!refused?.isError || !/Too many concurrent runs from your client/.test(refused.content[0].text)) throw new Error(`MCP: ${JSON.stringify(refused)}`);
+            granted.lease.release();
+            if (gates.heavy.stats().active !== 0) throw new Error('MCP-Lease gab den Platz nicht zurueck');
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        }
+    }
+
+    /** Ein Speicher-Messgeraet fuer Tests: RSS in MB vorgeben, GC zaehlen. */
+    private fakeMemoryProbe(rssMb: () => number): { probe: MemoryProbe; gcCalls: () => number } {
+        let gc = 0;
+        return {
+            probe: { rssBytes: () => rssMb() * 1024 * 1024, collectGarbage: () => { gc++; return true; } },
+            gcCalls: () => gc,
+        };
+    }
+
+    /** Env setzen und den alten Stand zurueckgeben (fuer finally). */
+    private withEnv(values: Record<string, string>): () => void {
+        const previous: Record<string, string | undefined> = {};
+        for (const [k, v] of Object.entries(values)) {
+            previous[k] = process.env[k];
+            process.env[k] = v;
+        }
+        return () => {
+            for (const [k, v] of Object.entries(previous)) {
+                if (v === undefined) delete process.env[k];
+                else process.env[k] = v;
+            }
+        };
+    }
+
+    /**
+     * Test P9 C1: Waechter mit Gegendruck — ueber dem Soft-Limit erst GC, dann Warten auf das Ende eines
+     * laufenden Isolats, danach neu messen und zulassen; ohne laufendes Isolat sofort abweisen (Marker) und
+     * Wartende wecken; nach Ablauf der Frist abweisen.
+     */
+    private async testMemoryGuardBackpressure(): Promise<void> {
+        const testName = 'P9 C1: Waechter wartet auf Isolat-Ende, weist ohne Isolat ab, weckt Wartende';
+        const gate = new DogWorkerGate();
+        const restore = this.withEnv({
+            MEMORY_GUARD: '1', MEMORY_SOFT_LIMIT_MB: '400', DOG_WORKER_GLOBAL_LIMIT: '2',
+            MEMORY_GUARD_WAIT_MS: '2000', MEMORY_GUARD_GC_MIN_INTERVAL_MS: '0',
+        });
+        try {
+            let rss = 500;
+            const meter = this.fakeMemoryProbe(() => rss);
+            gate.setMemoryProbe(meter.probe);
+
+            // Ein Isolat laeuft (haelt Slot 1).
+            const runningLease = await gate.acquire();
+            const running = gate.isolateSpawned(runningLease);
+
+            // Zweiter Dog: Slot 2, RSS zu hoch -> GC-Versuch, dann Warten auf das Ende des laufenden.
+            const lease2 = await gate.acquire();
+            let admitted = false;
+            let refusal: unknown = null;
+            const pending = gate.admit({ storageId: 's2', name: 'Two' }).then(() => { admitted = true; }, (e) => { refusal = e; });
+            await new Promise((r) => setTimeout(r, 30));
+            if (admitted || refusal) throw new Error('darf bei hoher RSS und laufendem Isolat weder zulassen noch abweisen');
+            if (meter.gcCalls() < 1) throw new Error('kein GC-Versuch vor dem Warten');
+            if (gate.stats().memoryWaiters !== 1) throw new Error(`memoryWaiters ${gate.stats().memoryWaiters} statt 1`);
+
+            rss = 300;                           // das Isolat gibt beim Ende Speicher frei
+            running.terminating();
+            running.exited();
+            await pending;
+            if (!admitted) throw new Error(`nach Isolat-Ende nicht zugelassen: ${String(refusal)}`);
+            if (gate.stats().slotsActive !== 1) throw new Error(`slotsActive ${gate.stats().slotsActive} statt 1 (Slot 1 erst beim exit frei)`);
+            lease2.release();
+
+            // Ohne laufendes Isolat: sofort abweisen, mit Marker.
+            rss = 500;
+            const lease3 = await gate.acquire();
+            const started = Date.now();
+            let lone: any = null;
+            await gate.admit({ storageId: 's3', name: 'Three' }).catch((e) => { lone = e; });
+            lease3.release();
+            if (!lone || !String(lone.message).includes(DOG_MEMPRESSURE_MARKER)) throw new Error(`keine Abweisung mit Marker: ${lone}`);
+            if (Date.now() - started > 500) throw new Error('ohne laufendes Isolat darf nicht gewartet werden');
+            if (classifyDogError(String(lone.message)) !== 'oom') throw new Error('Abweisung nicht als oom klassifiziert');
+
+            // Zwei Wartende, das letzte Isolat endet, RSS bleibt hoch -> beide geweckt, beide abgewiesen (keine Waisen).
+            const lastLease = await gate.acquire();
+            const last = gate.isolateSpawned(lastLease);
+            process.env.DOG_WORKER_GLOBAL_LIMIT = '3';
+            const w1 = await gate.acquire();
+            const w2 = await gate.acquire();
+            const results: string[] = [];
+            const p1 = gate.admit({ storageId: 'w1', name: 'W1' }).then(() => results.push('ok'), () => results.push('refused'));
+            const p2 = gate.admit({ storageId: 'w2', name: 'W2' }).then(() => results.push('ok'), () => results.push('refused'));
+            await new Promise((r) => setTimeout(r, 20));
+            const t0 = Date.now();
+            last.exited();
+            await Promise.all([p1, p2]);
+            w1.release();
+            w2.release();
+            if (results.join(',') !== 'refused,refused') throw new Error(`Wartende: ${results.join(',')}`);
+            if (Date.now() - t0 > 500) throw new Error('Wartende wurden nicht geweckt, sondern liefen in die Frist');
+
+            // Frist: ein Isolat laeuft endlos, RSS bleibt hoch -> Abweisung nach MEMORY_GUARD_WAIT_MS.
+            process.env.MEMORY_GUARD_WAIT_MS = '100';
+            const hogLease = await gate.acquire();
+            const hog = gate.isolateSpawned(hogLease);
+            const late = await gate.acquire();
+            const t1 = Date.now();
+            let timedOut: any = null;
+            await gate.admit({ storageId: 'late', name: 'Late' }).catch((e) => { timedOut = e; });
+            late.release();
+            hog.exited();
+            if (!timedOut || Date.now() - t1 < 90) throw new Error('Frist nicht eingehalten');
+            const stats = gate.stats();
+            if (stats.memoryRejectionsSinceBoot !== 4) throw new Error(`Abweisungen ${stats.memoryRejectionsSinceBoot} statt 4`);
+            if (stats.slotsActive !== 0 || stats.liveIsolates !== 0) throw new Error(`Reste: ${JSON.stringify(stats)}`);
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        } finally {
+            restore();
+        }
+    }
+
+    /**
+     * Test P9 C2: Echte Dog-Isolate — der Slot geht erst mit dem 'exit' zurueck: zu keinem Zeitpunkt leben
+     * mehr Isolate als DOG_WORKER_GLOBAL_LIMIT; danach alle Slots frei. Dazu der vmTimeout-Deckel und ein
+     * Waechter, der ohne laufendes Isolat abweist (geloggt, Marker im Dog-Fehler).
+     */
+    private async testWorkerSlotReleasedOnExit(baseDogsMap: Map<string, any>): Promise<void> {
+        const testName = 'P9 C2: Slot erst nach exit frei, vmTimeout-Deckel, Waechter-Abweisung im Lauf';
+        const restore = this.withEnv({ DOG_WORKER_GLOBAL_LIMIT: '1', SLOPDOGS_VM_TIMEOUT_MAX_MS: '300' });
+        const gate = DogWorkerGate.shared;
+        let sampler: ReturnType<typeof setInterval> | null = null;
+        try {
+            const dogs = Array.from({ length: 5 }, (_, i) => this.p4bDog(`P9Slot${i}`, `return ${i};`));
+            const { run } = this.p4bRun(baseDogsMap, dogs.map((d) => d.lineageId as string), dogs);
+            let maxLive = 0;
+            sampler = setInterval(() => { maxLive = Math.max(maxLive, gate.stats().liveIsolates); }, 1);
+            await run.run();
+            const settleUntil = Date.now() + 3_000;
+            while (gate.stats().liveIsolates > 0 && Date.now() < settleUntil) await new Promise((r) => setTimeout(r, 10));
+            clearInterval(sampler);
+            sampler = null;
+            if (maxLive > 1) throw new Error(`${maxLive} lebende Isolate bei Limit 1`);
+            const after = gate.stats();
+            if (after.liveIsolates !== 0 || after.slotsActive !== 0 || after.slotWaiters !== 0) throw new Error(`Reste nach dem Lauf: ${JSON.stringify(after)}`);
+            if (dogs.some((d, i) => d.collected !== i)) throw new Error(`Ergebnisse: ${JSON.stringify(dogs.map((d) => d.collected))}`);
+
+            // vmTimeout-Deckel: 100000 ms angefragt, 300 ms Deckel.
+            if (resolveVmTimeoutMs(100_000) !== 300) throw new Error(`resolveVmTimeoutMs(100000) = ${resolveVmTimeoutMs(100_000)}`);
+            const slow = this.p4bDog('P9Slow', 'const until = Date.now() + 5000; while (Date.now() < until) { /* spin */ } return 1;');
+            const slowRun = this.p4bRun(baseDogsMap, [slow.lineageId as string], [slow]);
+            slowRun.run.setVmTimeoutMs(100_000);
+            const t0 = Date.now();
+            await slowRun.run.run();
+            const tookMs = Date.now() - t0;
+            if (tookMs > 3_000) throw new Error(`vmTimeout nicht gedeckelt (${tookMs} ms)`);
+            if (slowRun.reports[0]?.outcome !== 'timeout' || !String(slowRun.reports[0]?.errorMessage).includes('300ms')) {
+                throw new Error(`Timeout-Report: ${JSON.stringify(slowRun.reports.map((r) => [r.outcome, r.errorMessage]))}`);
+            }
+
+            // Waechter im echten Lauf: RSS ueber Soft-Limit, kein anderes Isolat -> Abweisung, Klasse oom.
+            const restoreGuard = this.withEnv({ MEMORY_GUARD: '1', MEMORY_SOFT_LIMIT_MB: '1', MEMORY_GUARD_GC_MIN_INTERVAL_MS: '0' });
+            gate.setMemoryProbe(this.fakeMemoryProbe(() => 999).probe);
+            try {
+                const refused = this.p4bDog('P9Refused', 'return 1;');
+                const refusedRun = this.p4bRun(baseDogsMap, [refused.lineageId as string], [refused]);
+                const before = gate.stats().memoryRejectionsSinceBoot;
+                await refusedRun.run.run();
+                if (refusedRun.reports[0]?.outcome !== 'oom' || !String(refusedRun.reports[0]?.errorMessage).includes(DOG_MEMPRESSURE_MARKER)) {
+                    throw new Error(`Waechter-Report: ${JSON.stringify(refusedRun.reports.map((r) => [r.outcome, r.errorMessage]))}`);
+                }
+                if (gate.stats().memoryRejectionsSinceBoot !== before + 1) throw new Error('Abweisung nicht gezaehlt');
+                if (gate.stats().slotsActive !== 0) throw new Error('abgewiesener Dog haelt einen Slot');
+            } finally {
+                gate.setMemoryProbe(null);
+                restoreGuard();
+            }
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        } finally {
+            if (sampler) clearInterval(sampler);
+            restore();
+        }
+    }
+
+    /**
+     * Test P9 D1: Ein Eltern-Dog mit klein beginnendem displayName (Alias) haelt keinen Tracking-Proxy im
+     * Kontext-Cache: wiederholtes Lesen des vmContext (wie get_snapshot_dog_vmcontext) laesst readTracking
+     * nicht wachsen; das Kind sieht den Wert trotzdem unter allen Namen.
+     */
+    private async testAliasContextHoldsNoProxy(baseDogsMap: Map<string, any>): Promise<void> {
+        const testName = 'P9 D1: Alias-Eltern halten keine Tracking-Proxys (readTracking waechst nicht)';
+        try {
+            const parent = this.p4bDog('railsGeometry', 'return { rails: [1, 2, 3], meta: { name: "x" } };');
+            const child = this.p4bDog('P9AliasChild', 'return { sum: RailsGeometry.rails.length + railsGeometry.rails.length + Railsgeometry.meta.name.length };', [parent.lineageId as string]);
+            const { run } = this.p4bRun(baseDogsMap, [child.lineageId as string, parent.lineageId as string], [child, parent]);
+            const season = await run.run();
+            if ((child.collected as any)?.sum !== 7) throw new Error(`Kind-Ergebnis ${JSON.stringify(child.collected)} — Alias nicht gebunden`);
+            const baseline = season.readTracking.length;
+            for (let i = 0; i < 5; i++) JSON.stringify(child.simpleVmContext);
+            const grown = season.readTracking.length - baseline;
+            if (grown !== 0) throw new Error(`readTracking wuchs um ${grown} beim Lesen des vmContext`);
+            if (baseline === 0) throw new Error('der Lauf selbst hat keine Lesespur hinterlassen (Tracking kaputt?)');
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        }
+    }
+
+    /**
+     * Test P9 B1: Ehrlicher Lead-Status auf /k/:id — Lead wirft -> 502 lead_failed (ohne Interna fuer RUN),
+     * Speicher-Waechter -> 503 + Retry-After, Lead ohne Wert -> 200 mit JSON null; READ sieht Details.
+     * Dazu LeadOutcome direkt und openapi.json bei totem Lead.
+     */
+    private async testLeadFailureIsNot200(nodesStore: IStore, kennelsController: KennelController, baseDogsMap: Map<string, any>): Promise<void> {
+        const testName = 'P9 B1: Lead-Fehler -> 502/503 statt 200 mit leerem Rumpf';
+        const stamp = Date.now();
+        const kennelIds: string[] = [];
+        try {
+            const runHandler = new KennelRunHandler({ kennelsController, nodesStore, baseDogsMap, callCounter: this.testCallCounter });
+            const anon: AuthCtx = { user: null, isSuperUser: false };
+            const makeKennel = async (label: string, theRun: string, visibility: Visibility = 'public'): Promise<string> => {
+                const dog = await this.saveAclTestDog(nodesStore, `P9Lead${label}`, theRun, { visibility: 'public', ownerId: 'UO' });
+                const id = `test-p9-lead-${label.toLowerCase()}-${stamp}`;
+                const created = await kennelsController.create({ id, name: `P9 ${label}`, dogIds: [dog], visibility, ownerId: 'UO' });
+                if (!created.ok) throw new Error(`Kennel ${label}: ${created.error}`);
+                kennelIds.push(id);
+                return id;
+            };
+
+            // run-only: Anonyme duerfen ausfuehren, aber nicht lesen — sie duerfen den Fehlertext nicht sehen.
+            const throwing = await makeKennel('Throws', 'throw new Error("p9 secret boom");', 'run-only');
+            const failed = await this.callHandler(runHandler, 'handlePublicGet', { params: { id: throwing }, ctx: anon });
+            if (failed.statusCode !== 502 || failed.body?.error !== 'lead_failed') throw new Error(`Wurf: ${failed.statusCode} ${JSON.stringify(failed.body)}`);
+            if (JSON.stringify(failed.body).includes('p9 secret boom')) throw new Error('RUN-Leser sieht den Fehlertext');
+            const failedPost = await this.callHandler(runHandler, 'handlePublicPost', { params: { id: throwing }, ctx: anon, method: 'POST', body: {} });
+            if (failedPost.statusCode !== 502) throw new Error(`POST Wurf: ${failedPost.statusCode}`);
+            const failedRead = await this.callHandler(runHandler, 'handlePublicGet', { params: { id: throwing }, ctx: this.fakeUser('UO') });
+            if (failedRead.statusCode !== 502 || !String(failedRead.body?.detail).includes('p9 secret boom')) throw new Error(`READ-Detail: ${JSON.stringify(failedRead.body)}`);
+            const failedExec = await this.callHandler(runHandler, 'handleExecute', { params: { id: throwing }, ctx: anon });
+            if (failedExec.statusCode !== 502) throw new Error(`/execute Wurf: ${failedExec.statusCode}`);
+
+            const empty = await makeKennel('Empty', 'return null;');
+            const nothing = await this.callHandler(runHandler, 'handlePublicGet', { params: { id: empty }, ctx: anon });
+            if (nothing.statusCode !== 200 || nothing.body !== 'null') throw new Error(`leerer Lead: ${nothing.statusCode} ${JSON.stringify(nothing.body)}`);
+
+            // Speicher-Waechter: RSS ueber Soft-Limit, kein anderes Isolat -> 503 + Retry-After.
+            const restoreGuard = this.withEnv({ MEMORY_GUARD: '1', MEMORY_SOFT_LIMIT_MB: '1', MEMORY_GUARD_GC_MIN_INTERVAL_MS: '0' });
+            DogWorkerGate.shared.setMemoryProbe(this.fakeMemoryProbe(() => 999).probe);
+            try {
+                const ok = await makeKennel('Busy', 'return { fine: true };');
+                const busy = await this.callHandler(runHandler, 'handlePublicGet', { params: { id: ok }, ctx: anon });
+                if (busy.statusCode !== 503 || busy.body?.reason !== 'memory_pressure' || !busy.headers['retry-after']) {
+                    throw new Error(`Waechter: ${busy.statusCode} ${JSON.stringify(busy.body)} ${JSON.stringify(busy.headers)}`);
+                }
+                const swagger = new KennelSwaggerHandler(runHandler, nodesStore);
+                const spec = await this.callHandler(swagger, 'handleSwaggerJson', { params: { id: ok }, ctx: anon });
+                if (spec.statusCode !== 503) throw new Error(`openapi.json bei Waechter: ${spec.statusCode}`);
+            } finally {
+                DogWorkerGate.shared.setMemoryProbe(null);
+                restoreGuard();
+            }
+
+            // LeadOutcome ohne Season: Waves allein.
+            const fromWaves = (waves: any) => LeadOutcome.fromWaves(waves, 'lead');
+            if (fromWaves([[{ id: 'lead', result: 1 }]]).status !== 'ok') throw new Error('ok nicht erkannt');
+            if (fromWaves([[{ id: 'lead', error: 'x' }]]).status !== 'failed') throw new Error('failed nicht erkannt');
+            if (!fromWaves([[{ id: 'lead', error: `a ${DOG_MEMPRESSURE_MARKER} b` }]]).memoryPressure) throw new Error('Speicherdruck nicht erkannt');
+            if (fromWaves([[{ id: 'other', result: 1 }]]).status !== 'not_run') throw new Error('not_run nicht erkannt');
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        } finally {
+            for (const id of kennelIds) {
+                try { await kennelsController.delete(id); } catch { /* ignore */ }
+            }
+        }
+    }
+
+    /** Test: Snapshot-Cache haelt die Byte-Grenze — aelteste fallen, Summe bleibt darunter. */
+    private async testSnapshotCacheByteLimit(): Promise<void> {
+        const testName = 'D: Snapshot-Cache haelt Byte-Grenze (LRU)';
+        try {
+            const maxBytes = 50_000;
+            const cache = new KennelSnapshotCache({ maxBytes });
+            const waves = (tag: string) => [[{ id: tag, result: 'x'.repeat(15_000) }]] as any;
+            const ids = ['k1', 'k2', 'k3', 'k4', 'k5'];
+            for (const id of ids) {
+                cache.startJob(id, 'anon', 'v1', undefined, undefined, null);
+                cache.markOk(id, 'anon', { waves: waves(id), kennelConfig: {} as any });
+            }
+            const stats = cache.stats();
+            if (stats.approxBytes > maxBytes) throw new Error(`Summe ${stats.approxBytes} > Grenze ${maxBytes}`);
+            if (stats.maxBytes !== maxBytes) throw new Error(`maxBytes ${stats.maxBytes} statt ${maxBytes}`);
+            if (stats.evictedSinceBoot < 1) throw new Error('nichts verdraengt');
+            if (stats.entries >= ids.length) throw new Error(`alle ${stats.entries} Eintraege noch da`);
+            if (cache.has('k1', 'anon')) throw new Error('aeltester Eintrag k1 noch da');
+            const newest = cache.get('k5', 'anon');
+            if (newest?.status !== 'ok' || !newest.waves) throw new Error('neuester Eintrag k5 fehlt oder ohne Waves');
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        }
+    }
+
+    /** Test: Raeumung laeuft auch bei markOk/delete, nicht erst bei get(). */
+    private async testSnapshotCacheEvictsOnMutation(): Promise<void> {
+        const testName = 'D: Snapshot-Cache raeumt bei markOk/delete (Idle-TTL)';
+        try {
+            const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+            const cache = new KennelSnapshotCache({ idleTtlMs: 20, maxBytes: 10_000_000 });
+            // Innenansicht ohne Raeumung: get/has/stats raeumen selbst und taugen hier nicht als Messung.
+            const held = () => (cache as any).entries.size as number;
+            const okWaves = [[{ id: 'a', result: 'x'.repeat(100) }]] as any;
+
+            cache.startJob('old', 'anon', 'v1', undefined, undefined, null);
+            cache.markOk('old', 'anon', { waves: okWaves, kennelConfig: {} as any });
+            await sleep(60);
+            cache.startJob('fresh', 'anon', 'v1', undefined, undefined, null);
+            cache.markOk('fresh', 'anon', { waves: okWaves, kennelConfig: {} as any });
+            if (held() !== 1) throw new Error(`nach markOk ${held()} Eintraege statt 1`);
+
+            await sleep(60);
+            cache.delete('does-not-exist', 'anon');
+            if (held() !== 0) throw new Error(`nach delete ${held()} Eintraege statt 0`);
+
+            const stats = cache.stats();
+            if (stats.entries !== 0 || stats.approxBytes !== 0) throw new Error(`stats ${JSON.stringify(stats)}`);
+            if (stats.evictedSinceBoot !== 2) throw new Error(`evictedSinceBoot ${stats.evictedSinceBoot} statt 2`);
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        }
+    }
+
+    /** Test: Ein Einzeleintrag ueber der Grenze wird nicht gehalten, sondern failed mit Hinweis. */
+    private async testSnapshotCacheRejectsOversizedEntry(): Promise<void> {
+        const testName = 'D: Snapshot-Cache lehnt Eintrag ueber Grenze ab';
+        try {
+            const cache = new KennelSnapshotCache({ maxBytes: 10_000 });
+            cache.startJob('big', 'anon', 'v1', undefined, undefined, null);
+            cache.markOk('big', 'anon', {
+                waves: [[{ id: 'a', result: 'x'.repeat(50_000) }]] as any,
+                kennelConfig: {} as any,
+                leadDogId: 'a',
+                leadResult: 'x'.repeat(50_000),
+            });
+            const entry = cache.get('big', 'anon');
+            if (!entry) throw new Error('Eintrag fehlt ganz');
+            if (entry.status !== 'failed') throw new Error(`status ${entry.status} statt failed`);
+            if (entry.waves !== undefined || entry.leadResult !== undefined) throw new Error('Waves/leadResult trotzdem gehalten');
+            const msg = entry.errorMessage ?? '';
+            if (!/^Snapshot too large to keep in memory \(~[\d.]+ MB, limit [\d.]+ MB\)\. Use execute_kennel or run_kennel, or raise SNAPSHOT_CACHE_MAX_MB\.$/.test(msg)) {
+                throw new Error(`Text: ${msg}`);
+            }
+            if (cache.stats().approxBytes !== 0) throw new Error(`approxBytes ${cache.stats().approxBytes} statt 0`);
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        }
+    }
+
+    /** Test: ApproxHeapSize zaehlt geteilte Objekte einmal und uebersteht tiefe Daten. */
+    private async testApproxHeapSizeDedupeAndDepth(): Promise<void> {
+        const testName = 'D: ApproxHeapSize Dedupe + tiefe Daten';
+        try {
+            const shared = { payload: 'y'.repeat(100_000) };
+            const once = ApproxHeapSize.of([{ a: shared }]);
+            const twice = ApproxHeapSize.of([{ a: shared, b: shared }, shared]);
+            if (once < 100_000) throw new Error(`Unterschaetzt: ${once}`);
+            if (twice > once + 1_000) throw new Error(`Doppelt gezaehlt: ${once} vs ${twice}`);
+            let deep: any = { leaf: true };
+            for (let i = 0; i < 200_000; i++) deep = { next: deep };
+            const deepBytes = ApproxHeapSize.of([deep]);
+            if (deepBytes < 200_000 * ApproxHeapSize.OBJECT_OVERHEAD) throw new Error(`tiefe Kette zu leicht: ${deepBytes}`);
+            let getterFired = false;
+            const withGetter = Object.defineProperty({}, 'boom', { get: () => { getterFired = true; return 'z'.repeat(10); }, enumerable: true });
+            ApproxHeapSize.of([withGetter, () => 'fn', Symbol('s')]);
+            if (getterFired) throw new Error('Getter ausgeloest');
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        }
+    }
+
+    /** Test: Session-Store get/set/destroy-Rundlauf (JSON-Kopie, keine geteilte Referenz). */
+    private async testSessionStoreRoundTrip(): Promise<void> {
+        const testName = 'D: Session-Store get/set/destroy';
+        const store = new BoundedSessionStore({ pruneIntervalMs: 0 });
+        try {
+            const get = (sid: string) => new Promise<any>((resolve, reject) => store.get(sid, (err, s) => (err ? reject(err) : resolve(s))));
+            const set = (sid: string, s: any) => new Promise<void>((resolve, reject) => store.set(sid, s, (err) => (err ? reject(err) : resolve())));
+            const destroy = (sid: string) => new Promise<void>((resolve, reject) => store.destroy(sid, (err) => (err ? reject(err) : resolve())));
+            const cookie = { expires: new Date(Date.now() + 60_000).toISOString(), httpOnly: true, path: '/' };
+            const sess: any = { cookie, userId: 'u-roundtrip' };
+            await set('s1', sess);
+            sess.userId = 'mutated-after-set';
+            const loaded = await get('s1');
+            if (loaded?.userId !== 'u-roundtrip') throw new Error(`geladen: ${JSON.stringify(loaded)}`);
+            await destroy('s1');
+            if ((await get('s1')) != null) throw new Error('nach destroy noch da');
+            await set('s2', { cookie: { expires: new Date(Date.now() - 1).toISOString() }, userId: 'u-old' });
+            if ((await get('s2')) != null) throw new Error('abgelaufenes Cookie noch lesbar');
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        } finally {
+            store.close();
+        }
+    }
+
+    /** Test: Pending-Sitzung ohne userId verfaellt nach TTL, eingeloggte bleibt. */
+    private async testSessionStorePendingTtl(): Promise<void> {
+        const testName = 'D: Session-Store Pending-TTL';
+        let clock = 1_000_000;
+        const store = new BoundedSessionStore({ pendingTtlMs: 900_000, pruneIntervalMs: 0, now: () => clock });
+        try {
+            const get = (sid: string) => new Promise<any>((resolve, reject) => store.get(sid, (err, s) => (err ? reject(err) : resolve(s))));
+            const cookie = { expires: new Date(clock + 7 * 24 * 3600_000).toISOString() };
+            store.set('pending', { cookie, pkce: { codeVerifier: 'v', state: 's' } } as any);
+            store.set('user', { cookie, userId: 'u1' } as any);
+            clock += 899_000;
+            if (!(await get('pending'))) throw new Error('Pending vor Ablauf schon weg');
+            clock += 2_000;
+            if ((await get('pending')) != null) throw new Error('Pending nach TTL noch da');
+            if ((await get('user'))?.userId !== 'u1') throw new Error('eingeloggte Sitzung verloren');
+            const stats = store.stats();
+            if (stats.sessions !== 1 || stats.pending !== 0) throw new Error(`stats ${JSON.stringify(stats)}`);
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        } finally {
+            store.close();
+        }
+    }
+
+    /** Test: Obergrenze verdraengt aelteste Pending-Sitzungen vor eingeloggten. */
+    private async testSessionStoreMaxPrefersPending(): Promise<void> {
+        const testName = 'D: Session-Store Obergrenze verdraengt Pending zuerst';
+        const store = new BoundedSessionStore({ max: 3, pruneIntervalMs: 0 });
+        try {
+            const ids = () => new Promise<string[]>((resolve, reject) =>
+                store.all((err, all) => (err ? reject(err) : resolve(Object.keys(all ?? {}).sort()))));
+            const cookie = { expires: new Date(Date.now() + 3600_000).toISOString() };
+            const user = (id: string) => ({ cookie, userId: id }) as any;
+            const pending = () => ({ cookie, pkce: { codeVerifier: 'v', state: 's' } }) as any;
+
+            store.set('L1', user('u1'));
+            store.set('P1', pending());
+            store.set('P2', pending());
+            store.set('P3', pending());
+            let now = await ids();
+            if (now.join(',') !== 'L1,P2,P3') throw new Error(`nach P3: ${now.join(',')}`);
+
+            store.set('L2', user('u2'));
+            store.set('L3', user('u3'));
+            now = await ids();
+            if (now.join(',') !== 'L1,L2,L3') throw new Error(`nach L3: ${now.join(',')}`);
+
+            store.set('L4', user('u4'));
+            now = await ids();
+            if (now.join(',') !== 'L2,L3,L4') throw new Error(`nach L4 (keine Pending mehr): ${now.join(',')}`);
+            if (store.stats().max !== 3) throw new Error('max falsch gemeldet');
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        } finally {
+            store.close();
         }
     }
 
