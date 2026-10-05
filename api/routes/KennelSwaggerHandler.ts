@@ -5,7 +5,9 @@ import { publicKennelDocsPath, publicKennelOpenApiPath } from '@slopdogs/core';
 import { toSwaggridCast } from '../../services/swaggridAdapter';
 import { KennelRunHandler } from './KennelRunHandler';
 import { accessOf } from '../../mcp/auth/visibility';
-import { redactWavesForCtx } from '../../services/wavesRedaction';
+import { REDACTED_TEXT, redactWavesForCtx } from '../../services/wavesRedaction';
+import { LeadOutcome } from '../../services/LeadOutcome';
+import type { Access } from '../../mcp/auth/visibility';
 import type { IStore } from '../../store/IStore';
 import { LEGACY_ROUTE, PUBLIC_ROUTE } from './routeTable';
 
@@ -47,6 +49,7 @@ export class KennelSwaggerHandler {
     }
 
     private async handleSwaggerJson(req: any, res: any): Promise<void> {
+        let access: Access = 'none';
         try {
             const config = await this.runHandler.loadKennelConfig(req.params.id, req.query.version);
             if (!config) {
@@ -58,9 +61,10 @@ export class KennelSwaggerHandler {
             // whoever may run the kennel may read how to call it; nobody else learns it exists
             // (404, like /run). The defaults (defaultQuery/defaultBody as examples) are config:
             // READ only. A RUN caller gets the lead's shape and nothing of the pack behind it.
-            const access = accessOf(config as any, req.ctx);
+            access = accessOf(config as any, req.ctx);
             if (access === 'none') {
-                res.status(404).json({ error: `Kennel ${req.params.id} nicht gefunden` });
+                // Derselbe Text wie "gibt es nicht" — die Sprache verraet nicht mehr, dass der Kennel existiert.
+                res.status(404).json({ error: `Kennel ${req.params.id} not found` });
                 return;
             }
             const query = this.runHandler.mergeQueryParams(config.defaultQuery, req.query);
@@ -68,6 +72,14 @@ export class KennelSwaggerHandler {
             const rawWaves = await this.runHandler.runKennel(
                 config, query, body, this.runHandler.toCapabilityCtx(req.ctx), undefined, { source: 'swagger' },
             );
+            // Ein toter Lead liefert keine ehrliche Spec (kein Schema, kein Beispiel) — dieselbe Antwort wie
+            // /k/:id: 503 + Retry-After beim Speicher-Waechter, sonst 502 lead_failed. "empty" bleibt 200:
+            // ein Lead ohne Wert ist eine gueltige, nur beispiellose Spec.
+            const leadRef = config.dogIds?.[0] ?? '';
+            if (LeadOutcome.of(rawWaves, leadRef).failed) {
+                this.runHandler.sendLeadOutcome(req, res, rawWaves, leadRef, access);
+                return;
+            }
             // Every wave node's result lands in the spec as a schema example — dogs the caller
             // may not read inside a readable kennel are redacted exactly like /run.
             const waves = access === 'read' ? await redactWavesForCtx(rawWaves, req.ctx, this.nodesStore) : rawWaves;
@@ -80,7 +92,8 @@ export class KennelSwaggerHandler {
             res.json(spec);
         } catch (err) {
             console.error('[KennelSwaggerHandler.handleSwaggerJson]', err);
-            res.status(500).json({ error: String(err) });
+            // W13 wie die Lauf-Handler: nur READ-Leser sehen den Text eines Laufs, nie einen Stack.
+            res.status(500).json({ error: access === 'read' ? ((err as any)?.message || String(err)) : REDACTED_TEXT });
         }
     }
 
@@ -139,7 +152,7 @@ export class KennelSwaggerHandler {
             // 404 like the spec, for everyone who may not run it. The lock and "Authorize" button
             // remain for private kennels the caller may run (e.g. to try it out with a PAT).
             if (accessOf(config as any, req.ctx) === 'none') {
-                res.status(404).json({ error: `Kennel ${req.params.id} nicht gefunden` });
+                res.status(404).json({ error: `Kennel ${req.params.id} not found` });
                 return;
             }
             const title = config.name || config.id;

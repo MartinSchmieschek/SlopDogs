@@ -12,6 +12,7 @@ import { findLeadNodeEntry, type NodeEntry, type Waves } from './WavesConverter'
 import type { IKennelConfig } from '@slopdogs/core';
 import type { IStore } from '../store/IStore';
 import { DogAclIndex } from './dogAccess';
+import { LeadOutcome, type LeadStatus } from './LeadOutcome';
 
 /** Platzhalter, der an die Stelle eines verweigerten Ergebnisses tritt. */
 export const REDACTED_RESULT = '[redacted: not authorized to read this dog]';
@@ -111,6 +112,9 @@ async function pinnedVersionsOf(nodesStore: IStore, refs: Array<{ id: string; li
 export interface KennelRunView {
     ok: true;
     waves: Array<{ dogCount: number }>;
+    /** Was der Lead getan hat: ok | empty | failed | not_run — ohne Fehlertext (RUN-Leser). */
+    leadStatus: LeadStatus;
+    /** Das Lead-Ergebnis; `null`, wenn es keins gibt (frueher fiel der Schluessel als undefined aus dem JSON). */
     leadResult: unknown;
     durationMs: number;
     dogs: Array<{ status: 'ok' | 'failed' }>;
@@ -125,7 +129,8 @@ export function kennelRunView(waves: Waves, config: IKennelConfig, durationMs: n
     return {
         ok: true,
         waves: waves.map((wave) => ({ dogCount: wave.length })),
-        leadResult: findLeadNodeEntry(waves, config)?.result,
+        leadStatus: LeadOutcome.of(waves, config.dogIds?.[0]).status,
+        leadResult: findLeadNodeEntry(waves, config)?.result ?? null,
         durationMs,
         dogs: waves.flat().map((n) => ({ status: n.error ? 'failed' : 'ok' })),
     };
