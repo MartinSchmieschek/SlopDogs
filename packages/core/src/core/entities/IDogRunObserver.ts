@@ -38,10 +38,20 @@ export const DOG_TIMEOUT_MARKER = 'VM execution timed out after';
 /** Steht in der Meldung, wenn der Worker eines SerializedDog sein Heap-Limit gesprengt hat. */
 export const DOG_OOM_MARKER = 'sandbox worker exceeded its heap limit';
 
+/**
+ * Steht in der Meldung, wenn der Dog gar nicht erst gestartet wurde, weil die Container-RSS
+ * schon am Soft-Limit stand. Anders als DOG_OOM_MARKER (ein einzelner Worker sprengt SEINEN
+ * Heap-Deckel) schuetzt das vor der SUMME: der Prozess wuerde sonst still vom OS OOM-gekillt.
+ * Der Lauf wird mit diesem Fehler abgewiesen statt den ganzen Container mitzureissen.
+ */
+export const DOG_MEMPRESSURE_MARKER = 'sandbox refused: server under memory pressure';
+
 /** Ordnet eine Fehlermeldung ein — nur ueber die Marker, nie ueber Prosa. */
 export function classifyDogError(msg: string): DogRunOutcome {
     const text = typeof msg === 'string' ? msg : String(msg);
     if (text.includes(DOG_TIMEOUT_MARKER)) return 'timeout';
-    if (text.includes(DOG_OOM_MARKER)) return 'oom';
+    // Speicherdruck zaehlt als Speicher-Befund (gleiche Schublade wie ein gerissener Heap-Deckel):
+    // beides ist "zu wenig RAM", die Union bleibt schlank.
+    if (text.includes(DOG_OOM_MARKER) || text.includes(DOG_MEMPRESSURE_MARKER)) return 'oom';
     return 'error';
 }
