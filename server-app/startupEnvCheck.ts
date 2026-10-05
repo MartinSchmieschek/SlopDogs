@@ -212,8 +212,13 @@ export const ENV_CATALOG: readonly EnvVarSpec[] = [
     },
     {
         name: 'TRUST_PROXY_HOPS', section: 'operations', since: 'P9',
-        purpose: 'Proxy-Hops vor der App (express trust proxy): macht req.ip zur Client-IP fuer die Sperre je Quelle; zu hoch = X-Forwarded-For faelschbar, zu niedrig = alle Anonymen eine Quelle',
+        purpose: 'Proxy-Hops vor der App (express trust proxy): fuer req.secure/Secure-Cookie; req.ip ist nur Fallback der Client-IP (auf Render mit 1 Hop die Cloudflare-Kante bzw. ein 10.x-Hop, nie der Client — siehe CLIENT_IP_HEADER)',
         defaultValue: '1 in integration/production, sonst 0', consequence: 'Default nach NODE_ENV',
+    },
+    {
+        name: 'CLIENT_IP_HEADER', section: 'operations', since: 'P10',
+        purpose: 'Header mit der Client-IP fuer die Sperre je Quelle (anonym) und das MCP-Rate-Limit; gilt nur, wenn er genau eine gueltige IP traegt, sonst req.ip. Leer = aus. Nur hinter einem Proxy setzen, der den Header selbst setzt (Cloudflare), sonst faelschbar',
+        defaultValue: 'cf-connecting-ip bei RENDER=true, sonst aus', consequence: 'Default nach RENDER',
     },
     {
         name: 'CORS_ALLOWED_ORIGINS', section: 'operations', since: 'vor P1',
@@ -271,19 +276,39 @@ export const ENV_CATALOG: readonly EnvVarSpec[] = [
         defaultValue: '50', consequence: 'Default',
     },
     {
-        name: 'RUNS_PER_SOURCE_MAX_INFLIGHT', section: 'operations', since: 'P9',
-        purpose: 'Kennel-Laeufe je Quelle (user:<id> bzw. Client-IP) gleichzeitig, aktiv + wartend; darueber 429 + Retry-After',
+        name: 'RUNS_PER_SOURCE_MAX_ACTIVE', section: 'operations', since: 'P10',
+        purpose: 'Gleichzeitig AKTIVE Kennel-Laeufe je anonymer Quelle (anon:<Client-IP>); weitere warten in der Schlange der Quelle (reihum mit anderen Quellen), kein 429',
         defaultValue: '2', consequence: 'Default',
     },
     {
+        name: 'RUNS_PER_SOURCE_MAX_QUEUED', section: 'operations', since: 'P10',
+        purpose: 'Wartende Kennel-Laeufe je Quelle (anonym und angemeldet); darueber 429 source_queue_full + Retry-After',
+        defaultValue: '8', consequence: 'Default',
+    },
+    {
         name: 'RUNS_PER_SOURCE_PER_MINUTE', section: 'operations', since: 'P9',
-        purpose: 'Token-Bucket je Quelle: Kennel-Laeufe pro Minute (Nachfuellrate); darueber 429 + Retry-After',
+        purpose: 'Token-Bucket je anonymer Quelle: Kennel-Laeufe pro Minute (Nachfuellrate); darueber 429 + Retry-After',
         defaultValue: '20', consequence: 'Default',
     },
     {
         name: 'RUNS_PER_SOURCE_BURST', section: 'operations', since: 'P9',
-        purpose: 'Token-Bucket je Quelle: so viele Laeufe duerfen direkt hintereinander starten',
-        defaultValue: '6', consequence: 'Default',
+        purpose: 'Token-Bucket je anonymer Quelle: so viele Laeufe duerfen direkt hintereinander starten (Gruppenbeitritt mehrerer Handys hinter einer IP)',
+        defaultValue: '12', consequence: 'Default',
+    },
+    {
+        name: 'RUNS_PER_USER_MAX_ACTIVE', section: 'operations', since: 'P10',
+        purpose: 'Gleichzeitig AKTIVE Kennel-Laeufe je angemeldeter Quelle (user:<id>, Session oder PAT); weitere warten',
+        defaultValue: '3', consequence: 'Default',
+    },
+    {
+        name: 'RUNS_PER_USER_PER_MINUTE', section: 'operations', since: 'P10',
+        purpose: 'Token-Bucket je angemeldeter Quelle: Kennel-Laeufe pro Minute; darueber 429 + Retry-After',
+        defaultValue: '60', consequence: 'Default',
+    },
+    {
+        name: 'RUNS_PER_USER_BURST', section: 'operations', since: 'P10',
+        purpose: 'Token-Bucket je angemeldeter Quelle: so viele Laeufe duerfen direkt hintereinander starten',
+        defaultValue: '20', consequence: 'Default',
     },
     {
         name: 'WAVE_CONCURRENCY', section: 'operations', since: 'vor P1',

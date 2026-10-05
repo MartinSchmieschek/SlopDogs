@@ -38,7 +38,8 @@ import { KennelController } from './api/KennelController';
 import { ControllerRegistry, ConfigRouteHandler } from './api/routes/ConfigRouteHandler';
 import { TypeDefBuilder } from './services/TypeDefBuilder';
 import { HeavyRequestLimiter } from './server-app/heavyRequestLimiter';
-import { RunAdmission, RunGates, SourceRunGate } from './server-app/runAdmission';
+import { RunAdmission, RunGates, RunSource, SourceRunGate, type SourceLimits } from './server-app/runAdmission';
+import { ClientAddress } from './server-app/clientAddress';
 import { McpRunAdmission } from './mcp/tools/types';
 import { LeadOutcome } from './services/LeadOutcome';
 import { BoundedSessionStore } from './mcp/auth/BoundedSessionStore';
@@ -264,7 +265,10 @@ export class StartupTest {
             await this.testGateHangUpInQueueKeepsSlot();
             await this.testGateSerialWithinBudget();
             await this.testGateQueueMaxRejects();
-            await this.testGateSourceLimits();
+            await this.testClientAddressDerivation();
+            await this.testGateSourceQueuesInsteadOf429();
+            await this.testGateRoundRobinAcrossSources();
+            await this.testGateSourceRatesByKind();
             await this.testSnapshotCacheByteLimit();
             await this.testSnapshotCacheEvictsOnMutation();
             await this.testSnapshotCacheRejectsOversizedEntry();
@@ -1710,20 +1714,81 @@ export class StartupTest {
         }
     }
 
+    /** Grenzen einer Quellen-Art fuer Tests. */
+    private sourceLimits(maxActive: number, maxQueued: number, perMinute: number, burst: number): SourceLimits {
+        return { maxActive, maxQueued, perMinute, burst };
+    }
+
     /**
-     * Test P9 A4: Sperre je Quelle — 429 bei zu vielen gleichzeitigen Laeufen und bei leerem Token-Bucket
-     * (Retry-After = Sekunden bis zum naechsten Token); andere Quellen laufen weiter; UI-Pfade zaehlen nicht;
-     * leere Quellen verfallen beim Fegen.
+     * Test P10 A1: Client-IP — CF-Connecting-IP zaehlt nur eingeschaltet und nur als genau eine gueltige IP;
+     * gefaelschte Listen und Muell fallen auf req.ip zurueck, ohne req.ip auf die Socket-Adresse. Default des
+     * Schalters nach RENDER. Schluessel: IPv4 voll, IPv6 auf /64. Die Header-Form traegt keine Adresse.
      */
-    private async testGateSourceLimits(): Promise<void> {
-        const testName = 'P9 A4: Sperre je Quelle (429 Inflight/Rate, Raeumung)';
+    private async testClientAddressDerivation(): Promise<void> {
+        const testName = 'P10 A1: Client-IP aus CF-Connecting-IP, Faelschung verworfen, IPv6 /64';
+        try {
+            const cf = new ClientAddress('cf-connecting-ip');
+            const edge = '10.226.1.2';
+            const viaCf = (value: any) => cf.ipOf({ ip: edge, headers: { 'cf-connecting-ip': value } });
+            if (viaCf('203.0.113.7') !== '203.0.113.7') throw new Error('gueltiger CF-Header nicht genommen');
+            if (viaCf(' 2001:db8::1 ') !== '2001:db8::1') throw new Error('IPv6 im CF-Header nicht genommen');
+            if (viaCf('203.0.113.7, 198.51.100.1') !== edge) throw new Error('mehrwertiger CF-Header nicht verworfen');
+            if (viaCf('evil') !== edge) throw new Error('ungueltiger CF-Header nicht verworfen');
+            if (viaCf(['203.0.113.7', '198.51.100.1']) !== edge) throw new Error('doppelter CF-Header nicht verworfen');
+            if (cf.ipOf({ ip: edge, headers: {} }) !== edge) throw new Error('ohne Header kein Fallback auf req.ip');
+            if (cf.ipOf({ headers: {}, socket: { remoteAddress: '::1' } }) !== '::1') throw new Error('ohne req.ip kein Fallback auf die Socket');
+            const off = new ClientAddress(null);
+            if (off.ipOf({ ip: edge, headers: { 'cf-connecting-ip': '203.0.113.7' } }) !== edge) throw new Error('ausgeschaltet darf der Header nicht zaehlen');
+
+            if (ClientAddress.headerFromEnv({ RENDER: 'true' } as any) !== 'cf-connecting-ip') throw new Error('Default auf Render nicht cf-connecting-ip');
+            if (ClientAddress.headerFromEnv({} as any) !== null) throw new Error('Default ohne Render nicht aus');
+            if (ClientAddress.headerFromEnv({ RENDER: 'true', CLIENT_IP_HEADER: '' } as any) !== null) throw new Error('CLIENT_IP_HEADER= schaltet nicht ab');
+            if (ClientAddress.headerFromEnv({ CLIENT_IP_HEADER: ' X-Test-IP ' } as any) !== 'x-test-ip') throw new Error('CLIENT_IP_HEADER nicht kleingeschrieben uebernommen');
+
+            if (ClientAddress.keyOf('203.0.113.7') !== '203.0.113.7') throw new Error('IPv4 nicht voll');
+            if (ClientAddress.keyOf('::ffff:203.0.113.7') !== '203.0.113.7') throw new Error('IPv4-in-IPv6 nicht als IPv4');
+            if (ClientAddress.keyOf('2001:db8:1:2:aaaa::1') !== ClientAddress.keyOf('2001:db8:1:2:bbbb::2')) throw new Error('gleiches /64 ergibt verschiedene Schluessel');
+            if (ClientAddress.keyOf('2001:db8:1:2::1') === ClientAddress.keyOf('2001:db8:1:3::1')) throw new Error('verschiedene /64 ergeben denselben Schluessel');
+
+            const anon: AuthCtx = { user: null, isSuperUser: false };
+            if (RunSource.of(anon, '203.0.113.7') !== 'anon:203.0.113.7') throw new Error(`anonyme Quelle ${RunSource.of(anon, '203.0.113.7')}`);
+            if (RunSource.of({ user: { id: 'u1', email: 'e', name: null }, isSuperUser: false }, '203.0.113.7') !== 'user:u1') throw new Error('angemeldet nicht user:<id>');
+            if (RunSource.of({ ...anon, clientIp: '198.51.100.9' }, null) !== 'anon') throw new Error('ohne IP-Argument muss anon bleiben (Aufrufer reicht clientIp durch)');
+            if (RunSource.isAuthenticated('anon:203.0.113.7') || !RunSource.isAuthenticated('user:u1')) throw new Error('Art der Quelle falsch erkannt');
+
+            cf.observeAnonymous({ ip: edge, headers: { 'x-forwarded-for': '203.0.113.7, 172.71.0.1, 10.226.1.2', 'cf-connecting-ip': '203.0.113.7' } });
+            const shape = cf.lastAnonymousShape;
+            if (!shape || shape.xffEntries !== 3 || !shape.hasCfConnectingIp || !shape.cfConnectingIpValid || shape.usedHeader !== 'cf-connecting-ip') {
+                throw new Error(`Form ${JSON.stringify(shape)}`);
+            }
+            const shapeText = JSON.stringify(shape);
+            if (['203.0.113', '172.71', '10.226'].some((part) => shapeText.includes(part))) throw new Error('Form traegt eine Adresse');
+            off.observeAnonymous({ ip: edge, headers: {} });
+            const plain = off.lastAnonymousShape;
+            if (!plain || plain.xffEntries !== 0 || plain.hasCfConnectingIp || plain.usedHeader !== null) throw new Error(`Form ohne Header ${JSON.stringify(plain)}`);
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        }
+    }
+
+    /**
+     * Test P10 B1: Gleichzeitigkeit je Quelle wird EINGEREIHT statt 429 — 3 gleichzeitige Laeufe einer Quelle
+     * laufen seriell durch (2 aktiv, 1 wartend); andere Quellen und UI-Pfade sind nicht blockiert; 429
+     * (source_queue_full) erst ueber der Schlangen-Grenze der Quelle; Auflegen in der Quellen-Schlange traegt
+     * sofort aus und verliert keinen Platz.
+     */
+    private async testGateSourceQueuesInsteadOf429(): Promise<void> {
+        const testName = 'P10 B1: Quelle ueber Limit wird eingereiht, 429 erst bei voller Quellen-Schlange';
         try {
             const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
-            let now = 1_000_000;
-            const sources = new SourceRunGate({ maxInflight: 2, perMinute: 6, burst: 3, now: () => now });
+            const sources = new SourceRunGate({
+                anonymous: this.sourceLimits(2, 3, 60, 20),
+                authenticated: this.sourceLimits(3, 3, 60, 20),
+            });
             const limiter = new HeavyRequestLimiter({
-                name: 'public', paths: [/^\/(k|list)$/], maxConcurrent: 10, queueTimeoutMs: 5_000,
-                sourcePaths: [/^\/k$/], sourceGate: sources,
+                name: 'public', paths: [/^\/(k|list)$/], maxConcurrent: 4, queueTimeoutMs: 5_000,
+                sourcePaths: [/^\/k$/], sourceGate: sources, clientAddress: new ClientAddress(null),
             });
             const fire = this.gateHarness(limiter);
             const alice = { ip: '203.0.113.7', ctx: { user: null, isSuperUser: false } };
@@ -1734,70 +1799,233 @@ export class StartupTest {
             const a3 = fire('/k', alice);
             await tick();
             if (!a1.passed || !a2.passed) throw new Error('die ersten zwei Laeufe muessen durch');
-            if (a3.res.statusCode !== 429 || a3.res.body?.reason !== 'source_concurrency') throw new Error(`Inflight: ${a3.res.statusCode} ${JSON.stringify(a3.res.body)}`);
-            if (!a3.res.headers['retry-after']) throw new Error('Retry-After fehlt (Inflight)');
-            if (!/Too many concurrent runs from your client \(max 2\)/.test(a3.res.body.message)) throw new Error(`Text: ${a3.res.body.message}`);
+            if (a3.passed) throw new Error('der dritte Lauf muss warten (Quelle am Limit)');
+            if (a3.res.statusCode !== 200) throw new Error(`der dritte Lauf bekam ${a3.res.statusCode} statt zu warten`);
             const b1 = fire('/k', bob);
             const list = fire('/list', alice);
             await tick();
             if (!b1.passed) throw new Error('eine andere Quelle darf nicht blockiert sein');
             if (!list.passed) throw new Error('UI-Pfad darf nicht unter die Sperre je Quelle fallen');
-
             a1.res.finishNow();
+            await tick();
+            if (!a3.passed) throw new Error('der dritte Lauf muss nach dem ersten durch');
+
+            // a2, a3 aktiv; drei warten (Grenze 3), der vierte Wartende -> 429.
+            const a4 = fire('/k', alice);
+            const a5 = fire('/k', alice);
+            const a6 = fire('/k', alice);
+            const a7 = fire('/k', alice);
+            await tick();
+            if (a4.passed || a5.passed || a6.passed) throw new Error('a4..a6 muessen warten');
+            if (a7.res.statusCode !== 429 || a7.res.body?.reason !== 'source_queue_full') throw new Error(`Quellen-Schlange: ${a7.res.statusCode} ${JSON.stringify(a7.res.body)}`);
+            if (a7.res.headers['retry-after'] !== '5') throw new Error(`Retry-After ${a7.res.headers['retry-after']} statt 5`);
+            if (!/Too many queued runs from your client \(max 3 waiting\)/.test(a7.res.body.message)) throw new Error(`Text: ${a7.res.body.message}`);
+            if (sources.stats().queuedBySourceMax !== 3) throw new Error(`queuedBySourceMax ${sources.stats().queuedBySourceMax} statt 3`);
+
+            // Auflegen in der Quellen-Schlange: sofort raus, kein Platz geerbt, Reihenfolge bleibt.
+            a5.res.hangUp();
+            await tick();
+            if (limiter.admission.stats().waiting !== 2) throw new Error(`nach dem Auflegen ${limiter.admission.stats().waiting} Wartende statt 2`);
+            if (sources.stats().queuedBySourceMax !== 2) throw new Error('Aufgelegter zaehlt noch in der Quelle');
             a2.res.finishNow();
             await tick();
-            // Bucket: burst 3, a1+a2 haben 2 Token gekostet (a3 keins) -> noch eins, dann leer.
-            const a4 = fire('/k', alice);
+            if (!a4.passed || a6.passed) throw new Error('nach a2 muss a4 (nicht a6) durch');
+            a3.res.finishNow();
             await tick();
-            if (!a4.passed) throw new Error('drittes Token muss reichen');
-            a4.res.finishNow();
+            if (!a6.passed) throw new Error('nach a3 muss a6 durch');
+            if (a5.passed) throw new Error('der Aufgelegte a5 darf nie durch');
+            for (const r of [a4, a6, b1, list]) r.res.finishNow();
             await tick();
-            const a5 = fire('/k', alice);
-            await tick();
-            if (a5.res.statusCode !== 429 || a5.res.body?.reason !== 'source_rate') throw new Error(`Rate: ${a5.res.statusCode} ${JSON.stringify(a5.res.body)}`);
-            if (a5.res.headers['retry-after'] !== '10') throw new Error(`Retry-After ${a5.res.headers['retry-after']} statt 10 (6/min = 1 Token je 10 s)`);
-            if (!/Too many runs from your client: limit 6 per minute/.test(a5.res.body.message)) throw new Error(`Text: ${a5.res.body.message}`);
-            now += 10_000;
-            const a6 = fire('/k', alice);
-            await tick();
-            if (!a6.passed) throw new Error('nach 10 s muss ein Token nachgefuellt sein');
-            a6.res.finishNow();
-            b1.res.finishNow();
-            list.res.finishNow();
-            await tick();
+            const pot = limiter.admission.stats();
+            if (pot.active !== 0 || pot.waiting !== 0) throw new Error(`Reste: ${JSON.stringify(pot)}`);
+            const gate = sources.stats();
+            if (gate.rejectedSourceQueueFullSinceBoot !== 1 || gate.rejectedRateSinceBoot !== 0 || gate.queuedBySourceMax !== 0) throw new Error(`Zaehler ${JSON.stringify(gate)}`);
+            if (pot.withdrawnWhileWaitingSinceBoot !== 1) throw new Error(`withdrawn ${pot.withdrawnWhileWaitingSinceBoot} statt 1`);
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        }
+    }
 
+    /**
+     * Test P10 B2: Round-Robin — Quelle A mit 5 Wartenden blockiert Quelle B nicht: B kommt nach hoechstens
+     * einem weiteren A-Lauf dran (Topf mit 1 Platz). Danach wechseln die Quellen sich ab.
+     */
+    private async testGateRoundRobinAcrossSources(): Promise<void> {
+        const testName = 'P10 B2: freie Plaetze reihum ueber Quellen (A hungert B nicht aus)';
+        try {
+            const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+            const sources = new SourceRunGate({
+                anonymous: this.sourceLimits(2, 10, 600, 50),
+                authenticated: this.sourceLimits(2, 10, 600, 50),
+            });
+            const limiter = new HeavyRequestLimiter({
+                name: 'public', paths: [/^\/k$/], maxConcurrent: 1, queueTimeoutMs: 5_000,
+                sourcePaths: [/^\/k$/], sourceGate: sources, clientAddress: new ClientAddress(null),
+            });
+            const fire = this.gateHarness(limiter);
+            const alice = { ip: '203.0.113.7', ctx: { user: null, isSuperUser: false } };
+            const bob = { ip: '198.51.100.9', ctx: { user: null, isSuperUser: false } };
+            const order: string[] = [];
+            const runs = [fire('/k', alice)];
+            for (let i = 0; i < 5; i++) runs.push(fire('/k', alice));
+            const b = fire('/k', bob);
+            const b2 = fire('/k', bob);
+            await tick();
+            if (!runs[0].passed) throw new Error('a1 muss durch');
+            if (sources.stats().queuedBySourceMax !== 5) throw new Error(`A wartet mit ${sources.stats().queuedBySourceMax} statt 5`);
+            const all = [...runs.map((r, i) => ({ r, name: `a${i + 1}` })), { r: b, name: 'b1' }, { r: b2, name: 'b2' }];
+            order.push('a1');
+            for (let step = 0; step < all.length - 1; step++) {
+                const running = all.filter((x) => x.r.passed && !(x.r as any).done);
+                if (running.length !== 1) throw new Error(`Schritt ${step}: ${running.length} aktiv statt 1`);
+                (running[0].r as any).done = true;
+                running[0].r.res.finishNow();
+                await tick();
+                const next = all.find((x) => x.r.passed && !(x.r as any).done);
+                if (!next) throw new Error(`Schritt ${step}: niemand rueckt nach`);
+                order.push(next.name);
+            }
+            const firstB = order.indexOf('b1');
+            if (firstB < 0 || firstB > 2) throw new Error(`B kam zu spaet dran: ${order.join(' ')}`);
+            if (order.indexOf('b2') > order.indexOf('b1') + 2) throw new Error(`B wurde nicht reihum bedient: ${order.join(' ')}`);
+            (all.find((x) => !(x.r as any).done)!.r as any).done = true;
+            all.forEach((x) => x.r.res.finishNow());
+            await tick();
+            if (limiter.admission.stats().active !== 0 || limiter.admission.stats().waiting !== 0) throw new Error('Reste in der Schleuse');
+            if (all.some((x) => x.r.res.statusCode !== 200)) throw new Error('eine Anfrage wurde abgewiesen');
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        }
+    }
+
+    /**
+     * Test P10 C1: getrennte Raten — anonym und angemeldet haben eigene Token-Buckets und Grenzen (429
+     * source_rate mit Retry-After = Sekunden bis zum Token); Defaults aus der Umgebung; leere Quellen
+     * verfallen; Obergrenze verfolgter Quellen. MCP: ueber dem Limit wird gewartet statt abgewiesen, anonyme
+     * MCP-Laeufe zaehlen je Client-IP, und ein frei werdender Platz in einem Topf weckt Wartende im anderen.
+     */
+    private async testGateSourceRatesByKind(): Promise<void> {
+        const testName = 'P10 C1: Raten je Art (anonym/angemeldet), Raeumung, MCP wartet je Client-IP';
+        const restore = this.withEnv({
+            RUNS_PER_SOURCE_MAX_ACTIVE: '', RUNS_PER_SOURCE_MAX_QUEUED: '', RUNS_PER_SOURCE_PER_MINUTE: '', RUNS_PER_SOURCE_BURST: '',
+            RUNS_PER_USER_MAX_ACTIVE: '', RUNS_PER_USER_PER_MINUTE: '', RUNS_PER_USER_BURST: '',
+        });
+        try {
+            const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+            const defaults = SourceRunGate.fromEnv().stats();
+            const expectLimits = (got: SourceLimits, want: SourceLimits, label: string) => {
+                if (JSON.stringify(got) !== JSON.stringify(want)) throw new Error(`${label}-Defaults ${JSON.stringify(got)}`);
+            };
+            expectLimits(defaults.anonymous, this.sourceLimits(2, 8, 20, 12), 'anonym');
+            expectLimits(defaults.authenticated, this.sourceLimits(3, 8, 60, 20), 'angemeldet');
+
+            let now = 1_000_000;
+            const sources = new SourceRunGate({
+                anonymous: this.sourceLimits(5, 5, 6, 2),
+                authenticated: this.sourceLimits(5, 5, 60, 4),
+                now: () => now,
+            });
+            const limiter = new HeavyRequestLimiter({
+                name: 'public', paths: [/^\/k$/], maxConcurrent: 10, queueTimeoutMs: 5_000,
+                sourcePaths: [/^\/k$/], sourceGate: sources, clientAddress: new ClientAddress(null),
+            });
+            const fire = this.gateHarness(limiter);
+            const alice = { ip: '203.0.113.7', ctx: { user: null, isSuperUser: false } };
+            const host = { ip: '203.0.113.7', ctx: { user: { id: 'host', email: 'h@test', name: null }, isSuperUser: false } };
+            const runOnce = async (req: Record<string, any>) => {
+                const r = fire('/k', req);
+                await tick();
+                if (r.passed) r.res.finishNow();
+                await tick();
+                return r;
+            };
+            for (let i = 0; i < 2; i++) if (!(await runOnce(alice)).passed) throw new Error(`anonym Lauf ${i + 1} muss durch`);
+            const aOver = await runOnce(alice);
+            if (aOver.res.statusCode !== 429 || aOver.res.body?.reason !== 'source_rate') throw new Error(`anonym Rate: ${aOver.res.statusCode} ${JSON.stringify(aOver.res.body)}`);
+            if (aOver.res.headers['retry-after'] !== '10') throw new Error(`Retry-After ${aOver.res.headers['retry-after']} statt 10 (6/min)`);
+            if (!/Too many runs from your client: limit 6 per minute/.test(aOver.res.body.message)) throw new Error(`Text: ${aOver.res.body.message}`);
+            // Gleiche IP, aber angemeldet: eigener Bucket, eigene Grenze.
+            for (let i = 0; i < 4; i++) if (!(await runOnce(host)).passed) throw new Error(`angemeldet Lauf ${i + 1} muss durch (eigener Bucket)`);
+            const hOver = await runOnce(host);
+            if (hOver.res.statusCode !== 429 || hOver.res.headers['retry-after'] !== '1') throw new Error(`angemeldet Rate: ${hOver.res.statusCode} Retry-After ${hOver.res.headers['retry-after']}`);
+            if (!/limit 60 per minute/.test(hOver.res.body.message)) throw new Error(`Text: ${hOver.res.body.message}`);
+            now += 10_000;
+            if (!(await runOnce(alice)).passed) throw new Error('nach 10 s muss ein anonymes Token nachgefuellt sein');
+            if (sources.stats().rejectedRateSinceBoot !== 2) throw new Error(`Rate-Zaehler ${sources.stats().rejectedRateSinceBoot}`);
             if (sources.stats().trackedSources !== 2) throw new Error(`${sources.stats().trackedSources} Quellen statt 2`);
-            now += 60_000;
+            now += 120_000;
             sources.sweepNow();
             if (sources.stats().trackedSources !== 0) throw new Error(`nach dem Fegen noch ${sources.stats().trackedSources} Quellen`);
-            if (sources.stats().rejectedConcurrencySinceBoot !== 1 || sources.stats().rejectedRateSinceBoot !== 1) throw new Error(`Zaehler ${JSON.stringify(sources.stats())}`);
 
             // Obergrenze verfolgter Quellen: neue Quellen verdraengen leere, der Zustand waechst nicht.
-            const capped = new SourceRunGate({ maxInflight: 1, perMinute: 60, burst: 1, maxTrackedSources: 5, now: () => now });
+            const capped = new SourceRunGate({
+                anonymous: this.sourceLimits(1, 1, 60, 1), authenticated: this.sourceLimits(1, 1, 60, 1),
+                maxTrackedSources: 5, now: () => now,
+            });
             for (let i = 0; i < 50; i++) {
-                const entered = capped.enter(`ip:10.0.0.${i}`);
+                const entered = capped.enter(`anon:10.0.0.${i}`, true);
                 if (entered.ok) entered.pass.leave();
             }
             if (capped.stats().trackedSources > 5) throw new Error(`${capped.stats().trackedSources} Quellen trotz Obergrenze 5`);
 
-            // MCP: dieselbe Zulassung, Ablehnung als Tool-Fehler mit demselben Text.
+            // MCP: dieselbe Zulassung — ueber dem Limit warten statt abweisen; anonym je Client-IP.
             const gates = new RunGates(
-                new RunAdmission({ name: 'heavy', maxConcurrent: 4, queueTimeoutMs: 1_000, queueMax: 5 }),
-                new RunAdmission({ name: 'public', maxConcurrent: 4, queueTimeoutMs: 1_000, queueMax: 5 }),
-                new SourceRunGate({ maxInflight: 1, perMinute: 60, burst: 5 }),
+                new RunAdmission({ name: 'heavy', maxConcurrent: 4, queueTimeoutMs: 2_000, queueMax: 5 }),
+                new RunAdmission({ name: 'public', maxConcurrent: 4, queueTimeoutMs: 2_000, queueMax: 5 }),
+                new SourceRunGate({ anonymous: this.sourceLimits(1, 2, 600, 50), authenticated: this.sourceLimits(1, 2, 600, 50) }),
+                new ClientAddress(null),
             );
-            const user: AuthCtx = { user: { id: 'u-p9', email: 'p9@test', name: null }, isSuperUser: false };
+            const user: AuthCtx = { user: { id: 'u-p10', email: 'p10@test', name: null }, isSuperUser: false };
             const first = McpRunAdmission.request({ runGates: gates } as any, user);
             const granted = await first.granted();
             if (!granted.ok) throw new Error('erster MCP-Lauf muss zugelassen sein');
             const second = McpRunAdmission.request({ runGates: gates } as any, user);
-            const refused = second.immediateFailure;
-            if (!refused?.isError || !/Too many concurrent runs from your client/.test(refused.content[0].text)) throw new Error(`MCP: ${JSON.stringify(refused)}`);
+            if (second.immediateFailure) throw new Error(`zweiter MCP-Lauf abgewiesen statt eingereiht: ${JSON.stringify(second.immediateFailure)}`);
+            let secondDone = false;
+            const secondGranted = second.granted().then((g) => { secondDone = true; return g; });
+            await tick();
+            if (secondDone) throw new Error('zweiter MCP-Lauf darf erst nach dem ersten starten');
             granted.lease.release();
+            const g2 = await secondGranted;
+            if (!g2.ok) throw new Error('zweiter MCP-Lauf nach dem ersten nicht zugelassen');
+            g2.lease.release();
             if (gates.heavy.stats().active !== 0) throw new Error('MCP-Lease gab den Platz nicht zurueck');
+
+            const anonA: AuthCtx = { user: null, isSuperUser: false, clientIp: '203.0.113.7' };
+            const anonB: AuthCtx = { user: null, isSuperUser: false, clientIp: '198.51.100.9' };
+            const pa1 = gates.requestRun(anonA);
+            const pa2 = gates.requestRun(anonA);
+            const pb1 = gates.requestRun(anonB);
+            await tick();
+            const [oa1, ob1] = await Promise.all([pa1.outcome, pb1.outcome]);
+            if (!oa1.granted || !ob1.granted) throw new Error('anonyme MCP-Laeufe zweier IPs muessen je sofort starten (nicht unter einem gemeinsamen anon)');
+            if (gates.heavy.stats().waiting !== 1) throw new Error(`zweiter Lauf derselben IP muss warten (waiting ${gates.heavy.stats().waiting})`);
+
+            // Topf-uebergreifend: dieselbe Quelle gibt im Public-Topf frei -> ihr Wartender im Heavy-Topf startet.
+            pb1.close();
+            const pub = gates.publicRuns.request('user:cross', gates.sources);
+            const heavyWait = gates.heavy.request('user:cross', gates.sources);
+            await tick();
+            if (!(await pub.outcome).granted) throw new Error('Public-Lauf muss starten');
+            if (heavyWait.immediateDenial) throw new Error('Heavy-Lauf derselben Quelle abgewiesen statt eingereiht');
+            pub.close();
+            const heavyOutcome = await heavyWait.outcome;
+            if (!heavyOutcome.granted) throw new Error('Heavy-Lauf startet nicht, nachdem die Quelle im Public-Topf frei wurde');
+            heavyWait.close();
+            pa1.close();
+            const oa2 = await pa2.outcome;
+            if (!oa2.granted) throw new Error('zweiter Lauf derselben IP nach dem ersten nicht zugelassen');
+            pa2.close();
+            const pots = gates.stats().pots;
+            if (pots.some((p) => p.active !== 0 || p.waiting !== 0)) throw new Error(`Reste ${JSON.stringify(pots)}`);
+            if (!('lastAnonymousShape' in gates.stats())) throw new Error('lastAnonymousShape fehlt in den Gate-Stats');
             this.addResult(testName, true);
         } catch (error) {
             this.addResult(testName, false, String(error));
+        } finally {
+            restore();
         }
     }
 
