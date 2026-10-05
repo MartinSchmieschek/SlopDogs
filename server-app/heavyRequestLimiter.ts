@@ -9,7 +9,10 @@
  * Diese Klasse haengt einen Topf (RunAdmission, siehe runAdmission.ts) vor bestimmte Pfade:
  *   - frei -> sofort durch; belegt -> FIFO-Schlange, die Anfrage WARTET und kommt seriell dran;
  *   - abgewiesen wird nur bei voller Schlange (sofort 503) oder nach dem langen Wartebudget (503);
- *   - fuer Kennel-LAEUFE (sourcePaths) gilt zusaetzlich die Sperre je Quelle (429 + Retry-After).
+ *   - fuer Kennel-LAEUFE (sourcePaths) gilt zusaetzlich die Sperre je Quelle: je Quelle hoechstens
+ *     `maxActive` aktiv, weitere warten in der Schlange ihrer Quelle; freie Plaetze gehen reihum ueber die
+ *     Quellen. 429 + Retry-After erst bei voller Quellen-Schlange oder leerem Token-Bucket.
+ *   - die Quelle anonymer Laeufe ist die Client-IP aus ClientAddress (CF-Connecting-IP auf Render).
  *
  * Der Platz haengt am Leben der Verbindung, ab dem Einreihen: 'close' wird SOFORT beim Einreihen
  * abonniert. Legt ein Wartender auf, verlaesst er die Schlange und erbt nie einen Platz; legt ein
@@ -23,6 +26,7 @@
  */
 
 import type { Application, Request, RequestHandler, Response } from 'express';
+import { ClientAddress } from './clientAddress';
 import {
     AdmissionDenial,
     RunAdmission,
@@ -54,6 +58,8 @@ export interface HeavyRequestLimiterOptions {
     sourceGate?: SourceRunGate | null;
     /** Ein vorhandener Topf (geteilt mit MCP); ohne Angabe baut die Klasse ihren eigenen. */
     admission?: RunAdmission;
+    /** Ableitung der Client-IP fuer anonyme Quellen; ohne Angabe aus der Umgebung (CLIENT_IP_HEADER/RENDER). */
+    clientAddress?: ClientAddress;
 }
 
 export class HeavyRequestLimiter {
@@ -92,6 +98,7 @@ export class HeavyRequestLimiter {
             sourcePaths: HeavyRequestLimiter.HEAVY_RUN_PATHS,
             sourceGate: gates?.sources ?? null,
             admission: gates?.heavy,
+            clientAddress: gates?.clientAddress,
         });
     }
 
@@ -107,6 +114,7 @@ export class HeavyRequestLimiter {
             sourcePaths: HeavyRequestLimiter.PUBLIC_PATHS,
             sourceGate: gates?.sources ?? null,
             admission: gates?.publicRuns,
+            clientAddress: gates?.clientAddress,
         });
     }
 
@@ -115,6 +123,7 @@ export class HeavyRequestLimiter {
     private readonly methods: ReadonlySet<string> | null;
     private readonly sourcePaths: readonly RegExp[];
     private readonly sourceGate: SourceRunGate | null;
+    private readonly clientAddress: ClientAddress;
     readonly admission: RunAdmission;
 
     constructor(options: HeavyRequestLimiterOptions) {
@@ -122,6 +131,7 @@ export class HeavyRequestLimiter {
         this.methods = options.methods ? new Set(options.methods.map((m) => m.toUpperCase())) : null;
         this.sourcePaths = options.sourcePaths ?? [];
         this.sourceGate = options.sourceGate ?? null;
+        this.clientAddress = options.clientAddress ?? ClientAddress.fromEnv();
         this.admission = options.admission ?? new RunAdmission({
             name: options.name,
             maxConcurrent: options.maxConcurrent,
@@ -147,7 +157,7 @@ export class HeavyRequestLimiter {
             // Schon weg (aufgelegt waehrend Session/Auth-Middleware): niemand hoert zu, kein Platz.
             if (HeavyRequestLimiter.isGone(res)) return;
 
-            const sourceKey = this.isSourceLimited(req.path) ? RunSource.ofRequest(req as Request) : null;
+            const sourceKey = this.isSourceLimited(req.path) ? this.sourceOf(req as Request) : null;
             const pending = this.admission.request(sourceKey, this.sourceGate);
 
             // Ab JETZT haengt der Platz an der Verbindung: wartend -> raus aus der Schlange,
@@ -183,6 +193,12 @@ export class HeavyRequestLimiter {
     /** Gilt fuer diesen Pfad die Sperre je Quelle? Oeffentlich fuer den StartupTest. */
     public isSourceLimited(path: string): boolean {
         return this.sourceGate !== null && this.sourcePaths.some((pattern) => pattern.test(path));
+    }
+
+    /** Quelle eines Laufs; bei anonymen Laeufen merkt sich ClientAddress die Header-Form (health_check). */
+    private sourceOf(req: Request): string {
+        if (!req.ctx?.user) this.clientAddress.observeAnonymous(req);
+        return RunSource.ofRequest(req, this.clientAddress);
     }
 
     /** Antwort zerstoert oder geschlossen — dann schreibt niemand mehr hinein. */

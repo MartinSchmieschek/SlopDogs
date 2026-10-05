@@ -137,15 +137,14 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     // Personal-Token-Flow tot. Nur deployed setzen; lokal (development) laeuft
     // alles unveraendert ueber http://localhost ohne Proxy und ohne Login.
     //
-    // Dieselbe Einstellung macht req.ip zur Client-IP — die Quelle anonymer Kennel-Laeufe in der
-    // Sperre je Quelle (runAdmission.ts). Annahme: zwischen Client und App liegen genau
-    // TRUST_PROXY_HOPS Proxys (Render: 1), und der letzte haengt die Adresse seines Gegenuebers an
-    // X-Forwarded-For an. Express nimmt dann die Adresse an Position <Hops> von RECHTS — die, die
-    // Renders Proxy selbst eingetragen hat. Was ein Client vorne in X-Forwarded-For hineinschreibt,
-    // liegt weiter links und wird ignoriert: nicht faelschbar. Steht ein weiterer Proxy davor
-    // (z. B. ein CDN), ist die rechte Adresse dessen Kante — dann TRUST_PROXY_HOPS=2. Zu hoch gesetzt,
-    // wird die Adresse faelschbar; zu niedrig, teilen sich alle Anonymen die Adresse des Proxys.
-    // TRUST_PROXY_HOPS=0 schaltet ab.
+    // Fuer req.secure (Secure-Cookie) reicht der letzte Hop: 1. Die CLIENT-IP liefert req.ip auf Render
+    // dagegen NICHT: vor der App liegen Renders Cloudflare-Kante UND ein Render-interner Hop (10.x); beide
+    // haengen an X-Forwarded-For an, die Zahl der Eintraege schwankt (2 oder 3). Mit 1 Hop ist req.ip der
+    // rechteste Eintrag — Kante oder 10.x, nie der Client; mehr Hops sind je nach Form faelschbar.
+    // Die Quelle anonymer Kennel-Laeufe kommt deshalb aus ClientAddress (clientAddress.ts): auf Render
+    // CF-Connecting-IP (setzt Cloudflare selbst, ein mitgeschickter Wert endet dort mit 403), Schalter
+    // CLIENT_IP_HEADER; nur ohne gueltigen Header faellt sie auf req.ip zurueck. Lokal (0 Hops, kein
+    // Header-Schalter) ist req.ip die Socket-Adresse. TRUST_PROXY_HOPS=0 schaltet trust proxy ab.
     const trustProxyHops = resolveTrustProxyHops(nodeEnv);
     if (trustProxyHops > 0) {
         app.set('trust proxy', trustProxyHops);
@@ -223,6 +222,10 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     app.use(express.urlencoded({ extended: false, limit: '1mb' }));
     app.use(createSessionMiddleware());
     app.use(createAuthContextMiddleware(authPrisma));
+    // Ein Satz Toepfe fuer den Prozess (siehe Schleuse unten). Die Client-IP haengt am Auth-Kontext, damit
+    // anonyme In-Process-Laeufe (MCP/Actions) dieselbe Quelle bekommen wie HTTP.
+    const runGates = RunGates.fromEnv();
+    app.use(runGates.clientAddress.contextMiddleware());
     app.use('/auth', createAuthRouter(authPrisma));
     app.use('/.well-known', createDiscoveryRouter());
 
@@ -231,7 +234,6 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     // und Listen-Abfragen, die gleichzeitig im Heap stehen. EIN Satz Toepfe fuer den Prozess:
     // HTTP und MCP (run_kennel, execute_kennel, refresh_kennel_snapshot, build_kennel) teilen
     // den Heavy-Topf und die Sperre je Quelle.
-    const runGates = RunGates.fromEnv();
     HeavyRequestLimiter.heavy(runGates).applyTo(app);
     // Zweiter Topf fuer oeffentliche Kennel-Laeufe (/k/:id, /k/:id/openapi.json): Besucher
     // warten nicht vor der UI, die UI nicht hinter Besuchern. Vor /static und dem SPA-Fallback.

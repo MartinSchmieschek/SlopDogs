@@ -218,8 +218,9 @@ export interface McpRunLease {
 
 /**
  * Kennel-Laeufe aus MCP/Actions gehen durch dieselbe Zulassung wie HTTP (Heavy-Topf + Sperre je Quelle),
- * in-process. Sofortige Ablehnungen (429: zu viele gleichzeitige Laeufe oder zu viele je Minute; 503:
- * Schlange voll) kommen als Tool-Fehler mit demselben englischen Text wie bei HTTP zurueck.
+ * in-process. Ueber dem Limit der Quelle wird eingereiht, nicht abgewiesen. Sofortige Ablehnungen (429:
+ * Schlange der Quelle voll oder zu viele je Minute; 503: Topf-Schlange voll) kommen als Tool-Fehler mit
+ * demselben englischen Text wie bei HTTP zurueck.
  * `start()` fragt nur an (synchron entschieden, ob sofort abgelehnt); `granted()` wartet auf den Platz.
  */
 export class McpRunAdmission {

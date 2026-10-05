@@ -60,6 +60,7 @@ class RuntimeHealth {
         return {
             pots: stats.pots,
             sources: stats.sources,
+            lastAnonymousShape: stats.lastAnonymousShape,
             rejected429SinceBoot: stats.rejected429SinceBoot,
             rejected503SinceBoot: stats.rejected503SinceBoot,
         };
@@ -100,7 +101,7 @@ export function getMetaTools(): ToolDef[] {
         },
         {
             name: 'health_check',
-            description: 'Cheap liveness probe. Returns the current server time, the authenticated user (if any) and the kennel call counter `stats` {pending, dropped, lastFlushError}: pending = unflushed (kennel, day, source) keys, flushed every KENNEL_CALL_FLUSH_MS; plus `dogStats` {pendingDogs, referenceRows}: unflushed per-dog run keys and the rows of the dog reference index (who uses which dog); plus `memory` (process RSS/heap/external/arrayBuffers in MB, V8 heap_size_limit, the memory guard with soft limit, waiting runs, rejections and GC runs since boot, dog isolate slots: active/live/terminating, snapshot cache entries and approximate bytes) and `admission` (the run queues: active/waiting per pot, tracked sources, 429/503 refusals since boot). Numbers only — no client addresses or ids.',
+            description: 'Cheap liveness probe. Returns the current server time, the authenticated user (if any) and the kennel call counter `stats` {pending, dropped, lastFlushError}: pending = unflushed (kennel, day, source) keys, flushed every KENNEL_CALL_FLUSH_MS; plus `dogStats` {pendingDogs, referenceRows}: unflushed per-dog run keys and the rows of the dog reference index (who uses which dog); plus `memory` (process RSS/heap/external/arrayBuffers in MB, V8 heap_size_limit, the memory guard with soft limit, waiting runs, rejections and GC runs since boot, dog isolate slots: active/live/terminating, snapshot cache entries and approximate bytes) and `admission` (the run queues: active/waiting per pot, per-source limits for anonymous and signed-in callers, tracked sources, `queuedBySourceMax` = longest queue of a single source, 429/503 refusals since boot incl. `rejectedSourceQueueFullSinceBoot`, and `lastAnonymousShape` = header shape of the last anonymous run request: number of X-Forwarded-For entries, whether CF-Connecting-IP was present and valid, which header supplied the client IP). Numbers only — no client addresses or ids.',
             inputSchema: { type: 'object', properties: {}, additionalProperties: false },
             handler: async (_args, ctx, deps) => {
                 return ok({

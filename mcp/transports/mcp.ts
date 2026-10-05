@@ -6,7 +6,8 @@
 // the OpenAI Responses API's "mcp" tool type.
 
 import { Router, type Request, type Response } from 'express';
-import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import rateLimit from 'express-rate-limit';
+import { ClientAddress } from '../../server-app/clientAddress';
 import { promises as fs, readFileSync } from 'fs';
 import path from 'path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -200,8 +201,11 @@ export function createMcpRouter(deps: ToolDeps): Router {
     // back to their full long-form description + schema (Welle 11 token diet).
     setMetaToolRegistry(tools);
 
-    // Rate limit -- pro Identity (User-Id, sonst IP, sonst 'anon').
+    // Rate limit -- pro Identity (User-Id, sonst Client-IP, sonst 'anon').
     // Default 120/min, env-override per `SLOPDOGS_MCP_RATE_LIMIT`.
+    // Die Client-IP kommt aus derselben Ableitung wie die Sperre je Quelle (ClientAddress: auf Render
+    // CF-Connecting-IP, sonst req.ip) -- req.ip allein ist auf Render die Cloudflare-Kante bzw. ein 10.x-Hop.
+    const clientAddress = deps.runGates?.clientAddress ?? ClientAddress.fromEnv();
     const rateLimitMax = (() => {
         const raw = Number(envFirst('SLOPDOGS_MCP_RATE_LIMIT', 'DATADOGS_MCP_RATE_LIMIT'));
         return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 120;
@@ -213,8 +217,8 @@ export function createMcpRouter(deps: ToolDeps): Router {
         legacyHeaders: false,
         keyGenerator: (req: Request) => {
             if (req.ctx?.user?.id) return req.ctx.user.id;
-            if (req.ip) return ipKeyGenerator(req.ip);
-            return 'anon';
+            const ip = clientAddress.ipOf(req);
+            return ip ? ClientAddress.keyOf(ip) : 'anon';
         },
         message: {
             error: 'rate_limit_exceeded',

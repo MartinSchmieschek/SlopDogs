@@ -13,6 +13,8 @@ export interface AuthCtx {
     user: { id: string; email: string; name: string | null } | null;
     isSuperUser: boolean;
     via?: 'bearer' | 'session';
+    /** Client-IP (ClientAddress) — Quelle anonymer In-Process-Laeufe; gesetzt nach der Auth-Middleware. */
+    clientIp?: string | null;
 }
 
 declare global {
