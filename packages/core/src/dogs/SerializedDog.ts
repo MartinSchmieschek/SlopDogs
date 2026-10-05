@@ -14,7 +14,7 @@
 import { Dog } from "../core/entities/abstractHuntingDog";
 import { DogClass, IHuntingDog } from "../core/entities/IHuntingDog";
 import { IHuntingSeason } from "../core/entities/IHuntingSeason";
-import { DOG_OOM_MARKER, DOG_TIMEOUT_MARKER } from "../core/entities/IDogRunObserver";
+import { DOG_OOM_MARKER, DOG_TIMEOUT_MARKER, DOG_MEMPRESSURE_MARKER } from "../core/entities/IDogRunObserver";
 import { Worker } from "worker_threads";
 import { transform as sucraseTransform } from "sucrase";
 import { envFirst, isRuntimeLogVerbose } from "../runtimeLog";
@@ -316,6 +316,69 @@ function releaseDogWorkerSlot(): void {
     const next = dogWorkerWaiters.shift();
     if (next) next();
     else activeDogWorkers = Math.max(0, activeDogWorkers - 1);
+}
+
+/**
+ * Speicher-Waechter (Admission-Guard) — misst die ECHTE Prozess-RSS, bevor ein neues Isolate
+ * entsteht, und weist den Lauf mit einem lesbaren Fehler ab, wenn der Container schon am Soft-Limit
+ * steht. Das schliesst die Luecke zwischen den beiden vorhandenen Deckeln:
+ *   - resourceLimits.maxOldGenerationSizeMb deckelt ein EINZELNES Isolate (ein Fresser).
+ *   - der globale Worker-Deckel deckelt die ANZAHL gleichzeitiger Isolate.
+ * Beides misst NIE den tatsaechlichen Verbrauch. Haupt-Heap-Aufblaehung, Native-Puffer oder
+ * Isolate nahe ihrem Deckel koennen die RSS trotzdem Richtung 512 MB treiben — dann killt der OS
+ * den GANZEN Prozess still (502/503 fuer alle). Der Waechter verwandelt diesen stillen Tod in
+ * einen einzelnen abgewiesenen Lauf: Backpressure mit Diagnose statt Totalausfall.
+ *
+ * process.memoryUsage().rss umfasst den gesamten Prozess inkl. aller Worker-Threads (die teilen
+ * sich den Adressraum) — also exakt die Zahl, nach der auch der OS-OOM-Killer entscheidet.
+ */
+const DEFAULT_MEMORY_LIMIT_MB = 512;
+function resolveMemoryLimitMb(): number {
+    const configured = Number(process.env.MEMORY_LIMIT_MB);
+    return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MEMORY_LIMIT_MB;
+}
+
+/**
+ * Schwelle, ab der abgewiesen wird. Explizit via MEMORY_SOFT_LIMIT_MB, sonst 85 % des Budgets —
+ * genug Luft, damit zwischen Messung und tatsaechlichem Spawn (Isolate-Baseline ~80 MB) nicht
+ * doch der harte Deckel reisst.
+ */
+function resolveMemorySoftLimitMb(): number {
+    const configured = Number(process.env.MEMORY_SOFT_LIMIT_MB);
+    if (Number.isFinite(configured) && configured > 0) return configured;
+    return Math.round(resolveMemoryLimitMb() * 0.85);
+}
+
+/**
+ * Der Waechter ist im Betrieb AN, in der Entwicklung AUS. Grund: unter ts-node liegt die RSS
+ * dauerhaft bei ~900 MB (Toolchain im selben Prozess) — gegen ein 512-MB-Budget gemessen wuerde
+ * er JEDEN Dog abweisen und lokale Laeufe wie StartupTest komplett blockieren. MEMORY_GUARD=1/0
+ * ueberschreibt die Automatik in beide Richtungen.
+ */
+function memoryGuardEnabled(): boolean {
+    const flag = process.env.MEMORY_GUARD;
+    if (flag === '1' || flag === 'true') return true;
+    if (flag === '0' || flag === 'false') return false;
+    return process.env.NODE_ENV !== 'development';
+}
+
+/**
+ * Wirft (mit DOG_MEMPRESSURE_MARKER), wenn vor dem Spawn kein Speicher-Spielraum mehr ist.
+ * Bewusst VOR acquireDogWorkerSlot aufgerufen: ein abgewiesener Lauf belegt dann gar keinen
+ * globalen Slot. Die Rejection landet wie jeder andere Dog-Fehler in letOut() -> dog.__error,
+ * die uebrigen Dogs der Welle laufen weiter.
+ */
+function assertDogWorkerMemoryHeadroom(storageId: string, name: string): void {
+    if (!memoryGuardEnabled()) return;
+    const rssMb = Math.round(process.memoryUsage().rss / (1024 * 1024));
+    const softMb = resolveMemorySoftLimitMb();
+    if (rssMb < softMb) return;
+    throw new Error(
+        `SerializedDog ${storageId} ("${name}"): ${DOG_MEMPRESSURE_MARKER} `
+        + `(RSS ${rssMb} MB >= soft limit ${softMb} MB of ${resolveMemoryLimitMb()} MB). `
+        + `The kennel was not run to avoid an out-of-memory crash of the whole container; retry shortly. `
+        + `Tune via MEMORY_SOFT_LIMIT_MB / MEMORY_LIMIT_MB, or lower DOG_WORKER_GLOBAL_LIMIT.`
+    );
 }
 
 /**
@@ -1218,6 +1281,11 @@ export class SerializedDog<T> extends Dog<T> {
             // would mask the failure as a result and leave hasError=false in the snapshot.
             throw new Error(cloneTestError);
         }
+
+        // Speicher-Waechter: misst die echte RSS und weist den Lauf mit Fehler ab, wenn der Container
+        // schon am Soft-Limit steht — bevor ein Slot belegt oder ein Isolate erzeugt wird. Wirft es,
+        // laeuft weder acquire noch das finally unten (kein Slot-Leck). Siehe assertDogWorkerMemoryHeadroom.
+        assertDogWorkerMemoryHeadroom(this.storageId, this.name);
 
         // Globaler Worker-Deckel: wartet hier, bis ein Isolate-Slot frei ist (Backpressure statt OOM).
         // Freigabe im finally unten — exakt einmal, nachdem der Worker terminiert wurde (settle()).

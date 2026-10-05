@@ -261,6 +261,21 @@ export const ENV_CATALOG: readonly EnvVarSpec[] = [
         defaultValue: '2', consequence: 'Default',
     },
     {
+        name: 'MEMORY_LIMIT_MB', section: 'operations', since: 'P8',
+        purpose: 'Container-RAM-Budget; Bezugsgroesse des Speicher-Waechters (Soft-Limit = 85 %)',
+        defaultValue: '512', consequence: 'Default',
+    },
+    {
+        name: 'MEMORY_SOFT_LIMIT_MB', section: 'operations', since: 'P8',
+        purpose: 'RSS-Schwelle: neue Dog-Isolate werden darueber mit Fehler abgewiesen statt den Container OOM-killen zu lassen',
+        defaultValue: '85 % von MEMORY_LIMIT_MB', consequence: 'Default',
+    },
+    {
+        name: 'MEMORY_GUARD', section: 'operations', since: 'P8',
+        purpose: 'Speicher-Waechter erzwingen (1) oder abschalten (0); ohne Wert AN ausser NODE_ENV=development',
+        defaultValue: 'auto (AN im Betrieb)', consequence: 'Default',
+    },
+    {
         name: 'SLOPDOGS_VM_TIMEOUT_MS', section: 'operations', since: 'P2',
         purpose: 'Timeout je SerializedDog-Lauf im Worker (ms); Override je MCP-Aufruf per vmTimeoutMs',
         defaultValue: '10000', consequence: 'Default',

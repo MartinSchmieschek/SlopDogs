@@ -50,6 +50,7 @@ export {
     type IDogRunObserver,
     DOG_TIMEOUT_MARKER,
     DOG_OOM_MARKER,
+    DOG_MEMPRESSURE_MARKER,
     classifyDogError,
 } from './core/entities/IDogRunObserver';
 
