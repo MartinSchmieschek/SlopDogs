@@ -18,7 +18,8 @@ import {
     type Access,
 } from '../auth/visibility';
 import { LandingKennels } from '../auth/landingKennels';
-import { type BaseDogInfo, type ToolDef, type ToolDeps, ok, fail, resolveTsCode, codeHinweise } from './types';
+import { type BaseDogInfo, type ToolDef, type ToolDeps, ok, fail, resolveTsCode, codeHinweise, McpRunAdmission } from './types';
+import { LeadOutcome } from '../../services/LeadOutcome';
 import {
     BASE_DOG_PREFIX,
     KENNEL_PUBLIC_PREFIX,
@@ -718,7 +719,7 @@ export function getKennelTools(): ToolDef[] {
         {
             name: 'run_kennel',
             description:
-                'Runs a kennel and returns the full Waves payload — every dog\'s yield, code, vmContext, errors and timing. WARNING: this can be megabytes per call (5–20 MB on rich kennels). Prefer refresh_kennel_snapshot + the get_snapshot_* / get_kennel_snapshot_* tools for granular access. Use run_kennel only when you truly need every dog\'s details in one shot. Dogs you may not read come without code and context; if you may only run the kennel (run-only), you get just its shape: {ok, waves:[{dogCount}], leadResult, durationMs, dogs:[{status}]}. Optional `vmTimeoutMs` overrides the per-dog VM execution budget for this single run (resolution: vmTimeoutMs > SLOPDOGS_VM_TIMEOUT_MS env > 10000ms default) -- not persisted.',
+                'Runs a kennel and returns the full Waves payload — every dog\'s yield, code, vmContext, errors and timing. WARNING: this can be megabytes per call (5–20 MB on rich kennels). Prefer refresh_kennel_snapshot + the get_snapshot_* / get_kennel_snapshot_* tools for granular access. Use run_kennel only when you truly need every dog\'s details in one shot. Dogs you may not read come without code and context; if you may only run the kennel (run-only), you get just its shape: {ok, waves:[{dogCount}], leadResult, durationMs, dogs:[{status}]}. Optional `vmTimeoutMs` overrides the per-dog VM execution budget for this single run (resolution: vmTimeoutMs > SLOPDOGS_VM_TIMEOUT_MS env > 10000ms default, capped at SLOPDOGS_VM_TIMEOUT_MAX_MS, default 60000) -- not persisted. Runs share the server run queue: too many concurrent runs or too many runs per minute from you are refused (429), a full queue answers 503.',
             inputSchema: {
                 type: 'object',
                 required: ['id'],
@@ -734,7 +735,7 @@ export function getKennelTools(): ToolDef[] {
                     vmTimeoutMs: {
                         type: 'number',
                         minimum: 1,
-                        description: 'Per-run VM timeout in ms. Overrides SLOPDOGS_VM_TIMEOUT_MS (default 10000). Run-time-only, not persisted.',
+                        description: 'Per-run VM timeout in ms. Overrides SLOPDOGS_VM_TIMEOUT_MS (default 10000); capped at SLOPDOGS_VM_TIMEOUT_MAX_MS (default 60000). Run-time-only, not persisted.',
                     },
                 },
             },
@@ -751,25 +752,35 @@ export function getKennelTools(): ToolDef[] {
                 const vmTimeoutMs = typeof args.vmTimeoutMs === 'number' && args.vmTimeoutMs > 0
                     ? args.vmTimeoutMs
                     : undefined;
+                // Dieselbe Zulassung wie HTTP (Heavy-Topf + Sperre je Quelle) — wartet seriell, 429/503 als Tool-Fehler.
+                const admitted = await McpRunAdmission.request(deps, ctx).granted();
+                if (!admitted.ok) return admitted.result;
                 const startedAt = Date.now();
                 try {
                     const waves = await deps.kennelRunHandler.runKennel(
                         config, query, body, authCtxToCapabilityCtx(ctx), vmTimeoutMs, { source: 'mcp-run' },
                     );
-                    // Kennel-RUN (W3, W17 Stufe 1): only the run's shape and the lead result.
+                    // Kennel-RUN (W3, W17 Stufe 1): only the run's shape, the lead status and the lead result.
                     if (access === 'run') return ok(kennelRunView(waves, config, Date.now() - startedAt));
                     // SECURITY (2026-09-13): strip code/runtime of nodes this caller may not read.
                     const safeWaves = await redactWavesForCtx(waves, ctx, deps.nodesStore);
-                    return ok({ waves: safeWaves, kennelConfig: withMyRights(config as any, ctx) });
+                    const lead = LeadOutcome.of(waves, config.dogIds?.[0]);
+                    return ok({
+                        lead: { status: lead.status, ...(lead.error !== undefined ? { error: lead.error } : {}) },
+                        waves: safeWaves,
+                        kennelConfig: withMyRights(config as any, ctx),
+                    });
                 } catch (err: any) {
                     return fail(runErrorText(err, access));
+                } finally {
+                    admitted.lease.release();
                 }
             },
         },
         {
             name: 'execute_kennel',
             description:
-                'Runs a kennel and returns ONLY the lead dog\'s result — the public-facing payload, identical to `GET ' + KENNEL_PUBLIC_PREFIX + '/<kennelId>`. Use this when you want the spoils, not the diagnostic. The lead is the first entry in dogIds. Optional `vmTimeoutMs` overrides the per-dog VM execution budget for this run (resolution: vmTimeoutMs > SLOPDOGS_VM_TIMEOUT_MS env > 10000ms default) -- not persisted.',
+                'Runs a kennel and returns ONLY the lead dog\'s result — the public-facing payload, identical to `GET ' + KENNEL_PUBLIC_PREFIX + '/<kennelId>`. Use this when you want the spoils, not the diagnostic. The lead is the first entry in dogIds. Optional `vmTimeoutMs` overrides the per-dog VM execution budget for this run (resolution: vmTimeoutMs > SLOPDOGS_VM_TIMEOUT_MS env > 10000ms default, capped at SLOPDOGS_VM_TIMEOUT_MAX_MS, default 60000) -- not persisted. Runs share the server run queue: too many concurrent runs or too many runs per minute from you are refused (429), a full queue answers 503.',
             inputSchema: {
                 type: 'object',
                 required: ['id'],
@@ -784,7 +795,7 @@ export function getKennelTools(): ToolDef[] {
                     vmTimeoutMs: {
                         type: 'number',
                         minimum: 1,
-                        description: 'Per-run VM timeout in ms. Overrides SLOPDOGS_VM_TIMEOUT_MS (default 10000). Run-time-only, not persisted.',
+                        description: 'Per-run VM timeout in ms. Overrides SLOPDOGS_VM_TIMEOUT_MS (default 10000); capped at SLOPDOGS_VM_TIMEOUT_MAX_MS (default 60000). Run-time-only, not persisted.',
                     },
                 },
             },
@@ -804,22 +815,38 @@ export function getKennelTools(): ToolDef[] {
                 const vmTimeoutMs = typeof args.vmTimeoutMs === 'number' && args.vmTimeoutMs > 0
                     ? args.vmTimeoutMs
                     : undefined;
+                const admitted = await McpRunAdmission.request(deps, ctx).granted();
+                if (!admitted.ok) return admitted.result;
                 try {
                     const waves = await deps.kennelRunHandler.runKennel(
                         config, query, body, authCtxToCapabilityCtx(ctx), vmTimeoutMs, { source: 'mcp-execute' },
                     );
-                    const lead = findDogInWaves(waves, dogIds[0]);
-                    if (lead && lead.result !== undefined) return ok(lead.result);
-                    // Kein Ergebnis ist eine gueltige Antwort, kein Schemafehler: `undefined` hatte keinen Text, und
-                    // der MCP-Client meldete einen Schemafehler statt der Wahrheit. Ein Lead ohne Rueckgabewert
-                    // erscheint gar nicht in den Waves — auch das ist "kein Ergebnis", kein Werkzeugfehler.
-                    if (lead?.error) return fail(access === 'read' ? `Lead failed: ${lead.error}` : 'lead_failed');
-                    return ok({
-                        result: null,
-                        hint: 'The lead yielded no result — GET /k/<kennelId> answers with an empty body. Make the lead return a value; get_snapshot_errors shows what went wrong upstream.',
-                    });
+                    // Derselbe Ausgang wie GET /k/<id> (LeadOutcome): ok -> Ergebnis; empty -> null (kein Fehler);
+                    // failed -> Tool-Fehler (Speicher-Waechter: "Server busy", voruebergehend); not_run -> Tool-Fehler.
+                    const lead = LeadOutcome.of(waves, dogIds[0]);
+                    if (lead.status === 'ok') return ok(lead.result);
+                    if (lead.status === 'empty') {
+                        return ok({
+                            result: null,
+                            hint: 'The lead ran without an error and returned no value (null or undefined) — GET ' + KENNEL_PUBLIC_PREFIX + '/<kennelId> answers 200 with the JSON body null. Make the lead return a value if you expect one.',
+                        });
+                    }
+                    if (lead.memoryPressure) {
+                        return fail('Server busy: not enough memory to run this kennel right now. Retry shortly.'
+                            + (access === 'read' ? ` Lead error: ${lead.error}` : ''));
+                    }
+                    if (lead.status === 'failed') {
+                        return fail(access === 'read'
+                            ? `Lead failed: ${lead.error} — GET ${KENNEL_PUBLIC_PREFIX}/<kennelId> answers 502 lead_failed.`
+                            : 'lead_failed: the lead dog of this kennel failed.');
+                    }
+                    return fail(access === 'read'
+                        ? `Lead did not run: dog ${dogIds[0]} never started (its parents were not ready, or it may not run in this kennel). get_snapshot_errors shows what went wrong upstream.`
+                        : 'lead_failed: the lead dog of this kennel did not run.');
                 } catch (err: any) {
                     return fail(runErrorText(err, access));
+                } finally {
+                    admitted.lease.release();
                 }
             },
         },
@@ -1166,7 +1193,20 @@ async function buildKennel(
 
         if (refresh) {
             const startedAt = Date.now();
-            try {
+            // Der erste Lauf geht durch dieselbe Zulassung wie jeder andere Kennel-Lauf. Abgelehnt: der Bau
+            // steht trotzdem, nur der Probelauf faellt aus (firstRun.status 'failed' mit dem Grund).
+            const admitted = await McpRunAdmission.request(deps, ctx).granted();
+            if (!admitted.ok) {
+                firstRun = {
+                    status: 'failed',
+                    leadOk: false,
+                    durationMs: Date.now() - startedAt,
+                    errorCount: 0,
+                    leadDogId: null,
+                    leadResultPreview: null,
+                    error: admitted.message,
+                };
+            } else try {
                 const freshConfig = await deps.kennelRunHandler.loadKennelConfig(kennelLineageId);
                 if (!freshConfig) {
                     firstRun = {
@@ -1251,6 +1291,8 @@ async function buildKennel(
                     leadResultPreview: null,
                     error: err?.message ?? String(err),
                 };
+            } finally {
+                admitted.lease.release();
             }
         }
 

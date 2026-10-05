@@ -1,64 +1,44 @@
 /**
- * ~~~ HEAVY REQUEST LIMITER — eine Schleuse vor den teuren Pfaden ~~~
+ * ~~~ HEAVY REQUEST LIMITER — die HTTP-Seite der Lauf-Zulassung ~~~
  *
  * Body-Limits (express.json) deckeln, was HEREIN kommt. Sie sagen nichts darueber,
  * wie viele teure Antworten der Prozess GLEICHZEITIG baut — und genau dort entsteht
  * die Speicherspitze: ein Kennel-Run oder ein Listen-Endpunkt haelt waehrend seiner
- * Laufzeit Zeilen, geparste Configs und Ergebnisse im Heap. Zehn davon parallel sind
- * zehnmal so viel, und in einem 512-MB-Container ist das die Wasserlinie, die danach
- * nicht mehr faellt.
+ * Laufzeit Zeilen, geparste Configs und Ergebnisse im Heap.
  *
- * Die Schleuse laesst `MAX_CONCURRENT_HEAVY_REQUESTS` gleichzeitig durch; der Rest
- * wartet in einer FIFO-Schlange. Wer nicht binnen `HEAVY_REQUEST_QUEUE_TIMEOUT_MS`
- * an die Reihe kommt, bekommt 503 mit `Retry-After` statt einer haengenden Verbindung.
+ * Diese Klasse haengt einen Topf (RunAdmission, siehe runAdmission.ts) vor bestimmte Pfade:
+ *   - frei -> sofort durch; belegt -> FIFO-Schlange, die Anfrage WARTET und kommt seriell dran;
+ *   - abgewiesen wird nur bei voller Schlange (sofort 503) oder nach dem langen Wartebudget (503);
+ *   - fuer Kennel-LAEUFE (sourcePaths) gilt zusaetzlich die Sperre je Quelle (429 + Retry-After).
  *
- * Bewusst grosszuegig: eine zu enge Bremse bricht die UI, die beim Seitenaufbau
- * mehrere dieser Pfade parallel zieht. Die Schleuse soll die SPITZE kappen, nicht
- * den Normalbetrieb takten.
+ * Der Platz haengt am Leben der Verbindung, ab dem Einreihen: 'close' wird SOFORT beim Einreihen
+ * abonniert. Legt ein Wartender auf, verlaesst er die Schlange und erbt nie einen Platz; legt ein
+ * Zugelassener auf oder ist die Antwort fertig ('finish'), geht der Platz genau einmal zurueck.
+ * Frueher hingen die Listener erst nach dem Durchlassen — ein in der Schlange Aufgelegter erbte
+ * spaeter den Platz, antwortete ins Leere (kein 'finish', 'close' schon vorbei) und gab ihn nie zurueck.
  *
  * Zwei Instanzen, zwei Toepfe: `heavy()` fuer UI-Listen und Runs der Werkstatt,
  * `publicRuns()` fuer oeffentliche Kennel-Laeufe (`/k/:id`, `/k/:id/openapi.json`).
- * Getrennt, damit die UI nicht hinter einer Besucherwelle wartet — und Besucher
- * nicht an jeder Bremse vorbeilaufen.
+ * Getrennt, damit die UI nicht hinter einer Besucherwelle wartet.
  */
 
-import type { Application, RequestHandler } from 'express';
+import type { Application, Request, RequestHandler, Response } from 'express';
+import {
+    AdmissionDenial,
+    RunAdmission,
+    RunGates,
+    RunSource,
+    SourceRunGate,
+    positiveIntFromEnv,
+} from './runAdmission';
 
-/**
- * Default-Breite der Schleuse. Nicht 4: der Waves-Viewer zieht beim Seitenaufbau
- * Node- und Kennel-Liste parallel und startet danach Runs; bei 4 stellt sich ein
- * einzelner Nutzer schon selbst in die Warteschlange. 8 laesst den Normalbetrieb in
- * Ruhe und begrenzt die Spitze trotzdem auf eine Groesse, die in 512 MB passt.
- * Wer misst, setzt MAX_CONCURRENT_HEAVY_REQUESTS.
- */
-const DEFAULT_MAX_CONCURRENT_HEAVY_REQUESTS = 8;
-
-/** Wartebudget in der Schlange, bevor 503 gemeldet wird. */
-const DEFAULT_HEAVY_REQUEST_QUEUE_TIMEOUT_MS = 20_000;
-
-/**
- * Breite der Public-Schleuse. 4 statt 8: 512 MB, --max-old-space-size=320, und jeder
- * oeffentliche Lauf haelt seine Waves im Heap. Gesetzt, nicht gemessen — wer misst,
- * setzt MAX_CONCURRENT_PUBLIC_RUNS.
- */
-const DEFAULT_MAX_CONCURRENT_PUBLIC_RUNS = 4;
-
-/** Wartebudget in der Public-Schlange, bevor 503 gemeldet wird. */
-const DEFAULT_PUBLIC_RUN_QUEUE_TIMEOUT_MS = 20_000;
-
-/** Liest einen positiven Integer aus der Umgebung; alles andere faellt auf den Default. */
-function positiveIntFromEnv(name: string, fallback: number): number {
-    const parsed = Number.parseInt((process.env[name] || '').trim(), 10);
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-interface QueuedRequest {
-    grant: (granted: boolean) => void;
-    timer: ReturnType<typeof setTimeout>;
-}
+/** Default-Wartebudget der Schlangen: lang — warten und seriell weiterlaufen statt abweisen. */
+const DEFAULT_QUEUE_TIMEOUT_MS = 120_000;
+/** Default-Obergrenze der Schlangen; darueber sofort 503. */
+const DEFAULT_QUEUE_MAX = 50;
 
 export interface HeavyRequestLimiterOptions {
-    /** Fuer Log und 503-Text: 'heavy' | 'public'. */
+    /** Fuer Log und Statistik: 'heavy' | 'public'. */
     name: string;
     /** Getestet gegen req.path. */
     paths: readonly RegExp[];
@@ -66,13 +46,20 @@ export interface HeavyRequestLimiterOptions {
     methods?: readonly string[];
     maxConcurrent: number;
     queueTimeoutMs: number;
+    /** Obergrenze der Schlange (Default 50). */
+    queueMax?: number;
+    /** Pfade, fuer die zusaetzlich die Sperre je Quelle gilt (Kennel-Laeufe). Ohne Angabe: keine. */
+    sourcePaths?: readonly RegExp[];
+    /** Die Sperre je Quelle (geteilt mit MCP). Ohne Angabe: keine. */
+    sourceGate?: SourceRunGate | null;
+    /** Ein vorhandener Topf (geteilt mit MCP); ohne Angabe baut die Klasse ihren eigenen. */
+    admission?: RunAdmission;
 }
 
 export class HeavyRequestLimiter {
     /**
      * Die teuren Pfade: Kennel-Run (fuehrt die ganze Meute aus) und die beiden
-     * Listen-Endpunkte (ziehen eine Typ-Partition und parsen sie). Alles andere
-     * laeuft ungebremst durch — eine Schleuse vor `/api/kennels/:id` waere nur Reibung.
+     * Listen-Endpunkte (ziehen eine Typ-Partition und parsen sie).
      */
     private static readonly HEAVY_PATHS: readonly RegExp[] = [
         /^\/api\/kennels\/?$/,
@@ -80,53 +67,67 @@ export class HeavyRequestLimiter {
         /^\/api\/kennels\/[^/]+\/(run|execute)\/?$/,
     ];
 
+    /** Darunter die Kennel-LAEUFE — nur sie zaehlen gegen die Sperre je Quelle, die UI-Listen nicht. */
+    private static readonly HEAVY_RUN_PATHS: readonly RegExp[] = [
+        /^\/api\/kennels\/[^/]+\/(run|execute)\/?$/,
+    ];
+
     /**
      * Die oeffentlichen Laeufe: `/k/:id` und die Spec-Erzeugung `/k/:id/openapi.json`.
-     * Seit dem Praefix `/k/` exakt: kein Angular-Artefakt, kein festes Segment und kein
-     * Kennel-Name mit Punkt faellt mehr durch. `/k/:id/docs` liefert nur statisches HTML
-     * und bleibt ungebremst. Disjunkt zu HEAVY_PATHS — kein Request wird doppelt gebremst.
+     * `/k/:id/docs` liefert nur statisches HTML und bleibt ungebremst. Disjunkt zu HEAVY_PATHS.
      */
     private static readonly PUBLIC_PATHS: readonly RegExp[] = [
         /^\/k\/[^/]+\/?$/,
         /^\/k\/[^/]+\/openapi\.json\/?$/,
     ];
 
-    /** UI-Listen und Runs der Werkstatt. */
-    public static heavy(): HeavyRequestLimiter {
+    /** UI-Listen und Runs der Werkstatt. Mit `gates` teilt die Schleuse Topf und Quellen-Sperre mit MCP. */
+    public static heavy(gates?: RunGates): HeavyRequestLimiter {
         return new HeavyRequestLimiter({
             name: 'heavy',
             paths: HeavyRequestLimiter.HEAVY_PATHS,
-            maxConcurrent: positiveIntFromEnv('MAX_CONCURRENT_HEAVY_REQUESTS', DEFAULT_MAX_CONCURRENT_HEAVY_REQUESTS),
-            queueTimeoutMs: positiveIntFromEnv('HEAVY_REQUEST_QUEUE_TIMEOUT_MS', DEFAULT_HEAVY_REQUEST_QUEUE_TIMEOUT_MS),
+            maxConcurrent: positiveIntFromEnv('MAX_CONCURRENT_HEAVY_REQUESTS', 8),
+            queueTimeoutMs: positiveIntFromEnv('HEAVY_REQUEST_QUEUE_TIMEOUT_MS', DEFAULT_QUEUE_TIMEOUT_MS),
+            queueMax: positiveIntFromEnv('HEAVY_REQUEST_QUEUE_MAX', DEFAULT_QUEUE_MAX),
+            sourcePaths: HeavyRequestLimiter.HEAVY_RUN_PATHS,
+            sourceGate: gates?.sources ?? null,
+            admission: gates?.heavy,
         });
     }
 
     /** Oeffentliche Kennel-Laeufe. HEAD bleibt ungebremst — er fuehrt keinen Lauf aus. */
-    public static publicRuns(): HeavyRequestLimiter {
+    public static publicRuns(gates?: RunGates): HeavyRequestLimiter {
         return new HeavyRequestLimiter({
             name: 'public',
             paths: HeavyRequestLimiter.PUBLIC_PATHS,
             methods: ['GET', 'POST'],
-            maxConcurrent: positiveIntFromEnv('MAX_CONCURRENT_PUBLIC_RUNS', DEFAULT_MAX_CONCURRENT_PUBLIC_RUNS),
-            queueTimeoutMs: positiveIntFromEnv('PUBLIC_RUN_QUEUE_TIMEOUT_MS', DEFAULT_PUBLIC_RUN_QUEUE_TIMEOUT_MS),
+            maxConcurrent: positiveIntFromEnv('MAX_CONCURRENT_PUBLIC_RUNS', 4),
+            queueTimeoutMs: positiveIntFromEnv('PUBLIC_RUN_QUEUE_TIMEOUT_MS', DEFAULT_QUEUE_TIMEOUT_MS),
+            queueMax: positiveIntFromEnv('PUBLIC_RUN_QUEUE_MAX', DEFAULT_QUEUE_MAX),
+            sourcePaths: HeavyRequestLimiter.PUBLIC_PATHS,
+            sourceGate: gates?.sources ?? null,
+            admission: gates?.publicRuns,
         });
     }
 
-    private active = 0;
-    private readonly waiting: QueuedRequest[] = [];
-    private readonly name: string;
     private readonly paths: readonly RegExp[];
     /** Grossgeschriebene Methoden; null = alle. */
     private readonly methods: ReadonlySet<string> | null;
-    private readonly maxConcurrent: number;
-    private readonly queueTimeoutMs: number;
+    private readonly sourcePaths: readonly RegExp[];
+    private readonly sourceGate: SourceRunGate | null;
+    readonly admission: RunAdmission;
 
     constructor(options: HeavyRequestLimiterOptions) {
-        this.name = options.name;
         this.paths = options.paths;
         this.methods = options.methods ? new Set(options.methods.map((m) => m.toUpperCase())) : null;
-        this.maxConcurrent = options.maxConcurrent;
-        this.queueTimeoutMs = options.queueTimeoutMs;
+        this.sourcePaths = options.sourcePaths ?? [];
+        this.sourceGate = options.sourceGate ?? null;
+        this.admission = options.admission ?? new RunAdmission({
+            name: options.name,
+            maxConcurrent: options.maxConcurrent,
+            queueTimeoutMs: options.queueTimeoutMs,
+            queueMax: options.queueMax ?? DEFAULT_QUEUE_MAX,
+        });
     }
 
     /**
@@ -143,30 +144,28 @@ export class HeavyRequestLimiter {
                 next();
                 return;
             }
+            // Schon weg (aufgelegt waehrend Session/Auth-Middleware): niemand hoert zu, kein Platz.
+            if (HeavyRequestLimiter.isGone(res)) return;
 
-            void this.acquire().then((granted) => {
-                if (!granted) {
-                    res.setHeader('Retry-After', String(Math.ceil(this.queueTimeoutMs / 1000)));
-                    res.status(503).json({
-                        error:
-                            `Server ist ausgelastet (${this.name}): mehr als ${this.maxConcurrent} teure Anfragen gleichzeitig. `
-                            + 'Bitte in Kuerze erneut versuchen.',
-                    });
+            const sourceKey = this.isSourceLimited(req.path) ? RunSource.ofRequest(req as Request) : null;
+            const pending = this.admission.request(sourceKey, this.sourceGate);
+
+            // Ab JETZT haengt der Platz an der Verbindung: wartend -> raus aus der Schlange,
+            // zugelassen -> Platz zurueck. close() ist idempotent, 'finish' und 'close' duerfen beide feuern.
+            const done = (): void => pending.close();
+            res.once('close', done);
+            res.once('finish', done);
+
+            void pending.outcome.then((outcome) => {
+                if (!outcome.granted) {
+                    if (outcome.denial.reason === 'cancelled' || HeavyRequestLimiter.isGone(res)) return;
+                    HeavyRequestLimiter.sendDenial(res, outcome.denial);
                     return;
                 }
-
-                // Der Platz wird genau einmal zurueckgegeben: 'finish' bei sauberer Antwort,
-                // 'close' auch dann, wenn der Aufrufer vorher auflegt. Ohne das zweite
-                // Ereignis leckt die Schleuse bei jedem Abbruch einen Platz.
-                let released = false;
-                const release = (): void => {
-                    if (released) return;
-                    released = true;
-                    this.release();
-                };
-                res.on('finish', release);
-                res.on('close', release);
-
+                if (HeavyRequestLimiter.isGone(res)) {
+                    pending.close();
+                    return;
+                }
                 next();
             });
         };
@@ -181,36 +180,18 @@ export class HeavyRequestLimiter {
         return this.paths.some((pattern) => pattern.test(path));
     }
 
-    /** Liefert true, sobald ein Platz frei ist — oder false, wenn das Wartebudget reisst. */
-    private acquire(): Promise<boolean> {
-        if (this.active < this.maxConcurrent) {
-            this.active++;
-            return Promise.resolve(true);
-        }
-
-        return new Promise<boolean>((resolve) => {
-            const queued: QueuedRequest = {
-                grant: resolve,
-                timer: setTimeout(() => {
-                    const index = this.waiting.indexOf(queued);
-                    if (index >= 0) this.waiting.splice(index, 1);
-                    resolve(false);
-                }, this.queueTimeoutMs),
-            };
-            // Ein Wartender darf den Prozess nicht am Leben halten.
-            queued.timer.unref?.();
-            this.waiting.push(queued);
-        });
+    /** Gilt fuer diesen Pfad die Sperre je Quelle? Oeffentlich fuer den StartupTest. */
+    public isSourceLimited(path: string): boolean {
+        return this.sourceGate !== null && this.sourcePaths.some((pattern) => pattern.test(path));
     }
 
-    /** Gibt den Platz weiter an den naechsten Wartenden — oder frei, wenn keiner wartet. */
-    private release(): void {
-        const next = this.waiting.shift();
-        if (!next) {
-            this.active--;
-            return;
-        }
-        clearTimeout(next.timer);
-        next.grant(true);
+    /** Antwort zerstoert oder geschlossen — dann schreibt niemand mehr hinein. */
+    private static isGone(res: Response): boolean {
+        return Boolean((res as any).destroyed || (res as any).closed || (res as any).writableEnded);
+    }
+
+    private static sendDenial(res: Response, denial: AdmissionDenial): void {
+        if (denial.retryAfterSec > 0) res.setHeader('Retry-After', String(denial.retryAfterSec));
+        res.status(denial.status).json(denial.toBody());
     }
 }

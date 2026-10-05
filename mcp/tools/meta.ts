@@ -9,7 +9,62 @@
 
 import { promises as fs } from 'fs';
 import path from 'path';
-import { type ToolDef, ok, fail } from './types';
+import v8 from 'v8';
+import { DogWorkerGate } from '@slopdogs/core';
+import { type ToolDef, type ToolDeps, ok, fail } from './types';
+
+const MB = 1024 * 1024;
+const toMb = (bytes: number): number => Math.round((bytes / MB) * 10) / 10;
+
+/**
+ * Das Messgeraet hinter health_check: Speicher des Prozesses, Zustand des Dog-Tors (Slots, Isolate,
+ * Waechter) und der Lauf-Zulassung (Toepfe, Quellen). Nur Zahlen — keine Quell-IPs, keine User-IDs,
+ * keine Dog-Namen.
+ */
+class RuntimeHealth {
+    static memory(deps: ToolDeps): Record<string, unknown> {
+        const usage = process.memoryUsage();
+        const gate = DogWorkerGate.shared.stats();
+        return {
+            rssMb: toMb(usage.rss),
+            heapUsedMb: toMb(usage.heapUsed),
+            heapTotalMb: toMb(usage.heapTotal),
+            externalMb: toMb(usage.external),
+            arrayBuffersMb: toMb(usage.arrayBuffers ?? 0),
+            heapSizeLimitMb: toMb(v8.getHeapStatistics().heap_size_limit),
+            guard: {
+                enabled: gate.memoryGuardEnabled,
+                limitMb: gate.memoryLimitMb,
+                softLimitMb: gate.memorySoftLimitMb,
+                waitMs: gate.memoryGuardWaitMs,
+                waiting: gate.memoryWaiters,
+                rejectionsSinceBoot: gate.memoryRejectionsSinceBoot,
+                gcAvailable: gate.gcAvailable,
+                gcRunsSinceBoot: gate.gcRunsSinceBoot,
+            },
+            isolates: {
+                slotLimit: gate.slotLimit,
+                slotsActive: gate.slotsActive,
+                slotWaiters: gate.slotWaiters,
+                live: gate.liveIsolates,
+                terminating: gate.terminatingIsolates,
+                slotReleaseAnomalies: gate.slotReleaseAnomalies,
+            },
+            snapshotCache: deps.snapshotCache.stats(),
+        };
+    }
+
+    static admission(deps: ToolDeps): Record<string, unknown> | null {
+        if (!deps.runGates) return null;
+        const stats = deps.runGates.stats();
+        return {
+            pots: stats.pots,
+            sources: stats.sources,
+            rejected429SinceBoot: stats.rejected429SinceBoot,
+            rejected503SinceBoot: stats.rejected503SinceBoot,
+        };
+    }
+}
 
 /**
  * Lazy tool registry. Populated once at startup by createMcpRouter via
@@ -45,7 +100,7 @@ export function getMetaTools(): ToolDef[] {
         },
         {
             name: 'health_check',
-            description: 'Cheap liveness probe. Returns the current server time, the authenticated user (if any) and the kennel call counter `stats` {pending, dropped, lastFlushError}: pending = unflushed (kennel, day, source) keys, flushed every KENNEL_CALL_FLUSH_MS; plus `dogStats` {pendingDogs, referenceRows}: unflushed per-dog run keys and the rows of the dog reference index (who uses which dog).',
+            description: 'Cheap liveness probe. Returns the current server time, the authenticated user (if any) and the kennel call counter `stats` {pending, dropped, lastFlushError}: pending = unflushed (kennel, day, source) keys, flushed every KENNEL_CALL_FLUSH_MS; plus `dogStats` {pendingDogs, referenceRows}: unflushed per-dog run keys and the rows of the dog reference index (who uses which dog); plus `memory` (process RSS/heap/external/arrayBuffers in MB, V8 heap_size_limit, the memory guard with soft limit, waiting runs, rejections and GC runs since boot, dog isolate slots: active/live/terminating, snapshot cache entries and approximate bytes) and `admission` (the run queues: active/waiting per pot, tracked sources, 429/503 refusals since boot). Numbers only — no client addresses or ids.',
             inputSchema: { type: 'object', properties: {}, additionalProperties: false },
             handler: async (_args, ctx, deps) => {
                 return ok({
@@ -55,6 +110,8 @@ export function getMetaTools(): ToolDef[] {
                     isSuperUser: ctx.isSuperUser,
                     stats: deps.callCounter.status(),
                     dogStats: deps.dogStats.health(),
+                    memory: RuntimeHealth.memory(deps),
+                    admission: RuntimeHealth.admission(deps),
                 });
             },
         },

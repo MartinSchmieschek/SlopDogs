@@ -13,6 +13,7 @@ import type { KennelStatsService } from '../../services/KennelStatsService';
 import type { KennelCallCounter } from '../../services/KennelCallCounter';
 import type { DogStatsService } from '../../services/DogStatsService';
 import type { KeyStoreService } from '../../services/KeyStoreService';
+import type { PendingAdmission, RunGates } from '../../server-app/runAdmission';
 
 export interface BaseDogInfo {
     id: string;
@@ -65,6 +66,11 @@ export interface ToolDeps {
     dogStats: DogStatsService;
     /** P4c: set_key/list_keys/delete_key — derselbe Key-Store wie /api/keys. */
     keyStore: KeyStoreService;
+    /**
+     * Lauf-Zulassung (Heavy-Topf + Sperre je Quelle), geteilt mit der HTTP-Schleuse. Ohne (Tests):
+     * jeder Lauf ist sofort zugelassen.
+     */
+    runGates?: RunGates;
 }
 
 export interface ToolResult {
@@ -203,6 +209,48 @@ export function fail(message: string): ToolResult {
         content: [{ type: 'text', text: message }],
         isError: true,
     };
+}
+
+/** Ein zugelassener MCP-Lauf; `release()` nach Laufende (finally), genau einmal wirksam. */
+export interface McpRunLease {
+    release(): void;
+}
+
+/**
+ * Kennel-Laeufe aus MCP/Actions gehen durch dieselbe Zulassung wie HTTP (Heavy-Topf + Sperre je Quelle),
+ * in-process. Sofortige Ablehnungen (429: zu viele gleichzeitige Laeufe oder zu viele je Minute; 503:
+ * Schlange voll) kommen als Tool-Fehler mit demselben englischen Text wie bei HTTP zurueck.
+ * `start()` fragt nur an (synchron entschieden, ob sofort abgelehnt); `granted()` wartet auf den Platz.
+ */
+export class McpRunAdmission {
+    private constructor(private readonly pending: PendingAdmission | null) {}
+
+    static request(deps: ToolDeps, ctx: AuthCtx): McpRunAdmission {
+        return new McpRunAdmission(deps.runGates ? deps.runGates.requestRun(ctx) : null);
+    }
+
+    /** Sofort abgelehnt? Dann der Tool-Fehler, sonst null. */
+    get immediateFailure(): ToolResult | null {
+        const denial = this.pending?.immediateDenial;
+        return denial ? fail(McpRunAdmission.textOf(denial.status, denial.message, denial.retryAfterSec)) : null;
+    }
+
+    /** Wartet auf den Platz (seriell hinter anderen). Liefert die Lease oder den Tool-Fehler. */
+    async granted(): Promise<{ ok: true; lease: McpRunLease } | { ok: false; result: ToolResult; message: string }> {
+        if (!this.pending) return { ok: true, lease: { release: () => undefined } };
+        const outcome = await this.pending.outcome;
+        if (outcome.granted) {
+            const pending = this.pending;
+            return { ok: true, lease: { release: () => pending.close() } };
+        }
+        const { status, message, retryAfterSec } = outcome.denial;
+        const text = McpRunAdmission.textOf(status, message, retryAfterSec);
+        return { ok: false, result: fail(text), message: text };
+    }
+
+    private static textOf(status: number, message: string, retryAfterSec: number): string {
+        return retryAfterSec > 0 ? `${message} (HTTP ${status}, retry after ${retryAfterSec} s)` : message;
+    }
 }
 
 /**
