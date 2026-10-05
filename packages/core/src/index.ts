@@ -72,7 +72,16 @@ export {
     checkSerializedDogCode,
     describeTranspileError,
     buildVmGlobalCapabilities,
+    resolveVmTimeoutMs,
+    resolveVmTimeoutMaxMs,
 } from './dogs/SerializedDog';
+
+// Slot-Deckel und Speicher-Waechter der Dog-Isolate (Gegendruck statt Sofort-Abweisung)
+export {
+    DogWorkerGate,
+    type DogWorkerGateStats,
+    type MemoryProbe,
+} from './dogs/DogWorkerGate';
 
 // Annotations upon a spirit's scroll — line-level docs over a dog's code
 export {

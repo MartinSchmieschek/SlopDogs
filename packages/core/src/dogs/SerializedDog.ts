@@ -14,7 +14,8 @@
 import { Dog } from "../core/entities/abstractHuntingDog";
 import { DogClass, IHuntingDog } from "../core/entities/IHuntingDog";
 import { IHuntingSeason } from "../core/entities/IHuntingSeason";
-import { DOG_OOM_MARKER, DOG_TIMEOUT_MARKER, DOG_MEMPRESSURE_MARKER } from "../core/entities/IDogRunObserver";
+import { DOG_OOM_MARKER, DOG_TIMEOUT_MARKER } from "../core/entities/IDogRunObserver";
+import { DogWorkerGate, type DogIsolateHandle } from "./DogWorkerGate";
 import { Worker } from "worker_threads";
 import { transform as sucraseTransform } from "sucrase";
 import { envFirst, isRuntimeLogVerbose } from "../runtimeLog";
@@ -237,7 +238,7 @@ export function describeTranspileError(source: string, err: any): string {
     const bis = Math.min(source.length, offset + 80);
     const vor = source.slice(von, offset);
     const nach = source.slice(offset, bis);
-    return `${roh}\n  Stelle (Zeichen ${offset}): ${von > 0 ? '…' : ''}${vor}⟪HIER⟫${nach}${bis < source.length ? '…' : ''}`;
+    return `${roh}\n  at (character ${offset}): ${von > 0 ? '…' : ''}${vor}⟪HERE⟫${nach}${bis < source.length ? '…' : ''}`;
 }
 
 /**
@@ -283,102 +284,40 @@ function resolveDogWorkerMaxHeapMb(): number {
 function resolveDogWorkerYoungHeapMb(maxHeapMb: number): number {
     return Math.min(16, Math.max(8, Math.round(maxHeapMb / 4)));
 }
-
 /**
- * Globaler Deckel ueber ALLE Laeufe/Requests zusammen: so viele Dog-Isolate duerfen GLEICHZEITIG leben.
- * WAVE_CONCURRENCY deckelt nur INNERHALB eines Laufs — ohne diesen globalen Deckel addieren sich die
- * Isolate mehrerer paralleler Requests ungebremst (je ~DOG_WORKER_MAX_HEAP_MB + Baseline) und sprengen
- * ein 512-MB-Budget: genau der intermittierende OOM. Default auf 512 MB ausgelegt (2 Isolate ~ 160 MB).
- * Mehr RAM -> DOG_WORKER_GLOBAL_LIMIT hochsetzen.
+ * Globaler Deckel, Speicher-Waechter und Gegendruck leben im DogWorkerGate (eigene Datei): ein Slot je
+ * LEBENDEM Isolat (Freigabe erst beim exit), Messung NACH dem Slot, GC-Versuch und Warten auf das Ende
+ * anderer Isolate statt Sofort-Abweisung. Siehe DogWorkerGate.ts.
  */
-const DEFAULT_DOG_WORKER_GLOBAL_LIMIT = 2;
-function resolveDogWorkerGlobalLimit(): number {
-    const configured = Number(process.env.DOG_WORKER_GLOBAL_LIMIT);
-    return Number.isInteger(configured) && configured > 0 ? configured : DEFAULT_DOG_WORKER_GLOBAL_LIMIT;
+
+/** Default-Timeout je Dog-Lauf im Worker (ms). */
+const DEFAULT_VM_TIMEOUT_MS = 10_000;
+/**
+ * Obergrenze fuer JEDEN Dog-Timeout (ms) — auch fuer den per MCP gereichten `vmTimeoutMs`. Ohne Deckel
+ * konnte ein Aufrufer bis 2^31-1 ms (~24,8 Tage) setzen; zwei solche Dogs belegten beide globalen Slots,
+ * und jeder andere Lauf wartete ohne Frist dahinter.
+ */
+const DEFAULT_VM_TIMEOUT_MAX_MS = 60_000;
+
+function positiveFiniteNumber(value: unknown): number | undefined {
+    const n = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
-let activeDogWorkers = 0;
-const dogWorkerWaiters: Array<() => void> = [];
-
-/** Einen globalen Worker-Slot belegen — blockiert (Backpressure), bis einer frei ist. */
-async function acquireDogWorkerSlot(): Promise<void> {
-    if (activeDogWorkers < resolveDogWorkerGlobalLimit()) {
-        activeDogWorkers++;
-        return;
-    }
-    // Kein Slot frei: anstellen. Beim release wird uns ein Slot DIREKT uebergeben (die Zahl bleibt),
-    // deshalb hier nicht noch einmal hochzaehlen.
-    await new Promise<void>((resolve) => dogWorkerWaiters.push(resolve));
-}
-
-/** Einen Slot freigeben — wartet jemand, erbt er ihn direkt (Zahl bleibt), sonst sinkt die Zahl. */
-function releaseDogWorkerSlot(): void {
-    const next = dogWorkerWaiters.shift();
-    if (next) next();
-    else activeDogWorkers = Math.max(0, activeDogWorkers - 1);
+/** Die Obergrenze aus `SLOPDOGS_VM_TIMEOUT_MAX_MS`, sonst 60 s. */
+export function resolveVmTimeoutMaxMs(): number {
+    return positiveFiniteNumber(process.env.SLOPDOGS_VM_TIMEOUT_MAX_MS) ?? DEFAULT_VM_TIMEOUT_MAX_MS;
 }
 
 /**
- * Speicher-Waechter (Admission-Guard) — misst die ECHTE Prozess-RSS, bevor ein neues Isolate
- * entsteht, und weist den Lauf mit einem lesbaren Fehler ab, wenn der Container schon am Soft-Limit
- * steht. Das schliesst die Luecke zwischen den beiden vorhandenen Deckeln:
- *   - resourceLimits.maxOldGenerationSizeMb deckelt ein EINZELNES Isolate (ein Fresser).
- *   - der globale Worker-Deckel deckelt die ANZAHL gleichzeitiger Isolate.
- * Beides misst NIE den tatsaechlichen Verbrauch. Haupt-Heap-Aufblaehung, Native-Puffer oder
- * Isolate nahe ihrem Deckel koennen die RSS trotzdem Richtung 512 MB treiben — dann killt der OS
- * den GANZEN Prozess still (502/503 fuer alle). Der Waechter verwandelt diesen stillen Tod in
- * einen einzelnen abgewiesenen Lauf: Backpressure mit Diagnose statt Totalausfall.
- *
- * process.memoryUsage().rss umfasst den gesamten Prozess inkl. aller Worker-Threads (die teilen
- * sich den Adressraum) — also exakt die Zahl, nach der auch der OS-OOM-Killer entscheidet.
+ * Der wirksame Timeout eines Dog-Laufs: Override (je Lauf) > SLOPDOGS_VM_TIMEOUT_MS > 10 s — und nie
+ * ueber SLOPDOGS_VM_TIMEOUT_MAX_MS. Eine Stelle fuer alle Wege (HTTP, MCP, Snapshot, Build).
  */
-const DEFAULT_MEMORY_LIMIT_MB = 512;
-function resolveMemoryLimitMb(): number {
-    const configured = Number(process.env.MEMORY_LIMIT_MB);
-    return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MEMORY_LIMIT_MB;
-}
-
-/**
- * Schwelle, ab der abgewiesen wird. Explizit via MEMORY_SOFT_LIMIT_MB, sonst 85 % des Budgets —
- * genug Luft, damit zwischen Messung und tatsaechlichem Spawn (Isolate-Baseline ~80 MB) nicht
- * doch der harte Deckel reisst.
- */
-function resolveMemorySoftLimitMb(): number {
-    const configured = Number(process.env.MEMORY_SOFT_LIMIT_MB);
-    if (Number.isFinite(configured) && configured > 0) return configured;
-    return Math.round(resolveMemoryLimitMb() * 0.85);
-}
-
-/**
- * Der Waechter ist im Betrieb AN, in der Entwicklung AUS. Grund: unter ts-node liegt die RSS
- * dauerhaft bei ~900 MB (Toolchain im selben Prozess) — gegen ein 512-MB-Budget gemessen wuerde
- * er JEDEN Dog abweisen und lokale Laeufe wie StartupTest komplett blockieren. MEMORY_GUARD=1/0
- * ueberschreibt die Automatik in beide Richtungen.
- */
-function memoryGuardEnabled(): boolean {
-    const flag = process.env.MEMORY_GUARD;
-    if (flag === '1' || flag === 'true') return true;
-    if (flag === '0' || flag === 'false') return false;
-    return process.env.NODE_ENV !== 'development';
-}
-
-/**
- * Wirft (mit DOG_MEMPRESSURE_MARKER), wenn vor dem Spawn kein Speicher-Spielraum mehr ist.
- * Bewusst VOR acquireDogWorkerSlot aufgerufen: ein abgewiesener Lauf belegt dann gar keinen
- * globalen Slot. Die Rejection landet wie jeder andere Dog-Fehler in letOut() -> dog.__error,
- * die uebrigen Dogs der Welle laufen weiter.
- */
-function assertDogWorkerMemoryHeadroom(storageId: string, name: string): void {
-    if (!memoryGuardEnabled()) return;
-    const rssMb = Math.round(process.memoryUsage().rss / (1024 * 1024));
-    const softMb = resolveMemorySoftLimitMb();
-    if (rssMb < softMb) return;
-    throw new Error(
-        `SerializedDog ${storageId} ("${name}"): ${DOG_MEMPRESSURE_MARKER} `
-        + `(RSS ${rssMb} MB >= soft limit ${softMb} MB of ${resolveMemoryLimitMb()} MB). `
-        + `The kennel was not run to avoid an out-of-memory crash of the whole container; retry shortly. `
-        + `Tune via MEMORY_SOFT_LIMIT_MB / MEMORY_LIMIT_MB, or lower DOG_WORKER_GLOBAL_LIMIT.`
-    );
+export function resolveVmTimeoutMs(override?: number): number {
+    const requested = positiveFiniteNumber(override)
+        ?? positiveFiniteNumber(envFirst("SLOPDOGS_VM_TIMEOUT_MS", "DATADOGS_VM_TIMEOUT_MS"))
+        ?? DEFAULT_VM_TIMEOUT_MS;
+    return Math.min(requested, resolveVmTimeoutMaxMs());
 }
 
 /**
@@ -674,8 +613,14 @@ export class SerializedDog<T> extends Dog<T> {
      *   1. this override (when set + > 0)
      *   2. `process.env.SLOPDOGS_VM_TIMEOUT_MS` (when numeric + > 0)
      *   3. 10000 (10s default)
+     * Every value is capped at `SLOPDOGS_VM_TIMEOUT_MAX_MS` (default 60000) — see resolveVmTimeoutMs.
      */
     private vmTimeoutMsOverride: number | undefined;
+
+    /** The timeout this dog's next run will actually get (override/env/default, capped). */
+    public get effectiveVmTimeoutMs(): number {
+        return resolveVmTimeoutMs(this.vmTimeoutMsOverride);
+    }
 
     /** Set the per-instance VM execution timeout (ms). Falsy / <=0 clears the override. */
     public setVmTimeoutMs(ms: number | undefined): void {
@@ -999,6 +944,14 @@ export class SerializedDog<T> extends Dog<T> {
         }
     }
 
+    /**
+     * Die Beute eines Eltern-Dogs OHNE Lese-Spur. `season.exhausted` liefert im Lauf Tracking-Proxys;
+     * `untrackedCollected` laeuft durch deren get-Falle als normale Eigenschaft und kommt roh zurueck.
+     */
+    private static untrackedYieldOf(dog: IHuntingDog<unknown>): unknown {
+        return dog instanceof Dog ? (dog as Dog<unknown>).untrackedCollected : dog.collected;
+    }
+
     /** The raw config of this spirit -- its full blueprint, laid bare */
     public get instanceConfig():any{
         return this.config
@@ -1163,10 +1116,16 @@ export class SerializedDog<T> extends Dog<T> {
 
             if (parentDog && parentDog.collected !== undefined) {
                 const dogName = parentDog.name;
-                // Inscribe the parent's plunder as a global variable in the context
+                // Inscribe the parent's plunder as a global variable in the context. Nur der Primaername
+                // bekommt den Tracking-Proxy (die Kopie fuer den Worker liest hindurch -> readFrom/readBy).
+                // Was LAENGER lebt als dieser Lauf — der Kontext-Cache (simpleVmContext, Snapshot-vmContext)
+                // und die Aliasse — bekommt den Rohwert: ein Proxy dort haelt die ganze Season fest und
+                // haengt bei jeder spaeteren Lesung neue readTracking-Eintraege an (gemessen +2,1 MB je
+                // Lesung eines Snapshot-vmContext, wenn der Eltern-displayName klein beginnt).
+                const untracked = SerializedDog.untrackedYieldOf(parentDog);
                 contextObj[dogName] = parentDog.collected;
-                this.requiredYieldsContext.set(dogName, parentDog.collected);
-                boundParents.push({ dog: parentDog, value: parentDog.collected });
+                this.requiredYieldsContext.set(dogName, untracked);
+                boundParents.push({ dog: parentDog, value: untracked });
                 // Debug: log fer SerializedDog parents
                 if (parentDog instanceof SerializedDog && isRuntimeLogVerbose()) {
                     console.log(`[SerializedDog ${this.storageId}] Füge ${dogName} (storageId: ${(parentDog as SerializedDog<unknown>).storageId}) zum Context hinzu`);
@@ -1234,201 +1193,211 @@ export class SerializedDog<T> extends Dog<T> {
             methods: Object.keys(bridges[ns]),
         }));
 
-        // Drop functions / symbols -- postMessage's structured clone cannot carry them.
-        const safeContext = sanitizeContextForWorker(contextObj);
+        // Resolution: per-run override > SLOPDOGS_VM_TIMEOUT_MS > 10 s — capped at SLOPDOGS_VM_TIMEOUT_MAX_MS.
+        const timeoutMs = resolveVmTimeoutMs(this.vmTimeoutMsOverride);
 
-        if (isRuntimeLogVerbose()) {
-            console.log(`[SerializedDog ${this.storageId}] Required/Optional Parent IDs:`, allParentIds);
-            console.log(`[SerializedDog ${this.storageId}] Context keys (raw):`, Object.keys(contextObj));
-            console.log(`[SerializedDog ${this.storageId}] Context keys (worker-safe):`, Object.keys(safeContext));
-            if (bridgeNamespaces.length > 0) {
-                console.log(`[SerializedDog ${this.storageId}] Bridge namespaces:`, bridgeNamespaces.map(b => `${b.namespace}.{${b.methods.join(',')}}`));
-            }
-        }
-
-        // Resolution: per-kennel override > env var > default 10s. setVmTimeoutMs()
-        // only stores values > 0; env-Number-coercion of NaN / 0 falls through to 10000.
-        const timeoutMs =
-            this.vmTimeoutMsOverride
-            ?? (Number(envFirst('SLOPDOGS_VM_TIMEOUT_MS', 'DATADOGS_VM_TIMEOUT_MS')) || 10_000);
-
-        // Diagnose: probe whether the payload is structured-cloneable BEFORE we hand it to a Worker.
-        // If this fails we know it is the context shape (not vm.runInContext output) and we get
-        // a clear log instead of a cryptic "could not be cloned" from the Worker constructor.
-        let cloneTestError: string | null = null;
+        // Globaler Worker-Deckel ZUERST: wer hier wartet, haelt nur Referenzen — die JSON-Kopie der
+        // Eltern-Ergebnisse (safeContext) und die Clone-Probe entstehen erst mit Slot. Der Slot geht erst
+        // beim 'exit' des Isolats zurueck (DogIsolateHandle.exited), nicht schon beim Ergebnis; entsteht
+        // gar kein Isolat (Waechter, Clone-Probe, new Worker wirft), gibt ihn das finally zurueck.
+        const gate = DogWorkerGate.shared;
+        const lease = await gate.acquire();
+        let isolateSpawned = false as boolean;
         try {
-            if (typeof (globalThis as any).structuredClone === 'function') {
-                (globalThis as any).structuredClone({ wrappedCode, contextObj: safeContext });
-            } else {
-                JSON.parse(JSON.stringify({ wrappedCode, contextObj: safeContext }));
+            // Speicher-Waechter NACH dem Slot, unmittelbar vor dem Spawn: GC-Versuch, dann Warten auf das
+            // Ende anderer Isolate, sonst Abweisung mit DOG_MEMPRESSURE_MARKER (und einer Logzeile).
+            await gate.admit({ storageId: this.storageId, name: this.name });
+
+            // Drop functions / symbols -- postMessage's structured clone cannot carry them.
+            const safeContext = sanitizeContextForWorker(contextObj);
+
+            if (isRuntimeLogVerbose()) {
+                console.log(`[SerializedDog ${this.storageId}] Required/Optional Parent IDs:`, allParentIds);
+                console.log(`[SerializedDog ${this.storageId}] Context keys (raw):`, Object.keys(contextObj));
+                console.log(`[SerializedDog ${this.storageId}] Context keys (worker-safe):`, Object.keys(safeContext));
+                if (bridgeNamespaces.length > 0) {
+                    console.log(`[SerializedDog ${this.storageId}] Bridge namespaces:`, bridgeNamespaces.map(b => `${b.namespace}.{${b.methods.join(',')}}`));
+                }
             }
-        } catch (e: any) {
-            cloneTestError = `pre-worker clone test failed: ${e?.message ?? e}`;
-        }
-        if (cloneTestError) {
-            console.error(`[SerializedDog ${this.storageId}] ${cloneTestError}`);
-            console.error(`[SerializedDog ${this.storageId}] safeContext keys:`, Object.keys(safeContext));
-            for (const k of Object.keys(safeContext)) {
-                const v = (safeContext as any)[k];
-                let t: string;
-                try {
-                    t = typeof v + '/' + (Array.isArray(v) ? 'array' : (v === null ? 'null' : Object.prototype.toString.call(v)));
-                } catch { t = '<unreadable>'; }
-                console.error(`  [${k}]: ${t}`);
+
+            // Diagnose: probe whether the payload is structured-cloneable BEFORE we hand it to a Worker.
+            // If this fails we know it is the context shape (not vm.runInContext output) and we get
+            // a clear log instead of a cryptic "could not be cloned" from the Worker constructor.
+            let cloneTestError: string | null = null;
+            try {
+                if (typeof (globalThis as any).structuredClone === 'function') {
+                    (globalThis as any).structuredClone({ wrappedCode, contextObj: safeContext });
+                } else {
+                    JSON.parse(JSON.stringify({ wrappedCode, contextObj: safeContext }));
+                }
+            } catch (e: any) {
+                cloneTestError = `pre-worker clone test failed: ${e?.message ?? e}`;
             }
-            // Throw -- the harvester's letOut() will catch, brand the dog with __error,
-            // and WavesConverter surfaces it as `hasError: true`. Returning a string here
-            // would mask the failure as a result and leave hasError=false in the snapshot.
-            throw new Error(cloneTestError);
-        }
+            if (cloneTestError) {
+                console.error(`[SerializedDog ${this.storageId}] ${cloneTestError}`);
+                console.error(`[SerializedDog ${this.storageId}] safeContext keys:`, Object.keys(safeContext));
+                for (const k of Object.keys(safeContext)) {
+                    const v = (safeContext as any)[k];
+                    let t: string;
+                    try {
+                        t = typeof v + '/' + (Array.isArray(v) ? 'array' : (v === null ? 'null' : Object.prototype.toString.call(v)));
+                    } catch { t = '<unreadable>'; }
+                    console.error(`  [${k}]: ${t}`);
+                }
+                // Throw -- the harvester's letOut() will catch, brand the dog with __error,
+                // and WavesConverter surfaces it as `hasError: true`. Returning a string here
+                // would mask the failure as a result and leave hasError=false in the snapshot.
+                throw new Error(cloneTestError);
+            }
 
-        // Speicher-Waechter: misst die echte RSS und weist den Lauf mit Fehler ab, wenn der Container
-        // schon am Soft-Limit steht — bevor ein Slot belegt oder ein Isolate erzeugt wird. Wirft es,
-        // laeuft weder acquire noch das finally unten (kein Slot-Leck). Siehe assertDogWorkerMemoryHeadroom.
-        assertDogWorkerMemoryHeadroom(this.storageId, this.name);
+            try {
+                return await new Promise<T>((resolve, reject) => {
+                    // No workerData -- payload goes via postMessage AFTER spawn so any clone failure
+                    // can be caught/reported by us rather than thrown synchronously by the constructor.
+                    //
+                    // resourceLimits deckelt das einzelne Isolate: ohne diesen Deckel kann ein
+                    // einziger entgleister Dog den ganzen Container umbringen, denn Worker-Heaps
+                    // liegen AUSSERHALB von --max-old-space-size und werden vom Budget des
+                    // Haupt-Isolates nicht erfasst. Reisst ein Worker das Limit, beendet Node ihn
+                    // mit ERR_WORKER_OUT_OF_MEMORY — der 'error'-Pfad unten uebersetzt das in eine
+                    // Meldung, die den schuldigen Dog nennt.
+                    const maxHeapMb = resolveDogWorkerMaxHeapMb();
+                    // Sicherheit gegen Env-Exfiltration. Node's vm ist kein Sicherheits-Sandkasten: Dog-Code
+                    // bricht aus dem VM-Kontext in den Worker-Realm aus (fetch.constructor.constructor(
+                    // "return process.env")()) und liest process.env. Damit dort keine Server-Geheimnisse
+                    // (DATABASE_URL, KEYSTORE_MASTER_KEY_V1, GOOGLE_OAUTH_CLIENT_SECRET, MCP_TOKEN_SIGNING_KEY)
+                    // stehen, wird der Worker dreifach entkoppelt -- gemessen war jede Schicht fuer sich noetig:
+                    //   - execArgv: [] -- ohne das erbt der Worker die -r-Preloads des Servers, u.a.
+                    //     "-r ./scripts/load-env.cjs", und laedt die .env-Secrets SELBST erneut in seine env
+                    //     (env: {} allein genuegt deshalb NICHT -- der Worker fuellt sich sonst wieder).
+                    //   - env: {} -- ohne das erbt der Worker eine Kopie der Prozess-env des Servers.
+                    //   - der Env-Scrub oben in SANDBOX_WORKER_SOURCE -- letzte Garantie: leert die eigene
+                    //     process.env, bevor Dog-Code laeuft, egal wie eine Variable hereinkommt.
+                    // heap-Deckel und Timeout sind parent-seitig (resolveDogWorkerMaxHeapMb hier, timeoutMs weiter
+                    // oben) und von alldem unberuehrt.
+                    // Ehrlich benannt: das schliesst nur das Auslesen der Secrets aus der Env. Der Realm-Ausbruch
+                    // selbst bleibt moeglich -- require('fs')/child_process oder Netz unter Umgehung von
+                    // guardedFetch. Echte Isolation braucht eine Prozess-Sandbox / isolated-vm (eigener
+                    // Folgeauftrag). Siehe auch das bewusste SSRF-Restrisiko R30 in docs/slopdogs/PLAN.md.
+                    const worker = new Worker(SANDBOX_WORKER_SOURCE, {
+                        eval: true,
+                        env: {},
+                        execArgv: [],
+                        resourceLimits: {
+                            maxOldGenerationSizeMb: maxHeapMb,
+                            maxYoungGenerationSizeMb: resolveDogWorkerYoungHeapMb(maxHeapMb),
+                        },
+                    });
+                    // Ab hier lebt ein Isolat: es haelt seinen Slot, bis 'exit' feuert (genau einmal je Worker).
+                    isolateSpawned = true;
+                    const isolate = gate.isolateSpawned(lease);
 
-        // Globaler Worker-Deckel: wartet hier, bis ein Isolate-Slot frei ist (Backpressure statt OOM).
-        // Freigabe im finally unten — exakt einmal, nachdem der Worker terminiert wurde (settle()).
-        await acquireDogWorkerSlot();
-        try {
-            return await new Promise<T>((resolve, reject) => {
-                // No workerData -- payload goes via postMessage AFTER spawn so any clone failure
-                // can be caught/reported by us rather than thrown synchronously by the constructor.
-                //
-                // resourceLimits deckelt das einzelne Isolate: ohne diesen Deckel kann ein
-                // einziger entgleister Dog den ganzen Container umbringen, denn Worker-Heaps
-                // liegen AUSSERHALB von --max-old-space-size und werden vom Budget des
-                // Haupt-Isolates nicht erfasst. Reisst ein Worker das Limit, beendet Node ihn
-                // mit ERR_WORKER_OUT_OF_MEMORY — der 'error'-Pfad unten uebersetzt das in eine
-                // Meldung, die den schuldigen Dog nennt.
-                const maxHeapMb = resolveDogWorkerMaxHeapMb();
-                // Sicherheit gegen Env-Exfiltration. Node's vm ist kein Sicherheits-Sandkasten: Dog-Code
-                // bricht aus dem VM-Kontext in den Worker-Realm aus (fetch.constructor.constructor(
-                // "return process.env")()) und liest process.env. Damit dort keine Server-Geheimnisse
-                // (DATABASE_URL, KEYSTORE_MASTER_KEY_V1, GOOGLE_OAUTH_CLIENT_SECRET, MCP_TOKEN_SIGNING_KEY)
-                // stehen, wird der Worker dreifach entkoppelt -- gemessen war jede Schicht fuer sich noetig:
-                //   - execArgv: [] -- ohne das erbt der Worker die -r-Preloads des Servers, u.a.
-                //     "-r ./scripts/load-env.cjs", und laedt die .env-Secrets SELBST erneut in seine env
-                //     (env: {} allein genuegt deshalb NICHT -- der Worker fuellt sich sonst wieder).
-                //   - env: {} -- ohne das erbt der Worker eine Kopie der Prozess-env des Servers.
-                //   - der Env-Scrub oben in SANDBOX_WORKER_SOURCE -- letzte Garantie: leert die eigene
-                //     process.env, bevor Dog-Code laeuft, egal wie eine Variable hereinkommt.
-                // heap-Deckel und Timeout sind parent-seitig (resolveDogWorkerMaxHeapMb hier, timeoutMs weiter
-                // oben) und von alldem unberuehrt.
-                // Ehrlich benannt: das schliesst nur das Auslesen der Secrets aus der Env. Der Realm-Ausbruch
-                // selbst bleibt moeglich -- require('fs')/child_process oder Netz unter Umgehung von
-                // guardedFetch. Echte Isolation braucht eine Prozess-Sandbox / isolated-vm (eigener
-                // Folgeauftrag). Siehe auch das bewusste SSRF-Restrisiko R30 in docs/slopdogs/PLAN.md.
-                const worker = new Worker(SANDBOX_WORKER_SOURCE, {
-                    eval: true,
-                    env: {},
-                    execArgv: [],
-                    resourceLimits: {
-                        maxOldGenerationSizeMb: maxHeapMb,
-                        maxYoungGenerationSizeMb: resolveDogWorkerYoungHeapMb(maxHeapMb),
-                    },
-                });
+                    let settled = false;
+                    const settle = (fn: () => void) => {
+                        if (settled) return;
+                        settled = true;
+                        clearTimeout(timer);
+                        // Das Ergebnis geht sofort zurueck (keine Latenz); der Slot erst mit dem 'exit'.
+                        isolate.terminating();
+                        worker.terminate().catch(() => undefined);
+                        fn();
+                    };
 
-                let settled = false;
-                const settle = (fn: () => void) => {
-                    if (settled) return;
-                    settled = true;
-                    clearTimeout(timer);
-                    worker.terminate().catch(() => undefined);
-                    fn();
-                };
-
-                const timer = setTimeout(() => {
-                    settle(() => reject(new Error(
-                        `SerializedDog ${this.storageId}: ${DOG_TIMEOUT_MARKER} ${timeoutMs}ms`
-                    )));
-                }, timeoutMs);
-
-                // Persistent listener -- rpc:call messages can arrive any number of times
-                // before the final {ok,...} / {ok:false,...} result message. The settle()
-                // guard ensures we resolve/reject the outer Promise exactly once even though
-                // the listener stays attached.
-                worker.on('message', async (msg: any) => {
-                    if (msg && msg.type === 'rpc:call') {
-                        const ns = bridges[msg.namespace];
-                        const id = msg.id;
-                        try {
-                            if (!ns) {
-                                throw new Error(`Unknown bridge namespace: ${msg.namespace}`);
-                            }
-                            const fn = ns[msg.method];
-                            if (typeof fn !== 'function') {
-                                // Whitelist enforcement -- only registered method names are callable.
-                                throw new Error(`Unknown method: ${msg.namespace}.${msg.method}`);
-                            }
-                            const args = Array.isArray(msg.args) ? msg.args : [];
-                            const result = await fn(...args);
-                            // JSON-roundtrip the result so it survives postMessage cleanly
-                            // (DB rows etc. may carry exotic shapes that structured-clone refuses).
-                            let safe: unknown = null;
-                            try {
-                                safe = result === undefined ? null : JSON.parse(JSON.stringify(result));
-                            } catch (cloneErr: any) {
-                                throw new Error(`RPC result not serializable: ${cloneErr?.message ?? cloneErr}`);
-                            }
-                            try {
-                                worker.postMessage({ type: 'rpc:result', id, value: safe });
-                            } catch {
-                                // Worker may have died between call and reply -- nothing to do.
-                            }
-                        } catch (err: any) {
-                            try {
-                                worker.postMessage({ type: 'rpc:result', id, error: err?.message ?? String(err) });
-                            } catch {
-                                // Worker gone -- swallow.
-                            }
-                        }
-                        return;
-                    }
-                    if (msg && typeof msg.ok === 'boolean') {
-                        if (msg.ok) {
-                            settle(() => resolve(msg.result as T));
-                        } else {
-                            const message = msg.error ?? 'unknown sandbox error';
-                            settle(() => reject(new Error(message)));
-                        }
-                    }
-                });
-                worker.once('error', (err: Error) => {
-                    settle(() => reject(this.describeWorkerError(err, maxHeapMb)));
-                });
-                worker.once('exit', (code: number) => {
-                    if (code !== 0) {
+                    const timer = setTimeout(() => {
                         settle(() => reject(new Error(
-                            `SerializedDog ${this.storageId}: sandbox worker exited with code ${code}`
+                            `SerializedDog ${this.storageId}: ${DOG_TIMEOUT_MARKER} ${timeoutMs}ms`
+                        )));
+                    }, timeoutMs);
+
+                    // Persistent listener -- rpc:call messages can arrive any number of times
+                    // before the final {ok,...} / {ok:false,...} result message. The settle()
+                    // guard ensures we resolve/reject the outer Promise exactly once even though
+                    // the listener stays attached.
+                    worker.on('message', async (msg: any) => {
+                        if (msg && msg.type === 'rpc:call') {
+                            const ns = bridges[msg.namespace];
+                            const id = msg.id;
+                            try {
+                                if (!ns) {
+                                    throw new Error(`Unknown bridge namespace: ${msg.namespace}`);
+                                }
+                                const fn = ns[msg.method];
+                                if (typeof fn !== 'function') {
+                                    // Whitelist enforcement -- only registered method names are callable.
+                                    throw new Error(`Unknown method: ${msg.namespace}.${msg.method}`);
+                                }
+                                const args = Array.isArray(msg.args) ? msg.args : [];
+                                const result = await fn(...args);
+                                // JSON-roundtrip the result so it survives postMessage cleanly
+                                // (DB rows etc. may carry exotic shapes that structured-clone refuses).
+                                let safe: unknown = null;
+                                try {
+                                    safe = result === undefined ? null : JSON.parse(JSON.stringify(result));
+                                } catch (cloneErr: any) {
+                                    throw new Error(`RPC result not serializable: ${cloneErr?.message ?? cloneErr}`);
+                                }
+                                try {
+                                    worker.postMessage({ type: 'rpc:result', id, value: safe });
+                                } catch {
+                                    // Worker may have died between call and reply -- nothing to do.
+                                }
+                            } catch (err: any) {
+                                try {
+                                    worker.postMessage({ type: 'rpc:result', id, error: err?.message ?? String(err) });
+                                } catch {
+                                    // Worker gone -- swallow.
+                                }
+                            }
+                            return;
+                        }
+                        if (msg && typeof msg.ok === 'boolean') {
+                            if (msg.ok) {
+                                settle(() => resolve(msg.result as T));
+                            } else {
+                                const message = msg.error ?? 'unknown sandbox error';
+                                settle(() => reject(new Error(message)));
+                            }
+                        }
+                    });
+                    worker.once('error', (err: Error) => {
+                        settle(() => reject(this.describeWorkerError(err, maxHeapMb)));
+                    });
+                    worker.once('exit', (code: number) => {
+                        isolate.exited();
+                        // Ein Ergebnis kommt immer VOR 'exit' an (Node leert den Port vorher). Wer hier
+                        // noch nicht entschieden ist, kommt nie mehr: frueher hielt Code 0 den Lauf bis zum Timer.
+                        settle(() => reject(new Error(code !== 0
+                            ? `SerializedDog ${this.storageId}: sandbox worker exited with code ${code}`
+                            : `SerializedDog ${this.storageId}: sandbox worker exited before returning a result`
+                        )));
+                    });
+
+                    // Send the payload AFTER Worker is up. Any clone failure here surfaces via the
+                    // 'error' listener with full diagnostic, not as a synchronous throw that we'd
+                    // misattribute to the user's code.
+                    try {
+                        worker.postMessage({ wrappedCode, contextObj: safeContext, bridgeNamespaces });
+                    } catch (postErr: any) {
+                        settle(() => reject(new Error(
+                            `SerializedDog ${this.storageId}: postMessage failed: ${postErr?.message ?? postErr}`
                         )));
                     }
                 });
-
-                // Send the payload AFTER Worker is up. Any clone failure here surfaces via the
-                // 'error' listener with full diagnostic, not as a synchronous throw that we'd
-                // misattribute to the user's code.
-                try {
-                    worker.postMessage({ wrappedCode, contextObj: safeContext, bridgeNamespaces });
-                } catch (postErr: any) {
-                    settle(() => reject(new Error(
-                        `SerializedDog ${this.storageId}: postMessage failed: ${postErr?.message ?? postErr}`
-                    )));
-                }
-            });
-        } catch (err: any) {
-            // Re-throw so the harvester's letOut() catches, brands the dog with __error,
-            // and WavesConverter surfaces hasError=true via get_snapshot_dog_error.
-            // Returning a result string here would mask the failure as a successful yield
-            // and leave hasError=false in the snapshot -- the original sin of this method.
-            const scriptError = `[SerializedDog ${this.storageId}] Script Error: ${err?.message ?? err}`;
-            if (vmConsoleSink) vmConsoleSink('error', scriptError, this.capabilityCtx);
-            else console.error(scriptError);
-            throw err instanceof Error
-                ? err
-                : new Error(typeof err === 'string' ? err : String(err));
+            } catch (err: any) {
+                // Re-throw so the harvester's letOut() catches, brands the dog with __error,
+                // and WavesConverter surfaces hasError=true via get_snapshot_dog_error.
+                // Returning a result string here would mask the failure as a successful yield
+                // and leave hasError=false in the snapshot -- the original sin of this method.
+                const scriptError = `[SerializedDog ${this.storageId}] Script Error: ${err?.message ?? err}`;
+                if (vmConsoleSink) vmConsoleSink('error', scriptError, this.capabilityCtx);
+                else console.error(scriptError);
+                throw err instanceof Error
+                    ? err
+                    : new Error(typeof err === 'string' ? err : String(err));
+            }
         } finally {
-            releaseDogWorkerSlot();
+            // Kein Isolat entstanden -> der Slot geht hier zurueck. Sonst gibt ihn erst das 'exit' frei.
+            if (!isolateSpawned) lease.release();
         }
     }
 

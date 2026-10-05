@@ -35,6 +35,7 @@ import { createActionsRouter } from '../mcp/transports/openapi';
 import { KennelSnapshotCache } from '../mcp/snapshots/KennelSnapshotCache';
 import { resolveAngularBrowserDir, resolvePublicDir } from './expressPaths';
 import { HeavyRequestLimiter } from './heavyRequestLimiter';
+import { RunGates } from './runAdmission';
 import type { KennelCallCounter } from '../services/KennelCallCounter';
 import { KennelStatsService } from '../services/KennelStatsService';
 import type { IDogStatsStore, IKennelStatsStore } from '../store/IKennelStatsStore';
@@ -97,6 +98,19 @@ function shouldRunStartupTests(nodeEnv: string): boolean {
 }
 
 /**
+ * Proxy-Hops vor der App (siehe `trust proxy` unten). Deployed Default 1 (Render), lokal 0.
+ * TRUST_PROXY_HOPS ueberschreibt in beide Richtungen; nur ein Integer >= 0 zaehlt.
+ */
+export function resolveTrustProxyHops(nodeEnv: string): number {
+    const raw = (process.env.TRUST_PROXY_HOPS || '').trim();
+    if (raw !== '') {
+        const parsed = Number(raw);
+        if (Number.isInteger(parsed) && parsed >= 0) return parsed;
+    }
+    return nodeEnv === 'production' || nodeEnv === 'integration' ? 1 : 0;
+}
+
+/**
  * Baut die Express-App: CORS, JSON, Auth/MCP, /static, umgebungsabhängiges Frontend (dev vs. gebaute SPA),
  * API, Kennel-Run/Swagger/Bundle, SPA-Fallback (nur built UI).
  */
@@ -122,8 +136,19 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     // verweigert das Secure-Cookie -> kein Set-Cookie -> OAuth/PKCE- und
     // Personal-Token-Flow tot. Nur deployed setzen; lokal (development) laeuft
     // alles unveraendert ueber http://localhost ohne Proxy und ohne Login.
-    if (nodeEnv === 'production' || nodeEnv === 'integration') {
-        app.set('trust proxy', 1);
+    //
+    // Dieselbe Einstellung macht req.ip zur Client-IP — die Quelle anonymer Kennel-Laeufe in der
+    // Sperre je Quelle (runAdmission.ts). Annahme: zwischen Client und App liegen genau
+    // TRUST_PROXY_HOPS Proxys (Render: 1), und der letzte haengt die Adresse seines Gegenuebers an
+    // X-Forwarded-For an. Express nimmt dann die Adresse an Position <Hops> von RECHTS — die, die
+    // Renders Proxy selbst eingetragen hat. Was ein Client vorne in X-Forwarded-For hineinschreibt,
+    // liegt weiter links und wird ignoriert: nicht faelschbar. Steht ein weiterer Proxy davor
+    // (z. B. ein CDN), ist die rechte Adresse dessen Kante — dann TRUST_PROXY_HOPS=2. Zu hoch gesetzt,
+    // wird die Adresse faelschbar; zu niedrig, teilen sich alle Anonymen die Adresse des Proxys.
+    // TRUST_PROXY_HOPS=0 schaltet ab.
+    const trustProxyHops = resolveTrustProxyHops(nodeEnv);
+    if (trustProxyHops > 0) {
+        app.set('trust proxy', trustProxyHops);
     }
 
     const isLocalDevOrigin = (origin: string): boolean => {
@@ -203,11 +228,14 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
 
     // Schleuse vor den teuren Pfaden — MUSS vor allen Route-Handlern montiert sein.
     // Body-Limits deckeln nur die Eingabe; die Spitze entsteht durch parallele Runs
-    // und Listen-Abfragen, die gleichzeitig im Heap stehen.
-    HeavyRequestLimiter.heavy().applyTo(app);
+    // und Listen-Abfragen, die gleichzeitig im Heap stehen. EIN Satz Toepfe fuer den Prozess:
+    // HTTP und MCP (run_kennel, execute_kennel, refresh_kennel_snapshot, build_kennel) teilen
+    // den Heavy-Topf und die Sperre je Quelle.
+    const runGates = RunGates.fromEnv();
+    HeavyRequestLimiter.heavy(runGates).applyTo(app);
     // Zweiter Topf fuer oeffentliche Kennel-Laeufe (/k/:id, /k/:id/openapi.json): Besucher
     // warten nicht vor der UI, die UI nicht hinter Besuchern. Vor /static und dem SPA-Fallback.
-    HeavyRequestLimiter.publicRuns().applyTo(app);
+    HeavyRequestLimiter.publicRuns(runGates).applyTo(app);
 
     if (publicDir) {
         app.use('/static', express.static(publicDir));
@@ -384,6 +412,7 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
         callCounter: input.callCounter,
         dogStats,
         keyStore,
+        runGates,
     };
     app.use('/mcp', createMcpRouter(toolDeps));
     app.use('/actions', createActionsRouter(toolDeps));

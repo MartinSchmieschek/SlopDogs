@@ -53,7 +53,7 @@ export class ChannelLiveSnippetRetriever extends Dog<LobbyLeadYield> {
         const channelDog = season.exhausted.find(d => d.name === WebSocketChannelRetriever.name);
         const snapshot = (channelDog?.collected ?? null) as ChannelState | null;
         if (!snapshot) {
-            throw new Error("ChannelLiveSnippetRetriever: ChannelState fehlt — WebSocketChannelRetriever muss als Parent laufen.");
+            throw new Error("ChannelLiveSnippetRetriever: ChannelState missing — WebSocketChannelRetriever must run as a parent.");
         }
         return { snapshot, live: renderLobbyHtml(snapshot) };
     };
@@ -68,7 +68,7 @@ function renderLobbyHtml(state: ChannelState): string {
     const initial = safeJson(state);
 
     return `<!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -128,27 +128,27 @@ pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; font-size:
 </head>
 <body>
 <header>
-  <h1>Lobby <span id="channel-id">${escapeHtml(state.channelId)}</span><span id="created-badge" class="created-badge" style="display:${state.created ? "inline-block" : "none"}">neu</span></h1>
+  <h1>Lobby <span id="channel-id">${escapeHtml(state.channelId)}</span><span id="created-badge" class="created-badge" style="display:${state.created ? "inline-block" : "none"}">new</span></h1>
   <div class="share">
-    <input id="share-url" type="text" readonly aria-label="Share-Link">
-    <button id="copy-btn" type="button">Kopieren</button>
-    <button id="share-btn" type="button" hidden>Teilen</button>
+    <input id="share-url" type="text" readonly aria-label="Share link">
+    <button id="copy-btn" type="button">Copy</button>
+    <button id="share-btn" type="button" hidden>Share</button>
   </div>
-  <p class="status"><span id="conn-status" class="bad">verbinde...</span> &middot; Peers: <span id="peer-count">0</span></p>
+  <p class="status"><span id="conn-status" class="bad">connecting...</span> &middot; Peers: <span id="peer-count">0</span></p>
 </header>
 
 <section>
-  <h2>Mein shared-Objekt</h2>
+  <h2>My shared object</h2>
   <textarea id="my-shared" spellcheck="false">{}</textarea>
   <div class="row" style="margin-top:8px">
-    <button id="save-btn" type="button">Senden</button>
+    <button id="save-btn" type="button">Send</button>
     <span id="save-status" class="status"></span>
   </div>
   <div id="parse-error" class="error" hidden></div>
 </section>
 
 <section>
-  <h2>Teilnehmer</h2>
+  <h2>Participants</h2>
   <ul class="peers" id="peer-list"></ul>
 </section>
 
@@ -201,8 +201,8 @@ pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; font-size:
   copyBtn.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(absoluteShareUrl);
-      copyBtn.textContent = "kopiert";
-      setTimeout(() => copyBtn.textContent = "Kopieren", 1500);
+      copyBtn.textContent = "copied";
+      setTimeout(() => copyBtn.textContent = "Copy", 1500);
     } catch(_) {
       shareInput.select();
       document.execCommand && document.execCommand("copy");
@@ -222,7 +222,7 @@ pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; font-size:
     try {
       const next = JSON.parse(sharedTA.value || "{}");
       if (next === null || typeof next !== "object" || Array.isArray(next)){
-        throw new Error("shared muss ein Objekt sein");
+        throw new Error("shared must be an object");
       }
       myShared = next;
       sessionStorage.setItem(SHARED_KEY, JSON.stringify(myShared));
@@ -231,11 +231,11 @@ pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; font-size:
       peers.set(peerId, me);
       sendPatch();
       render();
-      saveStatus.textContent = "gesendet";
+      saveStatus.textContent = "sent";
       setTimeout(() => saveStatus.textContent = "", 1200);
     } catch(e){
       parseErr.hidden = false;
-      parseErr.textContent = "JSON-Fehler: " + (e && e.message || e);
+      parseErr.textContent = "JSON error: " + (e && e.message || e);
     }
   });
 
@@ -302,12 +302,12 @@ pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; font-size:
   }
 
   function connect(){
-    setStatus("verbinde...", false);
+    setStatus("connecting...", false);
     try { ws = new WebSocket(wsUrl()); }
-    catch(e){ setStatus("WS-Fehler", false); scheduleReconnect(); return; }
+    catch(e){ setStatus("WebSocket error", false); scheduleReconnect(); return; }
 
     ws.addEventListener("open", () => {
-      setStatus("verbunden", true);
+      setStatus("connected", true);
       reconnectMs = 500;
       sendJoin();
       startHeartbeat();
@@ -317,7 +317,7 @@ pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; font-size:
       handle(msg);
     });
     ws.addEventListener("close", () => {
-      setStatus("getrennt — neuer Versuch", false);
+      setStatus("disconnected — retrying", false);
       stopHeartbeat();
       scheduleReconnect();
     });
@@ -370,7 +370,7 @@ pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; font-size:
     peerId: peerId,
     me: () => myShared,
     setMine: (next) => {
-      if (!next || typeof next !== "object" || Array.isArray(next)) throw new Error("shared muss Objekt sein");
+      if (!next || typeof next !== "object" || Array.isArray(next)) throw new Error("shared must be an object");
       myShared = next;
       sessionStorage.setItem(SHARED_KEY, JSON.stringify(myShared));
       const me = peers.get(peerId) || { lastSeen: Date.now(), shared: {} };

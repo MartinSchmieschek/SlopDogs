@@ -3,7 +3,7 @@
 // Volle Waves werden niemals in einem Aufruf zurueckgegeben — die Inspektion ist granular.
 
 import { accessOf, type Access } from '../auth/visibility';
-import { type ToolDef, type ToolDeps, ok, fail } from './types';
+import { type ToolDef, type ToolDeps, ok, fail, McpRunAdmission } from './types';
 import type { AuthCtx } from '../auth/middleware';
 import type { NodeEntry, Waves, ReadTrackingEntry } from '../../services/WavesConverter';
 import type { KennelSnapshotEntry } from '../snapshots/types';
@@ -225,7 +225,7 @@ export function getSnapshotTools(): ToolDef[] {
         {
             name: 'refresh_kennel_snapshot',
             description:
-                'Runs a kennel asynchronously and stores the full Waves in-memory as a snapshot, keyed by kennelLineageId and by you: a run carries your capabilities (your jsonStore), so every caller reads only his own snapshot. The run right is enough to refresh; per-dog inspection needs the read right. Returns immediately with status=running. Use wait_for_kennel_snapshot or get_kennel_snapshot to observe completion. Prefer this over run_kennel for any inspection workflow — subsequent get_snapshot_* tools read from the cached run. Optional `vmTimeoutMs` overrides the per-dog VM execution budget for this run (resolution: vmTimeoutMs > SLOPDOGS_VM_TIMEOUT_MS env > 10000ms default) -- not persisted.',
+                'Runs a kennel asynchronously and stores the full Waves in-memory as a snapshot, keyed by kennelLineageId and by you: a run carries your capabilities (your jsonStore), so every caller reads only his own snapshot. The run right is enough to refresh; per-dog inspection needs the read right. Returns immediately with status=running. Use wait_for_kennel_snapshot or get_kennel_snapshot to observe completion. Prefer this over run_kennel for any inspection workflow — subsequent get_snapshot_* tools read from the cached run. Optional `vmTimeoutMs` overrides the per-dog VM execution budget for this run (resolution: vmTimeoutMs > SLOPDOGS_VM_TIMEOUT_MS env > 10000ms default, capped at SLOPDOGS_VM_TIMEOUT_MAX_MS, default 60000) -- not persisted. Runs share the server run queue: too many concurrent runs or too many runs per minute from you are refused (429), a full queue answers 503.',
             inputSchema: {
                 type: 'object',
                 required: ['id'],
@@ -241,7 +241,7 @@ export function getSnapshotTools(): ToolDef[] {
                     vmTimeoutMs: {
                         type: 'number',
                         minimum: 1,
-                        description: 'Per-run VM timeout in ms. Overrides SLOPDOGS_VM_TIMEOUT_MS (default 10000). Run-time-only, not persisted.',
+                        description: 'Per-run VM timeout in ms. Overrides SLOPDOGS_VM_TIMEOUT_MS (default 10000); capped at SLOPDOGS_VM_TIMEOUT_MAX_MS (default 60000). Run-time-only, not persisted.',
                     },
                 },
             },
@@ -267,6 +267,12 @@ export function getSnapshotTools(): ToolDef[] {
                 const vmTimeoutMs = typeof args.vmTimeoutMs === 'number' && args.vmTimeoutMs > 0
                     ? args.vmTimeoutMs
                     : undefined;
+                // Dieselbe Zulassung wie jeder Kennel-Lauf. Die Sperre je Quelle (429) und eine volle
+                // Schlange (503) antworten SOFORT als Tool-Fehler; sonst wartet der Hintergrund-Lauf auf
+                // seinen Platz (Status bleibt 'running') und haelt ihn bis Laufende.
+                const admission = McpRunAdmission.request(deps, ctx);
+                const refused = admission.immediateFailure;
+                if (refused) return refused;
                 deps.snapshotCache.startJob(
                     lineageId,
                     viewer,
@@ -278,6 +284,11 @@ export function getSnapshotTools(): ToolDef[] {
 
                 // Async hunt — return now, let the dogs run.
                 void (async () => {
+                    const admitted = await admission.granted();
+                    if (!admitted.ok) {
+                        deps.snapshotCache.markFailed(lineageId, viewer, admitted.message);
+                        return;
+                    }
                     try {
                         const freshConfig = await deps.kennelRunHandler.loadKennelConfig(id);
                         if (!freshConfig) {
@@ -307,6 +318,8 @@ export function getSnapshotTools(): ToolDef[] {
                         });
                     } catch (err: any) {
                         deps.snapshotCache.markFailed(lineageId, viewer, err?.message ?? String(err));
+                    } finally {
+                        admitted.lease.release();
                     }
                 })();
 

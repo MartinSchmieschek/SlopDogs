@@ -30,8 +30,10 @@ export function createAuthRouter(prisma: PrismaClient): Router {
 
     // Only allow returnTo values that are same-origin paths (start with "/" but not "//").
     // Prevents open-redirect via ?returnTo=https://attacker.example/.
+    // Laenge begrenzt: der Wert reist in der (anonym anlegbaren) Session mit.
     function safeReturnTo(raw: unknown): string | undefined {
         if (typeof raw !== 'string') return undefined;
+        if (raw.length > 2048) return undefined;
         if (!raw.startsWith('/') || raw.startsWith('//')) return undefined;
         return raw;
     }

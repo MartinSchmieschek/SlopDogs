@@ -26,6 +26,7 @@ import type { KennelCallCounter } from '../../services/KennelCallCounter';
 import { dogStatsKeyOf } from '../../services/dogStatsKey';
 import type { KennelCallSource } from '../../store/IKennelStatsStore';
 import { KeyRunState } from '../../services/keysCapability';
+import { LeadOutcome } from '../../services/LeadOutcome';
 
 /** Lead-Yield mit { snapshot, live } — Lobby-Konvention fuer den Socket-Dog. */
 function isLobbyLeadShape(v: any): boolean {
@@ -137,9 +138,9 @@ export class KennelRunHandler {
         const leadRef = config.dogIds?.[0];
         if (!leadRef) return null;
         const waves = await this.runKennel(config, this.mergeQueryParams(config.defaultQuery, query), config.defaultBody, undefined, undefined, attribution);
-        const lead: any = this.findDogInWaves(waves, leadRef);
-        if (!lead || lead.error) return null;
-        return KeyRunState.forResult(waves).scrubValue(lead.result);
+        const outcome = LeadOutcome.of(waves, leadRef);
+        if (outcome.status !== 'ok') return null;
+        return KeyRunState.forResult(waves).scrubValue(outcome.result);
     }
 
     /**
@@ -215,11 +216,12 @@ export class KennelRunHandler {
             // die Waves tragen ihren Lauf mit, damit Antwort und Snapshot noch einmal scrubben koennen.
             const waves = convertSeasonToWaves(season, config, keyRun);
             KeyRunState.attach(waves, keyRun);
-            // Ein Lead, der gar nicht in den Waves steht (durfte nicht laufen), ist so gescheitert
-            // wie einer mit error-Brandzeichen — die Handler antworten dann `lead_failed`.
-            const leadRef = config.dogIds?.[0];
-            const lead: any = leadRef ? this.findDogInWaves(waves, leadRef) : null;
-            leadFailed = !lead || !!lead.error;
+            // Der Ausgang des Leads, einmal aus der Season entschieden und an die Waves gehaengt:
+            // ok | empty (lief, lieferte nichts) | failed (Fehler, auch leerer Text) | not_run (lief nie).
+            // Jeder Weg nach aussen liest ihn ueber LeadOutcome.of(waves) — kein 200 mit leerem Rumpf mehr.
+            const outcome = LeadOutcome.fromRun(waves, season, config.dogIds?.[0]);
+            LeadOutcome.attach(waves, outcome);
+            leadFailed = outcome.failed;
             return waves;
         } catch (err) {
             leadFailed = true;                                               // "Nothing to harvest" oder Infrastruktur
@@ -473,24 +475,6 @@ export class KennelRunHandler {
         }
     }
 
-    private findDogInWaves(waves: Waves, targetDogId: string) {
-        const searchId = targetDogId.startsWith('base:')
-            ? targetDogId.substring(5)
-            : targetDogId;
-
-        for (const wave of waves) {
-            for (const node of wave) {
-                if (node.id === searchId ||
-                    node.id === targetDogId ||
-                    (node as any).lineageId === searchId ||
-                    (node as any).lineageId === targetDogId) {
-                    return node;
-                }
-            }
-        }
-        return null;
-    }
-
     /**
      * Das Lead-Ergebnis als Antwort. P4c: vorher noch einmal der Scrub des Laufs (`waves`) — die
      * Waves sind schon bereinigt, das hier ist die letzte Tuer vor dem Draht (Defense-in-Depth).
@@ -546,7 +530,7 @@ export class KennelRunHandler {
             }
             const access = accessOf(config as any, req.ctx);
             if (access === 'none') {
-                res.status(404).json({ ok: false, error: `Kennel ${req.params.id} nicht gefunden` });
+                res.status(404).json({ ok: false, error: `Kennel ${req.params.id} not found` });
                 return;
             }
 
@@ -564,7 +548,13 @@ export class KennelRunHandler {
                     return;
                 }
                 const safeWaves = await redactWavesForCtx(waves, req.ctx, this.deps.nodesStore);
-                res.json({ ok: true, waves: safeWaves, kennelConfig: withMyRights(config as any, req.ctx) });
+                const lead = LeadOutcome.of(waves, config.dogIds?.[0]);
+                res.json({
+                    ok: true,
+                    lead: { status: lead.status, ...(lead.error !== undefined ? { error: lead.error } : {}) },
+                    waves: safeWaves,
+                    kennelConfig: withMyRights(config as any, req.ctx),
+                });
             } catch (runError: any) {
                 const msg = KennelRunHandler.errorText(runError, access);
                 const kennelConfig = access === 'read' ? { kennelConfig: withMyRights(config as any, req.ctx) } : {};
@@ -591,13 +581,13 @@ export class KennelRunHandler {
             }
             access = accessOf(config as any, req.ctx);
             if (access === 'none') {
-                res.status(404).json({ error: `Kennel ${req.params.id} nicht gefunden` });
+                res.status(404).json({ error: `Kennel ${req.params.id} not found` });
                 return;
             }
 
             const dogIds = config.dogIds || [];
             if (dogIds.length === 0) {
-                res.status(400).json({ error: 'Keine Hunde in der Config gefunden' });
+                res.status(400).json({ error: 'No dogs found in the kennel config' });
                 return;
             }
 
@@ -607,25 +597,63 @@ export class KennelRunHandler {
                     ? req.body
                     : config.defaultBody;
             const waves = await this.runKennel(config, queryData, body, this.toCapabilityCtx(req.ctx), undefined, { source: 'api-execute' });
-
-            const firstDog = this.findDogInWaves(waves, dogIds[0]);
-            if (!firstDog) {
-                this.sendLeadMissing(res, dogIds[0], access);
-                return;
-            }
-            this.sendResult(res, firstDog.result, req, waves);
+            this.sendLeadOutcome(req, res, waves, dogIds[0], access);
         } catch (err) {
             console.error('[KennelRunHandler.handleExecute]', err);
             res.status(500).json({ error: KennelRunHandler.errorText(err, access) });
         }
     }
 
+    /** Retry-After, wenn der Speicher-Waechter den Lead abgewiesen hat: kurz, der Druck ist voruebergehend. */
+    public static readonly MEMORY_PRESSURE_RETRY_AFTER_S = 10;
+
     /**
-     * Der Lead lief nicht (fehlt, weil er in diesem Kennel nicht laufen darf, oder crashte vor
-     * seinem Eintrag). Leser erfahren die id, RUN-Leser nur, dass der Lead fehlt.
+     * Die Antwort auf einen Lauf — ehrlich nach dem Ausgang des Leads (LeadOutcome):
+     *   ok       -> 200 mit dem Ergebnis (HTML/Markdown/JSON/Lobby wie bisher);
+     *   empty    -> 200 mit JSON `null`: der Lead lief fehlerfrei und lieferte nichts. Bewusst nicht 204 —
+     *               ein leerer Rumpf war genau die Mehrdeutigkeit, die einen Fehler versteckte, und
+     *               `fetch().json()` scheitert an 204; `null` ist gueltiges JSON und eindeutig "kein Wert";
+     *   failed + Speicher-Waechter -> 503 + Retry-After (der Server, nicht der Kennel);
+     *   failed / not_run           -> 502 `lead_failed`.
+     * Fehlerdetails (Dog-id, Fehlertext) nur fuer READ-Leser (W13) — RUN-Leser und Anonyme sehen keine Interna.
      */
-    private sendLeadMissing(res: any, leadRef: string, access: Access): void {
-        res.status(404).json({ error: access === 'read' ? `Dog ${leadRef} not found in waves` : 'lead_failed' });
+    public sendLeadOutcome(req: any, res: any, waves: Waves, leadRef: string, access: Access): void {
+        const outcome = LeadOutcome.of(waves, leadRef);
+        if (outcome.status === 'ok') {
+            this.sendResult(res, outcome.result, req, waves);
+            return;
+        }
+        if (outcome.status === 'empty') {
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.status(200).send('null');
+            return;
+        }
+        const detail = access === 'read'
+            ? {
+                dog: leadRef,
+                detail: outcome.status === 'not_run'
+                    ? `Dog ${leadRef} did not run (its parents were not ready, or it may not run in this kennel).`
+                    : outcome.error,
+            }
+            : {};
+        console.warn(`[KennelRunHandler] ${req?.method ?? ''} ${req?.path ?? ''}: lead ${outcome.status}${outcome.memoryPressure ? ' (memory guard)' : ''}`);
+        if (outcome.memoryPressure) {
+            res.setHeader('Retry-After', String(KennelRunHandler.MEMORY_PRESSURE_RETRY_AFTER_S));
+            res.status(503).json({
+                error: 'server_busy',
+                reason: 'memory_pressure',
+                message: 'Server busy: not enough memory to run this kennel right now. Retry shortly.',
+                ...detail,
+            });
+            return;
+        }
+        res.status(502).json({
+            error: 'lead_failed',
+            message: outcome.status === 'not_run'
+                ? 'The lead dog of this kennel did not run.'
+                : 'The lead dog of this kennel failed.',
+            ...detail,
+        });
     }
 
     /**
@@ -699,19 +727,14 @@ export class KennelRunHandler {
 
             const dogIds = config.dogIds || [];
             if (dogIds.length === 0) {
-                res.status(400).json({ error: 'Keine Hunde in der Config gefunden' });
+                res.status(400).json({ error: 'No dogs found in the kennel config' });
                 return;
             }
 
             const queryData = this.mergeQueryParams(config.defaultQuery, req.query);
             // Wie GET /api/…/run: ohne Request-Body die gespeicherte defaultBody-Konfiguration nutzen.
             const waves = await this.runKennel(config, queryData, config.defaultBody, this.toCapabilityCtx(req.ctx), undefined, { source: 'public' });
-            const firstDog = this.findDogInWaves(waves, dogIds[0]);
-            if (!firstDog) {
-                this.sendLeadMissing(res, dogIds[0], access);
-                return;
-            }
-            this.sendResult(res, firstDog.result, req, waves);
+            this.sendLeadOutcome(req, res, waves, dogIds[0], access);
         } catch (err) {
             console.error(err);
             res.status(500).json({ error: KennelRunHandler.errorText(err, access) });
@@ -731,7 +754,7 @@ export class KennelRunHandler {
 
             const dogIds = config.dogIds || [];
             if (dogIds.length === 0) {
-                res.status(400).json({ error: 'Keine Hunde in der Config gefunden' });
+                res.status(400).json({ error: 'No dogs found in the kennel config' });
                 return;
             }
 
@@ -740,12 +763,7 @@ export class KennelRunHandler {
                 req.body !== undefined && req.body !== null ? req.body : config.defaultBody;
 
             const waves = await this.runKennel(config, queryData, bodyData, this.toCapabilityCtx(req.ctx), undefined, { source: 'public' });
-            const firstDog = this.findDogInWaves(waves, dogIds[0]);
-            if (!firstDog) {
-                this.sendLeadMissing(res, dogIds[0], access);
-                return;
-            }
-            this.sendResult(res, firstDog.result, req, waves);
+            this.sendLeadOutcome(req, res, waves, dogIds[0], access);
         } catch (err) {
             console.error(err);
             res.status(500).json({ error: KennelRunHandler.errorText(err, access) });
