@@ -1,190 +1,163 @@
 # Plan: Web-Push-Benachrichtigungen aufs Handy
 
-Status: **Entwurf / Planung** — noch kein Code. Eigener Branch `plan/web-push-notifications`.
+Status: **Plan, geprüft gegen den Code (2026-10-05)** — noch kein Code. Branch `plan/web-push-notifications`.
+Der Plan reist mit dem ersten Bau-PR nach `main`; er bekommt keinen eigenen PR.
 
 ## 1. Ziel
 
-Der Besitzer bekommt eine Nachricht auf sein Handy, **auch wenn das Handy im
-Standby ist und keine Website offen ist**. Auslöser:
+Ein Nutzer bekommt eine Nachricht auf sein Handy — **auch im Standby, ohne offene Website** —, auf
+**Android und iPhone**. Zwei Auslöser:
 
-1. **Der Agent meldet sich selbst** (Haupt-Trigger): wenn er eine **Frage** hat
-   oder **fertig** ist. Nicht automatisch bei jedem `save_node`/`build_kennel` —
-   der Agent entscheidet bewusst, wann er klingelt.
-2. **Ein Kennel-Event** (z. B. dogdoc: „ein User hat das Dokument gelesen") —
-   **nur über einen Umweg**, nie als direktes Push-Primitive im Dog-Code.
+1. **Der Agent meldet sich selbst** über das MCP-Tool `notify_me`: Frage, fertig, Info.
+   Kein Auto-Push bei `build_kennel`/`save_node`.
+2. **Ein Kennel meldet ein Ereignis** — nur über einen Umweg (Drain, Abschnitt 5b), nie über ein
+   Push-Werkzeug im Dog-Code.
 
-## 2. Das Standby-Problem — und warum Web Push es löst
+## 2. Entscheidungen (10-0, 2026-10-05)
 
-Zustellung darf **nicht** an der offenen Website hängen (offener Tab, WebSocket-
-Lobby, Presence — das stirbt beim Tab-Schließen / Standby).
+| Thema | Entscheidung |
+|---|---|
+| Transport | Web Push mit eigenen VAPID-Schlüsseln. Keine Fremd-App. |
+| Besitz | SlopDogs besitzt die Zustellung. Einzige Sendestelle: `NotificationService.sendToUser`. |
+| Empfänger Agent | Wer `notify_me` aufruft, bekommt die Nachricht (`ctx.user.id`). |
+| Empfänger Kennel | **Immer der eingeloggte Nutzer, der den Lauf auslöst** — öffentlich wie privat. Nie automatisch der Besitzer. Anonyme Läufe benachrichtigen niemanden. |
+| Kennel-Umweg | (ii) Drain: der Kennel schreibt in einen Postausgang, ein Arbeiter der Plattform verschickt. |
+| Einstellungen | Je Nutzer: Agent-Nachrichten an/aus; Kennel-Nachrichten je Kennel an/aus. |
+| Geräte | Android und iPhone ab PR 1. |
+| Service Worker | Schlichter `sw.js` nur mit `push` + `notificationclick`, **ohne fetch-Handler**. Kein Angular-`ngsw` — der beantwortet in der Grundeinstellung Navigationen aus dem App-Cache, unter Scope `/` auch Kennel-Seiten. |
+| Drossel | Zentral in `sendToUser`, DB-atomar — nicht je Auslöser. |
 
-Bei Web Push hängt sie das auch nicht: Ein **Service Worker** wird einmal
-registriert; danach weckt ihn der **OS-Push-Dienst** (FCM auf Android, APNs auf
-iOS/macOS) über den jeweiligen Browser-Push-Endpoint — unabhängig davon, ob ein
-Tab offen ist oder das Gerät schläft. Genau dafür gibt es Service Worker + Push
-API. Kein Fremd-App nötig, alles selbst gehostet (eigene VAPID-Keys).
+**Folge der Empfänger-Regel:** Die frühere Idee „dogdoc meldet dem Besitzer, dass jemand gelesen hat“
+ist nicht mehr Teil des Plans. Der Leser löst den Lauf aus, also ginge die Nachricht an ihn. Soll der
+Besitzer-Fall zurückkommen, ist das eine eigene Ausnahme mit eigener Entscheidung.
 
-**Preis (bewusst gewählt, siehe Transport-Entscheidung):** Die UI muss zur PWA
-werden (Service Worker + Manifest — fehlt heute), und **iOS liefert Web Push nur
-für eine zum Homescreen hinzugefügte PWA**. Das ist der teuerste Posten des
-Plans und steht als Risiko unten.
+## 3. Voraussetzung vor jedem Deploy von PR 1
 
-## 3. Architektur-Prinzip (hart)
-
-**SlopDogs selbst besitzt die Benachrichtigung.** Plattform-eigen sind:
-
-- die VAPID-Keys (Server-Geheimnis),
-- der Service Worker + das Manifest (Client),
-- die Speicherung der Push-Subscriptions pro User/Gerät,
-- der Versand (`web-push` mit VAPID → Browser-Push-Endpoint).
-
-**Kennels bekommen KEIN direktes Push-Primitive.** Kein `notify`-VM-Global, kein
-gesegneter `fetch` auf einen Push-Dienst. Ein Kennel kann eine Benachrichtigung
-höchstens **indirekt** anstoßen (Abschnitt 5c) — und das ist eine noch zu
-bestätigende Design-Entscheidung, kein Freifahrtschein.
+Kennel-Seiten und die App teilen sich heute denselben Ursprung. Bevor neue, sitzungsgebundene
+Push-Endpunkte live gehen, wird entschieden und umgesetzt, wie Kennel-Seiten von der App abgeschottet
+werden (eigener Origin für `/k/` oder Sandbox-Header). Befund und Begründung liegen intern; Prüfung durch
+Nira auf Freigabe.
 
 ## 4. Komponenten
 
-### 4a. Server — `NotificationService`
-Ein einziger interner Dienst mit **einer** Kernmethode:
+### 4a. Datenbank — zwei neue Modelle
+In **drei** Dateien, 1:1 gleich: `store/prisma-auth/schema.prisma`, `store/prisma-auth/schema.postgres.prisma`,
+`store/prisma/schema.postgres.prisma` — **nicht** in `store/prisma/schema.prisma`.
 
-```
-NotificationService.sendToUser(userId, { title, body, url?, kind? })
-  → lädt alle PushSubscriptions des Users
-  → sendet je Subscription via web-push (VAPID)
-  → räumt abgelaufene/410-Subscriptions auf
-```
-
-Alle Auslöser (Agent-Tool, Server-intern, Kennel-Umweg) sind nur **Aufrufer**
-dieser Methode. Sie ist die einzige Stelle, die VAPID und Endpoints kennt.
-
-### 4b. Datenbank — neues Modell `PushSubscription`
-Hängt am `User` (heute: `id, googleSub, email, name, picture, createdAt,
-updatedAt` in `store/prisma-auth/schema.prisma`):
+Grund: Im Postgres-Betrieb pusht `scripts/run-prisma-sync.cjs` nur `store/prisma/schema.postgres.prisma`
+mit `--accept-data-loss`; der Auth-Push wird übersprungen (`run-prisma-sync.cjs:55-74`,
+`scripts/dbEnv.cjs:143-166`). Eine Tabelle nur im Auth-Schema entstünde im Betrieb nie.
+Kein Auth-Modell nutzt `@relation` — `userId` als String plus `@@index` (Vorlage `UserKey`,
+`store/prisma-auth/schema.prisma:74-93`). Skripte brauchen keine Änderung.
 
 ```
 model PushSubscription {
-  id        String   @id @default(uuid())
-  userId    String
-  endpoint  String   @unique      // der Browser-Push-Endpoint
-  p256dh    String                // Public Key der Subscription
-  auth      String                // Auth-Secret der Subscription
-  ua        String?               // User-Agent, damit der User Geräte erkennt
-  createdAt DateTime @default(now())
+  id         String    @id @default(uuid())
+  userId     String
+  endpoint   String    @unique
+  p256dh     String
+  auth       String
+  ua         String?
+  createdAt  DateTime  @default(now())
   lastUsedAt DateTime?
-  // user   User   @relation(...)  // Relation wie bei AccessToken
+  @@index([userId])
+}
+
+model PushSettings {
+  userId        String  @id
+  agentEnabled  Boolean @default(true)
+  mutedKennels  String  @default("")   // CSV der Lineage-IDs, Vorlage kennelGrants
+  // Drossel-Zähler, Vorlage usedToday/usedDayStamp (UserKey)
 }
 ```
 
-**⚠ Schema-Duplikat-Falle** (siehe `reference_*`/PAT-Lektion): Prod teilt EINE
-Postgres-DB zwischen Content- und Auth-Schema; der Deploy pusht das
-**Content-Schema autoritativ** (`prisma db push --accept-data-loss`). Bei der
-PAT-Arbeit hat das auth-only **Spalten** einer geteilten Tabelle gestrippt.
-Offene Frage für ein **komplett neues, nur im Auth-Schema existierendes** Modell:
-Lässt der Content-Push eine ihm unbekannte Tabelle in Ruhe, oder droppt er sie?
-→ **Vor Bau verifizieren.** Falls er sie anfasst: `PushSubscription` in **beide**
-Schemas spiegeln (wie AccessToken), sonst ist sie nach jedem Deploy weg.
+Die Felder für PR 3 (`mutedKennels`) kommen schon in PR 1 — das spart eine Schemarunde.
 
-### 4c. Client — PWA + Service Worker
-- `manifest.webmanifest` + Icons (für „zum Homescreen hinzufügen", iOS-Pflicht).
-- `sw.js` (bzw. Angular `ngsw` + Push-Handler): empfängt `push`-Event → zeigt
-  die Notification; `notificationclick` → öffnet die mitgelieferte `url`
-  (Deep-Link in den fertigen Kennel / das dogdoc).
-- **Der Server muss den Service Worker am Site-Root ausliefern** (Scope = `/`),
-  mit korrektem Content-Type und ohne aggressives Caching. Heute wird Angular in
-  prod/integration aus `angularBrowserDir` serviert
-  (`server-app/createHttpApplication.ts:105‑106`), Statisches unter `/static`
-  (`:213`). → Eine Route für `/<sw>.js` und das Manifest am Root ergänzen.
+### 4b. Server — `NotificationService` (`services/NotificationService.ts`, neu)
+- `fromEnv`: ohne VAPID-Schlüssel oder `PUSH_ENABLED` aus (Vorlage `KeyStoreService.fromEnv`, `services/KeyStoreService.ts:224-242`).
+- `sendToUser(userId, { title, body, url?, kind, kennelLineageId? })`: prüft Einstellungen und Drossel,
+  sendet je Subscription, löscht Subscriptions bei 404/410.
+- Drossel DB-atomar nach `consumeQuota` (`KeyStoreService.ts:333-351`). `SLOPDOGS_MCP_RATE_LIMIT` taugt nicht
+  (Middleware im Prozessspeicher, `mcp/transports/mcp.ts:203-225`).
+- Beim Anmelden einer Subscription nur HTTPS und eine Allowlist der Push-Dienste — sonst schickt der Server
+  POSTs an beliebige URLs (Vorlage `hostAllowedBy`, `KeyStoreService.ts:197-200`).
+- `url` nur als Pfad im eigenen Origin (Vorlage `safeReturnTo`, `mcp/auth/router.ts:33-37`).
+- Transport-Interface für Tests (Vorlage `KeysNetwork` / `FakeKeysNetwork`).
+- Abhängigkeit: `web-push` neu — oder Eigenbau mit `jose` + `node:crypto` (`jose` ist da, `package.json:170`).
 
-### 4d. UI — Account-Seite
-In `ui-app/src/app/pages/account/` (existiert):
-- „Benachrichtigungen auf diesem Gerät aktivieren" → fragt die Browser-
-  Permission, legt via `PushManager.subscribe({ applicationServerKey: VAPID_PUB })`
-  eine Subscription an, schickt sie an einen neuen Endpoint `POST /api/push/subscribe`.
-- Geräteliste (aus `PushSubscription.ua/createdAt`) mit „Gerät entfernen".
-- „Test-Benachrichtigung senden"-Knopf (Selbsttest).
+Verdrahtung in `server-app/createHttpApplication.ts`: Dienst nach `keyStore` (`:196`), Handler zwischen
+`:291` und `:299` — **vor** `:300`, sonst antwortet `/api/:subpath` zuerst.
 
-## 5. Die Auslöser-Oberflächen
+### 4c. REST — `api/routes/PushRouteHandler.ts` (neu), nur Browser-Sitzung
+`GET /api/push` (Status, Public Key) · `GET`/`POST /api/push/subscriptions` ·
+`DELETE /api/push/subscriptions/:id` · `POST /api/push/test` · `GET`/`PUT /api/push/settings`.
+Vorlage `KeysRouteHandler` (`api/routes/KeysRouteHandler.ts:11-57`), `requireLogin`
+(`ConfigRouteHandler.ts:32-36`). Jeder Pfad in `api/routes/routeTable.ts` (`API_ROUTE`, `API_ROUTES`,
+`EXPRESS_APP_ROUTES`) — das prüfen StartupTest und `lint:docs`.
 
-### 5a. Agent → Besitzer (Haupt-Trigger, neues MCP-Tool)
-Ein neues MCP-Tool, Muster wie die vorhandenen in `mcp/tools/*.ts`
-(`name` + `handler: async (args, ctx, deps) => …`, `ctx.user?.id` liegt an —
-vgl. `mcp/tools/kennels.ts:212‑216`):
+### 4d. Client — PWA-Teile in `ui-app/public/`
+- `sw.js`, `manifest.webmanifest`, `icons/*` nach `ui-app/public/`. Der vorhandene `express.static` liefert sie
+  in production/integration am Root aus, mit passendem Typ und `max-age=0`
+  (`server-app/httpFrontEnd.builtUi.ts:13`). Keine eigene Server-Route nötig.
+- Manifest: `scope: "/"`, **`start_url: "/kennels"`** — auf `/` liegt der Landing-Kennel; ein neuer Pfad
+  würde von der Alt-Weiche per 308 auf `/k/<name>` umgeleitet. `display: "standalone"`.
+- `ui-app/src/index.html`: `<link rel="manifest">`, `apple-touch-icon`, `theme-color`.
+- **Icons sind Handarbeit:** es gibt nur `favicon.ico`; die Marke existiert nur als Inline-SVG mit Webfont.
 
-```
-name: 'notify_me'   (Arbeitstitel)
-args: { kind: 'question' | 'done' | 'info', title, message, url? }
-handler: → NotificationService.sendToUser(ctx.user.id, …)
-```
+### 4e. UI — Account-Tab „Push“
+Angular 18, standalone. Neuer Tab nach dem Muster des Keys-Tabs (`ui-app/src/app/utils/account.ts:2-18`,
+Service nach `user-key.service.ts:10-27`):
+- „Auf diesem Gerät aktivieren“ — `Notification.requestPermission` als erste Handlung im Klick.
+- **iPhone ohne Homescreen-App:** statt des Knopfs die Anleitung „Zum Home-Bildschirm“.
+- Geräteliste mit Entfernen, Testknopf.
+- Schalter: Agent-Nachrichten an/aus (ab PR 2), Kennels stummschalten (ab PR 3).
 
-Der Agent ruft es bewusst: „Ich habe eine Frage" / „Ich bin fertig". Es pusht an
-**das Konto des Aufrufers** (der Agent baut unter dem PAT des Besitzers →
-`ctx.user.id` ist der Besitzer). Anonyme Aufrufe → Fehler/no-op.
-Doku reist mit dem Tool mit, damit der MCP es von selbst ankündigt.
+## 5. Auslöser
 
-### 5b. Server-intern (optional, bewusst sparsam)
-`NotificationService` kann serverseitig auch bei echten Plattform-Ereignissen
-feuern. **Aber:** laut Vorgabe **kein** Auto-Push an jedem `build_kennel`/
-`save_node`. Diese Verdrahtung bleibt vorerst leer; der Agent über 5a ist der
-Weg. (Hook-Punkte existieren falls später gewünscht: `build_kennel` in
-`mcp/tools/kennels.ts`, Run-Abschluss `onDogRun` in
-`api/routes/KennelRunHandler.ts:201`.)
+### 5a. Agent → Aufrufer (`notify_me`, PR 2)
+`mcp/tools/notify.ts` (neu), Vorlage `getKeyTools` (`mcp/tools/keys.ts:11-66`).
+Argumente `kind` (question | done | info), `title`, `message`, `url?`.
+Einzutragen in **beide** Werkzeuglisten (`mcp/transports/mcp.ts:191-198`, `mcp/transports/openapi.ts:61-68`),
+ToolDeps-Feld in `mcp/tools/types.ts`, `createHttpApplication.ts:373-387` **und** `StartupTest.ts:2523-2548`
+(sonst Root-Typecheck rot). `mcp/skill.md`: Werkzeug-Zähler 54 → 55 (prüft `lint:docs`), README-Abschnitt.
+`/actions` hat kein Rate-Limit — die Drossel in `sendToUser` trägt das. Ohne Identität (Dev-Super-User) → `no_identity`.
 
-### 5c. Kennel-Event → Besitzer (nur Umweg, zu bestätigen)
-Für „ein User hat das dogdoc gelesen": Der dogdoc-`DocTrackSink` (ein **Kennel**
-auf der Instanz, nicht Plattform-Code) bucht eine Sitzung als „gelesen"
-(≥30 s + 40 % Tiefe). Der Dog-Code darf **nicht** direkt pushen.
+### 5b. Kennel → auslösender Nutzer (Drain, PR 3)
+- **Postausgang:** Dog-Code schreibt `jsonStore.set('@outbox:<id>', { title, body, url })`. Die jsonStore-Fabrik
+  (`main.ts:102-143`) legt das unter dem Raum des auslösenden Nutzers ab und stempelt **serverseitig**
+  `kennelLineageId` dazu (`ctx` aus `KennelRunHandler.ts:176-181` — für Dog-Code nicht fälschbar).
+  Für `@outbox:` nur `set`; Zahl offener Einträge gedeckelt. Anonyme Läufe (`anon:`): verworfen.
+- **Drain:** `services/KennelEventDrain.ts` (neu) nach `KennelCallCounter` (`services/KennelCallCounter.ts:240-311`,
+  Start/Stop `main.ts:88, :240, :274-280, :307`). Timer mit `unref`, serialisierter Tick, Präfix-Abfrage statt
+  Vollscan (`JsonStorageService.ts:64-76`), **Anspruch per Löschen** — beim Deploy laufen alter und neuer
+  Prozess kurz parallel. Prüft Stummschaltung je Kennel, dann `sendToUser`.
+- `JsonEntry` bleibt unverändert, keine Migration.
 
-Umweg-Varianten (eine davon wählen):
-- **(i) Blessed interner Endpoint:** Die Plattform stellt `POST /api/push/from-kennel`
-  bereit, das **ausschließlich** an den **Besitzer des aufrufenden Kennels**
-  pusht (Rate-limitiert, Owner aus dem Kennel-Kontext, kein frei wählbarer
-  Empfänger). Der Sink-Dog ruft diesen einen Endpoint.
-- **(ii) Drain-Modell:** Der Sink schreibt „gelesen"-Events wie bisher in seine
-  Ablage; ein plattformseitiger Drain (Cron/Worker) macht daraus Pushes an den
-  Owner. Entkoppelt, aber mehr bewegliche Teile.
+## 6. Phasen (je ein PR)
 
-Empfehlung: **(i)** — ein enger, besitzergebundener Endpoint ist der
-kontrollierte „Umweg", den die Vorgabe meint, ohne ein allgemeines Kennel-Push-
-Primitive zu öffnen. **Zu bestätigen vor Bau.**
+0. **Voraussetzung (Abschnitt 3):** Abschottung der Kennel-Seiten entschieden und umgesetzt.
+1. **Durchstich:** Modelle, `NotificationService` mit Drossel und Allowlist, `/api/push/*`, Routentabelle,
+   `sw.js` + Manifest + Icons, Account-Tab mit Aktivieren, iPhone-Anleitung, Geräteliste, Testknopf, Env.
+   **Abnahme:** auf integration, Handy im Standby — Testknopf, es klingelt. Auf Android und iPhone.
+2. **Agent klingelt:** `notify_me`, Schalter Agent-Nachrichten. **Abnahme:** eine Claude-Sitzung ruft das Tool, das Handy klingelt.
+3. **Kennel-Drain:** Postausgang, Drain-Arbeiter, Stummschaltung je Kennel. **Abnahme:** ein Testkennel schreibt
+   in den Postausgang, das Handy des auslösenden Nutzers klingelt; stummgeschaltet bleibt es still.
 
-## 6. Phasen (je eigener PR)
+## 7. Env (Katalog `server-app/startupEnvCheck.ts` + beide `.env`-Beispiele)
+- `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `PUSH_ENABLED` — Abschnitt features, nach `KEYSTORE_MASTER_KEY_V2`.
+- Drain-Intervall — Abschnitt operations, nach `KENNEL_CALL_MAX_PENDING` (PR 3).
+- Eine „recommended“-Regel lässt `testEnvCatalogWarnings` scheitern, bis `prodFull` (`StartupTest.ts:5767-5779`) die VAPID-Werte enthält.
+- `VAPID_PRIVATE_KEY` ist ein Server-Geheimnis → Deploy-Checkliste, nie ins Repo.
 
-1. **Fundament (Server):** VAPID-Keys/Env, `PushSubscription`-Modell (+ Schema-
-   Duplikat-Frage klären), `NotificationService.sendToUser`, Endpoints
-   `POST/DELETE /api/push/subscribe`. Ohne Client testbar per curl + web-push.
-2. **PWA/Client:** Manifest + Service Worker am Root ausliefern, Account-Seite
-   (aktivieren / Geräteliste / Testknopf). Erster echter Push aufs Handy.
-3. **Agent-Tool:** `notify_me` MCP-Tool (5a). Das ist der eigentliche Nutzen —
-   Agent klingelt bei Frage/fertig.
-4. **Kennel-Umweg (5c):** erst nach Bestätigung der Variante. dogdoc-Sink
-   anpassen, dass er den blessed Endpoint ruft.
+## 8. Risiken und Prüfgrenzen
+- **Abnahme nur auf integration am echten Gerät.** Lokal sieht der Dev-Super-User ohne Identität nur den Tab
+  `beta` (`ui-app/src/app/utils/account.ts:15-17`); es gibt keinen `/auth`-Proxy. Deploy auf Wort.
+- **Testschranke dünn:** StartupTest läuft nicht in `npm test` (nur dev oder `RUN_STARTUP_TESTS=1`); die UI hat
+  keine Specs und ist nicht Teil von `npm test`; `sw.js` prüft niemand.
+- **iPhone:** zuerst den Login in der Homescreen-App prüfen. Sitzungen liegen im MemoryStore und gehen bei jedem
+  Neustart verloren — in der Homescreen-App heißt das: erneut anmelden.
+- **Doppelversand** bei Deploy-Überlappung — durch Anspruch per Löschen abgefangen.
+- Lokal vor `npm test`: `npm run prisma:sync` (generierter Client ist gitignored).
 
-## 7. Offene Entscheidungen / Risiken
-
-- **iOS:** Web Push nur für zum Homescreen hinzugefügte PWA. Onboarding muss das
-  erklären, sonst „geht nicht auf dem iPhone". Größtes UX-Risiko.
-- **Schema-Duplikat** (4b): vor Bau klären, ob der Content-Push die neue Tabelle
-  droppt. Sonst nach jedem Deploy weg.
-- **Service-Worker-Scope/Headers** (4c): muss vom Root mit richtigem MIME +
-  Cache-Control kommen, sonst registriert er nicht oder bleibt alt stehen.
-- **Subscription-Lifecycle:** Endpoints laufen ab / liefern 410 → beim Versand
-  aufräumen, sonst tote Einträge.
-- **VAPID-Privatkey** ist ein Server-Geheimnis → in die Keystore-/Env-Checkliste
-  (`reference_slopdogs_deploy_env`), nie ins Repo.
-- **Env-Katalog:** neue Vars (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
-  `VAPID_SUBJECT`, `PUSH_ENABLED`) in `server-app/startupEnvCheck.ts` + beide
-  `.env.example` (Konsistenz-Test im StartupTest).
-
-## 8. Anker (verifiziert)
-
-- VM-Capability-Muster (bewusst NICHT für Push genutzt): `registerVmGlobalCapability`
-  in `main.ts:102` (`jsonStore`).
-- MCP-Tool-Muster + `ctx.user.id`: `mcp/tools/kennels.ts:212‑216`, `:352`;
-  weitere Tools in `mcp/tools/*.ts`.
-- UI-Auslieferung / SW-Scope: `server-app/createHttpApplication.ts:105‑106`, `:213`.
-- Account-Seite: `ui-app/src/app/pages/account/`.
-- User-Modell: `store/prisma-auth/schema.prisma` (model User).
-- Server-Event-Hooks (für später, 5b): `mcp/tools/kennels.ts` (`build_kennel`),
-  `api/routes/KennelRunHandler.ts:201` (`onDogRun`).
-- Heute **keine** Push/Webhook/VAPID/Service-Worker-Infra im Repo — grüne Wiese.
+## 9. Quellen
+Archon-Berichte vom 2026-10-05: Boreal (Server), Boreal (Client), Amar (Drain). Alle Datei:Zeile-Angaben dort belegt.
