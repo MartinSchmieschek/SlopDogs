@@ -36,6 +36,7 @@ import { warnMissingEnv } from './server-app/startupEnvCheck';
 import { KennelCallCounter } from './services/KennelCallCounter';
 import { DogReferenceIndex } from './services/DogReferenceIndex';
 import { KeysCapability, scrubbingConsoleSink } from './services/keysCapability';
+import { logBootMemory } from './api/utils/memoryLog';
 import {
     assertSlimRegistryCoversKennelDbRefs,
     collectBaseDogNamesFromLatestKennels,
@@ -81,6 +82,7 @@ async function start() {
 
     // Plant the first bones in the earth — the seeds from which our pack shall grow.
     await runSeeds(nodesStore, kennelsStore);
+    logBootMemory('Seeds');
 
     // Aufrufe je Kennel (P4): im Speicher gezaehlt, alle KENNEL_CALL_FLUSH_MS in einer Transaktion
     // geschrieben. Die Tabellen haengen am Store-Client — kein fuenfter PrismaClient.
@@ -197,6 +199,7 @@ async function start() {
     } catch (err) {
         console.error('[DogReferenceIndex] rebuild gescheitert — Referenzzahlen leer bis zum naechsten Start:', err);
     }
+    logBootMemory('Referenzindex gebaut');
 
     const envForTypeDefs = process.env.NODE_ENV;
     if (envForTypeDefs === 'production' || envForTypeDefs === 'integration') {
@@ -255,6 +258,7 @@ async function start() {
     registerGracefulShutdown({ httpServer, callCounter, store, jsonStorageService, disconnectHttpApplication });
 
     console.log('App started.');
+    logBootMemory('App started');
     // Render u. a.: öffentlich erreichbar nur bei Bind an 0.0.0.0; PORT kommt von der Plattform.
     httpServer.listen(port, '0.0.0.0', () => {
         const base = `http://localhost:${port}`;

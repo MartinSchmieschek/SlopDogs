@@ -41,6 +41,7 @@ import { KennelStatsService } from '../services/KennelStatsService';
 import type { IDogStatsStore, IKennelStatsStore } from '../store/IKennelStatsStore';
 import type { DogReferenceIndex } from '../services/DogReferenceIndex';
 import { DogStatsService } from '../services/DogStatsService';
+import { startMemoryHeartbeat } from '../api/utils/memoryLog';
 import { BaseDogPacks } from '../services/BaseDogPacks';
 import type { BaseDogInfo } from '../mcp/tools/types';
 import type { HttpFrontEndBinder, HttpFrontEndContext } from './httpFrontEndTypes';
@@ -424,6 +425,9 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     new KennelRatingHandler(kennelsController, kennelStats).registerRoutes(app);
 
     frontBinder.afterKennelRoutes(app, frontCtx);
+
+    // Speicher-Heartbeat: Grundstand im Log, nur bei Bewegung oder nach langer Stille (siehe memoryLog.ts).
+    startMemoryHeartbeat();
 
     // Jeder Disconnect fuer sich gekapselt: ein sterbender Pool darf den naechsten
     // nicht mit in die Tiefe ziehen.
