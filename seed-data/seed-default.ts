@@ -6,8 +6,10 @@ import { RandomRecipesRetriever, CountryFlagBlackLab, DishFlagBlackLab, RandomEv
 import { saveKennelSeed } from './seed-helpers';
 
 export async function seedSerializedDog(nodesStore: IStore): Promise<string | null> {
-    const nodeSeeds = await nodesStore.findByType(SerializedDog.name);
-    if (!nodeSeeds || nodeSeeds.length === 0) {
+    // Eine Zeile genuegt — frueher zog dieser Check die ganze SerializedDog-Tabelle ueber ALLE Versionen
+    // samt tsCode durch den Boot, um danach nur die erste zu lesen.
+    const firstSeed = await nodesStore.findFirstOfType(SerializedDog.name);
+    if (!firstSeed) {
         // Forge the spirit's identity — a GUID for the incarnation, a GUID for the lineage.
         const versionId = randomUUID();
         const lineageId = randomUUID();
@@ -47,10 +49,10 @@ return {
 
     // If a hound already lurks, extract its lineageId for the kennel manifest.
     try {
-        const config = typeof nodeSeeds[0].serializedDogConfig === 'string'
-            ? JSON.parse(nodeSeeds[0].serializedDogConfig)
-            : nodeSeeds[0].serializedDogConfig;
-        return config.lineageId || (nodeSeeds[0] as any).lineageId || null;
+        const config = typeof firstSeed.serializedDogConfig === 'string'
+            ? JSON.parse(firstSeed.serializedDogConfig)
+            : firstSeed.serializedDogConfig;
+        return config.lineageId || firstSeed.lineageId || null;
     } catch {
         return null;
     }
@@ -75,8 +77,8 @@ export async function seedKennelConfig(kennelsStore: IStore, seedLineageId: stri
     // Rouse each hound just long enough to read its name for the kennel manifest.
     const allBaseDogs = allBaseDogClasses.map(DogClass => new DogClass());
 
-    const kennelSeeds = await kennelsStore.findByType('KennelConfig');
-    if (!kennelSeeds || kennelSeeds.length === 0) {
+    // Nur "gibt es schon einen?" — eine Zeile, nicht alle Kennel-Versionen.
+    if (!(await kennelsStore.findFirstOfType('KennelConfig'))) {
         // The kennel references the lineageId (lineage GUID), not a specific version —
         // so it always summons the latest incarnation from the branching tree.
         const dogIds = [

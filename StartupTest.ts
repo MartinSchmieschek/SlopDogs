@@ -371,6 +371,8 @@ export class StartupTest {
             await this.testDogCounterCost(nodesStore, kennelsController as KennelController, baseDogsMap);
             await this.testReferenceDerivation(nodesStore, kennelsStore, dogStatsStore, baseDogsMap);
             await this.testReferenceRebuildIdempotent(nodesStore, kennelsStore, dogStatsStore, baseDogsMap);
+            await this.testRebuildReadsNarrowAndReplaysWrites(nodesStore, dogStatsStore, baseDogsMap);
+            await this.testNarrowReadsMatchFullRows(nodesStore, kennelsStore, nodesController, kennelsController as KennelController, dogStatsStore, baseDogsMap);
             await this.testDogDeleteClearsStats(nodesStore, kennelsStore, statsStore, dogStatsStore, baseDogsMap);
             await this.testDogReuseAndUsage();
             await this.testProvenFormula();
@@ -6052,6 +6054,155 @@ export class StartupTest {
             this.addResult(testName, false, String(error));
         } finally {
             try { await kennels.delete(kennelId); } catch { /* ignore */ }
+        }
+    }
+
+    /**
+     * Test OOM 3: der Rebuild liest schmal — kein findLatestByType/load/findByLineageId/findByType ueber die volle
+     * Zeile; und ein Controller-Schreibzugriff WAEHREND des Rebuilds ueberlebt ihn (Nachspielen statt Ueberschreiben).
+     */
+    private async testRebuildReadsNarrowAndReplaysWrites(nodesStore: IStore, dogStore: IDogStatsStore, baseDogsMap: Map<string, any>): Promise<void> {
+        const testName = 'OOM 3: Rebuild liest schmal, Schreibzugriffe waehrend des Rebuilds bleiben';
+        const key = `test-oom-replay-${Date.now()}`;
+        const fullReads = ['findLatestByType', 'load', 'findByLineageId', 'findByType', 'findLatestVersionsByType'];
+        const calls: string[] = [];
+        const spy = new Proxy(nodesStore as any, {
+            get(target, prop) {
+                const value = target[prop];
+                if (typeof value !== 'function') return value;
+                return (...args: unknown[]) => {
+                    if (fullReads.includes(String(prop))) calls.push(String(prop));
+                    return value.apply(target, args);
+                };
+            },
+        }) as IStore;
+        const refIndex = new DogReferenceIndex(dogStore, spy, baseDogsMap);
+        try {
+            const report = await refIndex.rebuild();
+            if (calls.length) throw new Error(`volle Lesewege im Rebuild: ${calls.join(', ')}`);
+            const reference = await new DogReferenceIndex(dogStore, nodesStore, baseDogsMap).rebuild();
+            if (report.rows !== reference.rows || report.kennels !== reference.kennels || report.dogs !== reference.dogs) {
+                throw new Error(`zwei Rebuilds verschieden: ${JSON.stringify(report)} / ${JSON.stringify(reference)}`);
+            }
+
+            const pending = refIndex.rebuild();
+            if (!refIndex.isRebuilding) throw new Error('isRebuilding nicht gesetzt');
+            await refIndex.replaceKennelRefs(key, 'UO', ['base:QueryRetriever']);
+            await pending;
+            if (refIndex.isRebuilding) throw new Error('isRebuilding bleibt gesetzt');
+            const crew = await this.refsFrom(dogStore, 'kennel', key);
+            if (crew !== 'crew:base:QueryRetriever@0/1') throw new Error(`Schreibzugriff waehrend des Rebuilds verloren: "${crew}"`);
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        } finally {
+            try { await refIndex.removeFrom('kennel', key); } catch { /* ignore */ }
+        }
+    }
+
+    /**
+     * Test OOM 4: jeder schmale Leseweg liefert dasselbe wie die volle Ableitung auf derselben DB — Referenz-Koepfe
+     * (auch mit Altformen: parents als JSON-String, Zahl, lineageId nur in der Konfig), Referenzziele, Seed-Pruefung,
+     * Kennel-Crews, Kennel-Liste (Sieger-Wahl), Kennel-Teilliste, Dog-Metadaten und Mimic-Kandidaten.
+     */
+    private async testNarrowReadsMatchFullRows(
+        nodesStore: IStore, kennelsStore: IStore, nodesController: AbstractController<any>, kennelsController: KennelController,
+        dogStore: IDogStatsStore, baseDogsMap: Map<string, any>,
+    ): Promise<void> {
+        const testName = 'OOM 4: schmale Lesewege = volle Ableitung (Koepfe, Ziele, Listen, Meta, Mimics)';
+        const created: string[] = [];
+        // Dieselbe Lesart wie DogReferenceIndex: stringList(parseJson(x)).
+        const parse = (v: unknown) => { if (typeof v !== 'string') return v ?? null; try { return JSON.parse(v); } catch { return null; } };
+        const list = (raw: unknown): string[] => {
+            const value = Array.isArray(raw) ? raw : parse(raw);
+            return Array.isArray(value) ? value.filter((x): x is string => typeof x === 'string' && x.length > 0) : [];
+        };
+        const headKey = (h: any) => JSON.stringify({
+            id: h.id, lineageId: h.lineageId, ownerId: h.ownerId, at: h.createdAt ? new Date(h.createdAt).getTime() : null,
+            dogIds: list(h.dogIds ?? null), cfgLineageId: h.cfgLineageId ?? null,
+            req: list(parse(h.parentsRequired ?? null)), opt: list(parse(h.parentsOptional ?? null)),
+        });
+        try {
+            const save = async (id: string, lineageCol: string | null, cfg: Record<string, unknown>) => {
+                await nodesStore.save({ id, type: SerializedDog.name, lineageId: lineageCol, displayName: 'OomNarrow', serializedDogConfig: JSON.stringify(cfg), createdAt: new Date() });
+                created.push(id);
+            };
+            const v1 = generateVersionId(); const l1 = generateLineageId();
+            await save(v1, l1, { id: v1, lineageId: l1, theRun: 'return 1;', parentsRequired: JSON.stringify(['QueryRetriever', 'oom-x-guid']), parentsOptional: 5 });
+            const v2 = generateVersionId(); const l2 = generateLineageId();
+            await save(v2, null, { id: v2, lineageId: l2, theRun: 'return 2;', parentsRequired: ['BodyRetriever'], parentsOptional: 'kein-json' });
+
+            for (const type of ['KennelConfig', SerializedDog.name, MimicDog.name]) {
+                const narrow = new Map((await nodesStore.findReferenceHeads(type)).map((h) => [h.id, headKey(h)]));
+                const full = new Map((await nodesStore.findLatestByType(type)).map((r: any) => [r.id, headKey(DogReferenceIndex.headFromFullRow(type, r))]));
+                if (narrow.size !== full.size) throw new Error(`${type}: ${narrow.size} schmale / ${full.size} volle Koepfe`);
+                for (const [id, k] of full) if (narrow.get(id) !== k) throw new Error(`${type} ${id}: schmal ${narrow.get(id)} / voll ${k}`);
+            }
+            if (!JSON.parse(headKey((await nodesStore.findReferenceHeads(SerializedDog.name)).find((h) => h.id === v1))).req.includes('oom-x-guid')) {
+                throw new Error('parents als JSON-String nicht gelesen');
+            }
+
+            const refIndex = new DogReferenceIndex(dogStore, nodesStore, baseDogsMap);
+            const norm = async (raw: string) => JSON.stringify(await refIndex.normalize(raw));
+            if (await norm(v1) !== JSON.stringify({ toKey: l1, resolved: 1 })) throw new Error(`Version v1: ${await norm(v1)}`);
+            if (await norm(v2) !== JSON.stringify({ toKey: l2, resolved: 1 })) throw new Error(`Version v2 (Lineage nur in Konfig): ${await norm(v2)}`);
+            if (await norm(l1) !== JSON.stringify({ toKey: l1, resolved: 1 })) throw new Error(`Lineage l1: ${await norm(l1)}`);
+            const missing = `oom-missing-${Date.now()}`;
+            if (await norm(missing) !== JSON.stringify({ toKey: missing, resolved: 0 })) throw new Error(`unbekannt: ${await norm(missing)}`);
+
+            for (const type of [SerializedDog.name, 'KennelConfig']) {
+                const first = await nodesStore.findFirstOfType(type);
+                const all = await nodesStore.findByType(type);
+                if ((first?.id ?? null) !== (all[0]?.id ?? null)) throw new Error(`findFirstOfType(${type}) ${first?.id} statt ${all[0]?.id}`);
+            }
+            const crews = await kennelsStore.findLatestKennelCrews();
+            const crewsFull = (await kennelsStore.findLatestVersionsByType('KennelConfig')).map((r: any) => ({ dogIds: r.dogIds ?? null, serializedDogConfig: r.serializedDogConfig ?? null }));
+            if (JSON.stringify(crews) !== JSON.stringify(crewsFull)) throw new Error('Kennel-Crews schmal != voll');
+
+            // Kennel-Liste: dieselbe Sieger-Wahl wie mit findByType ueber alle vollen Versionen.
+            const pick = (rows: any[]) => (kennelsController as any).pickLatestKennelStoreRow(rows);
+            const byLineage = new Map<string, any[]>();
+            for (const r of (await kennelsStore.findByType('KennelConfig')) as any[]) {
+                const k = r.lineageId || r.id;
+                if (!byLineage.has(k)) byLineage.set(k, []);
+                byLineage.get(k)!.push(r);
+            }
+            const legacy = [...byLineage.values()].map((g) => {
+                const row = pick(g);
+                const parsed = (kennelsController as any).parseEntity(row);
+                if (row.id) parsed.id = row.id;
+                parsed.lineageId = row.lineageId;
+                return parsed;
+            });
+            const listed = (await kennelsController.list()).data ?? [];
+            if (JSON.stringify(listed) !== JSON.stringify(legacy)) throw new Error(`Kennel-Liste weicht ab (${listed.length} / ${legacy.length})`);
+            const some = listed.slice(0, 3).map((k: any) => k.lineageId || k.id);
+            const part = (await kennelsController.listLatestOf(some)).data ?? [];
+            if (JSON.stringify(part) !== JSON.stringify(listed.filter((k: any) => some.includes(k.lineageId || k.id)))) throw new Error('Kennel-Teilliste weicht ab');
+
+            // Dog-Metadaten: Rechte, Name, Schluessel wie listLatest; Teilliste wie gefilterte Liste.
+            const fields = (d: any) => JSON.stringify(['id', 'lineageId', 'displayName', 'visibility', 'ownerId', 'editors', 'viewers', 'runners', 'frozen'].map((f) => d[f] ?? null));
+            const meta = new Map(((await nodesController.listLatestMeta()).data ?? []).map((d: any) => [d.lineageId || d.id, fields(d)]));
+            const fullDogs = (await nodesController.listLatest()).data ?? [];
+            if (meta.size !== fullDogs.length) throw new Error(`Dog-Meta ${meta.size} / voll ${fullDogs.length}`);
+            for (const d of fullDogs as any[]) if (meta.get(d.lineageId || d.id) !== fields(d)) throw new Error(`Dog-Meta ${d.lineageId}: ${meta.get(d.lineageId || d.id)} / ${fields(d)}`);
+            const of = ((await nodesController.listLatest(undefined, [l1, l2])).data ?? []).filter((d: any) => [l1, l2].includes(d.lineageId || d.id));
+            const ofFull = (fullDogs as any[]).filter((d) => [l1, l2].includes(d.lineageId || d.id));
+            if (JSON.stringify(of) !== JSON.stringify(ofFull)) throw new Error('Dog-Teilliste weicht ab');
+
+            // Mimic-Kandidaten: schmal == voll, Konfig des Kandidaten gleich.
+            const handler: any = new KennelRunHandler({ kennelsController, nodesStore, baseDogsMap, callCounter: this.testCallCounter });
+            const shape = async (c: any) => JSON.stringify([c.versionId, c.lineageId, c.createdAt, c.imitates, c.acl, await c.loadCfg()]);
+            const narrowMimics = await Promise.all((await handler.readMimicCandidates()).map(shape));
+            const fullMimics = await Promise.all((await handler.readMimicCandidatesFull()).filter((c: any) => c.imitates !== null).map(shape));
+            if (JSON.stringify(narrowMimics) !== JSON.stringify(fullMimics)) throw new Error(`Mimic-Kandidaten weichen ab (${narrowMimics.length} / ${fullMimics.length})`);
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        } finally {
+            for (const id of created) {
+                try { await nodesStore.delete(id); } catch { /* ignore */ }
+            }
         }
     }
 

@@ -194,17 +194,13 @@ async function start() {
         baseDogsMap.set(instance.name, PactClass);
     });
 
-    // Wiederverwendung (P4b): wer wen referenziert, aus den Kopfversionen — nach den Seeds (die am
-    // Controller vorbeischreiben) und mit voller baseDogsMap (blanke Klassennamen -> base:X), vor den
-    // Routen. Idempotent; ein Fehler kostet nur die Referenzzahlen bis zum naechsten Boot.
+    // Wiederverwendung (P4b): wer wen referenziert, aus den Kopfversionen — mit voller baseDogsMap
+    // (blanke Klassennamen -> base:X). Gebaut wird erst NACH listen() (siehe unten): der Rebuild war die
+    // Speicherspitze des Boots, und ein Fehler kostet nur die Referenzzahlen bis zum naechsten Boot.
+    // Bis dahin liest DogStatsService den Tabellenstand des letzten Boots; Controller-Schreibzugriffe
+    // waehrend des Rebuilds spielt der Index danach nach (DogReferenceIndex.rebuild).
     const refIndex = new DogReferenceIndex(store, store, baseDogsMap, callCounter);
-    try {
-        const rebuilt = await refIndex.rebuild();
-        console.log(`[DogReferenceIndex] rebuild: ${rebuilt.rows} Referenzen aus ${rebuilt.kennels} Kennels und ${rebuilt.dogs} Dogs in ${rebuilt.durationMs} ms`);
-    } catch (err) {
-        console.error('[DogReferenceIndex] rebuild gescheitert — Referenzzahlen leer bis zum naechsten Start:', err);
-    }
-    logBootMemory('Referenzindex gebaut');
+    logBootMemory('vor Registry-Abgleich');
 
     const envForTypeDefs = process.env.NODE_ENV;
     if (envForTypeDefs === 'production' || envForTypeDefs === 'integration') {
@@ -271,11 +267,31 @@ async function start() {
             console.log(`API ${base} — Dev-UI-Redirect: ${base}/ → ${devUiOrigin}/`);
         }
         console.log(`Server läuft auf Port ${port}`);
-        Watchpost.shared?.bootFinished();
-        // ERST JETZT die Selbsttests: der Port ist offen, die Plattform sieht einen gesunden Dienst.
-        // runStartupTests faengt intern alles ab und wirft nie.
-        void runStartupTests();
+        // ERST JETZT Referenzindex und Selbsttests: der Port ist offen, die Plattform sieht einen gesunden
+        // Dienst. Die Selbsttests warten auf den Rebuild — sie schreiben in dieselbe Referenztabelle.
+        // Beide fangen intern alles ab und werfen nie.
+        void rebuildReferenceIndex(refIndex).then(() => runStartupTests());
     });
+}
+
+/**
+ * Drossel fuer den Rebuild nach listen(): nach einem Absturz verbinden sich die MCP-Clients sofort neu und
+ * ziehen Listen — der Rebuild soll nicht mit dieser Welle zusammenfallen. Ein Fehler oder eine Verzoegerung
+ * kostet nur die Referenzzahlen (health_check.dogStats.referenceRows) bis zum Abschluss.
+ */
+const REFERENCE_REBUILD_DELAY_MS = 3_000;
+
+async function rebuildReferenceIndex(refIndex: DogReferenceIndex): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, REFERENCE_REBUILD_DELAY_MS));
+    try {
+        const rebuilt = await refIndex.rebuild();
+        console.log(`[DogReferenceIndex] rebuild: ${rebuilt.rows} Referenzen aus ${rebuilt.kennels} Kennels und ${rebuilt.dogs} Dogs in ${rebuilt.durationMs} ms`);
+    } catch (err) {
+        console.error('[DogReferenceIndex] rebuild gescheitert — Referenzzahlen leer bis zum naechsten Start:', err);
+    }
+    logBootMemory('Referenzindex gebaut');
+    // Der Boot endet hier, nicht bei listen(): der Rebuild laeuft danach.
+    Watchpost.shared?.bootFinished();
 }
 
 /** Wie lange das Ableben hoechstens dauern darf, ehe wir es erzwingen. */

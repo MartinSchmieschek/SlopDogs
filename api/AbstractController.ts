@@ -137,62 +137,81 @@ export abstract class AbstractController<T extends IEntity = IEntity> {
      * Haul up only the newest incarnation of each spirit — one per lineageId lineage.
      * Fer versioned entities this avoids flooding the manifest with every past life.
      */
-    async listLatest(search?: string): Promise<IControllerResponse<T[]>> {
+    async listLatest(search?: string, lineageIds?: string[]): Promise<IControllerResponse<T[]>> {
         try {
             // Die Masse faellt schon in der DB weg (ein Fenster-Query je Lineage) — frueher
             // lief parseEntity ueber JEDE jemals gespeicherte Version, nur damit der Dedup
-            // danach fast alles wegwirft.
-            const results = await this.store.findLatestByType(this.entityType, search);
-            const all = results.map((r: any) => {
-                const parsed = this.parseEntity(r.serializedDogConfig || r);
-                if (r.id) parsed.id = r.id;
-                // Resolve lineageId from DB column or parsed config
-                const lineageId = r.lineageId || (parsed as any).lineageId;
-                if (lineageId) (parsed as any).lineageId = lineageId;
-                const displayName = r.displayName || (parsed as any).displayName;
-                if (displayName) (parsed as any).displayName = displayName;
-                // ACL fields live on the outer row, not in serializedDogConfig. Inject them so
-                // route handlers / MCP tools can apply visibility / editor / viewer checks.
-                if (r.visibility !== undefined && r.visibility !== null) (parsed as any).visibility = r.visibility;
-                if (r.ownerId !== undefined && r.ownerId !== null) (parsed as any).ownerId = r.ownerId;
-                if (r.editors !== undefined && r.editors !== null) (parsed as any).editors = r.editors;
-                if (r.viewers !== undefined && r.viewers !== null) (parsed as any).viewers = r.viewers;
-                if (r.runners !== undefined && r.runners !== null) (parsed as any).runners = r.runners;
-                (parsed as any).frozen = Boolean(r.frozen);
-                (parsed as any)._createdAt = r.createdAt;
-                return parsed;
-            });
-
-            // Deduplicate: keep only the newest per lineageId.
-            //
-            // Dieser zweite Durchgang bleibt BEWUSST stehen, obwohl die DB schon je Lineage
-            // reduziert hat. Alte Zeilen koennen ihre lineageId NUR im serializedDogConfig-JSON
-            // tragen, nicht in der Spalte — `COALESCE("lineageId","id")` haelt die faelschlich
-            // fuer eigene Lineages. SQL nimmt die Masse weg, dieser Dedup sichert die Semantik
-            // auf der dann kleinen Menge. Wer ihn entfernt, bringt Altbestand doppelt zurueck.
-            const latest = new Map<string, T>();
-            for (const entity of all) {
-                const key = (entity as any).lineageId || entity.id;
-                const existing = latest.get(key);
-                if (!existing) {
-                    latest.set(key, entity);
-                } else {
-                    const eTime = (existing as any)._createdAt ? new Date((existing as any)._createdAt).getTime() : 0;
-                    const nTime = (entity as any)._createdAt ? new Date((entity as any)._createdAt).getTime() : 0;
-                    if (nTime > eTime) {
-                        latest.set(key, entity);
-                    }
-                }
-            }
-
-            // Strip internal field
-            const entities = Array.from(latest.values());
-            entities.forEach(e => delete (e as any)._createdAt);
-
-            return { ok: true, data: entities };
+            // danach fast alles wegwirft. Mit lineageIds nur deren Partitionen (plus Altzeilen ohne
+            // lineageId-Spalte); der Aufrufer filtert das Ergebnis auf seine Schluessel.
+            const results = await this.store.findLatestByType(this.entityType, search, lineageIds);
+            return { ok: true, data: this.latestPerLineage(results) };
         } catch (error) {
             return { ok: false, error: String(error), data: [] };
         }
+    }
+
+    /**
+     * Wie listLatest, aber ohne Konfig-Blob: id, lineageId, displayName, ACL, frozen — genug fuer Rechte-
+     * Pruefung, Namen und Stats-Schluessel (Landing, usage). Felder aus der Konfig (description, icon,
+     * theRun …) fehlen, ausser die Zeile brauchte ihre Konfig fuer lineageId/displayName/ACL.
+     */
+    async listLatestMeta(): Promise<IControllerResponse<T[]>> {
+        try {
+            const results = await this.store.findLatestMetaByType(this.entityType);
+            return { ok: true, data: this.latestPerLineage(results) };
+        } catch (error) {
+            return { ok: false, error: String(error), data: [] };
+        }
+    }
+
+    private latestPerLineage(results: any[]): T[] {
+        const all = results.map((r: any) => {
+            const parsed = this.parseEntity(r.serializedDogConfig || r);
+            if (r.id) parsed.id = r.id;
+            // Resolve lineageId from DB column or parsed config
+            const lineageId = r.lineageId || (parsed as any).lineageId;
+            if (lineageId) (parsed as any).lineageId = lineageId;
+            const displayName = r.displayName || (parsed as any).displayName;
+            if (displayName) (parsed as any).displayName = displayName;
+            // ACL fields live on the outer row, not in serializedDogConfig. Inject them so
+            // route handlers / MCP tools can apply visibility / editor / viewer checks.
+            if (r.visibility !== undefined && r.visibility !== null) (parsed as any).visibility = r.visibility;
+            if (r.ownerId !== undefined && r.ownerId !== null) (parsed as any).ownerId = r.ownerId;
+            if (r.editors !== undefined && r.editors !== null) (parsed as any).editors = r.editors;
+            if (r.viewers !== undefined && r.viewers !== null) (parsed as any).viewers = r.viewers;
+            if (r.runners !== undefined && r.runners !== null) (parsed as any).runners = r.runners;
+            (parsed as any).frozen = Boolean(r.frozen);
+            (parsed as any)._createdAt = r.createdAt;
+            return parsed;
+        });
+
+        // Deduplicate: keep only the newest per lineageId.
+        //
+        // Dieser zweite Durchgang bleibt BEWUSST stehen, obwohl die DB schon je Lineage
+        // reduziert hat. Alte Zeilen koennen ihre lineageId NUR im serializedDogConfig-JSON
+        // tragen, nicht in der Spalte — `COALESCE("lineageId","id")` haelt die faelschlich
+        // fuer eigene Lineages. SQL nimmt die Masse weg, dieser Dedup sichert die Semantik
+        // auf der dann kleinen Menge. Wer ihn entfernt, bringt Altbestand doppelt zurueck.
+        const latest = new Map<string, T>();
+        for (const entity of all) {
+            const key = (entity as any).lineageId || entity.id;
+            const existing = latest.get(key);
+            if (!existing) {
+                latest.set(key, entity);
+            } else {
+                const eTime = (existing as any)._createdAt ? new Date((existing as any)._createdAt).getTime() : 0;
+                const nTime = (entity as any)._createdAt ? new Date((entity as any)._createdAt).getTime() : 0;
+                if (nTime > eTime) {
+                    latest.set(key, entity);
+                }
+            }
+        }
+
+        // Strip internal field
+        const entities = Array.from(latest.values());
+        entities.forEach(e => delete (e as any)._createdAt);
+
+        return entities;
     }
 
     /**

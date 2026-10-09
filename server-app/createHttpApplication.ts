@@ -22,7 +22,6 @@ import { BetaKeys, type BetaKeyPrisma } from '../mcp/auth/betaKeys';
 import { KeyStoreService } from '../services/KeyStoreService';
 import { NodesRouteHandler } from '../api/routes/NodesRouteHandler';
 import { ReadmeRouteHandler } from '../api/routes/ReadmeRouteHandler';
-import { StartupTest } from '../StartupTest';
 import { PrismaCacheHandler } from '../services/PrismaCacheHandler';
 import { withResilientCacheInfra } from '../services/resilientCacheHandler';
 import { createPrismaAuthClient } from '../store/createPrismaAuthClient';
@@ -260,23 +259,35 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     // Die Kopfversionen aller Dogs — SerializedDogs UND MimicDogs (nodesController.listLatest kennt nur
     // den ersten Typ). Nur gelesen: fuer usage.dependents und die provenDogs der Landing. Traegt eine
     // Lineage Zeilen beider Typen, gilt der SerializedDog-Kopf (so wie list_nodes ihn zeigt).
+    // Geladen wird je Anfrage und schmal (OOM 2026-10-08): usage nennt seine Lineages, die Landing liest erst
+    // die Metadaten aller Dogs und holt description/icon nur fuer die, die sie zeigt. Kein Cache ueber DB-Dogs.
     const mimicsReader = new Controller<ISerializedDogConfig>(nodesStore, MimicDog.name);
-    const listAllDogs = async (): Promise<any[]> => {
-        const [serialized, mimics] = await Promise.all([nodesController.listLatest(), mimicsReader.listLatest()]);
+    const oneDogPerLineage = (serialized: any[], mimics: any[]): any[] => {
         const byLineage = new Map<string, any>();
-        for (const dog of [...(serialized.data ?? []), ...(mimics.data ?? [])]) {
+        for (const dog of [...serialized, ...mimics]) {
             const key = (dog as any).lineageId || dog.id;
             if (key && !byLineage.has(key)) byLineage.set(key, dog);
         }
         return [...byLineage.values()];
+    };
+    const listDogsOf = async (lineageIds: string[]): Promise<any[]> => {
+        const [serialized, mimics] = await Promise.all([
+            nodesController.listLatest(undefined, lineageIds), mimicsReader.listLatest(undefined, lineageIds),
+        ]);
+        const wanted = new Set(lineageIds);
+        return oneDogPerLineage(serialized.data ?? [], mimics.data ?? []).filter((d) => wanted.has(d.lineageId || d.id));
+    };
+    const listDogMeta = async (): Promise<any[]> => {
+        const [serialized, mimics] = await Promise.all([nodesController.listLatestMeta(), mimicsReader.listLatestMeta()]);
+        return oneDogPerLineage(serialized.data ?? [], mimics.data ?? []);
     };
     const dogStats = new DogStatsService(
         input.dogStatsStore,
         input.callCounter,
         kennelStats,
         {
-            listKennels: async () => (await kennelsController.listLatest()).data ?? [],
-            listDogs: listAllDogs,
+            listKennels: async (lineageIds) => (await kennelsController.listLatestOf(lineageIds)).data ?? [],
+            listDogs: listDogsOf,
         },
         () => input.refIndex.referenceRows,
     );
@@ -297,6 +308,9 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
             return;
         }
         try {
+            // Erst hier geladen: die Suite (8 000+ Zeilen samt ihrem Modulgraphen) liegt sonst in jedem
+            // Prozess im Heap, auch dort, wo sie nie laeuft (integration ohne RUN_STARTUP_TESTS).
+            const { StartupTest } = await import('../StartupTest');
             const startupTest = new StartupTest();
             await startupTest.runAllTests(nodesStore, kennelsStore, nodesController, kennelsController, baseDogsMap, app, authPrisma, keyStore);
         } catch (err) {
@@ -313,7 +327,8 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     // Landing-Daten (P4) VOR /api/:subpath — sonst antwortet dort der Controller-404. Keine Bremse.
     // P4b: provenDogs aus denselben Kopfversionen und demselben Dog-Memo wie list_nodes.
     new LandingRouteHandler(kennelsController, kennelStats, {
-        listDogs: listAllDogs,
+        listDogMeta,
+        listDogsOf,
         dogStats,
     }).registerRoutes(app);
     // Key-Store (P4c): /api/keys und /api/keys/:alias — ebenfalls VOR /api/:subpath.

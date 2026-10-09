@@ -14,7 +14,7 @@ import {
 } from '@slopdogs/core';
 import { FIXED_TOP_LEVEL } from './spaRouteConstants';
 import { API_ROUTE, LEGACY_ROUTE, PUBLIC_ROUTE } from './routeTable';
-import { IStore } from '../../store/IStore';
+import { IStore, type MimicHeadRow } from '../../store/IStore';
 import { KennelController } from '../KennelController';
 import { accessOf, aclOf, withMyRights, type Access } from '../../mcp/auth/visibility';
 import type { AuthCtx } from '../../mcp/auth/middleware';
@@ -47,14 +47,19 @@ import { generateVersionId, generateLineageId } from '../utils/versioning';
 import { memSnapshot, logKennelRun } from '../utils/memoryLog';
 import { Watchpost } from '../../services/Watchpost';
 
-/** Ein adoptierbarer MimicDog, aus einer rohen Store-Zeile geschaelt. */
+/**
+ * Ein adoptierbarer MimicDog, aus einer schmalen Kopfzeile geschaelt: der Pact, den er imitiert, steht
+ * daneben; die volle Konfig (tsCode) wird nur fuer den Sieger geladen.
+ */
 interface MimicCandidate {
     versionId: string;
     lineageId: string;
     createdAt: number;
-    cfg: IMimicDogConfig;
-    /** Die Rechte der Zeile — getLatestVersionsForAll liefert Koepfe, also die gueltigen. */
+    /** config.imitates, wenn dort ein String steht — sonst passt der Kandidat zu keinem Pact. */
+    imitates: string | null;
+    /** Die Rechte der Zeile — Koepfe, also die gueltigen. */
     acl: ReturnType<typeof aclOf>;
+    loadCfg: () => Promise<IMimicDogConfig | null>;
 }
 
 /** The provisions required to arm the KennelRunHandler. */
@@ -309,7 +314,7 @@ export class KennelRunHandler {
             // (P3.5: a foreign private mimic is no more adoptable than a foreign private dog).
             // `.filter` liefert eine eigene Liste — die gemerkte Ladung darf vom sort() weiter
             // unten nicht umsortiert werden.
-            const candidates = (await loadMimicCandidates()).filter(c => c.cfg.imitates === pactName && policy.mayRun(c.acl));
+            const candidates = (await loadMimicCandidates()).filter(c => c.imitates === pactName && policy.mayRun(c.acl));
             if (candidates.length === 0) return null;
 
             // Option (c): remembered lineages win; tie-break by newest createdAt.
@@ -317,23 +322,53 @@ export class KennelRunHandler {
             const rememberedCands = candidates.filter(c => memory.has(c.lineageId));
             const pool = rememberedCands.length > 0 ? rememberedCands : candidates;
             pool.sort((a, b) => b.createdAt - a.createdAt);
-            const winner = pool[0];
-
-            const mimicCfg: IMimicDogConfig = {
-                ...winner.cfg,
-                id: winner.cfg.id ?? winner.versionId,
-                lineageId: winner.lineageId,
-            };
-            return policy.instantiate(mimicCfg, winner.versionId, winner.acl, winner.lineageId) as MimicDog<unknown>;
+            // Die Konfig nur fuer den Sieger; verschwand seine Zeile seit der Kopfwahl, ist der naechste dran.
+            for (const winner of pool) {
+                const cfg = await winner.loadCfg();
+                if (!cfg) continue;
+                const mimicCfg: IMimicDogConfig = {
+                    ...cfg,
+                    id: cfg.id ?? winner.versionId,
+                    lineageId: winner.lineageId,
+                };
+                return policy.instantiate(mimicCfg, winner.versionId, winner.acl, winner.lineageId) as MimicDog<unknown>;
+            }
+            return null;
         };
     }
 
     /**
-     * Schaelt die neuesten MimicDog-Zeilen aus dem Store zu Adoptions-Kandidaten.
-     * Pact-unabhaengig: die Zeilen sind fuer alle offenen Pacts eines Runs dieselben,
-     * nur der Filter darauf unterscheidet sich (siehe createMimicAdopter).
+     * Die neuesten MimicDog-Zeilen als Adoptions-Kandidaten — schmal: Lineage, createdAt, Rechte und der
+     * imitierte Pact, nie die Konfig aller Mimics (die laedt erst der Sieger). Pact-unabhaengig: die Zeilen
+     * sind fuer alle offenen Pacts eines Runs dieselben, nur der Filter darauf unterscheidet sich.
+     * Scheitert der schmale Weg (Postgres: ungueltiges JSON im Cast), der alte volle.
      */
     private async readMimicCandidates(): Promise<MimicCandidate[]> {
+        const store = this.deps.nodesStore;
+        let heads: MimicHeadRow[];
+        try {
+            heads = await store.findMimicHeads();
+        } catch (err) {
+            console.warn('[KennelRunHandler] schmale Mimic-Koepfe gescheitert, voller Weg:', err instanceof Error ? err.message : err);
+            return this.readMimicCandidatesFull();
+        }
+        return heads
+            .filter((row) => row.imitates !== null)
+            .map((row) => ({
+                versionId: row.id,
+                lineageId: row.cfgLineageId || row.lineageId || row.id,
+                createdAt: row.createdAt ? new Date(row.createdAt).getTime() : 0,
+                imitates: row.imitates,
+                acl: aclOf(row),
+                loadCfg: async () => {
+                    const [full] = await store.findRowsByIds([row.id]);
+                    try { return full?.serializedDogConfig ? JSON.parse(full.serializedDogConfig) as IMimicDogConfig : null; } catch { return null; }
+                },
+            }));
+    }
+
+    /** Der alte Weg: alle Kopf-Konfigs auf einmal. Nur noch Rueckfall. */
+    private async readMimicCandidatesFull(): Promise<MimicCandidate[]> {
         const rows = await this.deps.nodesStore.findLatestVersionsByType(MimicDog.name);
         const candidates: MimicCandidate[] = [];
         for (const row of rows as any[]) {
@@ -347,8 +382,9 @@ export class KennelRunHandler {
                 versionId: row.id,
                 lineageId,
                 createdAt: row.createdAt ? new Date(row.createdAt).getTime() : 0,
-                cfg: raw as IMimicDogConfig,
+                imitates: typeof raw.imitates === 'string' ? raw.imitates : null,
                 acl: aclOf(row),
+                loadCfg: async () => raw as IMimicDogConfig,
             });
         }
         return candidates;
