@@ -9,6 +9,7 @@
 // MEMORY_LOG_MAX_SILENCE_MS (Default 5 min). So zeigt das Log jede Stufe einer Ratsche, ohne im Leerlauf
 // 2 880 gleiche Zeilen am Tag zu schreiben (30-s-Takt ohne Filter).
 import { ProcessMemory } from '../../services/ProcessMemory';
+import { Watchpost } from '../../services/Watchpost';
 
 const C = {
     reset: '\x1b[0m', bold: '\x1b[1m',
@@ -97,6 +98,8 @@ export function logKennelRun(opts: {
 
 /** Eine Boot-Phase (Seeds, App started, Referenzindex): wo die Spitze entsteht, steht im Log. */
 export function logBootMemory(phase: string): void {
+    // Der Wachposten nennt die letzte Phase in jeder Alarmzeile — auch bei abgeschaltetem Log.
+    Watchpost.shared?.bootPhaseReached(phase);
     if (!memLogEnabled()) return;
     const s = memSnapshot();
     console.log(
@@ -104,6 +107,12 @@ export function logBootMemory(phase: string): void {
         + ` ${dot} heap ${MB(s.heapUsed)}/${MB(s.heapTotal)} ${dot} ext ${MB(s.external)} MB`
         + peakTail(),
     );
+}
+
+/** Verzoegerung der Event-Loop seit Start (Wachposten), wenn er laeuft. */
+function eventLoopTail(): string {
+    const delay = Watchpost.shared?.delayMs();
+    return delay ? ` ${dot} ${C.gray}loop p99 ${delay.p99} max ${delay.max} ms${C.reset}` : '';
 }
 
 let heartbeat: ReturnType<typeof setInterval> | null = null;
@@ -126,7 +135,8 @@ export function startMemoryHeartbeat(): void {
         console.log(
             `${C.magenta}[mem]${C.reset} ${C.gray}♥${C.reset} rss ${rssTag(rssMb)} ${C.gray}/ ${limitMb()} MB${C.reset}`
             + ` ${dot} heap ${MB(s.heapUsed)}/${MB(s.heapTotal)} ${dot} ext ${MB(s.external)} ${dot} ab ${MB(s.arrayBuffers)} MB`
-            + peakTail(),
+            + peakTail()
+            + eventLoopTail(),
         );
     }, intervalMs);
     // Darf den Prozess nicht am Leben halten.

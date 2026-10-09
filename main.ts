@@ -37,6 +37,7 @@ import { KennelCallCounter } from './services/KennelCallCounter';
 import { DogReferenceIndex } from './services/DogReferenceIndex';
 import { KeysCapability, scrubbingConsoleSink } from './services/keysCapability';
 import { logBootMemory } from './api/utils/memoryLog';
+import { Watchpost } from './services/Watchpost';
 import {
     assertSlimRegistryCoversKennelDbRefs,
     collectBaseDogNamesFromLatestKennels,
@@ -66,6 +67,10 @@ async function start() {
     }
     // Eine Zeile je fehlender Pflicht-Env (Katalog: server-app/startupEnvCheck.ts) — warnt nur, beendet nie.
     warnMissingEnv(process.env);
+
+    // Wachposten (eigener Thread): sieht Blockaden des Haupt-Threads und den Speicher der cgroup auch dann,
+    // wenn hier kein Timer mehr feuert — ab jetzt, damit Seeds und Referenzindex schon ueberwacht sind.
+    Watchpost.startShared();
 
     dbEnv.assertRequiredDbEnv();
     const dbUrl = dbEnv.resolveStoreDatabaseUrl();
@@ -266,6 +271,7 @@ async function start() {
             console.log(`API ${base} — Dev-UI-Redirect: ${base}/ → ${devUiOrigin}/`);
         }
         console.log(`Server läuft auf Port ${port}`);
+        Watchpost.shared?.bootFinished();
         // ERST JETZT die Selbsttests: der Port ist offen, die Plattform sieht einen gesunden Dienst.
         // runStartupTests faengt intern alles ab und wirft nie.
         void runStartupTests();
@@ -316,6 +322,7 @@ function registerGracefulShutdown(targets: ShutdownTargets): void {
             targets.disconnectHttpApplication(),
         ]);
 
+        await Watchpost.stopShared();
         console.log('[shutdown] Verbindungen freigegeben.');
         process.exit(0);
     };

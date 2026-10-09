@@ -45,6 +45,7 @@ function clientWantsJson(req: any): boolean {
 }
 import { generateVersionId, generateLineageId } from '../utils/versioning';
 import { memSnapshot, logKennelRun } from '../utils/memoryLog';
+import { Watchpost } from '../../services/Watchpost';
 
 /** Ein adoptierbarer MimicDog, aus einer rohen Store-Zeile geschaelt. */
 interface MimicCandidate {
@@ -170,6 +171,8 @@ export class KennelRunHandler {
         }
         const memBefore = memSnapshot();
         const startedAt = Date.now();
+        // Der Wachposten nennt laufende Kennels in seinen Alarmzeilen (nur ID und Quelle).
+        const watchToken = Watchpost.shared?.runStarted(lineageId, source);
         let waveCount: number | undefined;
         let leadFailed = false;
         const keyRun = new KeyRunState();
@@ -232,6 +235,7 @@ export class KennelRunHandler {
             leadFailed = true;                                               // "Nothing to harvest" oder Infrastruktur
             throw keyRun.scrubError(err);                                    // P4c: kein Wert in Text oder Stack
         } finally {
+            Watchpost.shared?.runEnded(watchToken);
             this.deps.callCounter.record(lineageId, source, leadFailed);     // genau ein record je begonnenem Lauf
             logKennelRun({
                 kennelId: lineageId, source, dogCount: config.dogIds?.length, waveCount,

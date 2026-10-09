@@ -84,6 +84,7 @@ import { dogStatsKeyOf } from './services/dogStatsKey';
 import { DogReferenceIndex } from './services/DogReferenceIndex';
 import { DogStatsService } from './services/DogStatsService';
 import { DogReuseAdvisor } from './services/DogReuseAdvisor';
+import { MemoryLevels, StallDetector, Watchpost } from './services/Watchpost';
 import { buildWerkzeugkasten } from './mcp/werkzeugkasten';
 import { ENV_CATALOG, ENV_CATALOG_NAMES, ENV_SECTIONS, missingEnvWarnings, recommendedEnvHints } from './server-app/startupEnvCheck';
 import { EXPRESS_APP_ROUTES, FRONTEND_ROUTES, LEGACY_ROUTE, PUBLIC_ROUTE, SPA_ROUTES } from './api/routes/routeTable';
@@ -359,6 +360,8 @@ export class StartupTest {
             await this.testDogRunClassification(baseDogsMap);
             await this.testMemoryGuardBackpressure();
             await this.testWorkerSlotReleasedOnExit(baseDogsMap);
+            await this.testWatchpostLogic();
+            await this.testWatchpostThreadSeesBlockedMainThread();
             await this.testAliasContextHoldsNoProxy(baseDogsMap);
             await this.testDogCacheStatsWrapper(baseDogsMap);
             await this.testDogStatsKeyOf(baseDogsMap);
@@ -1912,6 +1915,123 @@ export class StartupTest {
             this.addResult(testName, false, String(error));
         } finally {
             restore();
+        }
+    }
+
+    /** Wartet, bis cond() wahr ist oder ms vergangen sind. */
+    private async waitUntil(cond: () => boolean, ms: number): Promise<void> {
+        const until = Date.now() + ms;
+        while (!cond() && Date.now() < until) await new Promise((r) => setTimeout(r, 5));
+    }
+
+    /**
+     * Wachposten 1: Speicher-Stufen mit Hysterese und Blockade-Erkennung — reine Logik mit kuenstlicher Zeit,
+     * dazu der Schalter SLOPDOGS_WATCHPOST (Default an ausser development).
+     */
+    private async testWatchpostLogic(): Promise<void> {
+        const testName = 'Wachposten 1: Speicher-Stufen mit Hysterese, Blockade Beginn/Fortsetzung/Ende, Schalter';
+        try {
+            const levels = new MemoryLevels([0.8, 0.9, 0.95], 0.05);
+            const seen = [0.5, 0.79, 0.8, 0.85, 0.96, 0.97, 0.92, 0.89, 0.86, 0.84, 0.7, 0.81]
+                .map((fraction) => {
+                    const event = levels.observe(fraction);
+                    return event ? `${event.kind}${Math.round(event.threshold * 100)}` : '-';
+                })
+                .join(' ');
+            const expectedLevels = '- - up80 - up95 - - down95 - down90 down80 up80';
+            if (seen !== expectedLevels) throw new Error(`Stufen: ${seen} (erwartet ${expectedLevels})`);
+
+            const stall = new StallDetector(1000, 5000);
+            const steps: Array<[number, number]> = [
+                [1, 0], [2, 50], [2, 1000], [2, 1050], [2, 3000], [2, 6050], [2, 8000], [2, 11050], [3, 11100], [3, 11200], [4, 11250],
+            ];
+            const events = steps
+                .map(([pulse, now]) => {
+                    const event = stall.observe(pulse, now);
+                    return event ? `${event.kind}@${Math.round(event.ms)}` : '-';
+                })
+                .join(' ');
+            const expectedStall = '- - - begin@1000 - continue@6000 - continue@11000 end@11050 - -';
+            if (events !== expectedStall) throw new Error(`Blockade: ${events} (erwartet ${expectedStall})`);
+
+            const switches = [
+                Watchpost.enabled({ NODE_ENV: 'development' }),
+                Watchpost.enabled({ NODE_ENV: 'integration' }),
+                Watchpost.enabled({ NODE_ENV: 'production' }),
+                Watchpost.enabled({ NODE_ENV: 'integration', SLOPDOGS_WATCHPOST: '0' }),
+                Watchpost.enabled({ NODE_ENV: 'development', SLOPDOGS_WATCHPOST: '1' }),
+            ].join(',');
+            if (switches !== 'false,true,true,false,true') throw new Error(`Schalter: ${switches}`);
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        }
+    }
+
+    /**
+     * Wachposten 2: der echte Thread. Der Haupt-Thread blockiert 1,5 s — die Blockadezeile steht in der Datei,
+     * BEVOR er wieder frei ist (geschrieben am Haupt-Thread vorbei), mit laufendem Kennel und Boot-Phase; danach
+     * die Ende-Zeile. Eine Speicher-Stufe aus einer unechten cgroup-Wurzel; health liest alles ueber den
+     * SharedArrayBuffer; stop() beendet den Thread.
+     */
+    private async testWatchpostThreadSeesBlockedMainThread(): Promise<void> {
+        const testName = 'Wachposten 2: Thread meldet 1,5-s-Blockade waehrend sie laeuft, Stufe 90 %, health';
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'slopdogs-watchpost-'));
+        const logFile = path.join(dir, 'watchpost.log');
+        const fd = fs.openSync(logFile, 'w');
+        const mb = 1024 * 1024;
+        fs.writeFileSync(path.join(dir, 'memory.current'), String(100 * mb));
+        fs.writeFileSync(path.join(dir, 'memory.peak'), String(120 * mb));
+        fs.writeFileSync(path.join(dir, 'memory.max'), String(200 * mb));
+        const watchpost = new Watchpost({ stallMs: 500, pollMs: 50, limitMb: 512, fd, cgroupDir: dir });
+        const log = (): string => fs.readFileSync(logFile, 'utf8');
+        try {
+            watchpost.start();
+            watchpost.bootPhaseReached('Seeds');
+            const token = watchpost.runStarted('watchpost-test-kennel', 'mcp');
+            await this.waitUntil(() => log().includes('wacht'), 3_000);
+            if (!log().includes('Speicher-Stufen 80/90/95 % von 200 MB (cgroup v2 memory.max)')) throw new Error(`Startzeile: ${log()}`);
+            await new Promise((r) => setTimeout(r, 200));
+
+            const blockedAt = Date.now();
+            while (Date.now() - blockedAt < 1_500) { /* Haupt-Thread blockiert */ }
+            const duringBlock = log();
+            const blockLine = duringBlock.split('\n').find((l) => l.includes('Haupt-Thread blockiert'));
+            if (!blockLine) throw new Error(`keine Blockadezeile waehrend der Blockade: ${duringBlock}`);
+            if (!blockLine.includes('watchpost-test-kennel (mcp)') || !blockLine.includes("Boot nach 'Seeds'")) {
+                throw new Error(`Blockadezeile ohne Kontext: ${blockLine}`);
+            }
+
+            await this.waitUntil(() => log().includes('wieder frei'), 2_000);
+            const freeLine = log().split('\n').find((l) => l.includes('wieder frei')) ?? '';
+            const freeMs = Number(/nach (\d+) ms/.exec(freeLine)?.[1]);
+            if (!(freeMs >= 1_400 && freeMs < 2_500)) throw new Error(`Ende-Zeile: ${freeLine}`);
+
+            watchpost.runEnded(token);
+            watchpost.bootFinished();
+            fs.writeFileSync(path.join(dir, 'memory.current'), String(184 * mb));
+            await this.waitUntil(() => log().includes('Speicher ueber'), 2_000);
+            const levelLines = log().split('\n').filter((l) => l.includes('Speicher ueber'));
+            if (levelLines.length !== 1 || !levelLines[0].includes('ueber 90 %') || !levelLines[0].includes('cg 184/200 MB (92 %)')
+                || !levelLines[0].includes('keine Laeufe') || levelLines[0].includes('Boot nach')) {
+                throw new Error(`Stufenzeilen: ${levelLines.join(' | ')}`);
+            }
+
+            const health = watchpost.health() as any;
+            const w = health.watchpost;
+            if (!health.enabled || !w.alive || w.stallsSinceStart !== 1 || w.longestStallMs < 1_400 || w.cgroupPeakSeenMb !== 184
+                || !(health.delayMs.max >= 1_400)) {
+                throw new Error(`health: ${JSON.stringify(health)}`);
+            }
+            await watchpost.stop();
+            if (watchpost.alive) throw new Error('nach stop() lebt der Thread noch');
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        } finally {
+            await watchpost.stop();
+            fs.closeSync(fd);
+            fs.rmSync(dir, { recursive: true, force: true });
         }
     }
 
