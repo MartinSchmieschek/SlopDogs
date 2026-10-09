@@ -12,6 +12,9 @@ import path from 'path';
 import v8 from 'v8';
 import { DogWorkerGate } from '@slopdogs/core';
 import { type ToolDef, type ToolDeps, ok, fail } from './types';
+import { ProcessMemory } from '../../services/ProcessMemory';
+import { kennelRunsSinceBoot } from '../../api/utils/memoryLog';
+import { Watchpost } from '../../services/Watchpost';
 
 const MB = 1024 * 1024;
 const toMb = (bytes: number): number => Math.round((bytes / MB) * 10) / 10;
@@ -23,15 +26,23 @@ const toMb = (bytes: number): number => Math.round((bytes / MB) * 10) / 10;
  */
 class RuntimeHealth {
     static memory(deps: ToolDeps): Record<string, unknown> {
-        const usage = process.memoryUsage();
+        const usage = ProcessMemory.snapshot();
         const gate = DogWorkerGate.shared.stats();
         return {
-            rssMb: toMb(usage.rss),
-            heapUsedMb: toMb(usage.heapUsed),
-            heapTotalMb: toMb(usage.heapTotal),
-            externalMb: toMb(usage.external),
-            arrayBuffersMb: toMb(usage.arrayBuffers ?? 0),
+            rssMb: usage.rssMb,
+            heapUsedMb: usage.heapUsedMb,
+            heapTotalMb: usage.heapTotalMb,
+            externalMb: usage.externalMb,
+            arrayBuffersMb: usage.arrayBuffersMb,
             heapSizeLimitMb: toMb(v8.getHeapStatistics().heap_size_limit),
+            // Hochwasser seit Start, Laufzeit, Laeufe — eine RSS im Leerlauf sagt ohne sie wenig.
+            maxRssMb: usage.maxRssMb,
+            uptimeSec: usage.uptimeSec,
+            runsSinceBoot: kennelRunsSinceBoot(),
+            runtime: ProcessMemory.runtime(),
+            // Linux: VmHWM/VmRSS/Threads, smaps_rollup, die cgroup (current/peak/limit/anon/file/events), nach der der
+            // Container stirbt, und memory.current minus RSS (npm/cross-env daneben). Ausserhalb von Linux null.
+            linux: ProcessMemory.linux(),
             guard: {
                 enabled: gate.memoryGuardEnabled,
                 limitMb: gate.memoryLimitMb,
@@ -100,7 +111,7 @@ export function getMetaTools(): ToolDef[] {
         },
         {
             name: 'health_check',
-            description: 'Cheap liveness probe. Returns the current server time, the authenticated user (if any) and the kennel call counter `stats` {pending, dropped, lastFlushError}: pending = unflushed (kennel, day, source) keys, flushed every KENNEL_CALL_FLUSH_MS; plus `dogStats` {pendingDogs, referenceRows}: unflushed per-dog run keys and the rows of the dog reference index (who uses which dog); plus `memory` (process RSS/heap/external/arrayBuffers in MB, V8 heap_size_limit, the memory guard with soft limit, waiting runs, rejections and GC runs since boot, dog isolate slots: active/live/terminating, snapshot cache entries and approximate bytes) and `admission` (the run queues: active/waiting per pot, tracked sources, 429/503 refusals since boot). Numbers only — no client addresses or ids.',
+            description: 'Cheap liveness probe. Returns the current server time, the authenticated user (if any) and the kennel call counter `stats` {pending, dropped, lastFlushError}: pending = unflushed (kennel, day, source) keys, flushed every KENNEL_CALL_FLUSH_MS; plus `dogStats` {pendingDogs, referenceRows}: unflushed per-dog run keys and the rows of the dog reference index (who uses which dog); plus `memory` (process RSS/heap/external/arrayBuffers in MB, V8 heap_size_limit, peak RSS since start (maxRssMb), uptimeSec, kennel runs since boot, node version and available parallelism, on Linux VmHWM/VmRSS/threads, smaps_rollup Rss/Anonymous/Private_Dirty, the container cgroup current/peak/limit/anon/file/events and current minus process RSS, the memory guard with soft limit, waiting runs, rejections and GC runs since boot, dog isolate slots: active/live/terminating, snapshot cache entries and approximate bytes), `admission` (the run queues: active/waiting per pot, tracked sources, 429/503 refusals since boot) and `eventLoop` (main-thread event loop lag since start in ms beyond the 20 ms sampling tick: p50/p99/max/mean; plus the watchpost thread that watches the main thread from outside: alive, restarts, stall threshold and poll interval, stalls since start, longest stall in ms, highest and current cgroup memory it saw in MB; `{enabled:false}` when SLOPDOGS_WATCHPOST is off). Numbers only — no client addresses or ids.',
             inputSchema: { type: 'object', properties: {}, additionalProperties: false },
             handler: async (_args, ctx, deps) => {
                 return ok({
@@ -112,6 +123,7 @@ export function getMetaTools(): ToolDef[] {
                     dogStats: deps.dogStats.health(),
                     memory: RuntimeHealth.memory(deps),
                     admission: RuntimeHealth.admission(deps),
+                    eventLoop: Watchpost.health(),
                 });
             },
         },

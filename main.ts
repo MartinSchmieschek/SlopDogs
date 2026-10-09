@@ -36,6 +36,8 @@ import { warnMissingEnv } from './server-app/startupEnvCheck';
 import { KennelCallCounter } from './services/KennelCallCounter';
 import { DogReferenceIndex } from './services/DogReferenceIndex';
 import { KeysCapability, scrubbingConsoleSink } from './services/keysCapability';
+import { logBootMemory } from './api/utils/memoryLog';
+import { Watchpost } from './services/Watchpost';
 import {
     assertSlimRegistryCoversKennelDbRefs,
     collectBaseDogNamesFromLatestKennels,
@@ -66,6 +68,10 @@ async function start() {
     // Eine Zeile je fehlender Pflicht-Env (Katalog: server-app/startupEnvCheck.ts) — warnt nur, beendet nie.
     warnMissingEnv(process.env);
 
+    // Wachposten (eigener Thread): sieht Blockaden des Haupt-Threads und den Speicher der cgroup auch dann,
+    // wenn hier kein Timer mehr feuert — ab jetzt, damit Seeds und Referenzindex schon ueberwacht sind.
+    Watchpost.startShared();
+
     dbEnv.assertRequiredDbEnv();
     const dbUrl = dbEnv.resolveStoreDatabaseUrl();
 
@@ -81,6 +87,7 @@ async function start() {
 
     // Plant the first bones in the earth — the seeds from which our pack shall grow.
     await runSeeds(nodesStore, kennelsStore);
+    logBootMemory('Seeds');
 
     // Aufrufe je Kennel (P4): im Speicher gezaehlt, alle KENNEL_CALL_FLUSH_MS in einer Transaktion
     // geschrieben. Die Tabellen haengen am Store-Client — kein fuenfter PrismaClient.
@@ -197,6 +204,7 @@ async function start() {
     } catch (err) {
         console.error('[DogReferenceIndex] rebuild gescheitert — Referenzzahlen leer bis zum naechsten Start:', err);
     }
+    logBootMemory('Referenzindex gebaut');
 
     const envForTypeDefs = process.env.NODE_ENV;
     if (envForTypeDefs === 'production' || envForTypeDefs === 'integration') {
@@ -255,6 +263,7 @@ async function start() {
     registerGracefulShutdown({ httpServer, callCounter, store, jsonStorageService, disconnectHttpApplication });
 
     console.log('App started.');
+    logBootMemory('App started');
     // Render u. a.: öffentlich erreichbar nur bei Bind an 0.0.0.0; PORT kommt von der Plattform.
     httpServer.listen(port, '0.0.0.0', () => {
         const base = `http://localhost:${port}`;
@@ -262,6 +271,7 @@ async function start() {
             console.log(`API ${base} — Dev-UI-Redirect: ${base}/ → ${devUiOrigin}/`);
         }
         console.log(`Server läuft auf Port ${port}`);
+        Watchpost.shared?.bootFinished();
         // ERST JETZT die Selbsttests: der Port ist offen, die Plattform sieht einen gesunden Dienst.
         // runStartupTests faengt intern alles ab und wirft nie.
         void runStartupTests();
@@ -312,6 +322,7 @@ function registerGracefulShutdown(targets: ShutdownTargets): void {
             targets.disconnectHttpApplication(),
         ]);
 
+        await Watchpost.stopShared();
         console.log('[shutdown] Verbindungen freigegeben.');
         process.exit(0);
     };
