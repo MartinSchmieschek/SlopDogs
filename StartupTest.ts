@@ -29,6 +29,8 @@ import {
     DogWorkerGate,
     type MemoryProbe,
     resolveVmTimeoutMs,
+    limitFetchBody,
+    resolveDogFetchMaxBodyBytes,
     type DogRunReport,
     type ICacheHandler,
 } from '@slopdogs/core';
@@ -360,6 +362,10 @@ export class StartupTest {
             await this.testDogRunClassification(baseDogsMap);
             await this.testMemoryGuardBackpressure();
             await this.testWorkerSlotReleasedOnExit(baseDogsMap);
+            await this.testRuntimeMemoryGuardKillsYoungest();
+            await this.testRuntimeMemoryGuardInRealRun(baseDogsMap);
+            await this.testFetchBodyLimit(baseDogsMap);
+            await this.testWorkerHeapCapEffective(baseDogsMap);
             await this.testWatchpostLogic();
             await this.testWatchpostThreadSeesBlockedMainThread();
             await this.testAliasContextHoldsNoProxy(baseDogsMap);
@@ -2092,6 +2098,189 @@ export class StartupTest {
                 gate.setMemoryProbe(null);
                 restoreGuard();
             }
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        } finally {
+            if (sampler) clearInterval(sampler);
+            restore();
+        }
+    }
+
+    /**
+     * Test OOM 1: Laufzeit-Waechter — misst nur, solange beendbare Isolate leben; ueber der harten Schwelle erst
+     * GC, dann wird das JUENGSTE beendet (Marker, Klasse oom), je Takt eines; abgeschaltet beendet er nichts;
+     * Isolate ohne kill-Rueckruf faesst er nie an.
+     */
+    private async testRuntimeMemoryGuardKillsYoungest(): Promise<void> {
+        const testName = 'OOM 1: Laufzeit-Waechter beendet das juengste Isolat, Timer nur solange Isolate leben';
+        const gate = new DogWorkerGate();
+        const restore = this.withEnv({
+            MEMORY_GUARD: '1', MEMORY_LIMIT_MB: '512', MEMORY_HARD_LIMIT_MB: '400', MEMORY_RUNTIME_CHECK_MS: '20',
+            MEMORY_GUARD_GC_MIN_INTERVAL_MS: '0', DOG_WORKER_GLOBAL_LIMIT: '4',
+        });
+        try {
+            let rss = 300;
+            const meter = this.fakeMemoryProbe(() => rss);
+            gate.setMemoryProbe(meter.probe);
+            const killed: string[] = [];
+            const spawn = async (name: string) => {
+                const lease = await gate.acquire();
+                const handle: ReturnType<DogWorkerGate['isolateSpawned']> = gate.isolateSpawned(lease, { storageId: name, name }, (err) => {
+                    killed.push(`${name}:${err.message}`);
+                    handle.terminating();
+                    setTimeout(() => handle.exited(), 5);
+                });
+                return handle;
+            };
+            const plain = gate.isolateSpawned(await gate.acquire());
+            if (gate.runtimeGuardActive) throw new Error('Timer laeuft ohne beendbares Isolat');
+            const older = await spawn('older');
+            await spawn('younger');
+            if (!gate.runtimeGuardActive) throw new Error('Timer laeuft nicht trotz lebender Isolate');
+            await new Promise((r) => setTimeout(r, 80));
+            if (killed.length) throw new Error(`unter der Schwelle beendet: ${killed.join(' | ')}`);
+
+            rss = 450;
+            await this.waitUntil(() => killed.length > 0, 1_000);
+            if (killed.length !== 1 || !killed[0].startsWith('younger:')) throw new Error(`nicht das juengste beendet: ${killed.join(' | ')}`);
+            if (!killed[0].includes(DOG_MEMPRESSURE_MARKER) || classifyDogError(killed[0]) !== 'oom') throw new Error(`Fehler ohne Marker/oom: ${killed[0]}`);
+            if (meter.gcCalls() < 1) throw new Error('kein GC-Versuch vor dem Beenden');
+            if (!LeadOutcome.fromWaves([[{ id: 'lead', error: killed[0] }]] as any, 'lead').memoryPressure) throw new Error('Lead-Ausgang erkennt den Speicherdruck nicht (503-Pfad)');
+
+            rss = 300;
+            await new Promise((r) => setTimeout(r, 80));
+            if (killed.length !== 1) throw new Error('nach Entlastung weiter beendet');
+            process.env.MEMORY_GUARD = '0';
+            rss = 450;
+            await new Promise((r) => setTimeout(r, 80));
+            if (killed.length !== 1) throw new Error('abgeschaltet trotzdem beendet');
+            process.env.MEMORY_GUARD = '1';
+            rss = 300;
+
+            older.terminating();
+            older.exited();
+            await this.waitUntil(() => !gate.runtimeGuardActive, 500);
+            if (gate.runtimeGuardActive) throw new Error('Timer laeuft nach dem letzten beendbaren Isolat weiter');
+            plain.exited();
+            const stats = gate.stats();
+            if (stats.memoryRuntimeKillsSinceBoot !== 1) throw new Error(`runtime kills ${stats.memoryRuntimeKillsSinceBoot} statt 1`);
+            if (stats.liveIsolates !== 0 || stats.slotsActive !== 0) throw new Error(`Reste: ${JSON.stringify(stats)}`);
+            if (stats.memoryHardLimitMb !== 400) throw new Error(`hardLimit ${stats.memoryHardLimitMb}`);
+            delete process.env.MEMORY_HARD_LIMIT_MB;
+            if (DogWorkerGate.memoryHardLimitMb() !== 416) throw new Error(`Default-Schwelle ${DogWorkerGate.memoryHardLimitMb()} statt 512 - 96`);
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        } finally {
+            gate.setMemoryProbe(null);
+            restore();
+        }
+    }
+
+    /**
+     * Test OOM 2: echter Dog — zugelassen unter dem Soft-Limit, waehrend er rechnet steigt die RSS ueber die harte
+     * Schwelle: der Laufzeit-Waechter beendet ihn, der Lauf scheitert als oom mit Marker (statt bis zum Timeout zu
+     * laufen oder den Container zu toeten); danach kein Isolat, kein Slot, kein Timer.
+     */
+    private async testRuntimeMemoryGuardInRealRun(baseDogsMap: Map<string, any>): Promise<void> {
+        const testName = 'OOM 2: Laufzeit-Waechter beendet einen laufenden Dog (oom, Marker), Prozess lebt';
+        const gate = DogWorkerGate.shared;
+        const restore = this.withEnv({
+            MEMORY_GUARD: '1', MEMORY_SOFT_LIMIT_MB: '100000', MEMORY_HARD_LIMIT_MB: '400', MEMORY_RUNTIME_CHECK_MS: '50',
+            MEMORY_GUARD_GC_MIN_INTERVAL_MS: '0',
+        });
+        let rss = 100;
+        let raise: ReturnType<typeof setTimeout> | null = null;
+        try {
+            gate.setMemoryProbe(this.fakeMemoryProbe(() => rss).probe);
+            const hog = this.p4bDog('OomRuntimeHog', 'const until = Date.now() + 8000; while (Date.now() < until) { /* spin */ } return 1;');
+            const { run, reports } = this.p4bRun(baseDogsMap, [hog.lineageId as string], [hog]);
+            const before = gate.stats().memoryRuntimeKillsSinceBoot;
+            raise = setTimeout(() => { rss = 999; }, 300);
+            const t0 = Date.now();
+            await run.run();
+            const tookMs = Date.now() - t0;
+            const message = String(reports[0]?.errorMessage);
+            if (reports[0]?.outcome !== 'oom' || !message.includes(DOG_MEMPRESSURE_MARKER) || !message.includes('runtime guard')) {
+                throw new Error(`Report: ${JSON.stringify(reports.map((r) => [r.outcome, r.errorMessage]))}`);
+            }
+            if (tookMs > 5_000) throw new Error(`Dog lief ${tookMs} ms — nicht beendet`);
+            if (gate.stats().memoryRuntimeKillsSinceBoot !== before + 1) throw new Error('Beenden nicht gezaehlt');
+            await this.waitUntil(() => gate.stats().liveIsolates === 0 && !gate.runtimeGuardActive, 3_000);
+            const after = gate.stats();
+            if (after.liveIsolates !== 0 || after.slotsActive !== 0 || gate.runtimeGuardActive) throw new Error(`Reste: ${JSON.stringify(after)}, Timer ${gate.runtimeGuardActive}`);
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        } finally {
+            if (raise) clearTimeout(raise);
+            gate.setMemoryProbe(null);
+            restore();
+        }
+    }
+
+    /**
+     * Test OOM 5: fetch-Body-Deckel — Content-Length ueber dem Deckel bricht sofort ab, ein Body ohne Laenge beim
+     * Streamen nach gezaehlten Bytes, kleine Antworten bleiben unberuehrt; im echten Dog-Lauf (data:-URL, der
+     * Worker blockt lokale Netze) scheitert der Dog mit fetch_body_too_large, der kleine liefert seinen Wert.
+     */
+    private async testFetchBodyLimit(baseDogsMap: Map<string, any>): Promise<void> {
+        const testName = 'OOM 5: fetch-Body-Deckel (Content-Length, gezaehlte Bytes, echter Dog-Lauf)';
+        const restore = this.withEnv({ DOG_FETCH_MAX_BODY_MB: '1' });
+        try {
+            const max = 1000;
+            let declared: unknown = null;
+            try { limitFetchBody(new Response('x'.repeat(10), { headers: { 'content-length': '2000' } }), max); } catch (e) { declared = e; }
+            if (!String(declared).includes('fetch_body_too_large')) throw new Error(`Content-Length nicht abgewiesen: ${declared}`);
+            const chunked = new ReadableStream<Uint8Array>({
+                start(controller) { for (let i = 0; i < 3; i++) controller.enqueue(new Uint8Array(600)); controller.close(); },
+            });
+            const streamed = await limitFetchBody(new Response(chunked), max).text().then(() => null, (e) => e);
+            if (!String(streamed).includes('fetch_body_too_large')) throw new Error(`Body ohne Laenge nicht abgebrochen: ${streamed}`);
+            const small = await limitFetchBody(new Response('klein', { status: 201 }), max);
+            if (small.status !== 201 || (await small.text()) !== 'klein') throw new Error('kleine Antwort veraendert');
+            if (resolveDogFetchMaxBodyBytes() !== 1024 * 1024) throw new Error(`Deckel aus Env: ${resolveDogFetchMaxBodyBytes()}`);
+
+            const big = this.p4bDog('OomFetchBig', "const r = await fetch('data:text/plain,' + 'a'.repeat(3 * 1024 * 1024)); return (await r.text()).length;");
+            const fine = this.p4bDog('OomFetchSmall', "const r = await fetch('data:text/plain,' + 'b'.repeat(100)); return (await r.text()).length;");
+            const { run, reports } = this.p4bRun(baseDogsMap, [big.lineageId as string, fine.lineageId as string], [big, fine]);
+            await run.run();
+            const bigReport = reports.find((r) => r.dog === big);
+            if (bigReport?.outcome !== 'error' || !String(bigReport.errorMessage).includes('fetch_body_too_large')) {
+                throw new Error(`grosser Body: ${JSON.stringify(reports.map((r) => [r.dog.name, r.outcome, r.errorMessage]))}`);
+            }
+            if (fine.collected !== 100) throw new Error(`kleiner Body: ${JSON.stringify(fine.collected)}`);
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        } finally {
+            restore();
+        }
+    }
+
+    /**
+     * Test OOM 6: der Worker-Heap-Deckel greift trotz --max-old-space-size am Prozess. Ohne die Freigabe des
+     * Flags waechst ein Dog mit DOG_WORKER_MAX_HEAP_MB=32 bis zur Grenze des HAUPT-Prozesses (gemessen +359 MB
+     * bei 320); mit ihr endet er als oom nahe seinem Deckel.
+     */
+    private async testWorkerHeapCapEffective(baseDogsMap: Map<string, any>): Promise<void> {
+        const testName = 'OOM 6: Worker-Heap-Deckel wirkt trotz --max-old-space-size (oom statt Prozess-Grenze)';
+        const restore = this.withEnv({ DOG_WORKER_MAX_HEAP_MB: '32' });
+        let sampler: ReturnType<typeof setInterval> | null = null;
+        try {
+            const hog = this.p4bDog('OomHeapHog', 'const a = []; for (;;) a.push({ s: "y".repeat(64) + a.length });');
+            const { run, reports } = this.p4bRun(baseDogsMap, [hog.lineageId as string], [hog]);
+            (globalThis as any).gc?.();
+            const base = process.memoryUsage().rss;
+            let peak = base;
+            sampler = setInterval(() => { peak = Math.max(peak, process.memoryUsage().rss); }, 5);
+            await run.run();
+            clearInterval(sampler);
+            sampler = null;
+            const growthMb = Math.round((peak - base) / 1048576);
+            if (reports[0]?.outcome !== 'oom') throw new Error(`Report: ${JSON.stringify(reports.map((r) => [r.outcome, r.errorMessage]))}`);
+            if (growthMb > 150) throw new Error(`Worker wuchs um ${growthMb} MB RSS bei Deckel 32 MB — Prozess-Flag sticht resourceLimits`);
             this.addResult(testName, true);
         } catch (error) {
             this.addResult(testName, false, String(error));

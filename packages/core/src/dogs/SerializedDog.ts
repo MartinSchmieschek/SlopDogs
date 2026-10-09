@@ -256,6 +256,69 @@ export function checkSerializedDogCode(source: string): { ok: true } | { ok: fal
     }
 }
 
+/** Groesste Antwort, die ein Dog per fetch lesen darf (MB), wenn DOG_FETCH_MAX_BODY_MB schweigt. */
+const DEFAULT_DOG_FETCH_MAX_BODY_MB = 32;
+
+/** Body-Deckel des Worker-fetch in Bytes (DOG_FETCH_MAX_BODY_MB, positiver Integer). */
+export function resolveDogFetchMaxBodyBytes(): number {
+    const configured = Number(process.env.DOG_FETCH_MAX_BODY_MB);
+    const mb = Number.isInteger(configured) && configured > 0 ? configured : DEFAULT_DOG_FETCH_MAX_BODY_MB;
+    return mb * 1024 * 1024;
+}
+
+/**
+ * Deckelt den Body einer fetch-Antwort im Worker. resourceLimits deckelt nur den JS-Heap, nicht die
+ * ArrayBuffer-Speicher, in die ein Body gelesen wird — ein Dog konnte so hunderte MB nativen Speicher
+ * belegen, bevor ein Waechter misst. Abbruch zweifach: sofort, wenn Content-Length mehr ankuendigt; sonst
+ * beim Streamen, sobald die gezaehlten Bytes den Deckel ueberschreiten (der Download wird dabei abgebrochen).
+ * Die Funktion reist als Quelltext in den Worker: keine Abhaengigkeiten, nur Web-Globals.
+ */
+export function limitFetchBody(res: Response, maxBytes: number): Response {
+    const tooLarge = (what: string): Error => new Error(
+        'fetch_body_too_large: ' + what + ' exceeds the limit of ' + maxBytes + ' bytes (DOG_FETCH_MAX_BODY_MB)'
+    );
+    const declared = Number(res.headers.get('content-length'));
+    if (Number.isFinite(declared) && declared > maxBytes) {
+        try { if (res.body) res.body.cancel(); } catch (e) { /* schon zu */ }
+        throw tooLarge('Content-Length ' + declared);
+    }
+    if (!res.body || [101, 204, 205, 304].indexOf(res.status) >= 0) return res;
+    let seen = 0;
+    const counted = res.body.pipeThrough(new TransformStream({
+        transform(chunk: Uint8Array, controller: TransformStreamDefaultController<Uint8Array>) {
+            seen += chunk.byteLength;
+            if (seen > maxBytes) {
+                controller.error(tooLarge('response body'));
+                return;
+            }
+            controller.enqueue(chunk);
+        },
+    }));
+    const limited = new Response(counted, { status: res.status, statusText: res.statusText, headers: res.headers });
+    Object.defineProperty(limited, 'url', { value: res.url });
+    Object.defineProperty(limited, 'redirected', { value: res.redirected });
+    return limited;
+}
+
+let workerHeapFlagReleased = false;
+
+/**
+ * Macht resourceLimits.maxOldGenerationSizeMb der Dog-Worker wirksam. Gemessen (node 22, Docker, 08.10.):
+ * steht --max-old-space-size im Startbefehl oder in NODE_OPTIONS, gilt dieses V8-Flag prozessweit fuer JEDES
+ * neue Isolat und sticht den Worker-Deckel aus — ein Dog mit "Deckel 64 MB" wuchs bei --max-old-space-size=320
+ * um 359 MB (cgroup), ohne Flag um 83 MB; die Fehlermeldung nannte trotzdem 64 MB. V8 liest das Flag nur beim
+ * Anlegen eines Isolats: das Haupt-Isolat behaelt seine Grenze (gemessen: heap_size_limit unveraendert), danach
+ * gespawnte Worker bekommen ihre resourceLimits. Einmal je Prozess, vor dem ersten Worker.
+ */
+function releaseProcessWideHeapFlagForWorkers(): void {
+    if (workerHeapFlagReleased) return;
+    workerHeapFlagReleased = true;
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        require('v8').setFlagsFromString('--max-old-space-size=0');
+    } catch { /* ohne v8-Modul bleibt es beim Flag des Prozesses */ }
+}
+
 /** Old-Space-Deckel je Sandbox-Isolate in MB, wenn DOG_WORKER_MAX_HEAP_MB schweigt. */
 const DEFAULT_DOG_WORKER_MAX_HEAP_MB = 64;
 
@@ -372,6 +435,10 @@ const SANDBOX_WORKER_SOURCE = `
     // oeffentliche API bleibt erreichbar. Jede Umleitung wird vor dem naechsten Sprung geprueft.
     const isPrivateNetworkAddress = ${isPrivateNetworkAddress.toString()};
     const nativeFetch = fetch;
+    // Body-Deckel (DOG_FETCH_MAX_BODY_MB): der Parent schickt ihn mit der Init-Nachricht; die env des
+    // Workers ist leer. Bis dahin gilt der Default.
+    const limitFetchBody = ${limitFetchBody.toString()};
+    let maxFetchBodyBytes = ${DEFAULT_DOG_FETCH_MAX_BODY_MB} * 1024 * 1024;
     const REDIRECT_STATUS = [301, 302, 303, 307, 308];
 
     async function assertPublicTarget(href) {
@@ -392,13 +459,13 @@ const SANDBOX_WORKER_SOURCE = `
         let href = isRequest ? input.url : String(input);
         await assertPublicTarget(href);
         const mode = (init && init.redirect) || (isRequest && input.redirect) || 'follow';
-        if (mode !== 'follow') return nativeFetch(input, init);
+        if (mode !== 'follow') return limitFetchBody(await nativeFetch(input, init), maxFetchBodyBytes);
         let target = input;
         let options = Object.assign({}, init || {}, { redirect: 'manual' });
         for (let hop = 0; hop < 20; hop++) {
             const res = await nativeFetch(target, options);
             const location = res.headers.get('location');
-            if (REDIRECT_STATUS.indexOf(res.status) < 0 || !location) return res;
+            if (REDIRECT_STATUS.indexOf(res.status) < 0 || !location) return limitFetchBody(res, maxFetchBodyBytes);
             href = new URL(location, href).href;
             await assertPublicTarget(href);
             const method = String(options.method || (isRequest ? input.method : 'GET') || 'GET').toUpperCase();
@@ -469,7 +536,8 @@ const SANDBOX_WORKER_SOURCE = `
         if (initFired) return;
         initFired = true;
         try {
-            const { wrappedCode, contextObj, bridgeNamespaces } = msg;
+            const { wrappedCode, contextObj, bridgeNamespaces, fetchMaxBodyBytes } = msg;
+            if (typeof fetchMaxBodyBytes === 'number' && fetchMaxBodyBytes > 0) maxFetchBodyBytes = fetchMaxBodyBytes;
             const bridges = {};
             for (const entry of (bridgeNamespaces || [])) {
                 bridges[entry.namespace] = makeBridgeProxy(entry.namespace, entry.methods);
@@ -1279,6 +1347,7 @@ export class SerializedDog<T> extends Dog<T> {
                     // selbst bleibt moeglich -- require('fs')/child_process oder Netz unter Umgehung von
                     // guardedFetch. Echte Isolation braucht eine Prozess-Sandbox / isolated-vm (eigener
                     // Folgeauftrag). Siehe auch das bewusste SSRF-Restrisiko R30 in docs/slopdogs/PLAN.md.
+                    releaseProcessWideHeapFlagForWorkers();
                     const worker = new Worker(SANDBOX_WORKER_SOURCE, {
                         eval: true,
                         env: {},
@@ -1290,7 +1359,13 @@ export class SerializedDog<T> extends Dog<T> {
                     });
                     // Ab hier lebt ein Isolat: es haelt seinen Slot, bis 'exit' feuert (genau einmal je Worker).
                     isolateSpawned = true;
-                    const isolate = gate.isolateSpawned(lease);
+                    // Der Laufzeit-Waechter darf dieses Isolat unter Speicherdruck beenden: settle() markiert es
+                    // als terminating, beendet den Worker und laesst den Lauf mit DOG_MEMPRESSURE_MARKER scheitern.
+                    const isolate = gate.isolateSpawned(
+                        lease,
+                        { storageId: this.storageId, name: this.name },
+                        (memoryError) => settle(() => reject(memoryError)),
+                    );
 
                     let settled = false;
                     const settle = (fn: () => void) => {
@@ -1376,7 +1451,7 @@ export class SerializedDog<T> extends Dog<T> {
                     // 'error' listener with full diagnostic, not as a synchronous throw that we'd
                     // misattribute to the user's code.
                     try {
-                        worker.postMessage({ wrappedCode, contextObj: safeContext, bridgeNamespaces });
+                        worker.postMessage({ wrappedCode, contextObj: safeContext, bridgeNamespaces, fetchMaxBodyBytes: resolveDogFetchMaxBodyBytes() });
                     } catch (postErr: any) {
                         settle(() => reject(new Error(
                             `SerializedDog ${this.storageId}: postMessage failed: ${postErr?.message ?? postErr}`

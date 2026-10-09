@@ -326,6 +326,21 @@ export const ENV_CATALOG: readonly EnvVarSpec[] = [
         defaultValue: '2000', consequence: 'Default',
     },
     {
+        name: 'MEMORY_HARD_LIMIT_MB', section: 'operations', since: 'OOM-Fix',
+        purpose: 'Schwelle des Laufzeit-Waechters (cgroup-Arbeitsspeicher, sonst RSS): darueber wird das juengste laufende Dog-Isolat beendet (503 statt Container-Kill)',
+        defaultValue: 'MEMORY_LIMIT_MB - 96', consequence: 'Default',
+    },
+    {
+        name: 'MEMORY_RUNTIME_CHECK_MS', section: 'operations', since: 'OOM-Fix',
+        purpose: 'Takt des Laufzeit-Waechters, solange Dog-Isolate laufen (ms)',
+        defaultValue: '100', consequence: 'Default',
+    },
+    {
+        name: 'DOG_FETCH_MAX_BODY_MB', section: 'operations', since: 'OOM-Fix',
+        purpose: 'Groesste fetch-Antwort je Dog (MB); darueber fetch_body_too_large (Content-Length oder gezaehlte Bytes)',
+        defaultValue: '32', consequence: 'Default',
+    },
+    {
         name: 'SLOPDOGS_VM_TIMEOUT_MS', section: 'operations', since: 'P2',
         purpose: 'Timeout je SerializedDog-Lauf im Worker (ms); Override je MCP-Aufruf per vmTimeoutMs',
         defaultValue: '10000', consequence: 'Default',

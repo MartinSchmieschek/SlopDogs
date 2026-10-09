@@ -21,6 +21,14 @@
  *      Wartende werden der Reihe nach geweckt, einer je beendetem Isolat; endet das letzte Isolat,
  *      werden alle geweckt (sonst warteten sie als Waisen bis zur Frist).
  *
+ *   3. Der Laufzeit-Waechter misst WAEHREND Isolate leben (alle `MEMORY_RUNTIME_CHECK_MS`, nur dann laeuft
+ *      sein Timer). Die Zulassung oben sieht nur den Augenblick vor dem Spawn; ein Worker, der danach
+ *      waechst, lief bis zum Kill des ganzen Containers. Gemessen wird, was der OOM-Killer zaehlt: der
+ *      Arbeitsspeicher der cgroup (memory.current - inactive_file, v2; ohne cgroup die RSS). Steht er ueber der harten Schwelle
+ *      (`MEMORY_HARD_LIMIT_MB`, sonst Budget minus 96 MB), erst ein GC-Versuch, dann wird das JUENGSTE
+ *      laufende Isolat beendet — sein Lauf scheitert mit DOG_MEMPRESSURE_MARKER (wie eine Abweisung,
+ *      also 503 am Lead), der Prozess lebt weiter. Ein Isolat je Takt, damit die RSS fallen kann.
+ *
  * process.memoryUsage().rss umfasst den ganzen Prozess inkl. aller Worker-Threads — die Zahl, nach der
  * auch der OOM-Killer des Containers entscheidet. Prozesse daneben (npm, sh, cross-env) sieht sie nicht.
  */
@@ -37,6 +45,17 @@ const DEFAULT_MEMORY_SOFT_LIMIT_SHARE = 0.85;
 const DEFAULT_MEMORY_GUARD_WAIT_MS = 30_000;
 /** Mindestabstand zwischen zwei erzwungenen GCs — ein voller GC haelt die Ereignisschleife an. */
 const DEFAULT_MEMORY_GUARD_GC_MIN_INTERVAL_MS = 2_000;
+/**
+ * Harte Schwelle ohne eigene Angabe: so viel unter dem Budget — Luft fuer den Takt bis zur naechsten Messung und
+ * fuer terminate() bis zur Freigabe. Gemessen (Docker -m 512m, nativer Speicherfresser, 100-ms-Takt): bei 24 MB
+ * Luft starb der Container in 3 von 5 Faellen, bei 64 MB keiner (memory.peak bis 489), bei 96 MB keiner (bis 452).
+ */
+const DEFAULT_MEMORY_HARD_LIMIT_HEADROOM_MB = 96;
+/**
+ * Takt des Laufzeit-Waechters, solange Isolate leben. 100 statt 500 ms: gemessen (Gauss, 08.10.) baut ein
+ * Worker mit nativen Puffern 221-231 MB je 500 ms auf — bei 500 ms waere die Marge zigfach ueberrannt.
+ */
+const DEFAULT_MEMORY_RUNTIME_CHECK_MS = 100;
 
 const MB = 1024 * 1024;
 
@@ -64,6 +83,39 @@ export interface MemoryProbe {
     rssBytes(): number;
     /** Ein voller GC; false, wenn keiner verfuegbar ist. */
     collectGarbage(): boolean;
+    /**
+     * Was der Container-OOM-Killer zaehlt, in Bytes — fuer den Laufzeit-Waechter. Ohne diese Methode
+     * (Tests) misst er rssBytes().
+     */
+    containerBytes?(): number;
+}
+
+const CGROUP_V2_CURRENT = '/sys/fs/cgroup/memory.current';
+const CGROUP_V2_STAT = '/sys/fs/cgroup/memory.stat';
+
+/**
+ * Arbeitsspeicher der cgroup (v2): memory.current minus inactive_file — dieselbe "working set"-Zahl, nach
+ * der kubelet/cAdvisor entscheiden. memory.current allein zaehlt auch Datei-Cache mit, den der Kernel vor
+ * einem OOM-Kill erst zurueckholt; der Waechter wuerde sonst Dogs beenden, obwohl nur Cache im Weg liegt.
+ * null, wenn keine cgroup v2 lesbar ist (Windows, macOS, cgroup v1) — dann misst der Waechter die RSS.
+ * Kosten: zwei kleine Dateien aus /sys, Mikrosekunden — darum auch im 100-ms-Takt vertretbar.
+ */
+function readCgroupWorkingSetBytes(): number | null {
+    let fs: typeof import('fs');
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        fs = require('fs');
+        const current = Number(fs.readFileSync(CGROUP_V2_CURRENT, 'utf8').trim());
+        if (!Number.isFinite(current)) return null;
+        let inactiveFile = 0;
+        try {
+            const match = /^inactive_file (\d+)$/m.exec(fs.readFileSync(CGROUP_V2_STAT, 'utf8'));
+            if (match) inactiveFile = Number(match[1]);
+        } catch { /* ohne memory.stat: memory.current allein */ }
+        return Math.max(0, current - inactiveFile);
+    } catch {
+        return null;
+    }
 }
 
 /**
@@ -74,9 +126,26 @@ export interface MemoryProbe {
  */
 class ProcessMemoryProbe implements MemoryProbe {
     private gcFn: (() => void) | null | undefined;
+    private cgroupReadable: boolean | undefined;
 
     rssBytes(): number {
         return process.memoryUsage().rss;
+    }
+
+    /** cgroup-Arbeitsspeicher, sonst RSS. Ist die cgroup einmal unlesbar, wird sie nicht mehr versucht. */
+    containerBytes(): number {
+        if (this.cgroupReadable !== false) {
+            const bytes = readCgroupWorkingSetBytes();
+            this.cgroupReadable = bytes !== null;
+            if (bytes !== null) return bytes;
+        }
+        return this.rssBytes();
+    }
+
+    /** Welche Quelle der Laufzeit-Waechter misst — fuer health_check. */
+    get containerSource(): 'cgroup' | 'rss' {
+        if (this.cgroupReadable === undefined) this.containerBytes();
+        return this.cgroupReadable ? 'cgroup' : 'rss';
     }
 
     collectGarbage(): boolean {
@@ -132,6 +201,12 @@ export interface DogWorkerGateStats {
     gcAvailable: boolean;
     gcRunsSinceBoot: number;
     slotReleaseAnomalies: number;
+    memoryHardLimitMb: number;
+    memoryRuntimeCheckMs: number;
+    /** Laufende Isolate, die der Laufzeit-Waechter seit Start beendet hat. */
+    memoryRuntimeKillsSinceBoot: number;
+    /** Was der Laufzeit-Waechter misst: cgroup-Arbeitsspeicher oder (ohne cgroup v2) Prozess-RSS. */
+    memoryRuntimeSource: 'cgroup' | 'rss';
 }
 
 /** Wer um Speicher bittet — nur fuer die Fehlermeldung und das Log. */
@@ -157,15 +232,29 @@ export class DogWorkerLease {
     }
 }
 
+/** Beendet den Lauf eines Isolats mit diesem Fehler (terminate + reject) — vom Laufzeit-Waechter gerufen. */
+export type DogIsolateKill = (error: Error) => void;
+
 /**
  * Ein lebendes Isolat. `terminating()` beim Ergebnis (terminate() angestossen), `exited()` genau einmal
- * aus dem `'exit'`-Ereignis des Workers — erst dann geht der Slot zurueck.
+ * aus dem `'exit'`-Ereignis des Workers — erst dann geht der Slot zurueck. Mit `kill` kann der
+ * Laufzeit-Waechter es unter Speicherdruck beenden.
  */
 export class DogIsolateHandle {
     private terminatingMarked = false;
     private exitedMarked = false;
 
-    constructor(private readonly gate: DogWorkerGate, private readonly lease: DogWorkerLease) {}
+    constructor(
+        private readonly gate: DogWorkerGate,
+        private readonly lease: DogWorkerLease,
+        readonly applicant?: DogWorkerApplicant,
+        private readonly kill?: DogIsolateKill,
+    ) {}
+
+    /** Kann der Laufzeit-Waechter dieses Isolat beenden? Nur, solange es noch rechnet. */
+    get killable(): boolean {
+        return this.kill !== undefined && !this.terminatingMarked && !this.exitedMarked;
+    }
 
     terminating(): void {
         if (this.terminatingMarked || this.exitedMarked) return;
@@ -176,8 +265,14 @@ export class DogIsolateHandle {
     exited(): void {
         if (this.exitedMarked) return;
         this.exitedMarked = true;
-        this.gate.isolateExited(this.terminatingMarked);
+        this.gate.isolateExited(this, this.terminatingMarked);
         this.lease.release();
+    }
+
+    /** Nur ueber DogWorkerGate — der Aufrufer (SerializedDog) markiert terminating und beendet den Worker. */
+    killForMemory(error: Error): void {
+        if (!this.killable) return;
+        this.kill!(error);
     }
 }
 
@@ -196,6 +291,10 @@ export class DogWorkerGate {
     private lastGcAt = 0;
     private readonly processProbe = new ProcessMemoryProbe();
     private probe: MemoryProbe = this.processProbe;
+    /** Lebende Isolate in Spawn-Reihenfolge (das letzte ist das juengste). */
+    private readonly liveHandles: DogIsolateHandle[] = [];
+    private runtimeTimer: ReturnType<typeof setInterval> | null = null;
+    private runtimeKills = 0;
 
     // --- Konfiguration (bei jedem Zugriff aus der Env, damit Tests und Betrieb sie umstellen koennen) ---
 
@@ -237,6 +336,16 @@ export class DogWorkerGate {
         return nonNegativeIntFromEnv('MEMORY_GUARD_GC_MIN_INTERVAL_MS') ?? DEFAULT_MEMORY_GUARD_GC_MIN_INTERVAL_MS;
     }
 
+    /** Ab hier beendet der Laufzeit-Waechter laufende Isolate. Explizit via MEMORY_HARD_LIMIT_MB, sonst Budget - 96. */
+    static memoryHardLimitMb(): number {
+        return positiveNumberFromEnv('MEMORY_HARD_LIMIT_MB')
+            ?? DogWorkerGate.memoryLimitMb() - DEFAULT_MEMORY_HARD_LIMIT_HEADROOM_MB;
+    }
+
+    static memoryRuntimeCheckMs(): number {
+        return positiveIntFromEnv('MEMORY_RUNTIME_CHECK_MS') ?? DEFAULT_MEMORY_RUNTIME_CHECK_MS;
+    }
+
     // --- Slots ---
 
     /** Einen Slot belegen — wartet (FIFO), bis einer frei ist. Gegendruck statt OOM. */
@@ -268,10 +377,16 @@ export class DogWorkerGate {
 
     // --- Isolate ---
 
-    /** Direkt nach erfolgreichem `new Worker(...)`. */
-    isolateSpawned(lease: DogWorkerLease): DogIsolateHandle {
+    /**
+     * Direkt nach erfolgreichem `new Worker(...)`. Mit `kill` darf der Laufzeit-Waechter das Isolat unter
+     * Speicherdruck beenden; sein Timer laeuft nur, solange ein solches Isolat lebt.
+     */
+    isolateSpawned(lease: DogWorkerLease, applicant?: DogWorkerApplicant, kill?: DogIsolateKill): DogIsolateHandle {
         this.liveIsolates++;
-        return new DogIsolateHandle(this, lease);
+        const handle = new DogIsolateHandle(this, lease, applicant, kill);
+        this.liveHandles.push(handle);
+        if (kill) this.startRuntimeGuard();
+        return handle;
     }
 
     /** Nur ueber DogIsolateHandle. */
@@ -280,7 +395,10 @@ export class DogWorkerGate {
     }
 
     /** Nur ueber DogIsolateHandle — genau einmal je Worker. */
-    isolateExited(wasTerminating: boolean): void {
+    isolateExited(handle: DogIsolateHandle, wasTerminating: boolean): void {
+        const at = this.liveHandles.indexOf(handle);
+        if (at >= 0) this.liveHandles.splice(at, 1);
+        if (!this.liveHandles.some((h) => h.killable)) this.stopRuntimeGuard();
         if (wasTerminating && this.terminatingIsolates > 0) this.terminatingIsolates--;
         if (this.liveIsolates <= 0) {
             console.error('[DogWorkerGate] isolate exit without a live isolate — counter out of step');
@@ -346,7 +464,63 @@ export class DogWorkerGate {
             gcAvailable: this.probe === this.processProbe ? this.processProbe.gcAvailable : true,
             gcRunsSinceBoot: this.gcRuns,
             slotReleaseAnomalies: this.releaseAnomalies,
+            memoryHardLimitMb: DogWorkerGate.memoryHardLimitMb(),
+            memoryRuntimeCheckMs: DogWorkerGate.memoryRuntimeCheckMs(),
+            memoryRuntimeKillsSinceBoot: this.runtimeKills,
+            memoryRuntimeSource: this.containerSource,
         };
+    }
+
+    /** Laeuft der Laufzeit-Waechter gerade? (Tests, Diagnose) */
+    get runtimeGuardActive(): boolean {
+        return this.runtimeTimer !== null;
+    }
+
+    // --- Laufzeit-Waechter ---
+
+    private startRuntimeGuard(): void {
+        if (this.runtimeTimer) return;
+        this.runtimeTimer = setInterval(() => this.checkRuntimeMemory(), DogWorkerGate.memoryRuntimeCheckMs());
+        // Ein lebender Worker haelt die Ereignisschleife selbst; der Takt soll es nicht.
+        this.runtimeTimer.unref?.();
+    }
+
+    private stopRuntimeGuard(): void {
+        if (!this.runtimeTimer) return;
+        clearInterval(this.runtimeTimer);
+        this.runtimeTimer = null;
+    }
+
+    /**
+     * Ein Takt: unter der harten Schwelle nichts; darueber ein (gedrosselter) GC-Versuch, und reicht der nicht,
+     * wird das juengste noch rechnende Isolat beendet. Juengstes statt groesstes: die Groesse je Worker kennt
+     * nur eine asynchrone Heap-Abfrage je Isolat — bis die antwortet, ist der Container schon tot; das
+     * juengste hat am wenigsten Arbeit verloren und ist meist das, mit dem die Spitze kam.
+     */
+    private checkRuntimeMemory(): void {
+        if (!DogWorkerGate.memoryGuardEnabled()) return;
+        const hardMb = DogWorkerGate.memoryHardLimitMb();
+        let usedMb = this.readContainerMb();
+        if (usedMb < hardMb) return;
+        if (this.tryCollectGarbage()) {
+            usedMb = this.readContainerMb();
+            if (usedMb < hardMb) return;
+        }
+        const source = this.containerSource;
+        const victim = [...this.liveHandles].reverse().find((h) => h.killable);
+        if (!victim) return;
+        this.runtimeKills++;
+        const limitMb = DogWorkerGate.memoryLimitMb();
+        const who = victim.applicant ? `${victim.applicant.storageId} ("${victim.applicant.name}")` : '(unbekannt)';
+        console.warn(
+            `[DogWorkerGate] runtime memory guard terminated dog ${who}: ${source} ${usedMb} MB >= hard limit ${hardMb} MB `
+            + `of ${limitMb} MB, live isolates ${this.liveIsolates}, runtime kills since boot ${this.runtimeKills}`,
+        );
+        victim.killForMemory(new Error(
+            `SerializedDog ${who}: ${DOG_MEMPRESSURE_MARKER} (runtime guard: ${source} ${usedMb} MB >= hard limit ${hardMb} MB `
+            + `of ${limitMb} MB; the dog was terminated mid-run to keep the container alive). Retry shortly. `
+            + `Tune via MEMORY_HARD_LIMIT_MB / MEMORY_LIMIT_MB, or lower DOG_WORKER_GLOBAL_LIMIT / DOG_WORKER_MAX_HEAP_MB.`,
+        ));
     }
 
     /** Nur fuer Tests: eine eigene Messung einsetzen; null stellt die echte wieder her. */
@@ -357,6 +531,16 @@ export class DogWorkerGate {
 
     private readRssMb(): number {
         return Math.round(this.probe.rssBytes() / MB);
+    }
+
+    /** Laufzeit-Waechter: cgroup-Arbeitsspeicher (sieht auch Prozesse neben dem Server), sonst RSS. */
+    private readContainerMb(): number {
+        return Math.round((this.probe.containerBytes ? this.probe.containerBytes() : this.probe.rssBytes()) / MB);
+    }
+
+    /** Welche Zahl der Laufzeit-Waechter misst: 'cgroup' (memory.current - inactive_file) oder 'rss'. */
+    get containerSource(): 'cgroup' | 'rss' {
+        return this.probe === this.processProbe ? this.processProbe.containerSource : (this.probe.containerBytes ? 'cgroup' : 'rss');
     }
 
     /** GC hoechstens alle MEMORY_GUARD_GC_MIN_INTERVAL_MS — ein voller GC haelt die Ereignisschleife an. */

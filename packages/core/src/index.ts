@@ -66,6 +66,8 @@ export {
     type VmConsoleSink,
     setVmConsoleSink,
     isPrivateNetworkAddress,
+    limitFetchBody,
+    resolveDogFetchMaxBodyBytes,
     registerVmGlobalCapability,
     unregisterVmGlobalCapability,
     listVmGlobalCapabilities,
