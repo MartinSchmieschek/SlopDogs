@@ -3,7 +3,7 @@
 // this class is the sole keeper of persistence, and it answers to no one but Prisma.
 // Now the lineage branches like cursed coral — lineageId binds incarnations, parentId traces ancestry.
 import { PrismaClient, Prisma } from '@prisma/client';
-import { IStore } from './IStore';
+import { IStore, type MimicHeadRow, type ReferenceHeadRow, type ReferenceTargetRow, type VersionHeaderRow } from './IStore';
 import {
   IKennelStatsStore,
   IDogStatsStore,
@@ -207,7 +207,8 @@ export class PrismaStore implements IStore, IKennelStatsStore, IDogStatsStore {
    * Die Zeilen laufen durch DENSELBEN Mapper wie findByType — die Rueckgabeform ist
    * ununterscheidbar. Die Fenster-Spalte `rn` faellt dabei heraus.
    */
-  public async findLatestByType(type: string, search?: string): Promise<Array<any>> {
+  public async findLatestByType(type: string, search?: string, lineageIds?: string[]): Promise<Array<any>> {
+    if (lineageIds && lineageIds.length === 0) return [];
     // Optionaler DB-Vorfilter: nur Zeilen, in denen das Schlagwort irgendwo sitzt — displayName/name/
     // description (Spalten) ODER serializedDogConfig (dort steht die SerializedDog-Beschreibung, die NICHT
     // in der description-Spalte liegt). Das ist eine Obermenge der echten Treffer; der Aufrufer schaerft
@@ -229,10 +230,220 @@ export class PrismaStore implements IStore, IKennelStatsStore, IDogStatsStore {
           PARTITION BY COALESCE("lineageId", "id")
           ORDER BY ("createdAt" IS NULL), "createdAt" DESC, "id" DESC
         ) AS rn
-        FROM "Dog" WHERE "type" = ${type} ${filter}
+        FROM "Dog" WHERE "type" = ${type} ${filter} ${this.lineageFilter(lineageIds)}
       ) t WHERE rn = 1
     `);
     return rows.map((r: any) => this.formatTypeRow(r));
+  }
+
+  /**
+   * Nur die Partitionen dieser Lineages — plus jede Zeile OHNE lineageId-Spalte: deren Lineage steht
+   * hoechstens in der Konfig, und der Aufrufer leitet sie wie bisher in JS ab und filtert danach.
+   * Damit bleibt jede Partition vollstaendig, die Rangfolge im Fenster also dieselbe.
+   */
+  private lineageFilter(lineageIds?: string[]): Prisma.Sql {
+    if (!lineageIds) return Prisma.empty;
+    return Prisma.sql`AND ("lineageId" IN (${Prisma.join(lineageIds)}) OR "lineageId" IS NULL)`;
+  }
+
+  // --- Schmale Lesewege (OOM 2026-10-08) -------------------------------------------------------
+  //
+  // Jede volle Zeile zieht serializedDogConfig (tsCode/theRun) bzw. nodes/edges/task durch die
+  // Query-Engine (Rust-Heap) und als JSON-String in den V8-Heap. Die Wege hier holen nur die
+  // Spalten, die ihr Aufrufer liest. Wo ein Wert aus der Konfig noetig ist, zieht SQL genau diesen
+  // Schluessel heraus (Postgres jsonb, SQLite json1) — typgeprueft, damit JS dieselbe Ableitung
+  // trifft wie mit der ganzen Konfig. Postgres bricht den Cast bei ungueltigem JSON ab: dann
+  // weichen die Aufrufer auf den alten, vollen Weg aus (siehe jeweils *Legacy).
+
+  /** Ein fester Schluessel der Konfig — nie Nutzereingabe. */
+  private static cfgKey(key: string): string {
+    if (!/^[A-Za-z]+$/.test(key)) throw new Error(`cfgKey: ${key}`);
+    return key;
+  }
+
+  /** Der Konfig-Wert als String — nur wenn dort ein JSON-String steht, sonst NULL. */
+  private cfgString(key: string): Prisma.Sql {
+    const k = PrismaStore.cfgKey(key);
+    return this.isPostgres
+      ? Prisma.raw(`CASE WHEN jsonb_typeof(("serializedDogConfig")::jsonb -> '${k}') = 'string' THEN ("serializedDogConfig")::jsonb ->> '${k}' END`)
+      : Prisma.raw(`CASE WHEN json_valid("serializedDogConfig") AND json_type("serializedDogConfig", '$.${k}') = 'text' THEN json_extract("serializedDogConfig", '$.${k}') END`);
+  }
+
+  /** Der Konfig-Wert als JSON-Text — nur fuer Array oder String (alles andere ergibt dieselbe leere Liste). */
+  private cfgJson(key: string): Prisma.Sql {
+    const k = PrismaStore.cfgKey(key);
+    return this.isPostgres
+      ? Prisma.raw(`CASE WHEN jsonb_typeof(("serializedDogConfig")::jsonb -> '${k}') IN ('array', 'string') THEN (("serializedDogConfig")::jsonb -> '${k}')::text END`)
+      : Prisma.raw(`CASE WHEN json_valid("serializedDogConfig") THEN CASE json_type("serializedDogConfig", '$.${k}') WHEN 'array' THEN json_extract("serializedDogConfig", '$.${k}') WHEN 'text' THEN json_quote(json_extract("serializedDogConfig", '$.${k}')) END END`);
+  }
+
+  public async findFirstOfType(type: string): Promise<{ id: string; lineageId: string | null; serializedDogConfig: string | null } | null> {
+    return this.prisma.dog.findFirst({
+      where: { type },
+      select: { id: true, lineageId: true, serializedDogConfig: true },
+    });
+  }
+
+  public async findReferenceHeads(type: string): Promise<ReferenceHeadRow[]> {
+    const dogColumns = type === 'KennelConfig'
+      ? Prisma.sql`"dogIds"`
+      : Prisma.sql`${this.cfgString('lineageId')} AS "cfgLineageId", ${this.cfgJson('parentsRequired')} AS "parentsRequired", ${this.cfgJson('parentsOptional')} AS "parentsOptional"`;
+    const rows = await this.prisma.$queryRaw<any[]>(Prisma.sql`
+      SELECT "id", "lineageId", "ownerId", "createdAt", ${dogColumns} FROM (
+        SELECT *, ROW_NUMBER() OVER (
+          PARTITION BY COALESCE("lineageId", "id")
+          ORDER BY ("createdAt" IS NULL), "createdAt" DESC, "id" DESC
+        ) AS rn
+        FROM "Dog" WHERE "type" = ${type}
+      ) t WHERE rn = 1
+    `);
+    return rows.map((r: any) => ({
+      id: r.id,
+      lineageId: r.lineageId ?? null,
+      ownerId: r.ownerId ?? null,
+      createdAt: r.createdAt ?? null,
+      ...(type === 'KennelConfig'
+        ? { dogIds: r.dogIds ?? null }
+        : { cfgLineageId: r.cfgLineageId ?? null, parentsRequired: r.parentsRequired ?? null, parentsOptional: r.parentsOptional ?? null }),
+    }));
+  }
+
+  public async findReferenceTarget(id: string): Promise<ReferenceTargetRow | null> {
+    const rows = await this.prisma.$queryRaw<any[]>(Prisma.sql`
+      SELECT "id", "lineageId",
+        CASE WHEN ${PrismaStore.KENNELISH} THEN 1 ELSE 0 END AS "kennelish",
+        CASE WHEN "serializedDogConfig" IS NOT NULL AND "serializedDogConfig" <> '' THEN 1 ELSE 0 END AS "hasConfig",
+        ${this.cfgString('lineageId')} AS "cfgLineageId"
+      FROM "Dog" WHERE "id" = ${id}
+    `);
+    const r = rows[0];
+    if (!r) return null;
+    return {
+      id: r.id,
+      lineageId: r.lineageId ?? null,
+      kennelish: Number(r.kennelish) === 1,
+      hasConfig: Number(r.hasConfig) === 1,
+      cfgLineageId: r.cfgLineageId ?? null,
+    };
+  }
+
+  public async lineageExists(lineageId: string): Promise<boolean> {
+    return (await this.prisma.dog.findFirst({ where: { lineageId }, select: { id: true } })) !== null;
+  }
+
+  public async findLatestKennelCrews(): Promise<Array<{ dogIds: string | null; serializedDogConfig: string | null }>> {
+    // Dieselbe Zeilenmenge und Reihenfolge wie findLatestVersionsByType('KennelConfig') ohne ids, nur ohne
+    // nodes/edges/task/defaults. serializedDogConfig ist bei Kennels leer, traegt aber die Altform (dogIds/lineageId).
+    const rows = await this.prisma.dog.findMany({
+      where: { type: 'KennelConfig' },
+      select: { id: true, lineageId: true, createdAt: true, dogIds: true, serializedDogConfig: true },
+    });
+    return this.getLatestVersionsForAll(rows).map((r: any) => ({ dogIds: r.dogIds ?? null, serializedDogConfig: r.serializedDogConfig ?? null }));
+  }
+
+  public async findVersionHeaders(type: string, lineageIds?: string[]): Promise<VersionHeaderRow[]> {
+    if (lineageIds && lineageIds.length === 0) return [];
+    const only = lineageIds
+      ? Prisma.sql`AND ("lineageId" IN (${Prisma.join(lineageIds)}) OR "id" IN (${Prisma.join(lineageIds)}))`
+      : Prisma.empty;
+    // parentId/updatedAt nur, wo formatTypeRow sie auch zeigt (Kennel-Form) — die Sieger-Wahl sieht so
+    // dieselben Felder wie mit den vollen Zeilen. Die Weiche in JS: ein CASE um "updatedAt" verliert in
+    // SQLite den DATETIME-Typ (Prisma liefert dann BigInt statt Date).
+    const rows = await this.prisma.$queryRaw<any[]>(Prisma.sql`
+      SELECT "id", "lineageId", "parentId", "createdAt", "updatedAt",
+        CASE WHEN ${PrismaStore.KENNELISH} THEN 1 ELSE 0 END AS "kennelish"
+      FROM "Dog" WHERE "type" = ${type} ${only}
+    `);
+    return rows.map((r) => {
+      const kennelish = Number(r.kennelish) === 1;
+      return {
+        id: r.id,
+        lineageId: r.lineageId ?? null,
+        parentId: kennelish ? r.parentId ?? null : undefined,
+        createdAt: r.createdAt ?? null,
+        updatedAt: kennelish ? r.updatedAt ?? null : undefined,
+      };
+    });
+  }
+
+  /** Dieselbe Weiche wie formatTypeRow: eine Zeile mit Kennel-Spalten hat Kennel-Form. */
+  private static readonly KENNELISH = Prisma.raw(`("name" IS NOT NULL OR "description" IS NOT NULL OR "dogIds" IS NOT NULL OR "emoji" IS NOT NULL
+    OR "task" IS NOT NULL OR "nodes" IS NOT NULL OR "edges" IS NOT NULL)`);
+
+  public async findRowsByIds(ids: string[]): Promise<Array<any>> {
+    const out: any[] = [];
+    for (let i = 0; i < ids.length; i += PrismaStore.ID_BATCH) {
+      const batch = ids.slice(i, i + PrismaStore.ID_BATCH);
+      const rows = await this.prisma.dog.findMany({ where: { id: { in: batch } } });
+      for (const r of rows) out.push(this.formatTypeRow(r));
+    }
+    return out;
+  }
+
+  /** IN-Listen in Bloecken: SQLite deckelt die Zahl gebundener Parameter. */
+  private static readonly ID_BATCH = 500;
+
+  public async findLatestMetaByType(type: string): Promise<Array<any>> {
+    // Die Konfig reist nur mit, wenn listLatest sie fuer eine Spalte braucht: leere lineageId/displayName
+    // (Altbestand) oder ACL-Schluessel im JSON (die gewinnen bei leerer Spalte). LIKE laeuft in der DB.
+    const needsConfig = Prisma.raw(`"lineageId" IS NULL OR "displayName" IS NULL
+      OR "serializedDogConfig" LIKE '%"visibility"%' OR "serializedDogConfig" LIKE '%"ownerId"%'
+      OR "serializedDogConfig" LIKE '%"editors"%' OR "serializedDogConfig" LIKE '%"viewers"%'
+      OR "serializedDogConfig" LIKE '%"runners"%' OR "serializedDogConfig" LIKE '%"frozen"%'`);
+    const rows = await this.prisma.$queryRaw<any[]>(Prisma.sql`
+      SELECT "id", "lineageId", "displayName", "visibility", "ownerId", "editors", "viewers", "runners", "frozen", "createdAt",
+        CASE WHEN ${needsConfig} THEN "serializedDogConfig" END AS "serializedDogConfig"
+      FROM (
+        SELECT *, ROW_NUMBER() OVER (
+          PARTITION BY COALESCE("lineageId", "id")
+          ORDER BY ("createdAt" IS NULL), "createdAt" DESC, "id" DESC
+        ) AS rn
+        FROM "Dog" WHERE "type" = ${type}
+      ) t WHERE rn = 1
+    `);
+    return rows.map((r: any) => ({
+      id: r.id,
+      lineageId: r.lineageId ?? null,
+      displayName: r.displayName ?? null,
+      visibility: r.visibility ?? null,
+      ownerId: r.ownerId ?? null,
+      editors: r.editors ?? null,
+      viewers: r.viewers ?? null,
+      runners: r.runners ?? null,
+      frozen: Boolean(r.frozen),
+      createdAt: r.createdAt ?? null,
+      serializedDogConfig: r.serializedDogConfig ?? null,
+    }));
+  }
+
+  public async findMimicHeads(): Promise<MimicHeadRow[]> {
+    // Alle Versionen, schmal, in DB-Reihenfolge — die Kopfwahl folgt danach exakt getLatestVersionsForAll
+    // (Gruppe: Spalte vor Konfig vor id; neuestes createdAt, bei Gleichstand die erste Zeile).
+    const rows = await this.prisma.$queryRaw<any[]>(Prisma.sql`
+      SELECT "id", "lineageId", "createdAt", "visibility", "ownerId", "editors", "viewers", "runners", "frozen",
+        ${this.cfgString('lineageId')} AS "cfgLineageId", ${this.cfgString('imitates')} AS "imitates"
+      FROM "Dog" WHERE "type" = 'MimicDog'
+    `);
+    const time = (row: any) => (row.createdAt ? new Date(row.createdAt).getTime() : 0);
+    const heads = new Map<string, any>();
+    for (const r of rows) {
+      const key = r.lineageId || r.cfgLineageId || r.id;
+      const existing = heads.get(key);
+      if (!existing || time(r) > time(existing)) heads.set(key, r);
+    }
+    return [...heads.values()].map((r: any) => ({
+      id: r.id,
+      lineageId: r.lineageId ?? null,
+      cfgLineageId: r.cfgLineageId ?? null,
+      imitates: r.imitates ?? null,
+      createdAt: r.createdAt ?? null,
+      visibility: r.visibility ?? null,
+      ownerId: r.ownerId ?? null,
+      editors: r.editors ?? null,
+      viewers: r.viewers ?? null,
+      runners: r.runners ?? null,
+      frozen: Boolean(r.frozen),
+    }));
   }
 
   /**

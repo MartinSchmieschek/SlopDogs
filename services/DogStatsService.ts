@@ -38,10 +38,13 @@ export interface DogUsage {
 /** Ein Dog, wie ihn Listen und Einzelantworten tragen: Schluessel = lineageId, sonst id (`base:X`). */
 export type StatsDog = { id: string; lineageId?: string; ownerId?: string | null };
 
-/** Woher usageOf Namen und Rechte der Kennels und Dogs bekommt (listLatest der Controller). */
+/**
+ * Woher usageOf Namen und Rechte der Kennels und Dogs bekommt (Kopfversionen der Controller). usageOf nennt
+ * die Lineages, die es braucht — die Quelle darf mehr liefern, usageOf liest nur diese Schluessel.
+ */
 export interface DogStatsDirectory {
-    listKennels(): Promise<any[]>;
-    listDogs(): Promise<any[]>;
+    listKennels(lineageIds: string[]): Promise<any[]>;
+    listDogs(lineageIds: string[]): Promise<any[]>;
 }
 
 /** Die Groessen der Formel (4b.6). */
@@ -160,9 +163,12 @@ export class DogStatsService {
         const memo = await this.current();
         const dogKey = dogKeyOfNode(node);
         const reuse = this.reuseOf(memo, dogKey);
+        // Nur die Kennels und Dogs, die usage nennt — nicht alle Kopfversionen samt Code (OOM 2026-10-08).
+        const kennelIds = [...reuse.transitive];
+        const dependentIds = [...reuse.dependents.keys()];
         const [kennels, dogs, calls] = await Promise.all([
-            this.directory ? this.directory.listKennels() : Promise.resolve([]),
-            this.directory ? this.directory.listDogs() : Promise.resolve([]),
+            this.directory && kennelIds.length > 0 ? this.directory.listKennels(kennelIds) : Promise.resolve([]),
+            this.directory && dependentIds.length > 0 ? this.directory.listDogs(dependentIds) : Promise.resolve([]),
             this.store.readDogKennelUsage(memo.sinceDay, dogKey),
         ]);
         const counts = new Map(calls.map((c) => [c.kennelLineageId, { count30d: c.count30d, failures30d: c.failures30d }]));

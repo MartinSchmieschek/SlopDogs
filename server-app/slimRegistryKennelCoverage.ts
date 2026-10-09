@@ -29,7 +29,8 @@ function parseDogIdsFromKennelRow(row: any): string[] {
 
 /** Alle `base:…`-Kurznamen aus den jeweils neuesten Kennel-Versionen (pro Lineage). */
 export async function collectBaseDogNamesFromLatestKennels(kennelsStore: IStore): Promise<Set<string>> {
-    const rows = await kennelsStore.findLatestVersionsByType('KennelConfig');
+    // Nur die Crew der Kopfversionen — nodes/edges/task/defaults braucht der Abgleich nicht.
+    const rows = await kennelsStore.findLatestKennelCrews();
     const names = new Set<string>();
     for (const row of rows) {
         for (const id of parseDogIdsFromKennelRow(row)) {

@@ -29,6 +29,8 @@ import {
     DogWorkerGate,
     type MemoryProbe,
     resolveVmTimeoutMs,
+    limitFetchBody,
+    resolveDogFetchMaxBodyBytes,
     type DogRunReport,
     type ICacheHandler,
 } from '@slopdogs/core';
@@ -360,6 +362,10 @@ export class StartupTest {
             await this.testDogRunClassification(baseDogsMap);
             await this.testMemoryGuardBackpressure();
             await this.testWorkerSlotReleasedOnExit(baseDogsMap);
+            await this.testRuntimeMemoryGuardKillsYoungest();
+            await this.testRuntimeMemoryGuardInRealRun(baseDogsMap);
+            await this.testFetchBodyLimit(baseDogsMap);
+            await this.testWorkerHeapCapEffective(baseDogsMap);
             await this.testWatchpostLogic();
             await this.testWatchpostThreadSeesBlockedMainThread();
             await this.testAliasContextHoldsNoProxy(baseDogsMap);
@@ -371,6 +377,8 @@ export class StartupTest {
             await this.testDogCounterCost(nodesStore, kennelsController as KennelController, baseDogsMap);
             await this.testReferenceDerivation(nodesStore, kennelsStore, dogStatsStore, baseDogsMap);
             await this.testReferenceRebuildIdempotent(nodesStore, kennelsStore, dogStatsStore, baseDogsMap);
+            await this.testRebuildReadsNarrowAndReplaysWrites(nodesStore, dogStatsStore, baseDogsMap);
+            await this.testNarrowReadsMatchFullRows(nodesStore, kennelsStore, nodesController, kennelsController as KennelController, dogStatsStore, baseDogsMap);
             await this.testDogDeleteClearsStats(nodesStore, kennelsStore, statsStore, dogStatsStore, baseDogsMap);
             await this.testDogReuseAndUsage();
             await this.testProvenFormula();
@@ -2090,6 +2098,189 @@ export class StartupTest {
                 gate.setMemoryProbe(null);
                 restoreGuard();
             }
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        } finally {
+            if (sampler) clearInterval(sampler);
+            restore();
+        }
+    }
+
+    /**
+     * Test OOM 1: Laufzeit-Waechter — misst nur, solange beendbare Isolate leben; ueber der harten Schwelle erst
+     * GC, dann wird das JUENGSTE beendet (Marker, Klasse oom), je Takt eines; abgeschaltet beendet er nichts;
+     * Isolate ohne kill-Rueckruf faesst er nie an.
+     */
+    private async testRuntimeMemoryGuardKillsYoungest(): Promise<void> {
+        const testName = 'OOM 1: Laufzeit-Waechter beendet das juengste Isolat, Timer nur solange Isolate leben';
+        const gate = new DogWorkerGate();
+        const restore = this.withEnv({
+            MEMORY_GUARD: '1', MEMORY_LIMIT_MB: '512', MEMORY_HARD_LIMIT_MB: '400', MEMORY_RUNTIME_CHECK_MS: '20',
+            MEMORY_GUARD_GC_MIN_INTERVAL_MS: '0', DOG_WORKER_GLOBAL_LIMIT: '4',
+        });
+        try {
+            let rss = 300;
+            const meter = this.fakeMemoryProbe(() => rss);
+            gate.setMemoryProbe(meter.probe);
+            const killed: string[] = [];
+            const spawn = async (name: string) => {
+                const lease = await gate.acquire();
+                const handle: ReturnType<DogWorkerGate['isolateSpawned']> = gate.isolateSpawned(lease, { storageId: name, name }, (err) => {
+                    killed.push(`${name}:${err.message}`);
+                    handle.terminating();
+                    setTimeout(() => handle.exited(), 5);
+                });
+                return handle;
+            };
+            const plain = gate.isolateSpawned(await gate.acquire());
+            if (gate.runtimeGuardActive) throw new Error('Timer laeuft ohne beendbares Isolat');
+            const older = await spawn('older');
+            await spawn('younger');
+            if (!gate.runtimeGuardActive) throw new Error('Timer laeuft nicht trotz lebender Isolate');
+            await new Promise((r) => setTimeout(r, 80));
+            if (killed.length) throw new Error(`unter der Schwelle beendet: ${killed.join(' | ')}`);
+
+            rss = 450;
+            await this.waitUntil(() => killed.length > 0, 1_000);
+            if (killed.length !== 1 || !killed[0].startsWith('younger:')) throw new Error(`nicht das juengste beendet: ${killed.join(' | ')}`);
+            if (!killed[0].includes(DOG_MEMPRESSURE_MARKER) || classifyDogError(killed[0]) !== 'oom') throw new Error(`Fehler ohne Marker/oom: ${killed[0]}`);
+            if (meter.gcCalls() < 1) throw new Error('kein GC-Versuch vor dem Beenden');
+            if (!LeadOutcome.fromWaves([[{ id: 'lead', error: killed[0] }]] as any, 'lead').memoryPressure) throw new Error('Lead-Ausgang erkennt den Speicherdruck nicht (503-Pfad)');
+
+            rss = 300;
+            await new Promise((r) => setTimeout(r, 80));
+            if (killed.length !== 1) throw new Error('nach Entlastung weiter beendet');
+            process.env.MEMORY_GUARD = '0';
+            rss = 450;
+            await new Promise((r) => setTimeout(r, 80));
+            if (killed.length !== 1) throw new Error('abgeschaltet trotzdem beendet');
+            process.env.MEMORY_GUARD = '1';
+            rss = 300;
+
+            older.terminating();
+            older.exited();
+            await this.waitUntil(() => !gate.runtimeGuardActive, 500);
+            if (gate.runtimeGuardActive) throw new Error('Timer laeuft nach dem letzten beendbaren Isolat weiter');
+            plain.exited();
+            const stats = gate.stats();
+            if (stats.memoryRuntimeKillsSinceBoot !== 1) throw new Error(`runtime kills ${stats.memoryRuntimeKillsSinceBoot} statt 1`);
+            if (stats.liveIsolates !== 0 || stats.slotsActive !== 0) throw new Error(`Reste: ${JSON.stringify(stats)}`);
+            if (stats.memoryHardLimitMb !== 400) throw new Error(`hardLimit ${stats.memoryHardLimitMb}`);
+            delete process.env.MEMORY_HARD_LIMIT_MB;
+            if (DogWorkerGate.memoryHardLimitMb() !== 416) throw new Error(`Default-Schwelle ${DogWorkerGate.memoryHardLimitMb()} statt 512 - 96`);
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        } finally {
+            gate.setMemoryProbe(null);
+            restore();
+        }
+    }
+
+    /**
+     * Test OOM 2: echter Dog — zugelassen unter dem Soft-Limit, waehrend er rechnet steigt die RSS ueber die harte
+     * Schwelle: der Laufzeit-Waechter beendet ihn, der Lauf scheitert als oom mit Marker (statt bis zum Timeout zu
+     * laufen oder den Container zu toeten); danach kein Isolat, kein Slot, kein Timer.
+     */
+    private async testRuntimeMemoryGuardInRealRun(baseDogsMap: Map<string, any>): Promise<void> {
+        const testName = 'OOM 2: Laufzeit-Waechter beendet einen laufenden Dog (oom, Marker), Prozess lebt';
+        const gate = DogWorkerGate.shared;
+        const restore = this.withEnv({
+            MEMORY_GUARD: '1', MEMORY_SOFT_LIMIT_MB: '100000', MEMORY_HARD_LIMIT_MB: '400', MEMORY_RUNTIME_CHECK_MS: '50',
+            MEMORY_GUARD_GC_MIN_INTERVAL_MS: '0',
+        });
+        let rss = 100;
+        let raise: ReturnType<typeof setTimeout> | null = null;
+        try {
+            gate.setMemoryProbe(this.fakeMemoryProbe(() => rss).probe);
+            const hog = this.p4bDog('OomRuntimeHog', 'const until = Date.now() + 8000; while (Date.now() < until) { /* spin */ } return 1;');
+            const { run, reports } = this.p4bRun(baseDogsMap, [hog.lineageId as string], [hog]);
+            const before = gate.stats().memoryRuntimeKillsSinceBoot;
+            raise = setTimeout(() => { rss = 999; }, 300);
+            const t0 = Date.now();
+            await run.run();
+            const tookMs = Date.now() - t0;
+            const message = String(reports[0]?.errorMessage);
+            if (reports[0]?.outcome !== 'oom' || !message.includes(DOG_MEMPRESSURE_MARKER) || !message.includes('runtime guard')) {
+                throw new Error(`Report: ${JSON.stringify(reports.map((r) => [r.outcome, r.errorMessage]))}`);
+            }
+            if (tookMs > 5_000) throw new Error(`Dog lief ${tookMs} ms — nicht beendet`);
+            if (gate.stats().memoryRuntimeKillsSinceBoot !== before + 1) throw new Error('Beenden nicht gezaehlt');
+            await this.waitUntil(() => gate.stats().liveIsolates === 0 && !gate.runtimeGuardActive, 3_000);
+            const after = gate.stats();
+            if (after.liveIsolates !== 0 || after.slotsActive !== 0 || gate.runtimeGuardActive) throw new Error(`Reste: ${JSON.stringify(after)}, Timer ${gate.runtimeGuardActive}`);
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        } finally {
+            if (raise) clearTimeout(raise);
+            gate.setMemoryProbe(null);
+            restore();
+        }
+    }
+
+    /**
+     * Test OOM 5: fetch-Body-Deckel — Content-Length ueber dem Deckel bricht sofort ab, ein Body ohne Laenge beim
+     * Streamen nach gezaehlten Bytes, kleine Antworten bleiben unberuehrt; im echten Dog-Lauf (data:-URL, der
+     * Worker blockt lokale Netze) scheitert der Dog mit fetch_body_too_large, der kleine liefert seinen Wert.
+     */
+    private async testFetchBodyLimit(baseDogsMap: Map<string, any>): Promise<void> {
+        const testName = 'OOM 5: fetch-Body-Deckel (Content-Length, gezaehlte Bytes, echter Dog-Lauf)';
+        const restore = this.withEnv({ DOG_FETCH_MAX_BODY_MB: '1' });
+        try {
+            const max = 1000;
+            let declared: unknown = null;
+            try { limitFetchBody(new Response('x'.repeat(10), { headers: { 'content-length': '2000' } }), max); } catch (e) { declared = e; }
+            if (!String(declared).includes('fetch_body_too_large')) throw new Error(`Content-Length nicht abgewiesen: ${declared}`);
+            const chunked = new ReadableStream<Uint8Array>({
+                start(controller) { for (let i = 0; i < 3; i++) controller.enqueue(new Uint8Array(600)); controller.close(); },
+            });
+            const streamed = await limitFetchBody(new Response(chunked), max).text().then(() => null, (e) => e);
+            if (!String(streamed).includes('fetch_body_too_large')) throw new Error(`Body ohne Laenge nicht abgebrochen: ${streamed}`);
+            const small = await limitFetchBody(new Response('klein', { status: 201 }), max);
+            if (small.status !== 201 || (await small.text()) !== 'klein') throw new Error('kleine Antwort veraendert');
+            if (resolveDogFetchMaxBodyBytes() !== 1024 * 1024) throw new Error(`Deckel aus Env: ${resolveDogFetchMaxBodyBytes()}`);
+
+            const big = this.p4bDog('OomFetchBig', "const r = await fetch('data:text/plain,' + 'a'.repeat(3 * 1024 * 1024)); return (await r.text()).length;");
+            const fine = this.p4bDog('OomFetchSmall', "const r = await fetch('data:text/plain,' + 'b'.repeat(100)); return (await r.text()).length;");
+            const { run, reports } = this.p4bRun(baseDogsMap, [big.lineageId as string, fine.lineageId as string], [big, fine]);
+            await run.run();
+            const bigReport = reports.find((r) => r.dog === big);
+            if (bigReport?.outcome !== 'error' || !String(bigReport.errorMessage).includes('fetch_body_too_large')) {
+                throw new Error(`grosser Body: ${JSON.stringify(reports.map((r) => [r.dog.name, r.outcome, r.errorMessage]))}`);
+            }
+            if (fine.collected !== 100) throw new Error(`kleiner Body: ${JSON.stringify(fine.collected)}`);
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        } finally {
+            restore();
+        }
+    }
+
+    /**
+     * Test OOM 6: der Worker-Heap-Deckel greift trotz --max-old-space-size am Prozess. Ohne die Freigabe des
+     * Flags waechst ein Dog mit DOG_WORKER_MAX_HEAP_MB=32 bis zur Grenze des HAUPT-Prozesses (gemessen +359 MB
+     * bei 320); mit ihr endet er als oom nahe seinem Deckel.
+     */
+    private async testWorkerHeapCapEffective(baseDogsMap: Map<string, any>): Promise<void> {
+        const testName = 'OOM 6: Worker-Heap-Deckel wirkt trotz --max-old-space-size (oom statt Prozess-Grenze)';
+        const restore = this.withEnv({ DOG_WORKER_MAX_HEAP_MB: '32' });
+        let sampler: ReturnType<typeof setInterval> | null = null;
+        try {
+            const hog = this.p4bDog('OomHeapHog', 'const a = []; for (;;) a.push({ s: "y".repeat(64) + a.length });');
+            const { run, reports } = this.p4bRun(baseDogsMap, [hog.lineageId as string], [hog]);
+            (globalThis as any).gc?.();
+            const base = process.memoryUsage().rss;
+            let peak = base;
+            sampler = setInterval(() => { peak = Math.max(peak, process.memoryUsage().rss); }, 5);
+            await run.run();
+            clearInterval(sampler);
+            sampler = null;
+            const growthMb = Math.round((peak - base) / 1048576);
+            if (reports[0]?.outcome !== 'oom') throw new Error(`Report: ${JSON.stringify(reports.map((r) => [r.outcome, r.errorMessage]))}`);
+            if (growthMb > 150) throw new Error(`Worker wuchs um ${growthMb} MB RSS bei Deckel 32 MB — Prozess-Flag sticht resourceLimits`);
             this.addResult(testName, true);
         } catch (error) {
             this.addResult(testName, false, String(error));
@@ -6052,6 +6243,155 @@ export class StartupTest {
             this.addResult(testName, false, String(error));
         } finally {
             try { await kennels.delete(kennelId); } catch { /* ignore */ }
+        }
+    }
+
+    /**
+     * Test OOM 3: der Rebuild liest schmal — kein findLatestByType/load/findByLineageId/findByType ueber die volle
+     * Zeile; und ein Controller-Schreibzugriff WAEHREND des Rebuilds ueberlebt ihn (Nachspielen statt Ueberschreiben).
+     */
+    private async testRebuildReadsNarrowAndReplaysWrites(nodesStore: IStore, dogStore: IDogStatsStore, baseDogsMap: Map<string, any>): Promise<void> {
+        const testName = 'OOM 3: Rebuild liest schmal, Schreibzugriffe waehrend des Rebuilds bleiben';
+        const key = `test-oom-replay-${Date.now()}`;
+        const fullReads = ['findLatestByType', 'load', 'findByLineageId', 'findByType', 'findLatestVersionsByType'];
+        const calls: string[] = [];
+        const spy = new Proxy(nodesStore as any, {
+            get(target, prop) {
+                const value = target[prop];
+                if (typeof value !== 'function') return value;
+                return (...args: unknown[]) => {
+                    if (fullReads.includes(String(prop))) calls.push(String(prop));
+                    return value.apply(target, args);
+                };
+            },
+        }) as IStore;
+        const refIndex = new DogReferenceIndex(dogStore, spy, baseDogsMap);
+        try {
+            const report = await refIndex.rebuild();
+            if (calls.length) throw new Error(`volle Lesewege im Rebuild: ${calls.join(', ')}`);
+            const reference = await new DogReferenceIndex(dogStore, nodesStore, baseDogsMap).rebuild();
+            if (report.rows !== reference.rows || report.kennels !== reference.kennels || report.dogs !== reference.dogs) {
+                throw new Error(`zwei Rebuilds verschieden: ${JSON.stringify(report)} / ${JSON.stringify(reference)}`);
+            }
+
+            const pending = refIndex.rebuild();
+            if (!refIndex.isRebuilding) throw new Error('isRebuilding nicht gesetzt');
+            await refIndex.replaceKennelRefs(key, 'UO', ['base:QueryRetriever']);
+            await pending;
+            if (refIndex.isRebuilding) throw new Error('isRebuilding bleibt gesetzt');
+            const crew = await this.refsFrom(dogStore, 'kennel', key);
+            if (crew !== 'crew:base:QueryRetriever@0/1') throw new Error(`Schreibzugriff waehrend des Rebuilds verloren: "${crew}"`);
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        } finally {
+            try { await refIndex.removeFrom('kennel', key); } catch { /* ignore */ }
+        }
+    }
+
+    /**
+     * Test OOM 4: jeder schmale Leseweg liefert dasselbe wie die volle Ableitung auf derselben DB — Referenz-Koepfe
+     * (auch mit Altformen: parents als JSON-String, Zahl, lineageId nur in der Konfig), Referenzziele, Seed-Pruefung,
+     * Kennel-Crews, Kennel-Liste (Sieger-Wahl), Kennel-Teilliste, Dog-Metadaten und Mimic-Kandidaten.
+     */
+    private async testNarrowReadsMatchFullRows(
+        nodesStore: IStore, kennelsStore: IStore, nodesController: AbstractController<any>, kennelsController: KennelController,
+        dogStore: IDogStatsStore, baseDogsMap: Map<string, any>,
+    ): Promise<void> {
+        const testName = 'OOM 4: schmale Lesewege = volle Ableitung (Koepfe, Ziele, Listen, Meta, Mimics)';
+        const created: string[] = [];
+        // Dieselbe Lesart wie DogReferenceIndex: stringList(parseJson(x)).
+        const parse = (v: unknown) => { if (typeof v !== 'string') return v ?? null; try { return JSON.parse(v); } catch { return null; } };
+        const list = (raw: unknown): string[] => {
+            const value = Array.isArray(raw) ? raw : parse(raw);
+            return Array.isArray(value) ? value.filter((x): x is string => typeof x === 'string' && x.length > 0) : [];
+        };
+        const headKey = (h: any) => JSON.stringify({
+            id: h.id, lineageId: h.lineageId, ownerId: h.ownerId, at: h.createdAt ? new Date(h.createdAt).getTime() : null,
+            dogIds: list(h.dogIds ?? null), cfgLineageId: h.cfgLineageId ?? null,
+            req: list(parse(h.parentsRequired ?? null)), opt: list(parse(h.parentsOptional ?? null)),
+        });
+        try {
+            const save = async (id: string, lineageCol: string | null, cfg: Record<string, unknown>) => {
+                await nodesStore.save({ id, type: SerializedDog.name, lineageId: lineageCol, displayName: 'OomNarrow', serializedDogConfig: JSON.stringify(cfg), createdAt: new Date() });
+                created.push(id);
+            };
+            const v1 = generateVersionId(); const l1 = generateLineageId();
+            await save(v1, l1, { id: v1, lineageId: l1, theRun: 'return 1;', parentsRequired: JSON.stringify(['QueryRetriever', 'oom-x-guid']), parentsOptional: 5 });
+            const v2 = generateVersionId(); const l2 = generateLineageId();
+            await save(v2, null, { id: v2, lineageId: l2, theRun: 'return 2;', parentsRequired: ['BodyRetriever'], parentsOptional: 'kein-json' });
+
+            for (const type of ['KennelConfig', SerializedDog.name, MimicDog.name]) {
+                const narrow = new Map((await nodesStore.findReferenceHeads(type)).map((h) => [h.id, headKey(h)]));
+                const full = new Map((await nodesStore.findLatestByType(type)).map((r: any) => [r.id, headKey(DogReferenceIndex.headFromFullRow(type, r))]));
+                if (narrow.size !== full.size) throw new Error(`${type}: ${narrow.size} schmale / ${full.size} volle Koepfe`);
+                for (const [id, k] of full) if (narrow.get(id) !== k) throw new Error(`${type} ${id}: schmal ${narrow.get(id)} / voll ${k}`);
+            }
+            if (!JSON.parse(headKey((await nodesStore.findReferenceHeads(SerializedDog.name)).find((h) => h.id === v1))).req.includes('oom-x-guid')) {
+                throw new Error('parents als JSON-String nicht gelesen');
+            }
+
+            const refIndex = new DogReferenceIndex(dogStore, nodesStore, baseDogsMap);
+            const norm = async (raw: string) => JSON.stringify(await refIndex.normalize(raw));
+            if (await norm(v1) !== JSON.stringify({ toKey: l1, resolved: 1 })) throw new Error(`Version v1: ${await norm(v1)}`);
+            if (await norm(v2) !== JSON.stringify({ toKey: l2, resolved: 1 })) throw new Error(`Version v2 (Lineage nur in Konfig): ${await norm(v2)}`);
+            if (await norm(l1) !== JSON.stringify({ toKey: l1, resolved: 1 })) throw new Error(`Lineage l1: ${await norm(l1)}`);
+            const missing = `oom-missing-${Date.now()}`;
+            if (await norm(missing) !== JSON.stringify({ toKey: missing, resolved: 0 })) throw new Error(`unbekannt: ${await norm(missing)}`);
+
+            for (const type of [SerializedDog.name, 'KennelConfig']) {
+                const first = await nodesStore.findFirstOfType(type);
+                const all = await nodesStore.findByType(type);
+                if ((first?.id ?? null) !== (all[0]?.id ?? null)) throw new Error(`findFirstOfType(${type}) ${first?.id} statt ${all[0]?.id}`);
+            }
+            const crews = await kennelsStore.findLatestKennelCrews();
+            const crewsFull = (await kennelsStore.findLatestVersionsByType('KennelConfig')).map((r: any) => ({ dogIds: r.dogIds ?? null, serializedDogConfig: r.serializedDogConfig ?? null }));
+            if (JSON.stringify(crews) !== JSON.stringify(crewsFull)) throw new Error('Kennel-Crews schmal != voll');
+
+            // Kennel-Liste: dieselbe Sieger-Wahl wie mit findByType ueber alle vollen Versionen.
+            const pick = (rows: any[]) => (kennelsController as any).pickLatestKennelStoreRow(rows);
+            const byLineage = new Map<string, any[]>();
+            for (const r of (await kennelsStore.findByType('KennelConfig')) as any[]) {
+                const k = r.lineageId || r.id;
+                if (!byLineage.has(k)) byLineage.set(k, []);
+                byLineage.get(k)!.push(r);
+            }
+            const legacy = [...byLineage.values()].map((g) => {
+                const row = pick(g);
+                const parsed = (kennelsController as any).parseEntity(row);
+                if (row.id) parsed.id = row.id;
+                parsed.lineageId = row.lineageId;
+                return parsed;
+            });
+            const listed = (await kennelsController.list()).data ?? [];
+            if (JSON.stringify(listed) !== JSON.stringify(legacy)) throw new Error(`Kennel-Liste weicht ab (${listed.length} / ${legacy.length})`);
+            const some = listed.slice(0, 3).map((k: any) => k.lineageId || k.id);
+            const part = (await kennelsController.listLatestOf(some)).data ?? [];
+            if (JSON.stringify(part) !== JSON.stringify(listed.filter((k: any) => some.includes(k.lineageId || k.id)))) throw new Error('Kennel-Teilliste weicht ab');
+
+            // Dog-Metadaten: Rechte, Name, Schluessel wie listLatest; Teilliste wie gefilterte Liste.
+            const fields = (d: any) => JSON.stringify(['id', 'lineageId', 'displayName', 'visibility', 'ownerId', 'editors', 'viewers', 'runners', 'frozen'].map((f) => d[f] ?? null));
+            const meta = new Map(((await nodesController.listLatestMeta()).data ?? []).map((d: any) => [d.lineageId || d.id, fields(d)]));
+            const fullDogs = (await nodesController.listLatest()).data ?? [];
+            if (meta.size !== fullDogs.length) throw new Error(`Dog-Meta ${meta.size} / voll ${fullDogs.length}`);
+            for (const d of fullDogs as any[]) if (meta.get(d.lineageId || d.id) !== fields(d)) throw new Error(`Dog-Meta ${d.lineageId}: ${meta.get(d.lineageId || d.id)} / ${fields(d)}`);
+            const of = ((await nodesController.listLatest(undefined, [l1, l2])).data ?? []).filter((d: any) => [l1, l2].includes(d.lineageId || d.id));
+            const ofFull = (fullDogs as any[]).filter((d) => [l1, l2].includes(d.lineageId || d.id));
+            if (JSON.stringify(of) !== JSON.stringify(ofFull)) throw new Error('Dog-Teilliste weicht ab');
+
+            // Mimic-Kandidaten: schmal == voll, Konfig des Kandidaten gleich.
+            const handler: any = new KennelRunHandler({ kennelsController, nodesStore, baseDogsMap, callCounter: this.testCallCounter });
+            const shape = async (c: any) => JSON.stringify([c.versionId, c.lineageId, c.createdAt, c.imitates, c.acl, await c.loadCfg()]);
+            const narrowMimics = await Promise.all((await handler.readMimicCandidates()).map(shape));
+            const fullMimics = await Promise.all((await handler.readMimicCandidatesFull()).filter((c: any) => c.imitates !== null).map(shape));
+            if (JSON.stringify(narrowMimics) !== JSON.stringify(fullMimics)) throw new Error(`Mimic-Kandidaten weichen ab (${narrowMimics.length} / ${fullMimics.length})`);
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        } finally {
+            for (const id of created) {
+                try { await nodesStore.delete(id); } catch { /* ignore */ }
+            }
         }
     }
 

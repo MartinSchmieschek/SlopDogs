@@ -1,3 +1,49 @@
+/** Kopfzeile fuer den Referenzindex — parents als JSON-Text (Array oder String-Wert), sonst null. */
+export interface ReferenceHeadRow {
+  id: string;
+  lineageId: string | null;
+  ownerId: string | null;
+  createdAt: Date | string | null;
+  /** KennelConfig: die dogIds-Spalte (JSON-String). */
+  dogIds?: string | null;
+  /** Dogs: lineageId aus der Konfig, nur wenn dort ein String steht. */
+  cfgLineageId?: string | null;
+  parentsRequired?: string | null;
+  parentsOptional?: string | null;
+}
+
+/** Ein Referenzziel: traegt die Zeile Kennel-Spalten, hat sie eine Konfig, welche Lineage nennt sie? */
+export interface ReferenceTargetRow {
+  id: string;
+  lineageId: string | null;
+  kennelish: boolean;
+  hasConfig: boolean;
+  cfgLineageId: string | null;
+}
+
+/** parentId/updatedAt sind undefined, wo formatTypeRow sie nicht zeigt (Zeile ohne Kennel-Spalten). */
+export interface VersionHeaderRow {
+  id: string;
+  lineageId: string | null;
+  parentId?: string | null;
+  createdAt: Date | string | null;
+  updatedAt?: Date | string | null;
+}
+
+export interface MimicHeadRow {
+  id: string;
+  lineageId: string | null;
+  cfgLineageId: string | null;
+  imitates: string | null;
+  createdAt: Date | string | null;
+  visibility: string | null;
+  ownerId: string | null;
+  editors: string | null;
+  viewers: string | null;
+  runners: string | null;
+  frozen: boolean;
+}
+
 /**
  * The eldritch contract of the Store — a pact sealed between our ship and the deep.
  * All who dare persist data in this realm must honour these rites.
@@ -21,7 +67,7 @@ export interface IStore {
    * erst durch den Prozess reisen.
    * @param type - The entity type (e.g. SerializedDog.name)
    */
-  findLatestByType(type: string, search?: string): Promise<Array<any>>;
+  findLatestByType(type: string, search?: string, lineageIds?: string[]): Promise<Array<any>>;
 
   /**
    * From the many incarnations that drift through branching time, retrieve only the newest —
@@ -55,6 +101,45 @@ export interface IStore {
    * @param lineageId - The lineage GUID that binds all incarnations
    */
   findByLineage(type: string, lineageId: string): Promise<Array<any>>;
+
+  // --- Schmale Lesewege: nur die Spalten, die der Aufrufer braucht, nie tsCode/Konfig im Ganzen ---
+
+  /** Irgendeine Zeile des Typs (erste in DB-Reihenfolge, wie `findByType(type)[0]`) — oder null. */
+  findFirstOfType(type: string): Promise<{ id: string; lineageId: string | null; serializedDogConfig: string | null } | null>;
+
+  /**
+   * Kopfzeilen fuer den Referenzindex: je Lineage die neueste (wie findLatestByType), aber nur
+   * id/lineageId/ownerId/createdAt, bei Kennels dogIds, bei Dogs lineageId und parents aus der Konfig.
+   */
+  findReferenceHeads(type: string): Promise<ReferenceHeadRow[]>;
+
+  /** Ein Referenzziel per PK: nur, was die Normalisierung braucht — oder null. */
+  findReferenceTarget(id: string): Promise<ReferenceTargetRow | null>;
+
+  /** Gibt es eine Zeile mit dieser lineageId? */
+  lineageExists(lineageId: string): Promise<boolean>;
+
+  /** Die Crew (dogIds) der neuesten Kennel-Version je Lineage — wie findLatestVersionsByType('KennelConfig'). */
+  findLatestKennelCrews(): Promise<Array<{ dogIds: string | null; serializedDogConfig: string | null }>>;
+
+  /**
+   * Alle Versionen eines Typs, nur Kopf-Metadaten (id, lineageId, parentId, createdAt, updatedAt) — fuer eine
+   * Sieger-Auswahl in JS. Mit lineageIds nur die Zeilen, deren lineageId oder id darin steht.
+   */
+  findVersionHeaders(type: string, lineageIds?: string[]): Promise<VersionHeaderRow[]>;
+
+  /** Volle Zeilen per PK, in der Form von findByType. Reihenfolge nicht garantiert. */
+  findRowsByIds(ids: string[]): Promise<Array<any>>;
+
+  /**
+   * Wie findLatestByType, aber ohne Konfig-Blob: id, lineageId, displayName, ACL-Spalten, createdAt. Die Konfig
+   * reist nur fuer Zeilen mit, deren Spalten-Werte aus ihr ergaenzt werden (lineageId/displayName leer, ACL-Schluessel
+   * im JSON) — die Ableitung bleibt so dieselbe wie bei findLatestByType.
+   */
+  findLatestMetaByType(type: string): Promise<Array<any>>;
+
+  /** Die neueste Version je MimicDog-Lineage, ohne Konfig: id, Lineage, createdAt, ACL, imitates. */
+  findMimicHeads(): Promise<MimicHeadRow[]>;
 
   /**
    * Freeze or unfreeze one row in place — no new version (P3.5, 8.25). Callers pass the

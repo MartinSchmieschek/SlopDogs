@@ -6,7 +6,7 @@
 // Aufrufern (Seeds, heal, cascadeVisibility, rename), denen die Bedeutung der Zeile fehlt. Was am
 // Controller vorbeigeht (Seeds), heilt der naechste Boot.
 import { BASE_DOG_PREFIX } from '@slopdogs/core';
-import type { IStore } from '../store/IStore';
+import type { IStore, ReferenceHeadRow } from '../store/IStore';
 import type { DogReferenceFromKind, DogReferenceKind, DogReferenceRow, IDogStatsStore } from '../store/IKennelStatsStore';
 import type { KennelCallCounter } from './KennelCallCounter';
 
@@ -25,6 +25,27 @@ export interface RebuildReport {
 }
 
 const DOG_TYPES = ['SerializedDog', 'MimicDog'] as const;
+/**
+ * Gleichzeitige PK-Lookups im Rebuild. Bewusst klein: der Rebuild laeuft nach listen() neben echten Anfragen
+ * und soll ihnen den 4er-Pool nicht wegnehmen; die Lookups sind schmal, die Dauer zaehlt wenig.
+ */
+const LOOKUP_CONCURRENCY = 2;
+
+/** fn ueber items, hoechstens limit gleichzeitig; Ergebnis in Eingangsreihenfolge. */
+async function mapBounded<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+    const out = new Array<R>(items.length);
+    let next = 0;
+    const worker = async (): Promise<void> => {
+        while (next < items.length) {
+            const index = next++;
+            out[index] = await fn(items[index]);
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+    return out;
+}
+
+type PendingWrite = { kind: DogReferenceFromKind; key: string; rows: DogReferenceRow[] | null };
 
 function parseJson(raw: unknown): any {
     if (typeof raw !== 'string') return raw ?? null;
@@ -44,6 +65,9 @@ export class DogReferenceIndex {
     private readonly listeners: Array<() => void> = [];
     /** Zeilen je Ursprung — der Zaehler fuer health_check.dogStats.referenceRows, ohne Query. */
     private readonly rowsBySource = new Map<string, number>();
+    private rebuilding = false;
+    /** Schreibzugriffe waehrend eines Rebuilds, je Ursprung der letzte — danach nachgespielt. */
+    private readonly writesDuringRebuild = new Map<string, PendingWrite>();
 
     constructor(
         private readonly store: IDogStatsStore,
@@ -91,6 +115,7 @@ export class DogReferenceIndex {
     async removeFrom(kind: DogReferenceFromKind, key: string): Promise<void> {
         await this.store.removeReferences(kind, key);
         this.rowsBySource.delete(sourceKey(kind, key));
+        if (this.rebuilding) this.writesDuringRebuild.set(sourceKey(kind, key), { kind, key, rows: null });
         this.changed();
     }
 
@@ -101,17 +126,38 @@ export class DogReferenceIndex {
         await this.removeFrom('dog', lineageId);
     }
 
+    /** Laeuft gerade ein Rebuild? Schreibt in der Zeit ein Controller, wird das danach nachgespielt. */
+    get isRebuilding(): boolean {
+        return this.rebuilding;
+    }
+
     /**
-     * Boot: aus den Kopfversionen (findLatestByType — SQL-Fenster, keine ueberholten Versionen) alle
-     * Zeilen ableiten und in EINER Transaktion ersetzen. Idempotent; heilt jede Drift (Seeds).
-     * Version-GUIDs, die keine Kopfversion sind, werden gebuendelt per PK-Lookup aufgeloest.
+     * Boot: aus den Kopfversionen (SQL-Fenster, keine ueberholten Versionen) alle Zeilen ableiten und in
+     * EINER Transaktion ersetzen. Idempotent; heilt jede Drift (Seeds). Geladen wird schmal — je Kopf nur
+     * id, Lineage, Owner und die Referenzlisten, nie tsCode — und Typ fuer Typ nacheinander, damit nie
+     * mehrere Ergebnismengen gleichzeitig in Query-Engine und Heap liegen. Version-GUIDs, die keine
+     * Kopfversion sind, werden mit hoechstens LOOKUP_CONCURRENCY parallelen PK-Lookups aufgeloest.
+     *
+     * Der Boot startet ihn NACH listen(): Controller-Schreibzugriffe waehrend des Rebuilds landen sofort in
+     * der Tabelle und werden nach seiner Transaktion noch einmal geschrieben — der Rebuild ueberschreibt
+     * sie also nicht mit seinem aelteren Stand.
      */
     async rebuild(): Promise<RebuildReport> {
         const startedAt = Date.now();
-        const [kennelRows, ...dogRowsByType] = await Promise.all([
-            this.nodesStore.findLatestByType('KennelConfig'),
-            ...DOG_TYPES.map((t) => this.nodesStore.findLatestByType(t)),
-        ]);
+        this.rebuilding = true;
+        this.writesDuringRebuild.clear();
+        try {
+            return await this.rebuildFromHeads(startedAt);
+        } finally {
+            this.rebuilding = false;
+            this.writesDuringRebuild.clear();
+        }
+    }
+
+    private async rebuildFromHeads(startedAt: number): Promise<RebuildReport> {
+        const kennelRows = await this.headsOf('KennelConfig');
+        const dogRowsByType: ReferenceHeadRow[][] = [];
+        for (const type of DOG_TYPES) dogRowsByType.push(await this.headsOf(type));
         const dogRows = DogReferenceIndex.oneHeadPerLineage(dogRowsByType.flat());
 
         // Was ohne Query aufloesbar ist: jede Kopf-Lineage und jede Kopf-Version.
@@ -133,19 +179,18 @@ export class DogReferenceIndex {
         for (const row of dogRows) {
             const key = DogReferenceIndex.dogLineageOf(row);
             if (!key) continue;
-            const cfg = parseJson(row.serializedDogConfig) ?? {};
             sources.push({
                 fromKind: 'dog', fromKey: key, ownerId: row.ownerId ?? null,
-                refs: [['required', stringList(cfg.parentsRequired)], ['optional', stringList(cfg.parentsOptional)]],
+                refs: [['required', stringList(parseJson(row.parentsRequired))], ['optional', stringList(parseJson(row.parentsOptional))]],
             });
         }
 
-        // Gebuendelt: jede noch unbekannte GUID genau einmal nachschlagen.
+        // Gebuendelt: jede noch unbekannte GUID genau einmal nachschlagen — begrenzt parallel.
         const unknown = new Set<string>();
         for (const s of sources) for (const [, list] of s.refs) for (const raw of list) {
             if (!this.baseKeyOf(raw) && !known.has(raw)) unknown.add(raw);
         }
-        const looked = await Promise.all([...unknown].map(async (raw) => [raw, await this.lookup(raw)] as const));
+        const looked = await mapBounded([...unknown], LOOKUP_CONCURRENCY, async (raw) => [raw, await this.lookup(raw)] as const);
         const resolvedLater = new Map<string, NormalizedRef>(looked);
 
         const rows: DogReferenceRow[] = [];
@@ -168,8 +213,47 @@ export class DogReferenceIndex {
             if (count > 0) this.rowsBySource.set(sourceKey(s.fromKind, s.fromKey), count);
         }
         await this.store.rebuildReferences(rows);
+        await this.replayWritesDuringRebuild();
         this.changed();
         return { rows: rows.length, kennels: kennelRows.length, dogs: dogRows.length, durationMs: Date.now() - startedAt };
+    }
+
+    /** Schmale Kopfzeilen; scheitert der schmale Weg (Postgres: ungueltiges JSON im Cast), der alte volle. */
+    private async headsOf(type: string): Promise<ReferenceHeadRow[]> {
+        try {
+            return await this.nodesStore.findReferenceHeads(type);
+        } catch (err) {
+            console.warn(`[DogReferenceIndex] schmale Kopfzeilen fuer ${type} gescheitert, voller Weg:`, err instanceof Error ? err.message : err);
+            return (await this.nodesStore.findLatestByType(type)).map((row) => DogReferenceIndex.headFromFullRow(type, row));
+        }
+    }
+
+    /** Dieselbe Ableitung wie die SQL-Extraktion in PrismaStore.findReferenceHeads — aus einer vollen Zeile. */
+    static headFromFullRow(type: string, row: any): ReferenceHeadRow {
+        const head: ReferenceHeadRow = { id: row.id, lineageId: row.lineageId ?? null, ownerId: row.ownerId ?? null, createdAt: row.createdAt ?? null };
+        if (type === 'KennelConfig') return { ...head, dogIds: row.dogIds ?? null };
+        const cfg = parseJson(row.serializedDogConfig);
+        const asJson = (v: unknown) => (Array.isArray(v) || typeof v === 'string' ? JSON.stringify(v) : null);
+        return {
+            ...head,
+            cfgLineageId: typeof cfg?.lineageId === 'string' && cfg.lineageId ? cfg.lineageId : null,
+            parentsRequired: asJson(cfg?.parentsRequired),
+            parentsOptional: asJson(cfg?.parentsOptional),
+        };
+    }
+
+    /** Was Controller waehrend des Rebuilds geschrieben haben, gilt — nicht der aeltere Stand des Rebuilds. */
+    private async replayWritesDuringRebuild(): Promise<void> {
+        for (const [key, write] of this.writesDuringRebuild) {
+            if (write.rows === null) {
+                await this.store.removeReferences(write.kind, write.key);
+                this.rowsBySource.delete(key);
+            } else {
+                await this.store.replaceReferences(write.kind, write.key, write.rows);
+                if (write.rows.length > 0) this.rowsBySource.set(key, write.rows.length);
+                else this.rowsBySource.delete(key);
+            }
+        }
     }
 
     /**
@@ -193,8 +277,26 @@ export class DogReferenceIndex {
         return null;
     }
 
-    /** Version-GUID (PK) oder lineageId; sonst dangling. */
+    /**
+     * Version-GUID (PK) oder lineageId; sonst dangling. Schmal: die Zeile liefert nur, ob sie Kennel-Spalten
+     * oder eine Konfig traegt und welche Lineage darin steht. Nur Altformen, deren Lineage sich so nicht
+     * zeigt, und ein gescheiterter schmaler Weg laufen ueber den alten vollen Lookup.
+     */
     private async lookup(raw: string): Promise<NormalizedRef> {
+        try {
+            const target = await this.nodesStore.findReferenceTarget(raw);
+            if (target && (target.kennelish || target.hasConfig)) {
+                const lineageId = target.kennelish ? target.lineageId || target.cfgLineageId : target.cfgLineageId;
+                return lineageId ? { toKey: lineageId, resolved: 1 } : this.fullLookup(raw);
+            }
+            return { toKey: raw, resolved: (await this.nodesStore.lineageExists(raw)) ? 1 : 0 };
+        } catch {
+            return this.fullLookup(raw);
+        }
+    }
+
+    /** Der alte Lookup ueber die volle Zeile — dieselbe Semantik, mehr Daten. */
+    private async fullLookup(raw: string): Promise<NormalizedRef> {
         try {
             const row = await this.nodesStore.load(raw);
             if (row) {
@@ -213,6 +315,7 @@ export class DogReferenceIndex {
         await this.store.replaceReferences(kind, key, rows);
         if (rows.length > 0) this.rowsBySource.set(sourceKey(kind, key), rows.length);
         else this.rowsBySource.delete(sourceKey(kind, key));
+        if (this.rebuilding) this.writesDuringRebuild.set(sourceKey(kind, key), { kind, key, rows });
         this.changed();
     }
 
@@ -243,7 +346,8 @@ export class DogReferenceIndex {
 
     /** Die Lineage einer Dog-Kopfzeile: Spalte, sonst Konfig, sonst die Zeilen-id (Altbestand). */
     static dogLineageOf(row: any): string | null {
-        const key = row?.lineageId || parseJson(row?.serializedDogConfig)?.lineageId || row?.id;
+        const fromConfig = row?.cfgLineageId !== undefined ? row.cfgLineageId : parseJson(row?.serializedDogConfig)?.lineageId;
+        const key = row?.lineageId || fromConfig || row?.id;
         return typeof key === 'string' && key ? key : null;
     }
 }

@@ -34,9 +34,13 @@ export interface LandingDogEntry {
     stats: DogStats;
 }
 
-/** Woher die Landing ihre Dogs nimmt (P4b): die Kopfversionen und ihre stats. */
+/**
+ * Woher die Landing ihre Dogs nimmt (P4b): die Kopfversionen und ihre stats. Erst die Metadaten aller Dogs
+ * (Rechte, Name, Stats-Schluessel — ohne Code), dann description/icon nur fuer die, die sie zeigt.
+ */
 export interface LandingDogSource {
-    listDogs(): Promise<any[]>;
+    listDogMeta(): Promise<any[]>;
+    listDogsOf(lineageIds: string[]): Promise<any[]>;
     dogStats: DogStatsService;
 }
 
@@ -158,23 +162,29 @@ export class LandingRouteHandler {
     /** Bewaehrte Dogs (P4b): nur mit Abzeichen, nach proven.score, dann ranked30d, dann Name. */
     private async loadProvenDogs(): Promise<LandingDogEntry[]> {
         if (!this.dogs) return [];
-        const visible = filterRunnable((await this.dogs.listDogs()) as any[], ANON)
-            .map((d) => ({ id: d.id, lineageId: d.lineageId || d.id, ownerId: d.ownerId ?? null, displayName: d.displayName ?? null, description: d.description, icon: d.icon }));
+        const visible = filterRunnable((await this.dogs.listDogMeta()) as any[], ANON)
+            .map((d) => ({ id: d.id, lineageId: d.lineageId || d.id, ownerId: d.ownerId ?? null, displayName: d.displayName ?? null }));
         const withStats = await this.dogs.dogStats.attach(visible);
-        return withStats
+        const shown = withStats
             .filter((d) => d.stats.proven.badge)
             .sort((a, b) => b.stats.proven.score - a.stats.proven.score
                 || b.stats.calls.ranked30d - a.stats.calls.ranked30d
                 || String(a.displayName ?? a.lineageId).localeCompare(String(b.displayName ?? b.lineageId)))
-            .slice(0, LandingRouteHandler.MAX_LIMIT)
-            .map((d) => ({
+            .slice(0, LandingRouteHandler.MAX_LIMIT);
+        // description/icon stehen in der Konfig: nur fuer die gezeigten Dogs nachladen.
+        const details = shown.length > 0 ? await this.dogs.listDogsOf(shown.map((d) => d.lineageId)) : [];
+        const detailOf = new Map(details.map((d: any) => [d.lineageId || d.id, d]));
+        return shown.map((d) => {
+            const full = detailOf.get(d.lineageId);
+            return {
                 id: d.id,
                 lineageId: d.lineageId,
                 displayName: d.displayName,
-                description: LandingRouteHandler.shorten(d.description),
-                icon: typeof d.icon === 'string' ? d.icon : null,
+                description: LandingRouteHandler.shorten(full?.description),
+                icon: typeof full?.icon === 'string' ? full.icon : null,
                 stats: d.stats,
-            }));
+            };
+        });
     }
 
     /** Ein Landing-Eintrag: nur, was ein Anonymer ohnehin sieht, plus stats. */

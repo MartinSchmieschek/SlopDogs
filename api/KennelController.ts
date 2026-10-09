@@ -665,30 +665,38 @@ export class KennelController extends AbstractController<IKennelConfig> {
     /**
      * Lists all kennels — only the newest version per lineageId.
      */
-    async list(filter?: Partial<IKennelConfig>): Promise<IControllerResponse<IKennelConfig[]>> {
+    async list(filter?: Partial<IKennelConfig>, lineageIds?: string[]): Promise<IControllerResponse<IKennelConfig[]>> {
         try {
-            // BEWUSST weiterhin findByType, NICHT findLatestByType: die Sieger-Auswahl hier
-            // ist eine andere als die des Fenster-Querys. pickLatestKennelStoreRow bevorzugt
-            // zuerst die BLAETTER der parentId-Kette und rankt danach nach
-            // max(createdAt, updatedAt) — findLatestByType kennt nur createdAt und keine
-            // Kette. Ein Kennel, dessen aeltere Version zuletzt per rename/ACL-Update
-            // beruehrt wurde, wuerde damit anders gewaehlt als bisher. KennelConfig ist
-            // ausserdem die kleine Partition; der Speichergewinn waere der Preis nicht wert.
-            const results = await this.store.findByType(this.entityType);
+            // BEWUSST nicht findLatestByType: die Sieger-Auswahl hier ist eine andere als die des
+            // Fenster-Querys. pickLatestKennelStoreRow bevorzugt zuerst die BLAETTER der parentId-Kette
+            // und rankt danach nach max(createdAt, updatedAt) — findLatestByType kennt nur createdAt und
+            // keine Kette. Ein Kennel, dessen aeltere Version zuletzt per rename/ACL-Update beruehrt
+            // wurde, wuerde damit anders gewaehlt als bisher.
+            // Deshalb zwei Schritte mit derselben Wahl: erst ALLE Versionen, aber nur die Kopf-Metadaten
+            // (id, lineageId, parentId, createdAt, updatedAt), dann die vollen Zeilen NUR der Sieger.
+            // Frueher kam jede Version mit nodes/edges/task/defaults durch den Prozess (OOM 2026-10-08).
+            // Mit lineageIds nur diese Lineages (usage eines Dogs braucht nicht alle Kennels).
+            const headers = await this.store.findVersionHeaders(this.entityType, lineageIds);
+            const wanted = lineageIds ? new Set(lineageIds) : null;
 
             // Group raw rows by lineage (stable "latest" even when createdAt ties on the same second).
             const byLineage = new Map<string, any[]>();
-            for (const r of results as any[]) {
+            for (const r of headers as any[]) {
                 const key = r.lineageId || r.id;
+                if (wanted && !wanted.has(key)) continue;
                 if (!byLineage.has(key)) {
                     byLineage.set(key, []);
                 }
                 byLineage.get(key)!.push(r);
             }
 
+            const winnerIds = [...byLineage.values()].map((group) => this.pickLatestKennelStoreRow(group).id as string);
+            const fullById = new Map((await this.store.findRowsByIds(winnerIds)).map((r: any) => [r.id, r]));
+
             let entities: IKennelConfig[] = [];
-            for (const group of byLineage.values()) {
-                const row = this.pickLatestKennelStoreRow(group);
+            for (const id of winnerIds) {
+                const row = fullById.get(id);
+                if (!row) continue;                                   // zwischen beiden Abfragen geloescht
                 const parsed = this.parseEntity(row);
                 if (row.id) parsed.id = row.id;
                 (parsed as any).lineageId = row.lineageId;
@@ -715,6 +723,11 @@ export class KennelController extends AbstractController<IKennelConfig> {
      */
     async listLatest(): Promise<IControllerResponse<IKennelConfig[]>> {
         return this.list();
+    }
+
+    /** Wie listLatest, aber nur diese Lineages — dieselbe Sieger-Wahl, ohne die uebrigen Kennels zu laden. */
+    async listLatestOf(lineageIds: string[]): Promise<IControllerResponse<IKennelConfig[]>> {
+        return this.list(undefined, lineageIds);
     }
 
     /**
