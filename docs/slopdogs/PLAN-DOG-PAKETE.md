@@ -26,6 +26,8 @@ Was vor dem Schnitt nicht einheitlich ist, muss danach in jedem Repo einzeln nac
 | E8 | Branch `fix/client-ip-fair-queue` (31.10.) | **Bleibt liegen, nicht Teil des Plans.** |
 | E9 | UI (31.10.) | Favoriten je Nutzer; Klick auf einen Eintrag der Kennel-Liste oeffnet immer `/k/<ref>`, Bearbeiten nur ueber das Menue des Eintrags (Spur U). |
 | E10 | Lokaler Modus (31.10.) | **Auth-frei auf einem Pi im Heimnetz, wie eine Hue-Steuerung; jeder im lokalen Netz darf ihn nutzen.** Kein Dev-Modus (Spur L). |
+| E11 | Sichtbarkeit und Lizenz (31.10.) | **Alle SlopDogs-Repos oeffentlich, MIT-Lizenz** (Text aus `SlopDogs/LICENSE`, in jedem Repo und jedem Paket-Tarball). Repos angelegt: `MartinSchmieschek/slopdogs-core` (mit Initial-Commit samt LICENSE — der Schnitt wird beim ersten Push per `--allow-unrelated-histories` daraufgesetzt, kein Force-Push), `MartinSchmieschek/slopdogs-base-dogs` (leer). |
+| E12 | Weggefallene StartupTest-Abdeckung (31.10.) | **Bestaetigt, faellt weg** (Keys T1–T10, Worker-Env/FS/privates Netz, Super-User-Boot-Guard): „das machen die Dogs selber". |
 
 Daraus folgt zwingend:
 
