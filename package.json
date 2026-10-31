@@ -43,6 +43,7 @@
     "check:dog-packs": "node -r ts-node/register scripts/check-base-dog-packs.cjs",
     "check:env-catalog": "node scripts/check-env-catalog.cjs",
     "check:prisma-schemas": "node scripts/check-prisma-schemas.cjs",
+    "update:dogs": "node scripts/update-dogs.cjs",
     "heap:registry-compare": "node scripts/compare-registry-heap.cjs",
     "lint:docs": "node -r ts-node/register scripts/check-doc-paths.cjs",
     "lint": "eslint .",
