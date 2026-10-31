@@ -93,6 +93,12 @@ Jede Phase endet mit einem lauffaehigen Server, gemessen, nicht behauptet. P0 bi
 
 **Abnahme P1:** CI gruen mit Lint/Format; `tsc -b` baut alle Pakete; `test:startup` gruen; lokaler Start aus `dist` mit `NODE_ENV=integration`.
 
+**Stand 31.10. — P1 umgesetzt** (`4edb501`..`7a61d2d` auf `feature/dog-pakete`, nicht gepusht). Gemessen: `npm test` 0 inkl. lint und format:check, `test:startup` 22/22, `build:prod` und `build:local` 0, `start:local` 27/27 im Abnahmeskript; Paketbau aus leeren `dist` 93,7 s -> 7,8 s; RSS nach Boot (`start:local`, je 3-4 Laeufe) vier SQLite-Dateien 178-179 MB -> 169-173 MB, eine Datei 158-165 MB. Abweichungen:
+- **Start aus `dist` mit `NODE_ENV=integration` nicht gemessen:** integration verlangt Postgres (`scripts/dbEnv.cjs`, schon vor P1 so), ein lokales Postgres mit Zugangsdaten fehlt. Der Single-DB-Pfad gegen Postgres ist nur per Regelprobe belegt; die erste echte Messung ist der naechste Render-Deploy (Boot-Zeile `[db] ein Prisma-Client ...`).
+- **Pool:** im Single-DB-Fall ein Pool statt vier. Ohne `DB_CONNECTION_LIMIT` bekommt er 4 je Teil auf derselben URL, also 16 wie vorher die vier Pools zusammen; die Render-Env muss sich nicht aendern. Neu ist, dass Geo-Laeufe, Auth und Store aus demselben Topf schoepfen.
+- Mehr-Datei-SQLite (dev, Pi) bekommt beim naechsten Sync 12 leere Zusatztabellen in der Store-Datei.
+- `ui-app` ist aus ESLint/Prettier ausgenommen (eigene Angular-Toolchain, spaeter angular-eslint). ESLint duldet 1172 Treffer per Bulk-Suppression, 1061 davon `no-explicit-any`.
+
 ### P2 — Kopplungen loesen und core-Vertrag schaerfen
 
 1. **Typen je Paket (Pflicht, Kopplung 1).** Werkzeug `@martinschmieschek/slopdogs-typedefs` (CLI, devDependency der Dog-Pakete) erzeugt beim Paket-Build `dist/type-defs.json` mit den Pact- und Klassen-Typen **dieses** Pakets — dieselbe Logik wie `computeForBuild`, auf das Paket begrenzt. Der Server-Build mischt die `type-defs.json` aller installierten Pakete plus die eigenen Server-Typen. Das Werkzeug liegt im core-Repo und wird mit core veroeffentlicht.
