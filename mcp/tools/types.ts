@@ -43,6 +43,10 @@ export interface BaseDogInfo {
      * module graph (`BaseDogPacks`), the same value GET /api/nodes carries as `pack`.
      */
     pack?: string;
+    /** P2.5: npm name of that package (`@martinschmieschek/slopdogs-dogs-weather`), from its package.json. */
+    packageName?: string;
+    /** P2.5: version of that package — which code a `base:` reference runs. */
+    packageVersion?: string;
 }
 
 export interface ToolDeps {

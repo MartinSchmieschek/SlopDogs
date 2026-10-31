@@ -9,11 +9,27 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./kennelImportTarget": {
-      "types": "./dist/kennelImportTarget.d.ts",
-      "import": "./dist/kennelImportTarget.js",
-      "default": "./dist/kennelImportTarget.js"
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "default": "./dist/runtime.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "runtime": [
+        "dist/runtime.d.ts"
+      ]
     }
+  },
+  "files": [
+    "dist",
+    "!dist/tsconfig.tsbuildinfo"
+  ],
+  "slopdogs": {
+    "typeDefs": "dist/type-defs.json",
+    "surface": "dist/surface.json",
+    "surfaceEntry": "src/index.ts"
   },
   "repository": {
     "type": "git",
@@ -23,16 +39,19 @@
   "engines": {
     "node": ">=18.19.0"
   },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "author": "Martin",
   "license": "MIT",
   "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json && slopdogs-typedefs build",
+    "prepare": "node -e \"process.exit(require('fs').existsSync('../../tsconfig.packages.json') ? 0 : 1)\" || npm run build"
+  },
   "dependencies": {
     "sucrase": "^3.35.1"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0"
+    "@martinschmieschek/slopdogs-typedefs": "file:../typedefs",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
   }
 }

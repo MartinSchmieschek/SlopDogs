@@ -17,7 +17,7 @@ import {
     isPrivateNetworkAddress,
     registerVmGlobalCapability,
     type VmGlobalCapabilityContext,
-} from '@martinschmieschek/slopdogs-core';
+} from '@martinschmieschek/slopdogs-core/runtime';
 import { KeyStoreService, hostAllowedBy, type UserKeyRow } from './KeyStoreService';
 
 /** Was an die Stelle eines Werts tritt — in Antworten, Waves, Snapshot, Fehlern und Log. */

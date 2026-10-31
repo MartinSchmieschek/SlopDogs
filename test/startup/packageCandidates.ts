@@ -1,13 +1,5 @@
-import {
-    IKennelConfig,
-    Dog,
-    IHuntingDog,
-    createPact,
-    MimicDog,
-    IMimicDogConfig,
-    KennelRun,
-    type ChannelState,
-} from '@martinschmieschek/slopdogs-core';
+import { Dog, IHuntingDog, createPact } from '@martinschmieschek/slopdogs-core';
+import { IKennelConfig, MimicDog, IMimicDogConfig, KennelRun, type ChannelState } from '@martinschmieschek/slopdogs-core/runtime';
 import { TypeDefBuilder } from '../../services/TypeDefBuilder';
 import { CompilerCache } from '../../services/CompilerCache';
 import { BloodhoundIsochronePact, type BloodhoundIsochroneInput, NearbyLandmarksPact } from '@martinschmieschek/slopdogs-dogs-geo';

@@ -1,5 +1,5 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "@martinschmieschek/slopdogs-typedefs/tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
@@ -8,10 +8,5 @@
   "include": [
     "src/**/*",
     "src/**/*.json"
-  ],
-  "references": [
-    {
-      "path": "../core"
-    }
   ]
 }

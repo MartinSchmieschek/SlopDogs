@@ -1,15 +1,8 @@
 // The WavesConverter — the chronicler of the hunt, who turns the raw season into Waves of plunder.
 // After the dogs have hunted, their season must be charted in a form the crew can read.
 // Carrion hordes trill their profane accord with eldritch plans: each wave is a tide of results.
-import {
-    IHuntingSeason,
-    IWaveEntry,
-    IReadTrackingEntry,
-    IHuntingDog,
-    SerializedDog,
-    MimicDog,
-    IKennelConfig,
-} from '@martinschmieschek/slopdogs-core';
+import { IHuntingSeason, IHuntingDog } from '@martinschmieschek/slopdogs-core';
+import { IWaveEntry, IReadTrackingEntry, SerializedDog, MimicDog, IKennelConfig } from '@martinschmieschek/slopdogs-core/runtime';
 import { TypeDefBuilder } from './TypeDefBuilder';
 
 /**

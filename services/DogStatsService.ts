@@ -3,7 +3,7 @@
 // Gelesen wird aus EINEM Memo (ein GROUP BY + ein findMany je Memo-Leben), nie je Dog. Das Memo
 // enthaelt auch private Kennels — sie verlassen den Prozess nur als Zahl (kennelsTransitive …) oder
 // ueber usageOf(), und usageOf() listet nur Kennels, die der Aufrufer ausfuehren darf.
-import { BASE_DOG_PREFIX, publicKennelPath } from '@martinschmieschek/slopdogs-core';
+import { BASE_DOG_PREFIX, publicKennelPath } from '@martinschmieschek/slopdogs-core/runtime';
 import type { DogCallAggregate, DogReferenceRow, IDogStatsStore } from '../store/IKennelStatsStore';
 import { KennelCallCounter, utcDay, type PendingDogAggregate } from './KennelCallCounter';
 import { KennelStatsService } from './KennelStatsService';

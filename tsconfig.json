@@ -1,7 +1,7 @@
 {
-  // Server, ts-node und Editor. Die Compiler-Basis (target, strict, Module) kommt aus tsconfig.base.json —
-  // dieselbe wie fuer die Pakete unter packages/.
-  "extends": "./tsconfig.base.json",
+  // Server, ts-node und Editor. Die Compiler-Basis (target, strict, Module) kommt aus dem Typ-Werkzeug
+  // (packages/typedefs/tsconfig.base.json) — dieselbe wie fuer die Pakete unter packages/.
+  "extends": "@martinschmieschek/slopdogs-typedefs/tsconfig.base.json",
   "compilerOptions": {
     // Der Server ist kein Projekt fuer tsc -b: er wird mit tsc -p tsconfig.emit.json gebaut (scripts/run-build.cjs).
     "composite": false,
@@ -24,7 +24,21 @@
     "baseUrl": ".",
     "paths": {
       "@martinschmieschek/slopdogs-core": ["packages/core/src/index.ts"],
+      "@martinschmieschek/slopdogs-core/runtime": ["packages/core/src/runtime.ts"],
+      // P2.7: Env-Metadaten der Dog-Pakete (<paket>/env), in dev aus der Quelle wie alles andere. Einzeln, nicht als
+      // "slopdogs-*/env": tsconfig-paths 4.2 schneidet bei einem Muster mit Text nach dem * falsch ("dogs-crypto/e").
+      "@martinschmieschek/slopdogs-dogs-birds/env": ["packages/dogs-birds/src/env.ts"],
+      "@martinschmieschek/slopdogs-dogs-crypto/env": ["packages/dogs-crypto/src/env.ts"],
+      "@martinschmieschek/slopdogs-dogs-demo/env": ["packages/dogs-demo/src/env.ts"],
+      "@martinschmieschek/slopdogs-dogs-geo/env": ["packages/dogs-geo/src/env.ts"],
+      "@martinschmieschek/slopdogs-dogs-hue/env": ["packages/dogs-hue/src/env.ts"],
+      "@martinschmieschek/slopdogs-dogs-images/env": ["packages/dogs-images/src/env.ts"],
+      "@martinschmieschek/slopdogs-dogs-transit-trips/env": ["packages/dogs-transit-trips/src/env.ts"],
+      "@martinschmieschek/slopdogs-dogs-translate/env": ["packages/dogs-translate/src/env.ts"],
+      "@martinschmieschek/slopdogs-dogs-travel/env": ["packages/dogs-travel/src/env.ts"],
+      "@martinschmieschek/slopdogs-dogs-webcams/env": ["packages/dogs-webcams/src/env.ts"],
       "@martinschmieschek/slopdogs-swaggrid": ["packages/swaggrid/src/index.ts"],
+      "@martinschmieschek/slopdogs-typedefs": ["packages/typedefs/src/index.ts"],
       "@martinschmieschek/slopdogs-dogs-demo": ["packages/dogs-demo/src/index.ts"],
       "@martinschmieschek/slopdogs-dogs-geo": ["packages/dogs-geo/src/index.ts"],
       "@martinschmieschek/slopdogs-dogs-warframe": ["packages/dogs-warframe/src/index.ts"],

@@ -46,5 +46,5 @@ export interface IHuntingDog<Y> {
      * are inscribed alongside the parent's collected yield.
      * Return undefined or {} if the hound carries no extra tools.
      */
-    getVmContextContributions?(): Record<string, any> | undefined;
+    getVmContextContributions?(): Record<string, unknown> | undefined;
 }

@@ -27,7 +27,7 @@ import { type ToolDeps, type ToolDef, unknownArgsRefusal } from '../tools/types'
 import type { AuthCtx } from '../auth/middleware';
 import { buildMcpInitializeInstructions } from '../spuren-brief';
 import { buildWerkzeugkasten } from '../werkzeugkasten';
-import { envFirst } from '@martinschmieschek/slopdogs-core';
+import { envFirst } from '@martinschmieschek/slopdogs-core/runtime';
 import { LocalMode } from '../../server-app/LocalMode';
 
 /**

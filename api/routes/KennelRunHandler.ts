@@ -1,5 +1,6 @@
 // The KennelRunHandler — the huntmaster who unleashes the hounds.
 // Vome speaks: to cosmic madness laws submit — the waves obey the dependency graph.
+import { type ICacheHandler } from '@martinschmieschek/slopdogs-core';
 import {
     SerializedDog,
     MimicDog,
@@ -7,11 +8,10 @@ import {
     IKennelConfig,
     KennelRun,
     type MimicAdopter,
-    type ICacheHandler,
     type VmGlobalCapabilityContext,
     isRuntimeLogVerbose,
     publicKennelPath,
-} from '@martinschmieschek/slopdogs-core';
+} from '@martinschmieschek/slopdogs-core/runtime';
 import { FIXED_TOP_LEVEL } from './spaRouteConstants';
 import { API_ROUTE, LEGACY_ROUTE, PUBLIC_ROUTE } from './routeTable';
 import { IStore, type MimicHeadRow } from '../../store/IStore';
@@ -46,6 +46,7 @@ function clientWantsJson(req: any): boolean {
 import { generateVersionId, generateLineageId } from '../utils/versioning';
 import { memSnapshot, logKennelRun } from '../utils/memoryLog';
 import { Watchpost } from '../../services/Watchpost';
+import { dogVersionsOf } from '../../services/dogVersions';
 
 /**
  * Ein adoptierbarer MimicDog, aus einer schmalen Kopfzeile geschaelt: der Pact, den er imitiert, steht
@@ -634,6 +635,8 @@ export class KennelRunHandler {
                     lead: { status: lead.status, ...(lead.error !== undefined ? { error: lead.error } : {}) },
                     waves: safeWaves,
                     kennelConfig: withMyRights(config as any, req.ctx),
+                    // P2.5: welche Paket-Version jeder Base-Dog dieses Laufs hatte (`base:<Klasse>` -> `<paket>@<version>`).
+                    dogVersions: dogVersionsOf(waves),
                 });
             } catch (runError: any) {
                 const msg = KennelRunHandler.errorText(runError, access);

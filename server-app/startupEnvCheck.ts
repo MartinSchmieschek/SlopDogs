@@ -13,50 +13,29 @@
  * Diese Zeilen sagen vorher, was fehlt und was es kostet — statt dass es erst beim ersten Login bricht.
  */
 
-/** Umgebungen, die der Dienst kennt. Alles andere zaehlt wie development (so auch authModeBootError). */
+import * as fs from 'fs';
+import * as path from 'path';
+import type { DogEnvVar } from '@martinschmieschek/slopdogs-core';
 import { LocalMode } from './LocalMode';
 
-export type NodeEnvName = 'development' | 'integration' | 'production';
-
-/** Abschnitte der .env-Dateien, in dieser Reihenfolge. */
-export type EnvSection = 'required' | 'operations' | 'features' | 'integrations' | 'development' | 'internal';
-
+/**
+ * Ein Katalog-Eintrag. Die Form steht seit P2.7 in core (`DogEnvVar`), weil Dog-Pakete ihre Variablen in derselben
+ * Form liefern (`<paket>/env`); Server- und Paket-Eintraege sind damit nicht zu unterscheiden.
+ */
+export type EnvVarSpec = DogEnvVar;
+/** Pflicht-/Empfehlungsregel eines Eintrags. */
+export type EnvRule = NonNullable<DogEnvVar['rules']>[number];
+/** Umgebungen, die der Dienst kennt. Alles andere zaehlt wie development (so auch authModeBootError). */
+export type NodeEnvName = EnvRule['in'][number];
+/** Abschnitte der .env-Dateien, in dieser Reihenfolge (ENV_SECTIONS). */
+export type EnvSection = DogEnvVar['section'];
 /**
  * Zusatzbedingung einer Regel:
  *   authRequired     — nur wenn MCP_AUTH_REQUIRED=true (Login an)
  *   storeNotPostgres — nur wenn DATABASE_URL KEINE Postgres-URL ist (sonst spiegelt dbEnv.cjs Cache/JSON darauf)
  *   notLocalMode     — nur ohne SLOPDOGS_MODE=local (der lokale Modus laeuft als production, aber ohne Login)
  */
-export type EnvCondition = 'authRequired' | 'storeNotPostgres' | 'notLocalMode';
-
-export interface EnvRule {
-    /** In welchen NODE_ENVs die Regel greift. */
-    readonly in: readonly NodeEnvName[];
-    /** required = Warnzeile "[env] missing"; recommended = Hinweiszeile "[env] recommended". */
-    readonly level: 'required' | 'recommended';
-    readonly when?: EnvCondition;
-}
-
-export interface EnvVarSpec {
-    readonly name: string;
-    readonly section: EnvSection;
-    /** Kurz: wofuer. */
-    readonly purpose: string;
-    /** Default im Code, oder '—' wenn es keinen gibt. */
-    readonly defaultValue: string;
-    /** Phase, seit der der Name gilt: 'vor P1', 'P1' … 'P6-Fix', 'Beta'. */
-    readonly since: string;
-    /** Folge bei Fehlen, z. B. "Exit 78", "Key-Store aus, POST /api/keys 503". */
-    readonly consequence: string;
-    /** Pflicht-/Empfehlungsregeln; leer = nie gewarnt. */
-    readonly rules?: readonly EnvRule[];
-    /** Weitere Namen, die die Regel ebenso erfuellen ("eins von"), z. B. CACHE_DB_PATH. */
-    readonly anyOf?: readonly string[];
-    /** Frueherer Name, den der Code noch liest (envFirst) — erfuellt die Regel ebenso. */
-    readonly aliases?: readonly string[];
-    /** Gesetzt reicht nicht, der Wert muss genau dieser sein (MCP_AUTH_REQUIRED=true). */
-    readonly requiredValue?: string;
-}
+export type EnvCondition = NonNullable<EnvRule['when']>;
 
 export interface EnvSectionSpec {
     readonly id: EnvSection;
@@ -82,7 +61,8 @@ const AUTH_RULES: readonly EnvRule[] = [
     { in: ['development'], level: 'required', when: 'authRequired' },
 ];
 
-export const ENV_CATALOG: readonly EnvVarSpec[] = [
+/** Die Variablen des Servers selbst (und von core). Die der Dog-Pakete kommen aus `<paket>/env` (DOG_PACKAGE_ENV). */
+const SERVER_ENV_CATALOG: readonly EnvVarSpec[] = [
     // --- 1. Pflicht -------------------------------------------------------------------------------
     {
         name: 'DATABASE_URL',
@@ -751,158 +731,7 @@ export const ENV_CATALOG: readonly EnvVarSpec[] = [
     },
 
     // --- 4. Integrationen -------------------------------------------------------------------------
-    {
-        name: 'HUE_BRIDGE_HOST',
-        section: 'integrations',
-        since: 'vor P1',
-        purpose: 'Philips-Hue-Bridge (Host/IP)',
-        defaultValue: '—',
-        consequence: 'HueBridgeEnvRetriever steht nicht auf',
-    },
-    {
-        name: 'HUE_BRIDGE_USER',
-        section: 'integrations',
-        since: 'vor P1',
-        purpose: 'Hue-API-User der Bridge',
-        defaultValue: '—',
-        consequence: 'HueBridgeEnvRetriever steht nicht auf',
-    },
-    {
-        name: 'HUE_INTER_COMMAND_DELAY_MS',
-        section: 'integrations',
-        since: 'vor P1',
-        purpose: 'Pause zwischen Hue-Befehlen (ms)',
-        defaultValue: '120',
-        consequence: 'Default',
-    },
-    {
-        name: 'ORS_API_KEYS',
-        section: 'integrations',
-        since: 'vor P1',
-        purpose: 'OpenRouteService-Keys, kommagetrennt',
-        defaultValue: '—',
-        consequence: 'Bloodhound-Route/-Isochrone stehen nicht auf',
-    },
-    {
-        name: 'OVERPASS_URL',
-        section: 'integrations',
-        since: 'vor P1',
-        purpose: 'Primaerer Overpass-Endpoint (vor der Fallback-Kette)',
-        defaultValue: 'Kette lz4 -> kumi -> public',
-        consequence: 'Default-Kette',
-    },
-    {
-        name: 'OVERPASS_URLS',
-        section: 'integrations',
-        since: 'vor P1',
-        purpose: 'Mehrere Overpass-Mirror, kommagetrennt (statt OVERPASS_URL)',
-        defaultValue: '—',
-        consequence: 'OVERPASS_URL bzw. Default-Kette',
-    },
-    {
-        name: 'OVERPASS_INTERPRETER_URL',
-        section: 'integrations',
-        since: 'vor P1',
-        purpose: 'Erzwingt EINEN Overpass-Server fuer die OpenStreetMap-Geometrie-Dogs',
-        defaultValue: 'overpass-api.de, dann Mirror',
-        consequence: 'Default',
-    },
-    {
-        name: 'OVERPASS_USER_AGENT',
-        section: 'integrations',
-        since: 'vor P1',
-        purpose: 'User-Agent an Overpass (mit Kontakt)',
-        defaultValue: 'SlopDogs/<label> (contact: set OVERPASS_USER_AGENT)',
-        consequence: 'generischer User-Agent',
-    },
-    {
-        name: 'OVERPASS_QUERY_TIMEOUT_SEC',
-        section: 'integrations',
-        since: 'vor P1',
-        purpose: 'Overpass [timeout:N] (Server-Laufzeit)',
-        defaultValue: '25',
-        consequence: 'Default',
-    },
-    {
-        name: 'OVERPASS_FETCH_TIMEOUT_MS',
-        section: 'integrations',
-        since: 'vor P1',
-        purpose: 'Abbruch-Budget je Overpass-Request (min. 5000)',
-        defaultValue: '30000',
-        consequence: 'Default',
-    },
-    {
-        name: 'OVERPASS_MAX_RESPONSE_BYTES',
-        section: 'integrations',
-        since: 'vor P1',
-        purpose: 'Deckel je Overpass-Antwort',
-        defaultValue: '8388608 (8 MiB)',
-        consequence: 'Default',
-    },
-    {
-        name: 'WINDY_API_KEY',
-        section: 'integrations',
-        since: 'vor P1',
-        purpose: 'Windy-Webcams',
-        defaultValue: '—',
-        consequence: 'WebcamRetriever steht nicht auf',
-    },
-    {
-        name: 'EBIRD_API_KEY',
-        section: 'integrations',
-        since: 'vor P1',
-        purpose: 'eBird-Beobachtungen',
-        defaultValue: '—',
-        consequence: 'BirdRetriever steht nicht auf',
-    },
-    {
-        name: 'YOUTUBE_API_KEY',
-        section: 'integrations',
-        since: '2026-09-27',
-        purpose: 'YouTube Data API v3 fuer FoodPornRetriever',
-        defaultValue: '—',
-        consequence: 'FoodPornRetriever scheitert beim Lauf',
-    },
-    {
-        name: 'COINGECKO_API_KEY',
-        section: 'integrations',
-        since: 'vor P1',
-        purpose: 'CoinGecko-Demo-Key (hoeheres Limit)',
-        defaultValue: '—',
-        consequence: 'ohne Key, engeres Rate-Limit',
-    },
-    {
-        name: 'NASA_API_KEY',
-        section: 'integrations',
-        since: 'vor P1',
-        purpose: 'NASA APOD',
-        defaultValue: 'DEMO_KEY',
-        consequence: 'DEMO_KEY (stark gedrosselt)',
-    },
-    {
-        name: 'GEONAMES_USERNAME',
-        section: 'integrations',
-        since: 'vor P1',
-        purpose: 'GeoNames-Konto',
-        defaultValue: 'demo',
-        consequence: '"demo" (stark gedrosselt)',
-    },
-    {
-        name: 'LIBRETRANSLATE_URL',
-        section: 'integrations',
-        since: 'vor P1',
-        purpose: 'Eigene LibreTranslate-Instanz (vor den Community-Instanzen)',
-        defaultValue: '—',
-        consequence: 'nur Community-Instanzen',
-    },
-    {
-        name: 'MOTIS_API_URL',
-        section: 'integrations',
-        since: 'vor P1',
-        purpose: 'MOTIS-Routing fuer TransitTrips',
-        defaultValue: 'https://europe.motis-project.de',
-        consequence: 'Default',
-    },
+    // Kommen aus den Dog-Paketen (P2.7): jedes Paket, das Env-Variablen liest, exportiert sie unter <paket>/env.
 
     // --- 5. Entwicklung ---------------------------------------------------------------------------
     {
@@ -1064,6 +893,55 @@ export const ENV_CATALOG: readonly EnvVarSpec[] = [
         consequence: '—',
     },
 ];
+
+/** Die Env-Variablen eines installierten Dog-Pakets, mit seinem Namen. */
+export interface DogPackageEnv {
+    packageName: string;
+    envVars: readonly EnvVarSpec[];
+}
+
+/**
+ * Liest die Env-Metadaten aller installierten SlopDogs-Pakete: jede Abhaengigkeit `@martinschmieschek/slopdogs-*`
+ * aus der package.json des Servers, die einen Einstieg `./env` anbietet, wird mit `require('<paket>/env')` geladen.
+ * Nur diese kleine Datei — die Dogs des Pakets laedt das nicht (der slim-Registry bleibt schlank). Aufgeloest wie zur
+ * Laufzeit (Workspace-Link, node_modules), nicht ueber einen Ordner packages/.
+ */
+export function loadDogPackageEnv(rootDir: string = serverRootDir()): DogPackageEnv[] {
+    const manifest = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8')) as { dependencies?: Record<string, string> };
+    const out: DogPackageEnv[] = [];
+    for (const name of Object.keys(manifest.dependencies ?? {})) {
+        if (!name.startsWith('@martinschmieschek/slopdogs-')) continue;
+        const pkgJson = require.resolve(`${name}/package.json`, { paths: [rootDir] });
+        const pkg = JSON.parse(fs.readFileSync(pkgJson, 'utf8')) as { exports?: Record<string, unknown> };
+        if (!pkg.exports || !('./env' in pkg.exports)) continue;
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- Paketname steht erst zur Laufzeit fest
+        const mod = require(require.resolve(`${name}/env`, { paths: [rootDir] })) as { envVars?: readonly EnvVarSpec[] };
+        if (!Array.isArray(mod.envVars)) throw new Error(`[env] ${name}/env exportiert kein envVars`);
+        out.push({ packageName: name, envVars: mod.envVars });
+    }
+    return out;
+}
+
+/** Der Projekt-Ordner: die naechste package.json oberhalb dieser Datei (Quelle wie dist/server-app). */
+function serverRootDir(): string {
+    for (let dir = __dirname; ; dir = path.dirname(dir)) {
+        if (fs.existsSync(path.join(dir, 'package.json'))) return dir;
+        if (path.dirname(dir) === dir) throw new Error('[env] package.json des Servers nicht gefunden');
+    }
+}
+
+/** Die Env-Variablen der installierten Dog-Pakete (beim Laden dieses Moduls gelesen). */
+export const DOG_PACKAGE_ENV: readonly DogPackageEnv[] = loadDogPackageEnv();
+
+/**
+ * Der ganze Katalog: Server-Eintraege und Paket-Eintraege, nach Abschnitt geordnet (ENV_SECTIONS), innerhalb eines
+ * Abschnitts erst der Server, dann die Pakete in der Reihenfolge der package.json. In dieser Reihenfolge stehen sie in
+ * beiden .env-Beispielen (scripts/check-env-catalog.cjs).
+ */
+export const ENV_CATALOG: readonly EnvVarSpec[] = ENV_SECTIONS.flatMap((section) => [
+    ...SERVER_ENV_CATALOG.filter((spec) => spec.section === section.id),
+    ...DOG_PACKAGE_ENV.flatMap((p) => p.envVars).filter((spec) => spec.section === section.id),
+]);
 
 /** Alle Namen des Katalogs, in Katalog-Reihenfolge. */
 export const ENV_CATALOG_NAMES: readonly string[] = ENV_CATALOG.map((v) => v.name);

@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import { IStore } from '../../store/IStore';
-import { SerializedDog } from '@martinschmieschek/slopdogs-core';
+import { SerializedDog } from '@martinschmieschek/slopdogs-core/runtime';
 
 /** Der absolute Standard fuer `/`: greift, wenn LANDING_KENNEL_IDS leer ist oder keiner der gelisteten Kennels laeuft (PLAN P5). */
 export const SLOPDOGS_LANDING_KENNEL_ID = 'slopdogs-landing';

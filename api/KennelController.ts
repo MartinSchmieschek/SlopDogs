@@ -8,7 +8,7 @@ import {
     IKennelEdgeAnnotation,
     isRuntimeLogVerbose,
     kennelIdBlockedReason,
-} from '@martinschmieschek/slopdogs-core';
+} from '@martinschmieschek/slopdogs-core/runtime';
 import { generateVersionId } from './utils/versioning';
 import { aclOf, normalizeVisibility, type Visibility } from '../mcp/auth/visibility';
 

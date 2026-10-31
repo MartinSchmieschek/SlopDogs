@@ -3,6 +3,8 @@
 /**
  * Vor jedem `npm run build:packages` (postinstall, build, typecheck): stehen alle Pakete in
  * tsconfig.packages.json, und nennt jedes Paket seine @martinschmieschek/slopdogs-*-Abhaengigkeiten als `references`?
+ * Die Referenzen stehen seit P2.8 in packages/<x>/tsconfig.monorepo.json; packages/<x>/tsconfig.json muss ohne
+ * Nachbarordner auskommen (kein `references`, kein `extends` auf ../), damit das Paket allein baut.
  *
  * `tsc -b tsconfig.packages.json` baut nur, was dort steht. Ein neues packages/<x> ohne Eintrag wuerde
  * still weder gebaut noch typgeprueft — lokal faellt das wegen eines alten dist nicht auf, auf Render
@@ -24,12 +26,17 @@ function readTsconfig(file) {
 }
 
 function referencedNames(config, fromDir) {
-    return (config.references || []).map((ref) => path.basename(path.resolve(fromDir, ref.path)));
+    return (config.references || []).map((ref) => {
+        const target = path.resolve(fromDir, ref.path);
+        return path.basename(target.endsWith('.json') ? path.dirname(target) : target);
+    });
 }
+
+const MONOREPO_TSCONFIG = 'tsconfig.monorepo.json';
 
 const packages = fs
     .readdirSync(packagesDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(packagesDir, entry.name, 'tsconfig.json')))
+    .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(packagesDir, entry.name, MONOREPO_TSCONFIG)))
     .map((entry) => entry.name)
     .sort();
 
@@ -39,19 +46,27 @@ for (const name of packages) {
     if (!solution.has(name)) problems.push(`tsconfig.packages.json: Referenz auf ./packages/${name} fehlt`);
 }
 for (const name of solution) {
-    if (!packages.includes(name)) problems.push(`tsconfig.packages.json: ./packages/${name} gibt es nicht (oder ohne tsconfig.json)`);
+    if (!packages.includes(name))
+        problems.push(`tsconfig.packages.json: ./packages/${name} gibt es nicht (oder ohne ${MONOREPO_TSCONFIG})`);
 }
 for (const name of packages) {
     const dir = path.join(packagesDir, name);
     const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
-    const deps = Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies })
+    const deps = Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies, ...manifest.devDependencies })
         .filter((dep) => dep.startsWith(SCOPE))
         .map((dep) => dep.slice(SCOPE.length));
-    const refs = new Set(referencedNames(readTsconfig(path.join(dir, 'tsconfig.json')), dir));
+    const refs = new Set(referencedNames(readTsconfig(path.join(dir, MONOREPO_TSCONFIG)), dir));
     for (const dep of deps) {
+        // Das Typ-Werkzeug liefert nur tsconfig-Basis und CLI, keinen Code, gegen den das Paket kompiliert.
+        if (dep === 'typedefs') continue;
         if (!refs.has(dep))
-            problems.push(`packages/${name}/tsconfig.json: references ohne ../${dep} (package.json haengt an ${SCOPE}${dep})`);
+            problems.push(`packages/${name}/${MONOREPO_TSCONFIG}: references ohne ../${dep} (package.json haengt an ${SCOPE}${dep})`);
     }
+    const own = readTsconfig(path.join(dir, 'tsconfig.json'));
+    if (own.references && own.references.length)
+        problems.push(`packages/${name}/tsconfig.json: references gehoeren nach ${MONOREPO_TSCONFIG} (sonst baut das Paket nicht allein)`);
+    if (typeof own.extends === 'string' && own.extends.startsWith('..'))
+        problems.push(`packages/${name}/tsconfig.json: extends ${own.extends} zeigt aus dem Paket heraus`);
 }
 
 if (problems.length) {

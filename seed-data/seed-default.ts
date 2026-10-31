@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { IStore } from '../store/IStore';
-import { SerializedDog, IKennelConfig, BASE_DOG_PREFIX, type IMimicDogConfig } from '@martinschmieschek/slopdogs-core';
+import { SerializedDog, IKennelConfig, BASE_DOG_PREFIX, type IMimicDogConfig } from '@martinschmieschek/slopdogs-core/runtime';
 import { TalkingDog } from '@martinschmieschek/slopdogs-dogs-talking';
 import {
     RandomRecipesRetriever,

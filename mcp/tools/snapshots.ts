@@ -8,7 +8,8 @@ import type { AuthCtx } from '../auth/middleware';
 import type { NodeEntry, Waves, ReadTrackingEntry } from '../../services/WavesConverter';
 import type { KennelSnapshotEntry } from '../snapshots/types';
 import { KennelSnapshotCache } from '../snapshots/KennelSnapshotCache';
-import type { IKennelConfig } from '@martinschmieschek/slopdogs-core';
+import { dogVersionsOf } from '../../services/dogVersions';
+import type { IKennelConfig } from '@martinschmieschek/slopdogs-core/runtime';
 import { REDACTED_TEXT, redactWavesForCtx } from '../../services/wavesRedaction';
 
 /**
@@ -210,6 +211,8 @@ function summaryHeader(snapshot: KennelSnapshotEntry, access: Access = 'read') {
         errorCount: flat.filter((d) => d.error).length,
         leadDogId: readable ? snapshot.leadDogId : undefined,
         errorMessage: readable ? snapshot.errorMessage : snapshot.errorMessage ? REDACTED_TEXT : undefined,
+        // P2.5: Paket-Versionen der Base-Dogs des Laufs (nur mit Leserecht — sie verraten die Zusammensetzung).
+        dogVersions: readable && waves.length ? dogVersionsOf(waves) : undefined,
     };
 }
 

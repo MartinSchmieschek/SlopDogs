@@ -21,12 +21,12 @@ import { IHuntingSeason } from '../core/entities/IHuntingSeason';
  * beast, it shall yield it faithfully when the void demands. From brooding gulfs
  * it bears ALL names -- fer it carries any type through the deep.
  */
-export class BodyRetriever extends Dog<any> {
-    // The cargo -- whatever dark payload was stowed aboard
-    private bodyData: any = null;
+export class BodyRetriever extends Dog<unknown> {
+    // The cargo -- whatever dark payload was stowed aboard (der HTTP-Rumpf, ungeprueft: `unknown`, P2.2)
+    private bodyData: unknown = null;
 
     /** Load the cargo-bearer with body data -- the hold accepts anything */
-    constructor(bodyData?: any) {
+    constructor(bodyData?: unknown) {
         super();
         this.bodyData = bodyData;
     }
@@ -56,7 +56,7 @@ export class BodyRetriever extends Dog<any> {
     }
 
     /** Yield the cargo -- whatever was stowed, returned from the hold unchanged */
-    protected yieldCollectorFactory: (season: IHuntingSeason) => Promise<any> = async (season: IHuntingSeason) => {
+    protected yieldCollectorFactory: (season: IHuntingSeason) => Promise<unknown> = async (season: IHuntingSeason) => {
         return this.bodyData;
     };
 }

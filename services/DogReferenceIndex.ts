@@ -5,7 +5,7 @@
 // Warum am Controller und nicht in PrismaStore.save: der Store-Save ist ein generischer Upsert mit
 // Aufrufern (Seeds, heal, cascadeVisibility, rename), denen die Bedeutung der Zeile fehlt. Was am
 // Controller vorbeigeht (Seeds), heilt der naechste Boot.
-import { BASE_DOG_PREFIX } from '@martinschmieschek/slopdogs-core';
+import { BASE_DOG_PREFIX } from '@martinschmieschek/slopdogs-core/runtime';
 import type { IStore, ReferenceHeadRow } from '../store/IStore';
 import type { DogReferenceFromKind, DogReferenceKind, DogReferenceRow, IDogStatsStore } from '../store/IKennelStatsStore';
 import type { KennelCallCounter } from './KennelCallCounter';

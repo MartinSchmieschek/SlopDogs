@@ -8,7 +8,7 @@ import {
     type IMimicDogConfig,
     type ISerializedDogConfig,
     type VmGlobalCapabilityContext,
-} from '@martinschmieschek/slopdogs-core';
+} from '@martinschmieschek/slopdogs-core/runtime';
 import type { IStore } from '../store/IStore';
 import type { AuthCtx } from '../mcp/auth/middleware';
 import {

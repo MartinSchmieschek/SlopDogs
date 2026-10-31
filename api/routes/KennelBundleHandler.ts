@@ -8,7 +8,7 @@ import {
     isKennelIdTakenInList,
     isKennelNameTakenInList,
     type KennelIdNameListEntry,
-} from '@martinschmieschek/slopdogs-core';
+} from '@martinschmieschek/slopdogs-core/runtime';
 import { KennelController } from '../KennelController';
 import { IStore } from '../../store/IStore';
 import { generateVersionId, generateLineageId } from '../utils/versioning';

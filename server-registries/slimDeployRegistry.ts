@@ -4,7 +4,12 @@
  * Lokal unter NODE_ENV=development wird stattdessen fullRegistry geladen.
  * @see server-registries/fullRegistry.ts für die volle Liste.
  */
-import { QueryRetriever, BodyRetriever, WebSocketChannelRetriever, ChannelLiveSnippetRetriever } from '@martinschmieschek/slopdogs-core';
+import {
+    QueryRetriever,
+    BodyRetriever,
+    WebSocketChannelRetriever,
+    ChannelLiveSnippetRetriever,
+} from '@martinschmieschek/slopdogs-core/runtime';
 import {
     RandomRecipesRetriever,
     RandomEveryThingRetriever,

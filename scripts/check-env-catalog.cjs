@@ -9,6 +9,8 @@
  *        - Helfer, die einen Namen als Parameter bekommen und env[param] lesen (positiveFromEnv, envFirst,
  *          parseEnvPositiveInt, …): sie werden im Code selbst erkannt, ihre Aufrufe liefern die Namen.
  *      Schreibzugriffe (env.X = …, delete env.X) zaehlen nicht als Lesung.
+ *   a') je Dog-Paket (P2.7): was packages/<x>/ liest, steht in den envVars von <x> (src/env.ts, Einstieg ./env),
+ *      und jede dort genannte Variable liest <x> auch — die Paket-Eintraege koennen nicht still verrotten.
  *   b) Katalog -> Beispiele: jeder Katalog-Name steht in .env.example und .env.integration.example, in seinem
  *      Abschnitt (Ueberschriften aus ENV_SECTIONS, in Katalog-Reihenfolge) und in Katalog-Reihenfolge — die
  *      Regeln des frueheren StartupTest testEnvCatalogWarnings (bis ef9f8af).
@@ -300,7 +302,11 @@ class EnvCatalogCheck {
     static run(argv) {
         process.chdir(ROOT);
         require('ts-node').register({ transpileOnly: true, project: path.join(ROOT, 'tsconfig.json') });
-        const { ENV_CATALOG, ENV_SECTIONS } = require(path.join(ROOT, 'server-app', 'startupEnvCheck.ts'));
+        require('tsconfig-paths').register({
+            baseUrl: ROOT,
+            paths: ts.readConfigFile(path.join(ROOT, 'tsconfig.json'), ts.sys.readFile).config.compilerOptions.paths,
+        });
+        const { ENV_CATALOG, ENV_SECTIONS, DOG_PACKAGE_ENV } = require(path.join(ROOT, 'server-app', 'startupEnvCheck.ts'));
 
         const known = new Set(ENV_CATALOG.flatMap((s) => [s.name, ...(s.anyOf ?? []), ...(s.aliases ?? [])]));
         const scanner = new EnvReadScanner(SourceFiles.list()).scan();
@@ -313,6 +319,34 @@ class EnvCatalogCheck {
         for (const name of NOT_CATALOGED.keys()) {
             if (known.has(name)) problems.push(`Ausnahme ${name} steht auch im Katalog — aus NOT_CATALOGED nehmen`);
             else if (!scanner.reads.has(name)) problems.push(`Ausnahme ${name} liest niemand mehr — aus NOT_CATALOGED nehmen`);
+        }
+
+        // P2.7: Dog-Pakete liefern ihre Variablen selbst (<paket>/env). Auch je Paket in beide Richtungen:
+        // was packages/<x>/ liest, steht in den envVars von <x>; was dort steht, liest <x> auch.
+        const SERVER_SIDE_PACKAGES = new Set(['core', 'typedefs', 'swaggrid']);
+        const declared = new Map(DOG_PACKAGE_ENV.map((p) => [p.packageName.replace(/^@martinschmieschek\/slopdogs-/, ''), p.envVars]));
+        const readsByPackage = new Map();
+        for (const [name, where] of scanner.reads) {
+            for (const w of where) {
+                const m = /^packages\/([^/]+)\//.exec(w);
+                if (!m || SERVER_SIDE_PACKAGES.has(m[1])) continue;
+                if (!readsByPackage.has(m[1])) readsByPackage.set(m[1], new Map());
+                readsByPackage.get(m[1]).set(name, w);
+            }
+        }
+        for (const [pack, reads] of readsByPackage) {
+            const own = new Set((declared.get(pack) || []).flatMap((s) => [s.name, ...(s.anyOf ?? []), ...(s.aliases ?? [])]));
+            for (const [name, w] of reads) {
+                if (!own.has(name))
+                    problems.push(`packages/${pack} liest ${name}, seine envVars (src/env.ts, Einstieg ./env) nennen es nicht: ${w}`);
+            }
+        }
+        for (const [pack, vars] of declared) {
+            const reads = readsByPackage.get(pack) || new Map();
+            for (const spec of vars) {
+                if (![spec.name, ...(spec.anyOf ?? []), ...(spec.aliases ?? [])].some((n) => reads.has(n)))
+                    problems.push(`packages/${pack}: envVars nennt ${spec.name}, das Paket liest es nicht`);
+            }
         }
 
         const examples = new ExampleFileCheck(ENV_CATALOG, ENV_SECTIONS);

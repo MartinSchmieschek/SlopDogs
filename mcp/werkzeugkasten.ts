@@ -11,7 +11,7 @@
  * der VM-Capability-Registry, die Infrastruktur-Anweisungen aus `static mcpGuidance` an
  * den Dog-Klassen. Eine neue Faehigkeit ist damit automatisch eine angekuendigte.
  */
-import { listVmGlobalCapabilities } from '@martinschmieschek/slopdogs-core';
+import { listVmGlobalCapabilities } from '@martinschmieschek/slopdogs-core/runtime';
 import type { BaseDogInfo } from './tools/types';
 
 export function buildWerkzeugkasten(baseDogsList: BaseDogInfo[]): string {

@@ -47,7 +47,7 @@ export abstract class Dog<Y> implements IHuntingDog<Y> {
     }
 
     /** Extra globals this hound provides to SerializedDog children. Override to carry tools into the VM. */
-    getVmContextContributions(): Record<string, any> | undefined {
+    getVmContextContributions(): Record<string, unknown> | undefined {
         return undefined;
     }
 

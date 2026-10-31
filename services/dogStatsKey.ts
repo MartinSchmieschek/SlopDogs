@@ -1,6 +1,7 @@
 // dogStatsKeyOf — unter welchem Schluessel ein Dog-Lauf gezaehlt wird (P4b 4b.2). Eine Quelle fuer
 // den Observer in runKennel und fuer die Referenz-Normalisierung: Versionen zaehlen auf ihre Lineage.
-import { BASE_DOG_PREFIX, SerializedDog, type IHuntingDog } from '@martinschmieschek/slopdogs-core';
+import { type IHuntingDog } from '@martinschmieschek/slopdogs-core';
+import { BASE_DOG_PREFIX, SerializedDog } from '@martinschmieschek/slopdogs-core/runtime';
 
 /**
  * SerializedDog/MimicDog mit lineageId -> die lineageId; Base-Dog -> `base:<Klasse>`;

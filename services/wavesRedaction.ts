@@ -9,7 +9,7 @@
 //                READ alles | RUN Identitaet + result + error (gekuerzt), kein Code/Kontext |
 //                NONE Identitaet + Schloss, result und error redigiert.
 import { findLeadNodeEntry, type NodeEntry, type Waves } from './WavesConverter';
-import type { IKennelConfig } from '@martinschmieschek/slopdogs-core';
+import type { IKennelConfig } from '@martinschmieschek/slopdogs-core/runtime';
 import type { IStore } from '../store/IStore';
 import { DogAclIndex } from './dogAccess';
 import { LeadOutcome, type LeadStatus } from './LeadOutcome';

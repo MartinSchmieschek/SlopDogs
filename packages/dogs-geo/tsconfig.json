@@ -1,5 +1,5 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "@martinschmieschek/slopdogs-typedefs/tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
@@ -7,13 +7,5 @@
   },
   "include": [
     "src/**/*"
-  ],
-  "references": [
-    {
-      "path": "../core"
-    },
-    {
-      "path": "../geo-pact"
-    }
   ]
 }

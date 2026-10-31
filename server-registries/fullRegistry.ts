@@ -2,7 +2,12 @@
  * Volle Base-Dog- und Pact-Registry für development/production.
  * Nur von fullRegistry.ts importieren — nicht in main.ts bündeln, damit Integration weniger Module lädt.
  */
-import { QueryRetriever, BodyRetriever, WebSocketChannelRetriever, ChannelLiveSnippetRetriever } from '@martinschmieschek/slopdogs-core';
+import {
+    QueryRetriever,
+    BodyRetriever,
+    WebSocketChannelRetriever,
+    ChannelLiveSnippetRetriever,
+} from '@martinschmieschek/slopdogs-core/runtime';
 import {
     RandomRecipesRetriever,
     RandomEveryThingRetriever,

@@ -1,6 +1,7 @@
 import express, { type Application } from 'express';
 import cookieParser from 'cookie-parser';
-import { ISerializedDogConfig, SerializedDog, MimicDog, type ICacheHandler } from '@martinschmieschek/slopdogs-core';
+import { type ICacheHandler } from '@martinschmieschek/slopdogs-core';
+import { ISerializedDogConfig, SerializedDog, MimicDog } from '@martinschmieschek/slopdogs-core/runtime';
 import { IStore } from '../store/IStore';
 import { Controller } from '../api/Controller';
 import { KennelController } from '../api/KennelController';
@@ -39,7 +40,8 @@ import type { IDogStatsStore, IKennelStatsStore } from '../store/IKennelStatsSto
 import type { DogReferenceIndex } from '../services/DogReferenceIndex';
 import { DogStatsService } from '../services/DogStatsService';
 import { startMemoryHeartbeat } from '../api/utils/memoryLog';
-import { BaseDogPacks } from '../services/BaseDogPacks';
+import { BaseDogPacks, type DogPackage } from '../services/BaseDogPacks';
+import { registerBaseDogPackages } from '../services/dogVersions';
 import type { BaseDogInfo } from '../mcp/tools/types';
 import type { HttpFrontEndBinder, HttpFrontEndContext } from './httpFrontEndTypes';
 import { LandingPage } from './LandingPage';
@@ -414,7 +416,8 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
         // Klasse (siehe WebSocketChannelRetriever.mcpGuidance). Von dort reist sie bis in
         // list_nodes und in den initialize-Brief -- eine Quelle, kein zweiter Ort zum Verrotten.
         const guidance = (dog as any)?.constructor?.mcpGuidance;
-        const pack = packs.packOf(dog);
+        const pkg = packs.packageOf(dog);
+        const pack = pkg?.pack;
         return {
             id: 'base:' + dog.name,
             name: dog.name,
@@ -425,8 +428,11 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
             parentsOptional: dependencyNames((dog as any).optional),
             ...(typeof guidance === 'string' && guidance ? { guidance } : {}),
             ...(pack ? { pack } : {}),
+            // P2.5: npm-Name und Version des Pakets, aus dessen package.json (auch unter node_modules).
+            ...(pkg ? { packageName: pkg.name, packageVersion: pkg.version } : {}),
         };
     });
+    registerBaseDogPackages(allBaseDogs.map((dog) => [dog.name, packs.packageOf(dog)] as [string, DogPackage | null]));
 
     // Pacts leben NUR in baseDogsMap, nie in allBaseDogs -- ohne sie kann ein Agent nicht
     // erkennen, welcher Vertrag hinter einem parentsRequired-Eintrag steckt und wie er zu
@@ -437,6 +443,7 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
         if ((DogClass as any)?.__isPact !== true) continue;
         const typeDef = (DogClass as any).__pactReturnTypeDef ?? (DogClass as any).__pactSourceTypeName;
         const shape = typeof typeDef === 'string' && typeDef ? ` Expected shape: ${typeDef}` : '';
+        const pactPkg = packs.packageOf(DogClass);
         baseDogsList.push({
             id: 'base:' + dogName,
             name: dogName,
@@ -446,6 +453,7 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
             parentsOptional: [],
             isPact: true,
             ...(typeof typeDef === 'string' && typeDef ? { pactTypeDef: typeDef } : {}),
+            ...(pactPkg ? { packageName: pactPkg.name, packageVersion: pactPkg.version } : {}),
         });
     }
     const snapshotCache = new KennelSnapshotCache();

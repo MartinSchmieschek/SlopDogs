@@ -25,16 +25,13 @@
  */
 
 import type { PrismaClient } from '../store/generated/prisma-cache-client';
+import { tileKeyString, type ITileFeatureCache, type StoredGeoFeature, type TileKey } from '@martinschmieschek/slopdogs-core';
 import {
     isRuntimeLogVerbose,
     tilesIntersectingBBox,
-    tileKeyString,
-    type ITileFeatureCache,
-    type StoredGeoFeature,
     type TileCoverageResult,
     type TileFetchResult,
-    type TileKey,
-} from '@martinschmieschek/slopdogs-core';
+} from '@martinschmieschek/slopdogs-core/runtime';
 
 interface CoverageRow {
     dogType: string;

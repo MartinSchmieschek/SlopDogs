@@ -19,7 +19,7 @@ process.on('uncaughtException', (err) => {
     process.exit(1);
 });
 
-import { WebSocketChannelRetriever, registerVmGlobalCapability, setVmConsoleSink } from '@martinschmieschek/slopdogs-core';
+import { WebSocketChannelRetriever, registerVmGlobalCapability, setVmConsoleSink } from '@martinschmieschek/slopdogs-core/runtime';
 import http from 'http';
 import type { Application } from 'express';
 import fs from 'fs';

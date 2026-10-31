@@ -7,7 +7,7 @@ import {
     DOG_MEMPRESSURE_MARKER,
     DogWorkerGate,
     type MemoryProbe,
-} from '@martinschmieschek/slopdogs-core';
+} from '@martinschmieschek/slopdogs-core/runtime';
 import { Controller } from './api/Controller';
 import { AbstractController } from './api/AbstractController';
 import { KennelController } from './api/KennelController';

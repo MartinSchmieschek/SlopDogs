@@ -182,7 +182,7 @@
   },
   "packages/core/src/KennelRun.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 14
+      "count": 11
     },
     "@typescript-eslint/no-unused-vars": {
       "count": 1
@@ -195,12 +195,12 @@
   },
   "packages/core/src/core/entities/IHuntingDog.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 2
+      "count": 1
     }
   },
   "packages/core/src/core/entities/abstractHuntingDog.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 15
+      "count": 14
     },
     "@typescript-eslint/no-this-alias": {
       "count": 1
@@ -221,7 +221,7 @@
   },
   "packages/core/src/dogs/SerializedDog.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 44
+      "count": 35
     },
     "@typescript-eslint/no-unused-vars": {
       "count": 3
@@ -253,7 +253,7 @@
   },
   "packages/core/src/platform/BodyRetriever.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 6
+      "count": 2
     },
     "@typescript-eslint/no-unused-vars": {
       "count": 1

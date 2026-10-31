@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { IStore } from '../../store/IStore';
-import { SerializedDog, IKennelConfig, BASE_DOG_PREFIX, type IMimicDogConfig } from '@martinschmieschek/slopdogs-core';
+import { SerializedDog, IKennelConfig, BASE_DOG_PREFIX, type IMimicDogConfig } from '@martinschmieschek/slopdogs-core/runtime';
 import { kennelExists, saveKennelSeed, saveMimic } from '../seed-helpers';
 import { EARTH_PULSE_DATA_CODE, EARTH_PULSE_RENDERER_CODE } from '../earth-pulse-code';
 

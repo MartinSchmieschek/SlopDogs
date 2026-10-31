@@ -74,7 +74,7 @@ export type VmGlobalCapabilityContext = {
  * Eine Factory, die fuer einen gegebenen Laufzeit-Kontext ein frisches
  * Bundle von VM-Methoden liefert (z.B. tenant-scoped `jsonStore`).
  */
-export type VmGlobalCapabilityFactory = (ctx: VmGlobalCapabilityContext) => Record<string, any>;
+export type VmGlobalCapabilityFactory = (ctx: VmGlobalCapabilityContext) => Record<string, unknown>;
 
 const vmGlobalCapabilities: Map<string, VmGlobalCapabilityFactory> = new Map();
 /**
@@ -200,8 +200,8 @@ export function isPrivateNetworkAddress(address: string): boolean {
  * verschmelzen. Factories, die werfen, werden uebersprungen.
  * Welle 8: nimmt optional einen ctx, den jede Factory bekommt.
  */
-export function buildVmGlobalCapabilities(ctx: VmGlobalCapabilityContext = {}): Record<string, any> {
-    const out: Record<string, any> = {};
+export function buildVmGlobalCapabilities(ctx: VmGlobalCapabilityContext = {}): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
     for (const [name, factory] of vmGlobalCapabilities) {
         try {
             out[name] = factory(ctx);
@@ -220,8 +220,9 @@ export function buildVmGlobalCapabilities(ctx: VmGlobalCapabilityContext = {}): 
  * niemand findet Zeichen 6982 durch Hinsehen. Wir schneiden die Stelle heraus und markieren
  * sie, damit der Aufrufer den Fehler sieht statt ihn zu suchen.
  */
-export function describeTranspileError(source: string, err: any): string {
-    const roh = err?.message ?? String(err);
+export function describeTranspileError(source: string, err: unknown): string {
+    const message = (err as { message?: unknown } | null | undefined)?.message;
+    const roh = typeof message === 'string' ? message : String(message ?? err);
     const m = /\((\d+):(\d+)\)/.exec(roh);
     if (!m) return roh;
     const zeile = Number(m[1]),
@@ -613,8 +614,11 @@ export interface IUpdateInput {
     displayName?: string;
     /** @deprecated Version number — a relic of the old linear rite, kept only fer the transition */
     version?: number;
-    /** Additional eldritch properties, uncharted and unknowable, carried through the abyss */
-    [key: string]: any;
+    /**
+     * Additional eldritch properties, uncharted and unknowable, carried through the abyss.
+     * `unknown`, nicht `any` (P2.2): ungenannte Felder reisen unveraendert mit, wer eines liest, prueft seinen Typ.
+     */
+    [key: string]: unknown;
 }
 
 /**
@@ -642,7 +646,7 @@ export interface ISerializedDogConfig extends IUpdateInput {
 
 /** A supplier that injects app-specific globals into the VM realm -- the void provides what the core cannot */
 export type SerializedDogVmGlobalsSupplier = (
-    ctx: Record<string, any>,
+    ctx: Record<string, unknown>,
     dog: SerializedDog<unknown>,
     /** The kennel (simpleVmContext) or season.exhausted (runExternalCode) -- source hounds fer context */
     sourceDogs: IHuntingDog<unknown>[] | null,
@@ -764,7 +768,7 @@ export class SerializedDog<T> extends Dog<T> {
      * Methoden-Bundle sichtbar; fer runExternalCode werden sie spaeter erneut
      * gemerged, sodass beide Pfade dieselbe Oberflaeche zeigen.
      */
-    protected buildBaseContext(): Record<string, any> {
+    protected buildBaseContext(): Record<string, unknown> {
         return {
             fetch: fetch,
             console: console,
@@ -847,7 +851,7 @@ export class SerializedDog<T> extends Dog<T> {
      * Merges base context, cached parent yields, and kennel-ref parents.
      * The void provides only what is needed, nothing more.
      */
-    public get simpleVmContext(): Record<string, any> | undefined {
+    public get simpleVmContext(): Record<string, unknown> | undefined {
         // Start with the base tools -- fetch and console, the spirit's lifeline
         const justContext = this.buildBaseContext();
 
@@ -1055,7 +1059,7 @@ export class SerializedDog<T> extends Dog<T> {
     }
 
     /** The raw config of this spirit -- its full blueprint, laid bare */
-    public get instanceConfig(): any {
+    public get instanceConfig(): ISerializedDogConfig {
         return this.config;
     }
 

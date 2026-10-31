@@ -1,7 +1,8 @@
 /**
- * Precompile-Schritt für int/prod: ruft CompilerCache.computeForBuild() einmalig auf,
- * spannt dabei genau ein ts.Program über das gesamte Repo und materialisiert
- * Pact-Return-Typen sowie Klassen-Typdefinitionen nach dist/type-defs.json.
+ * Precompile-Schritt für int/prod: mischt die `type-defs.json` aller installierten SlopDogs-Pakete
+ * (jedes Paket schreibt sie beim eigenen Build mit `slopdogs-typedefs build`, PLAN-DOG-PAKETE P2.1) mit den
+ * Server-eigenen Pact- und Klassen-Typen und schreibt das Ergebnis nach dist/type-defs.json
+ * (`computeTypeDefsForBuild` in services/CompilerCache.ts).
  *
  * Zur Laufzeit lädt main.ts diese JSON über CompilerCache.loadPrecomputed(),
  * sodass kein ts.createProgram in production/integration mehr aufgerufen wird.
@@ -16,10 +17,10 @@ if (!fs.existsSync(compiledCachePath)) {
     process.exit(1);
 }
 
-const { CompilerCache } = require(compiledCachePath);
+const { computeTypeDefsForBuild } = require(compiledCachePath);
 
 const start = Date.now();
-const payload = CompilerCache.computeForBuild();
+const { payload, conflicts, packages } = computeTypeDefsForBuild(projectRoot);
 const elapsed = ((Date.now() - start) / 1000).toFixed(2);
 
 const outPath = path.resolve(projectRoot, 'dist/type-defs.json');
@@ -29,5 +30,8 @@ fs.writeFileSync(outPath, JSON.stringify(payload));
 const pactCount = Object.keys(payload.pactReturnTypes).length;
 const classCount = Object.keys(payload.classTypes).length;
 console.log(
-    `[precompile-typedefs] ${pactCount} Pact-Typen, ${classCount} Klassen-Typen → ${path.relative(projectRoot, outPath)} (${elapsed}s)`,
+    `[precompile-typedefs] ${pactCount} Pact-Typen, ${classCount} Klassen-Typen aus ${packages} Paketen + Server → ${path.relative(projectRoot, outPath)} (${elapsed}s)`,
 );
+for (const c of conflicts) {
+    console.log(`[precompile-typedefs] Konflikt ${c.kind} ${c.key}: ${c.kept} behalten, ${c.dropped} verworfen`);
+}

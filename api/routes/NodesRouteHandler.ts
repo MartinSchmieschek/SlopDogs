@@ -1,6 +1,6 @@
 // The NodesRouteHandler — summoner of the hound manifest.
 // From tangent planes the dogs emerge, each bearing name and form for those who seek to know.
-import { BASE_DOG_PREFIX, SerializedDog } from '@martinschmieschek/slopdogs-core';
+import { BASE_DOG_PREFIX, SerializedDog } from '@martinschmieschek/slopdogs-core/runtime';
 import { ControllerRegistry } from './ConfigRouteHandler';
 import { accessOf, canRun, filterRunnable, runView, withMyRights, type AclEntity } from '../../mcp/auth/visibility';
 import type { AuthCtx } from '../../mcp/auth/middleware';
@@ -20,6 +20,9 @@ interface IBaseDogInfo {
     contextName: string;
     /** P6 U5: the package it comes from (`dogs-weather`, `core`) — the browser's pack filter. */
     pack?: string;
+    /** P2.5: npm name and version of that package, read from its package.json. */
+    packageName?: string;
+    packageVersion?: string;
 }
 
 /** Fields `lean=1` drops from a list entry: the code — the browser and the palette list, they do not read. */
@@ -51,17 +54,22 @@ export class NodesRouteHandler {
                 parentsOptional: dependencyNames(dog.optional),
             });
         }
-        this.baseDogsList = baseDogs.map((dog) => ({
-            id: BASE_DOG_PREFIX + dog.name,
-            name: dog.name,
-            description: dog.description,
-            type: 'BaseDog',
-            icon: dog.icon,
-            // A base dog binds under its own IHuntingDog.name (its class name) — the same
-            // getter SerializedDog.name implements via toCamelCase. One source, two dog kinds.
-            contextName: dog.name,
-            pack: packs.packOf(dog) ?? undefined,
-        }));
+        this.baseDogsList = baseDogs.map((dog) => {
+            const pkg = packs.packageOf(dog);
+            return {
+                id: BASE_DOG_PREFIX + dog.name,
+                name: dog.name,
+                description: dog.description,
+                type: 'BaseDog',
+                icon: dog.icon,
+                // A base dog binds under its own IHuntingDog.name (its class name) — the same
+                // getter SerializedDog.name implements via toCamelCase. One source, two dog kinds.
+                contextName: dog.name,
+                pack: pkg?.pack ?? undefined,
+                packageName: pkg?.name,
+                packageVersion: pkg?.version,
+            };
+        });
     }
 
     /** `lean=1` (P6 U5): the list without code — 840 kB -> a few dozen for the /dogs browser. */

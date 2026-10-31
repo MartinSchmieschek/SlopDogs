@@ -329,7 +329,7 @@ In `dogIds`, BaseDogs are prefixed (`base:QueryRetriever`), SerializedDogs are r
 
 **Kennel versioning** -- Every Kennel carries a stable **lineageId** (the name you chose) and a chain of **versionIds** (GUIDs). Each save creates a new version with a `parentId` pointing back. The full history is navigable -- branch off, revert, compare. The Kennel remembers its past lives.
 
-**Kennel export & import** -- `GET /api/kennels/:id/export` returns a **bundle** (format `bundleVersion: 2`): current Kennel config plus transitively collected SerializedDogs and MimicDogs; `base:` dog IDs stay as references. `POST /api/kennels/import` mints **new** GUIDs for serialized dogs and creates a **single** fresh Kennel version (no version history from the source). **Optional body field** `importTarget: { "kennelId": string, "name": string }` — when both strings are set, the imported Kennel uses that id and display name. If you omit it, the server **suggests** an id and name (collision-safe; see `suggestKennelImportTarget` in `@martinschmieschek/slopdogs-core`). All `base:` refs in the bundle must exist on the target server or import fails with 400. **In the browser UI** (Kennel list on `:4300`), the same workflow is copy-and-paste: **Export** in a row's `⋯` menu copies that bundle JSON to the clipboard; the **Import** button pastes bundle JSON from the clipboard and imports it. See [Kennel list copy and paste](#kennel-list-copy-and-paste). Copy and paste across instances or between UI, terminal, and other tools.
+**Kennel export & import** -- `GET /api/kennels/:id/export` returns a **bundle** (format `bundleVersion: 2`): current Kennel config plus transitively collected SerializedDogs and MimicDogs; `base:` dog IDs stay as references. `POST /api/kennels/import` mints **new** GUIDs for serialized dogs and creates a **single** fresh Kennel version (no version history from the source). **Optional body field** `importTarget: { "kennelId": string, "name": string }` — when both strings are set, the imported Kennel uses that id and display name. If you omit it, the server **suggests** an id and name (collision-safe; see `suggestKennelImportTarget` in `@martinschmieschek/slopdogs-core/runtime`). All `base:` refs in the bundle must exist on the target server or import fails with 400. **In the browser UI** (Kennel list on `:4300`), the same workflow is copy-and-paste: **Export** in a row's `⋯` menu copies that bundle JSON to the clipboard; the **Import** button pastes bundle JSON from the clipboard and imports it. See [Kennel list copy and paste](#kennel-list-copy-and-paste). Copy and paste across instances or between UI, terminal, and other tools.
 
 **Caching** -- Two-tier memory so dogs don't repeat themselves:
 - **KV cache** (`CacheHandler`) -- TTL-based key-value store with in-flight request deduplication plus negative-caching for 429/504 to break provider retry storms.
@@ -753,35 +753,58 @@ Every BaseDog lives in its own package under `packages/`. Follow these steps to 
 mkdir -p packages/dogs-mydog/src
 ```
 
-Create three files:
+Create four files (copy them from a similar package, e.g. `dogs-weather`):
 
 **`packages/dogs-mydog/package.json`**
 ```json
 {
   "name": "@martinschmieschek/slopdogs-dogs-mydog",
-  "version": "0.1.0-alpha.1",
+  "version": "0.2.0-beta.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "!dist/tsconfig.tsbuildinfo"],
+  "slopdogs": { "typeDefs": "dist/type-defs.json", "surface": "dist/surface.json" },
   "private": true,
-  "dependencies": { "@martinschmieschek/slopdogs-core": "file:../core" },
-  "peerDependencies": { "@martinschmieschek/slopdogs-core": "0.1.0-alpha.1" },
-  "scripts": { "build": "tsc" },
-  "devDependencies": { "typescript": "^5.0.0" }
+  "scripts": {
+    "build": "tsc -p tsconfig.json && slopdogs-typedefs build",
+    "prepare": "node -e \"process.exit(require('fs').existsSync('../../tsconfig.packages.json') ? 0 : 1)\" || npm run build"
+  },
+  "peerDependencies": { "@martinschmieschek/slopdogs-core": "^0.2.0-beta.0" },
+  "devDependencies": {
+    "@martinschmieschek/slopdogs-core": "file:../core",
+    "@martinschmieschek/slopdogs-typedefs": "file:../typedefs",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
 }
 ```
 
-**`packages/dogs-mydog/tsconfig.json`**
+- **core is a peerDependency, never a dependency** (same for `geo-pact` and `dogs-demo` if you use them): the server must hold exactly one copy. Parents are matched by class identity (`instanceof`), and core keeps singletons (slot gate, capability registry) — a second copy would match no parent and double the slot cap without a word. The devDependency `file:../core` is only there so the package builds by itself.
+- `build` compiles and then writes `dist/type-defs.json` (pact and class types — the server merges them at build time, it reads no `.d.ts`) and `dist/surface.json` (exports, classes, pact-type hashes) with `slopdogs-typedefs`. `slopdogs-typedefs surface --check <old surface.json>` exits 1 when something was removed, renamed or a pact type changed without a major version bump.
+- `prepare` builds when the package is installed from git or packed on its own; inside this monorepo it does nothing, because the root build (`npm run build:packages`) builds all packages in order.
+- Import only `@martinschmieschek/slopdogs-core`, never `@martinschmieschek/slopdogs-core/runtime` (sandbox, gate, kennel run — the server's side); ESLint refuses it in `packages/`.
+
+**`packages/dogs-mydog/tsconfig.json`** — stands alone (no `../` in it), so the package builds without this repo:
 ```json
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "@martinschmieschek/slopdogs-typedefs/tsconfig.base.json",
   "compilerOptions": { "outDir": "./dist", "rootDir": "./src", "tsBuildInfoFile": "./dist/tsconfig.tsbuildinfo" },
-  "include": ["src/**/*"],
-  "references": [{ "path": "../core" }]
+  "include": ["src/**/*"]
 }
+```
+
+**`packages/dogs-mydog/tsconfig.monorepo.json`** — only for `tsc -b` in this repo:
+```json
+{ "extends": "./tsconfig.json", "references": [{ "path": "../core/tsconfig.monorepo.json" }] }
 ```
 
 **`packages/dogs-mydog/src/index.ts`** — barrel export for all public symbols.
+
+If the package reads environment variables, list them in **`packages/dogs-mydog/src/env.ts`** (`export const envVars: readonly DogEnvVar[] = [...]`, same fields as the server's `ENV_CATALOG`), add `"./env": { "types": "./dist/env.d.ts", "default": "./dist/env.js" }` to `exports` and a path for `@martinschmieschek/slopdogs-dogs-mydog/env` to the root `tsconfig.json`. The server reads them into its catalog (start-up warning, `.env` examples); `npm run check:env-catalog` fails if the package reads a variable it does not list, or lists one it does not read.
 
 ### 2. Define a Pact (if the Dog needs input)
 
@@ -855,9 +878,9 @@ const allPacts = [ ..., MyDogQueryPact ];
 "dependencies": { "@martinschmieschek/slopdogs-dogs-mydog": "file:packages/dogs-mydog" }
 ```
 
-**Root `tsconfig.packages.json`** — add the package to `references` (`{ "path": "./packages/dogs-mydog" }`); `npm run build:packages` then builds it with the others.
+**Root `tsconfig.packages.json`** — add the package to `references` (`{ "path": "./packages/dogs-mydog/tsconfig.monorepo.json" }`); `npm run build:packages` then builds it with the others and writes its `type-defs.json`/`surface.json`.
 
-The package's own `package.json` declares `typescript` and `@types/node` as devDependencies, so it also builds outside the monorepo.
+The package's own `package.json` declares everything it needs to build (core and the type tool as devDependencies, `typescript`, `@types/node`), so it also builds alone: copy the folder, point the `file:` devDependencies at `npm pack` tarballs of core and typedefs, `npm install`, `npm run build`, `npm pack`.
 
 Then run `npm install` so the symlink in `node_modules/@martinschmieschek/slopdogs-dogs-mydog` is created.
 

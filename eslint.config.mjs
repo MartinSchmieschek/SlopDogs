@@ -61,6 +61,28 @@ export default defineConfig(
         },
     },
     {
+        // P2.3: Dog-Pakete kennen von core nur den Vertrag (Haupteinstieg). Die Laufzeit
+        // (`/runtime`: Sandbox, Gate, Kennel-Lauf, Plattform-Dogs) und Tiefenpfade sind Server-Sache;
+        // ein Dog-Paket, das sie importiert, haengt am Laufzeit-Release von core statt am Vertrag.
+        name: 'slopdogs/dog-packages-contract-only',
+        files: ['packages/**/*.{ts,mts,cts,js,cjs,mjs}'],
+        ignores: ['packages/core/**'],
+        rules: {
+            '@typescript-eslint/no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        {
+                            group: ['@martinschmieschek/slopdogs-core/*'],
+                            message:
+                                'Dog-Pakete importieren nur den Vertrag @martinschmieschek/slopdogs-core (PLAN-DOG-PAKETE P2.3); /runtime gehoert dem Server.',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+    {
         // Dog-Rumpfe der Landing (theRun als Quelltext, ES5 fuer den Browser): kein Modul, sondern
         // ein Funktionsrumpf mit `return` auf oberster Ebene.
         name: 'slopdogs/dog-bodies',

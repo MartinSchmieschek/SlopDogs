@@ -2,166 +2,169 @@
   "files": [],
   "references": [
     {
-      "path": "./packages/core"
+      "path": "./packages/typedefs/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-air-quality"
+      "path": "./packages/core/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-animals-random"
+      "path": "./packages/dogs-air-quality/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-astronomy"
+      "path": "./packages/dogs-animals-random/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-biodiversity"
+      "path": "./packages/dogs-astronomy/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-birds"
+      "path": "./packages/dogs-biodiversity/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-charging"
+      "path": "./packages/dogs-birds/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-crypto"
+      "path": "./packages/dogs-charging/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-cuisine"
+      "path": "./packages/dogs-crypto/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-currency"
+      "path": "./packages/dogs-cuisine/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-demo"
+      "path": "./packages/dogs-currency/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-dev"
+      "path": "./packages/dogs-demo/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-dictionary"
+      "path": "./packages/dogs-dev/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-gaming"
+      "path": "./packages/dogs-dictionary/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-geo"
+      "path": "./packages/dogs-gaming/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-geocoding"
+      "path": "./packages/dogs-geo/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-github-trending"
+      "path": "./packages/dogs-geocoding/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-health"
+      "path": "./packages/dogs-github-trending/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-historical-weather"
+      "path": "./packages/dogs-health/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-holidays"
+      "path": "./packages/dogs-historical-weather/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-hue"
+      "path": "./packages/dogs-holidays/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-humor"
+      "path": "./packages/dogs-hue/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-images"
+      "path": "./packages/dogs-humor/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-ip-geo"
+      "path": "./packages/dogs-images/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-knowledge"
+      "path": "./packages/dogs-ip-geo/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-music"
+      "path": "./packages/dogs-knowledge/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-name-insights"
+      "path": "./packages/dogs-music/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-open-library"
+      "path": "./packages/dogs-name-insights/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-phenology"
+      "path": "./packages/dogs-open-library/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-pop-culture"
+      "path": "./packages/dogs-phenology/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-public-transport"
+      "path": "./packages/dogs-pop-culture/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-quiz"
+      "path": "./packages/dogs-public-transport/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-random-fact"
+      "path": "./packages/dogs-quiz/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-regional-news"
+      "path": "./packages/dogs-random-fact/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-religion"
+      "path": "./packages/dogs-regional-news/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-season"
+      "path": "./packages/dogs-religion/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-social"
+      "path": "./packages/dogs-season/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-space"
+      "path": "./packages/dogs-social/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-sports"
+      "path": "./packages/dogs-space/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-sun"
+      "path": "./packages/dogs-sports/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-talking"
+      "path": "./packages/dogs-sun/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-transit-trips"
+      "path": "./packages/dogs-talking/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-translate"
+      "path": "./packages/dogs-transit-trips/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-travel"
+      "path": "./packages/dogs-translate/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-tv"
+      "path": "./packages/dogs-travel/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-warframe"
+      "path": "./packages/dogs-tv/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-water"
+      "path": "./packages/dogs-warframe/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-weather"
+      "path": "./packages/dogs-water/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-web-archive"
+      "path": "./packages/dogs-weather/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-webcams"
+      "path": "./packages/dogs-web-archive/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-wiki-search"
+      "path": "./packages/dogs-webcams/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/dogs-wikipedia"
+      "path": "./packages/dogs-wiki-search/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/geo-pact"
+      "path": "./packages/dogs-wikipedia/tsconfig.monorepo.json"
     },
     {
-      "path": "./packages/swaggrid"
+      "path": "./packages/geo-pact/tsconfig.monorepo.json"
+    },
+    {
+      "path": "./packages/swaggrid/tsconfig.monorepo.json"
     }
   ]
 }

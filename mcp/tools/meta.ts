@@ -10,7 +10,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import v8 from 'v8';
-import { DogWorkerGate } from '@martinschmieschek/slopdogs-core';
+import { DogWorkerGate } from '@martinschmieschek/slopdogs-core/runtime';
 import { type ToolDef, type ToolDeps, ok, fail } from './types';
 import { ProcessMemory } from '../../services/ProcessMemory';
 import { kennelRunsSinceBoot } from '../../api/utils/memoryLog';

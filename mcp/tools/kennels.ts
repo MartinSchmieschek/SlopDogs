@@ -29,11 +29,12 @@ import {
     publicKennelPath,
     sanitizeLineDocs,
     type ILineDoc,
-} from '@martinschmieschek/slopdogs-core';
+} from '@martinschmieschek/slopdogs-core/runtime';
 import type { AuthCtx } from '../auth/middleware';
 import { SPUREN_NODES_FIELD_HINT, SPUREN_TASK_FIELD_HINT } from '../spuren-brief';
 import { REDACTED_TEXT, kennelRunView, redactWavesForCtx } from '../../services/wavesRedaction';
 import { KennelSnapshotCache } from '../snapshots/KennelSnapshotCache';
+import { dogVersionsOf } from '../../services/dogVersions';
 import { firstRefusedDogRef, refusedDogRefMessage } from '../../services/dogAccess';
 import { ListQuery, USAGE_FILTERS, USAGE_FILTER_HELP } from '../../api/routes/ListQuery';
 import { DogReuseAdvisor, type BuiltDog, type ReuseCandidate, type ReuseHint } from '../../services/DogReuseAdvisor';
@@ -773,6 +774,8 @@ export function getKennelTools(): ToolDef[] {
                         lead: { status: lead.status, ...(lead.error !== undefined ? { error: lead.error } : {}) },
                         waves: safeWaves,
                         kennelConfig: withMyRights(config as any, ctx),
+                        // P2.5: Paket-Versionen der Base-Dogs dieses Laufs.
+                        dogVersions: dogVersionsOf(waves),
                     });
                 } catch (err: any) {
                     return fail(runErrorText(err, access));

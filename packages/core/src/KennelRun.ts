@@ -47,7 +47,7 @@ export interface IKennelConfig {
     /** Default query parameters fer the editor -- the map's starting coordinates, drawn before we sail */
     defaultQuery?: Record<string, string>;
     /** Default body data fer the editor -- the cargo manifest, pre-loaded into the hold */
-    defaultBody?: any;
+    defaultBody?: unknown;
     /** Global mission briefing -- what dark task this kennel is bound to complete */
     task?: string;
     /** Per-node layout hints (position) and annotations (comments) for the wave-view canvas */
@@ -101,7 +101,7 @@ export class KennelRun {
     private serializedDogFactory: (ids: string[]) => Promise<Array<SerializedDog<unknown>>>;
     private mimicAdopter?: MimicAdopter;
     private queryData?: Record<string, string>;
-    private bodyData?: any;
+    private bodyData?: unknown;
     private vmGlobalsSuppliers: SerializedDogVmGlobalsSupplier[];
     private cacheHandler?: ICacheHandler;
     private capabilityCtx?: VmGlobalCapabilityContext;
@@ -159,7 +159,7 @@ export class KennelRun {
         baseDogClasses: Map<string, new () => IDog<unknown>> = new Map(),
         serializedDogFactory: (ids: string[]) => Promise<Array<SerializedDog<unknown>>> = async () => [],
         queryData?: Record<string, string>,
-        bodyData?: any,
+        bodyData?: unknown,
         vmGlobalsSuppliers: SerializedDogVmGlobalsSupplier[] = [],
         cacheHandler?: ICacheHandler,
         mimicAdopter?: MimicAdopter,

@@ -1,7 +1,7 @@
 // The ConfigRouteHandler — the ship's navigator, mapping all HTTP requests to their captains.
 // In luminous space, blackened stars: each subpath is a star, each controller its light.
 import { Request, Response } from 'express';
-import { isRuntimeLogVerbose, sanitizeLineDocs } from '@martinschmieschek/slopdogs-core';
+import { isRuntimeLogVerbose, sanitizeLineDocs } from '@martinschmieschek/slopdogs-core/runtime';
 import { AbstractController, IControllerResponse, IEntity } from '../AbstractController';
 import {
     accessOf,

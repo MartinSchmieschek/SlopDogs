@@ -23,7 +23,7 @@ function write(p, content) {
 
 const kennelHeader = `import { randomUUID } from 'crypto';
 import { IStore } from '../../store/IStore';
-import { SerializedDog, IKennelConfig, BASE_DOG_PREFIX, type IMimicDogConfig } from '@martinschmieschek/slopdogs-core';
+import { SerializedDog, IKennelConfig, BASE_DOG_PREFIX, type IMimicDogConfig } from '@martinschmieschek/slopdogs-core/runtime';
 import { kennelExists, saveKennelSeed, saveMimic } from '../seed-helpers';
 `;
 
@@ -38,7 +38,7 @@ write(
     path.join(root, 'seed-data', 'seed-helpers.ts'),
     `import { randomUUID } from 'crypto';
 import { IStore } from '../store/IStore';
-import { SerializedDog, type IMimicDogConfig } from '@martinschmieschek/slopdogs-core';
+import { SerializedDog, type IMimicDogConfig } from '@martinschmieschek/slopdogs-core/runtime';
 
 ${helpersCore}
 
@@ -62,7 +62,7 @@ write(
     path.join(root, 'seed-data', 'seed-default.ts'),
     `import { randomUUID } from 'crypto';
 import { IStore } from '../store/IStore';
-import { SerializedDog, IKennelConfig, BASE_DOG_PREFIX, type IMimicDogConfig } from '@martinschmieschek/slopdogs-core';
+import { SerializedDog, IKennelConfig, BASE_DOG_PREFIX, type IMimicDogConfig } from '@martinschmieschek/slopdogs-core/runtime';
 import { TalkingDog } from '@martinschmieschek/slopdogs-dogs-talking';
 import { RandomRecipesRetriever, CountryFlagBlackLab, DishFlagBlackLab, RandomEveryThingRetriever } from '@martinschmieschek/slopdogs-dogs-demo';
 import { saveKennelSeed } from './seed-helpers';
