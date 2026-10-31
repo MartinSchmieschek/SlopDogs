@@ -52,6 +52,8 @@ export const API_ROUTE = {
     kennelFavorite: '/api/kennels/:id/favorite',
     /** Ranglisten fuer die Landing (P4), vor ConfigRouteHandler registriert. */
     landing: '/api/landing',
+    /** Spur K: liefert `/kennels` gerade den Kennel `slopdogs-kennels`? Das Signal fuer die Angular-Links. */
+    kennelListStatus: '/api/kennel-list',
     kennelExport: '/api/kennels/:id/export',
     kennelImport: '/api/kennels/import',
     nodesList: '/api/nodes',
@@ -119,6 +121,8 @@ export const LEGACY_308 = [LEGACY_ROUTE.docs, LEGACY_ROUTE.swagger, LEGACY_ROUTE
 /** Schaufenster und Legacy-POST auf App-Ebene. */
 export const ROOT_ROUTE = {
     landing: '/',
+    /** Spur K: die Kennel-Liste als Kennel (KennelListPage); faellt sie aus, die Angular-Liste (SPA_ROUTES). */
+    kennelList: '/kennels',
     robots: '/robots.txt',
     legacySave: '/save',
 } as const;
@@ -165,6 +169,7 @@ export const EXPRESS_APP_ROUTES = [
     API_ROUTE.nodeUsage,
     API_ROUTE.readme,
     API_ROUTE.landing,
+    API_ROUTE.kennelListStatus,
     API_ROUTE.keys,
     API_ROUTE.keyByAlias,
     API_ROUTE.beta,
@@ -175,7 +180,7 @@ export const EXPRESS_APP_ROUTES = [
 ] as const;
 
 /** Frontend-Binder-Routen: erscheinen je nach Umgebung zusaetzlich im Stack. */
-export const FRONTEND_ROUTES = [ROOT_ROUTE.landing, ROOT_ROUTE.robots] as const;
+export const FRONTEND_ROUTES = [ROOT_ROUTE.landing, ROOT_ROUTE.robots, ROOT_ROUTE.kennelList] as const;
 
 /** Alle Pfade, die ein Text nennen darf (Doc-Lint). Alt-Pfade nur in Zeilen, die `308` oder `legacy` sagen. */
 export const DOCUMENTED_ROUTES = [

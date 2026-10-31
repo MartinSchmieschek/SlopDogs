@@ -1,0 +1,25 @@
+// SlopDogs kennel list · base. Box model, type roles, the focus ring, chips and the small helpers (sd-lift,
+// sd-skel, sd-rise) of ui-app/src/styles.scss. Focus: 3 px tape orange outside plus a 2 px ink ring, because
+// orange alone is 2.3:1 on paper (Follie spec 2.2).
+return [
+    '*,*::before,*::after{box-sizing:border-box}html{-webkit-text-size-adjust:100%}',
+    'body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-mono);font-size:14px;line-height:21px;',
+    'font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}h1,h2,h3,p{margin:0}',
+    'a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--line-strong);text-decoration-thickness:1px;text-underline-offset:3px}',
+    'a:hover{text-decoration-color:var(--ink)}button,input,textarea,select{font:inherit;color:inherit}',
+    ':focus-visible{outline:3px solid var(--focus);outline-offset:2px;box-shadow:0 0 0 2px var(--ink)}',
+    '::selection{background:var(--accent-soft)}[hidden]{display:none!important}',
+    '.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}',
+    '.sd-kicker{font-size:11px;line-height:14px;letter-spacing:.22em;text-transform:uppercase}',
+    '.sd-h1{font-size:18px;line-height:24px;font-weight:700}.sd-small{font-size:12px;line-height:17px}',
+    '.sd-data{font-size:13px;line-height:19px}.muted{color:var(--ink-2)}',
+    '.sd-chip{display:inline-flex;align-items:center;gap:6px;min-height:20px;padding:3px 7px;border:0;border-radius:0;',
+    'background:var(--ink);color:var(--paper);font:700 11px/14px var(--font-mono);letter-spacing:.16em;text-transform:uppercase;',
+    'white-space:nowrap;vertical-align:middle;text-decoration:none}',
+    '.sd-chip--live{background:var(--chip-live-bg);color:var(--chip-live-fg)}.sd-chip--soft{background:var(--paper-3);color:var(--ink-2)}',
+    '.sd-chip--frozen{background:var(--paper-3);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line-strong)}',
+    '.sd-chip--outline{min-height:32px;padding:0 var(--s3);border:2px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer}',
+    ".sd-chip--outline[aria-pressed='true']{background:var(--ink);color:var(--paper)}.sd-chip svg{flex:none}",
+    '.sd-lift{border:2px solid var(--ink);box-shadow:4px 4px 0 var(--ink)}.sd-skel{display:block;height:12px;background:var(--paper-3)}',
+    '.sd-rise{animation:sd-rise var(--dur-base) var(--ease-out) both}@keyframes sd-rise{from{opacity:0;transform:translateY(4px)}}',
+].join('');

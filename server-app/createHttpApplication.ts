@@ -13,6 +13,7 @@ import { KennelBundleHandler } from '../api/routes/KennelBundleHandler';
 import { KennelRatingHandler } from '../api/routes/KennelRatingHandler';
 import { KennelFavoriteHandler } from '../api/routes/KennelFavoriteHandler';
 import { LandingRouteHandler } from '../api/routes/LandingRouteHandler';
+import { API_ROUTE } from '../api/routes/routeTable';
 import { KeysRouteHandler } from '../api/routes/KeysRouteHandler';
 import { BetaRouteHandler } from '../api/routes/BetaRouteHandler';
 import { BetaKeys, type BetaKeyPrisma } from '../mcp/auth/betaKeys';
@@ -45,6 +46,7 @@ import { registerBaseDogPackages } from '../services/dogVersions';
 import type { BaseDogInfo } from '../mcp/tools/types';
 import type { HttpFrontEndBinder, HttpFrontEndContext } from './httpFrontEndTypes';
 import { LandingPage } from './LandingPage';
+import { KennelListPage } from './KennelListPage';
 import { ResponseCompression } from './ResponseCompression';
 import { LOCAL_USER } from './LocalMode';
 import { NetworkBoundary } from './NetworkBoundary';
@@ -154,7 +156,9 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     const publicDir = resolvePublicDir(serverRootDir);
     // P5: `/` = Lead-Ausgabe des Landing-Kennels aus dem Memo; den Lauf-Lieferanten bekommt sie unten.
     const landingPage = LandingPage.fromEnv(publicDir);
-    const frontCtx: HttpFrontEndContext = { devUiOrigin, angularBrowserDir, publicDir, landingPage };
+    // Spur K: `/kennels` = Lead-Ausgabe des Kennels `slopdogs-kennels`; Lauf und Fingerabdruck bekommt sie unten.
+    const kennelListPage = KennelListPage.fromEnv();
+    const frontCtx: HttpFrontEndContext = { devUiOrigin, angularBrowserDir, publicDir, landingPage, kennelListPage };
 
     const app = express();
 
@@ -396,6 +400,15 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
         listDogsOf,
         dogStats,
     }).registerRoutes(app);
+    // Spur K: liefert /kennels gerade den Kennel? Das Signal, mit dem die Angular-App ihre Links auf /kennels zur
+    // Vollseiten-Navigation macht — ohne Signal bleibt sie bei ihrer Liste (kein Neuladen im Kreis). VOR /api/:subpath.
+    app.get(API_ROUTE.kennelListStatus, (_req, res) => {
+        res.setHeader('Cache-Control', 'no-store');
+        kennelListPage.status().then(
+            (status) => res.json({ ok: true, ...status }),
+            () => res.json({ ok: true, active: false, kennelId: kennelListPage.kennelId }),
+        );
+    });
     // Key-Store (P4c): /api/keys und /api/keys/:alias — ebenfalls VOR /api/:subpath.
     new KeysRouteHandler(keyStore).registerRoutes(app);
     // Beta (SLOPDOGS_STAGE=beta, Beta-Keys): /api/beta, /api/beta/keys, /api/beta/keys/:id — ebenfalls VOR /api/:subpath.
@@ -426,6 +439,19 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
         callCounter: input.callCounter,
     });
     landingPage.useRunner(kennelRunHandler);
+    kennelListPage.use(kennelRunHandler, {
+        kennelHead: async (kennelId) => {
+            const head = await kennelsController.getById(kennelId);
+            return head.ok && head.data ? { id: String(head.data.id), dogIds: head.data.dogIds ?? [] } : null;
+        },
+        lineageOf: async (ref) => {
+            const normalized = await input.refIndex.normalize(ref);
+            return normalized.toKey.startsWith(BASE_DOG_PREFIX) ? null : normalized.toKey;
+        },
+        dogHeads: listDogsOf,
+    });
+    // Jede neue Dog- oder Kennel-Version: die naechste Anfrage an /kennels prueft den Fingerabdruck (live anpassbar).
+    input.refIndex.onChange(() => kennelListPage.markChanged());
     const kennelSwaggerHandler = new KennelSwaggerHandler(kennelRunHandler, nodesStore);
     const kennelBundleHandler = new KennelBundleHandler(kennelRunHandler, kennelsController, nodesStore, baseDogsMap);
 

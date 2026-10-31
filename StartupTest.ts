@@ -49,6 +49,7 @@ import type { Request as ExpressRequest, Response as ExpressResponse } from 'exp
 import { TrustedKennels } from './mcp/auth/trustedKennels';
 import { LandingKennels } from './mcp/auth/landingKennels';
 import { Maintainers } from './mcp/auth/maintainers';
+import { SLOPDOGS_KENNELS_KENNEL_ID, seedSlopdogsKennelsKennel } from './seed-data/kennels/slopdogs-kennels';
 
 /**
  * Arr, the testament of a single trial endured upon the eldritch seas —
@@ -144,7 +145,7 @@ export class StartupTest {
             // Spur L: der lokale Modus hat keinen Login — Boot-Guard und Netzgrenze sind dort die Zugriffspruefung.
             this.testLocalModeBootGuard();
             this.testLocalNetworkBoundary(app);
-            this.testKennelHardening();
+            await this.testKennelHardening(nodesStore, kennelsStore);
 
             // Block 2 — Paket-Kandidaten: wandern in P4 als Paket-Tests nach slopdogs-core bzw. slopdogs-base-dogs.
             await new PackageCandidateTests((name, passed, error) => this.addResult(name, passed, error)).run(baseDogsMap);
@@ -954,9 +955,11 @@ export class StartupTest {
      * fix/k-sandbox: die drei Haertungen der Kennel-Seiten in einem Fall — Sandbox-Kopfzeile, Landing-Sperre
      * besitzerloser Dogs, Lobby-Ticket an der Netzgrenze. Ohne listen und Netz; globaler Zustand (Sperrmenge,
      * Maintainer-Env) wird synchron gesetzt und im finally unveraendert zurueckgelegt.
+     * Spur K: die Kennel-Liste `slopdogs-kennels` ist nach dem Boot geseedet, vertraut und gepflegt, und ein zweiter
+     * Seed-Lauf (= zweiter Boot) laesst Kennel und Dogs unberuehrt.
      */
-    private testKennelHardening(): void {
-        const testName = 'fix/k-sandbox: Kennel-Haertung (Sandbox, Landing-Sperre, Lobby-Ticket)';
+    private async testKennelHardening(nodesStore: IStore, kennelsStore: IStore): Promise<void> {
+        const testName = 'fix/k-sandbox: Kennel-Haertung (Sandbox, Landing-Sperre, Lobby-Ticket, Kennel-Liste)';
         const lockedBefore = LandingKennels.lockedDogsSnapshot();
         const maintainersBefore = process.env[Maintainers.ENV];
         try {
@@ -1033,6 +1036,27 @@ export class StartupTest {
             }
             clock += 61_000;
             if (upgrade(`channelId=lobby-1&ticket=${ticket}`, 'null')) throw new Error('abgelaufenes Ticket angenommen');
+
+            // 4. Kennel-Liste (Spur K): geseedet, vertraut, gepflegt; der zweite Boot ueberschreibt sie nicht.
+            const listId = SLOPDOGS_KENNELS_KENNEL_ID;
+            const listRows = (await kennelsStore.findByLineage('KennelConfig', listId)) as Array<{ id: string; dogIds?: unknown }>;
+            if (listRows.length === 0) throw new Error(`${listId} nach dem Boot nicht geseedet`);
+            if (!TrustedKennels.isTrusted({ lineageId: listId })) throw new Error(`${listId} nicht vertraut`);
+            const listKennel = { lineageId: listId, ownerId: null, visibility: 'public' } as AclEntity;
+            if (canMutate(listKennel, this.fakeUser('U9'))) throw new Error(`${listId} fuer Nicht-Maintainer aenderbar`);
+            const dogLineages = JSON.parse(
+                typeof listRows[0].dogIds === 'string' ? listRows[0].dogIds : JSON.stringify(listRows[0].dogIds ?? []),
+            );
+            const dogVersionsBefore = (await Promise.all(dogLineages.map((l: string) => nodesStore.findByLineageId(l)))).flat().length;
+            if ((await seedSlopdogsKennelsKennel(nodesStore, kennelsStore)) !== 'kept')
+                throw new Error(`zweiter Boot seedet ${listId} neu`);
+            const listRowsAfter = await kennelsStore.findByLineage('KennelConfig', listId);
+            const dogVersionsAfter = (await Promise.all(dogLineages.map((l: string) => nodesStore.findByLineageId(l)))).flat().length;
+            if (listRowsAfter.length !== listRows.length || dogVersionsAfter !== dogVersionsBefore) {
+                throw new Error(
+                    `zweiter Boot hat ${listId} veraendert (${listRows.length}->${listRowsAfter.length} Versionen, ${dogVersionsBefore}->${dogVersionsAfter} Dog-Zeilen)`,
+                );
+            }
 
             this.addResult(testName, true);
         } catch (error) {

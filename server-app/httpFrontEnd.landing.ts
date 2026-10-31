@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import type { Application } from 'express';
+import type { Application, NextFunction, Request, Response } from 'express';
 import { ROOT_ROUTE } from '../api/routes/routeTable';
 import type { HttpFrontEndContext } from './httpFrontEndTypes';
 
@@ -31,4 +31,20 @@ export function bindLandingFiles(app: Application, ctx: HttpFrontEndContext): vo
         void landing.handleGet(req, res, next);
     });
     app.get(ROOT_ROUTE.robots, serve('robots.txt', 'public, max-age=300'));
+}
+
+/**
+ * Spur K: `/kennels` (und `/kennels/`, nicht `/kennels/<ref>`) liefert den Kennel `slopdogs-kennels`. Liefert er
+ * nichts, entscheidet `fallback`: prod/lokal reichen per next() an den SPA-Fallback (die Angular-Liste), dev leitet
+ * auf die Angular-Liste unter ng serve um. HEAD laeuft nie einen Kennel.
+ */
+export function bindKennelListPage(
+    app: Application,
+    ctx: HttpFrontEndContext,
+    fallback: (req: Request, res: Response, next: NextFunction) => void = (_req, _res, next) => next(),
+): void {
+    const page = ctx.kennelListPage;
+    if (!page) return;
+    app.head(ROOT_ROUTE.kennelList, (req, res, next) => page.handleHead(req, res, () => fallback(req, res, next)));
+    app.get(ROOT_ROUTE.kennelList, (req, res, next) => void page.handleGet(req, res, () => fallback(req, res, next)));
 }

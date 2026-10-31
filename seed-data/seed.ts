@@ -22,6 +22,7 @@ import { seedNaturkundlerKennel, seedElevationKennel, seedTrailScoutKennel } fro
 import { seedEarthPulseKennel } from './kennels/earth-pulse';
 import { seedVoidStormsKennel } from './kennels/void-storms';
 import { seedSlopdogsLandingKennel } from './kennels/slopdogs-landing';
+import { seedSlopdogsKennelsKennel } from './kennels/slopdogs-kennels';
 
 export async function runSeeds(nodesStore: IStore, kennelsStore: IStore): Promise<void> {
     const seedLineageId = await seedSerializedDog(nodesStore);
@@ -47,6 +48,8 @@ export async function runSeeds(nodesStore: IStore, kennelsStore: IStore): Promis
     await seedElevationKennel(nodesStore, kennelsStore);
     await seedTrailScoutKennel(nodesStore, kennelsStore);
     await seedSlopdogsLandingKennel(nodesStore, kennelsStore);
+    // Die Kennel-Liste (Spur K): nur beim ersten Boot, danach nie ueberschrieben (Live-Aenderungen der Maintainer).
+    await seedSlopdogsKennelsKennel(nodesStore, kennelsStore);
 }
 
 async function prismaSeedMain(): Promise<void> {

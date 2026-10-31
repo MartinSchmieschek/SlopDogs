@@ -2,13 +2,15 @@ import path from 'path';
 import express, { type Application } from 'express';
 import { SPA_FALLBACK_SKIP_PREFIXES } from '../api/routes/spaRouteConstants';
 import type { HttpFrontEndBinder, HttpFrontEndContext } from './httpFrontEndTypes';
-import { bindLandingFiles } from './httpFrontEnd.landing';
+import { bindKennelListPage, bindLandingFiles } from './httpFrontEnd.landing';
 
 /** Production / Integration: gebautes Angular ausliefern und SPA-Fallback ans Ende. */
 export const bindHttpFrontEnd: HttpFrontEndBinder = {
     beforeControllers(app: Application, ctx: HttpFrontEndContext): void {
         // Landing vor express.static — sonst liefert static fuer `/` die Angular-index.html.
         bindLandingFiles(app, ctx);
+        // Spur K: /kennels als Kennel; ohne Seite faellt die Anfrage zum SPA-Fallback durch (Angular-Liste).
+        bindKennelListPage(app, ctx);
         if (ctx.angularBrowserDir) {
             app.use(express.static(ctx.angularBrowserDir, { index: 'index.html' }));
         }

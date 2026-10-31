@@ -630,6 +630,14 @@ const SERVER_ENV_CATALOG: readonly EnvVarSpec[] = [
         consequence: 'Default',
     },
     {
+        name: 'KENNEL_LIST_PAGE',
+        section: 'operations',
+        since: 'K',
+        purpose: 'off: /kennels bleibt die Angular-Liste; sonst liefert /kennels den Kennel slopdogs-kennels, solange er laeuft',
+        defaultValue: 'on',
+        consequence: 'Default',
+    },
+    {
         name: 'HTTP_COMPRESSION',
         section: 'operations',
         since: 'P6-Fix',
