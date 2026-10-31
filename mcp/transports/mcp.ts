@@ -28,6 +28,7 @@ import type { AuthCtx } from '../auth/middleware';
 import { buildMcpInitializeInstructions } from '../spuren-brief';
 import { buildWerkzeugkasten } from '../werkzeugkasten';
 import { envFirst } from '@slopdogs/core';
+import { LocalMode } from '../../server-app/LocalMode';
 
 /**
  * Welle 11: tools/list token diet. The full long-form description is kept on
@@ -268,6 +269,20 @@ export function createMcpRouter(deps: ToolDeps): Router {
     // Account, Beta-Key). Ein MCP-Client, der hier GET probiert, liest so direkt den Weg zur Connection.
     router.get('/', (req: Request, res: Response) => {
         const base = process.env.MCP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+        // Lokaler Modus (Spur L): kein OAuth, kein Token — der Brief darf keinen Login-Weg beschreiben.
+        if (LocalMode.isEnabled(process.env)) {
+            res.set('Allow', 'POST').status(405).json({
+                error: 'method_not_allowed',
+                error_description: 'This server speaks MCP over POST /mcp (JSON-RPC, stateless). It does not use GET/SSE.',
+                service: 'SlopDogs MCP (local mode)',
+                message: 'Local network instance: no sign-in, no token. Every client in this network shares one local user.',
+                how_to_connect: {
+                    transport: 'streamable-http (stateless): send JSON-RPC to POST /mcp without an Authorization header.',
+                    example: `claude mcp add --transport http slopdogs ${base}/mcp`,
+                },
+            });
+            return;
+        }
         res.set('Allow', 'POST').status(405).json({
             error: 'method_not_allowed',
             error_description: 'This server speaks MCP over POST /mcp (JSON-RPC, stateless). It does not use GET/SSE.',

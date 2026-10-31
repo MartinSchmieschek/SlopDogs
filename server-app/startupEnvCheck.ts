@@ -9,10 +9,13 @@
  * Die Warnung beendet den Prozess NIE. Die harten Guards bleiben, wo sie sind:
  *   - scripts/load-env.cjs -> dbEnv.assertRequiredDbEnv (DbEnvError, Exit 1)
  *   - mcp/auth/middleware.ts authModeBootError (production/integration ohne Auth, Exit 78)
+ *   - server-app/LocalMode.ts LocalMode.bootError (SLOPDOGS_MODE=local mit Deployment-Zeichen, Exit 79)
  * Diese Zeilen sagen vorher, was fehlt und was es kostet — statt dass es erst beim ersten Login bricht.
  */
 
 /** Umgebungen, die der Dienst kennt. Alles andere zaehlt wie development (so auch authModeBootError). */
+import { LocalMode } from './LocalMode';
+
 export type NodeEnvName = 'development' | 'integration' | 'production';
 
 /** Abschnitte der .env-Dateien, in dieser Reihenfolge. */
@@ -22,8 +25,9 @@ export type EnvSection = 'required' | 'operations' | 'features' | 'integrations'
  * Zusatzbedingung einer Regel:
  *   authRequired     — nur wenn MCP_AUTH_REQUIRED=true (Login an)
  *   storeNotPostgres — nur wenn DATABASE_URL KEINE Postgres-URL ist (sonst spiegelt dbEnv.cjs Cache/JSON darauf)
+ *   notLocalMode     — nur ohne SLOPDOGS_MODE=local (der lokale Modus laeuft als production, aber ohne Login)
  */
-export type EnvCondition = 'authRequired' | 'storeNotPostgres';
+export type EnvCondition = 'authRequired' | 'storeNotPostgres' | 'notLocalMode';
 
 export interface EnvRule {
     /** In welchen NODE_ENVs die Regel greift. */
@@ -74,7 +78,7 @@ const DEPLOYED: readonly NodeEnvName[] = ['integration', 'production'];
 
 /** Pflicht deployed (dort ist Login Pflicht, sonst Exit 78) — lokal nur, wenn der Login an ist. */
 const AUTH_RULES: readonly EnvRule[] = [
-    { in: DEPLOYED, level: 'required' },
+    { in: DEPLOYED, level: 'required', when: 'notLocalMode' },
     { in: ['development'], level: 'required', when: 'authRequired' },
 ];
 
@@ -142,7 +146,7 @@ export const ENV_CATALOG: readonly EnvVarSpec[] = [
         defaultValue: 'nicht true (Super-User)',
         consequence: 'Exit 78 (EX_CONFIG)',
         requiredValue: 'true',
-        rules: [{ in: DEPLOYED, level: 'required' }],
+        rules: [{ in: DEPLOYED, level: 'required', when: 'notLocalMode' }],
     },
     {
         name: 'MCP_TOKEN_SIGNING_KEY', section: 'required', since: 'vor P1',
@@ -170,14 +174,14 @@ export const ENV_CATALOG: readonly EnvVarSpec[] = [
         purpose: 'Basis der redirect_uri (<base>/auth/google/callback), ohne Slash am Ende',
         defaultValue: 'http://localhost:3000',
         consequence: 'Google leitet nach localhost zurueck, Login tot',
-        rules: [{ in: DEPLOYED, level: 'required' }],
+        rules: [{ in: DEPLOYED, level: 'required', when: 'notLocalMode' }],
     },
     {
         name: 'MCP_BASE_URL', section: 'required', since: 'vor P1',
         purpose: 'Oeffentliche URL: OAuth-Discovery, Token-Issuer, Landing-Links',
         defaultValue: 'Discovery/Landing: Request-Host; Token-Issuer: http://localhost:3000',
         consequence: 'Tokens tragen iss=http://localhost:3000',
-        rules: [{ in: DEPLOYED, level: 'recommended' }],
+        rules: [{ in: DEPLOYED, level: 'recommended', when: 'notLocalMode' }],
     },
 
     // --- 2. Betrieb und Grenzen -------------------------------------------------------------------
@@ -214,12 +218,38 @@ export const ENV_CATALOG: readonly EnvVarSpec[] = [
     {
         name: 'TRUST_PROXY_HOPS', section: 'operations', since: 'P9',
         purpose: 'Proxy-Hops vor der App (express trust proxy): macht req.ip zur Client-IP fuer die Sperre je Quelle; zu hoch = X-Forwarded-For faelschbar, zu niedrig = alle Anonymen eine Quelle',
-        defaultValue: '1 in integration/production, sonst 0', consequence: 'Default nach NODE_ENV',
+        defaultValue: '1 in integration/production, sonst 0; lokaler Modus immer 0 (> 0 = Exit 79)', consequence: 'Default nach NODE_ENV',
+    },
+    {
+        name: 'SLOPDOGS_MODE', section: 'operations', since: 'Spur L',
+        purpose: 'local = lokaler Modus auf dem Pi (nur mit NODE_ENV=production): kein Login, nur LAN, ein gemeinsamer Nutzer; jeder andere Wert bricht ab',
+        defaultValue: 'leer = heutiges Verhalten', consequence: 'kein lokaler Modus',
+    },
+    {
+        name: 'SLOPDOGS_LOCAL_ALLOW_CONTAINER', section: 'operations', since: 'Spur L',
+        purpose: '1 = lokaler Modus darf im Container laufen (Docker/Podman/LXC); Portfreigaben koennen Internet-Clients als LAN-Clients ausgeben — Warnung beim Start',
+        defaultValue: 'leer = Container bricht ab (Exit 79)', consequence: 'Exit 79 im Container',
+    },
+    {
+        name: 'LOCAL_ALLOWED_HOSTS', section: 'operations', since: 'Spur L',
+        purpose: 'Weitere Host-Namen der Netzgrenze (dev und lokal), kommagetrennt: name (mit PORT) oder name:port, IPv6 in []',
+        defaultValue: 'hostname, hostname.local, Interface-IPs, localhost, 127.0.0.1, [::1] mit PORT (dev: + DEV_UI_ORIGIN-Port)',
+        consequence: 'nur die Defaults, andere Host-Header/Origins 403',
+    },
+    {
+        name: 'LOCAL_SECRETS_FILE', section: 'operations', since: 'Spur L',
+        purpose: 'start:local: Datei, in der SESSION_SECRET und KEYSTORE_MASTER_KEY_V1 beim ersten Start erzeugt werden (0600, nie im Repo)',
+        defaultValue: '~/.slopdogs/local-secrets.env', consequence: 'Default-Pfad',
+    },
+    {
+        name: 'RENDER', section: 'internal', since: 'Spur L',
+        purpose: 'Setzt Render selbst; mit SLOPDOGS_MODE=local bricht der Start ab (Exit 79)',
+        defaultValue: '—', consequence: '—',
     },
     {
         name: 'CORS_ALLOWED_ORIGINS', section: 'operations', since: 'vor P1',
-        purpose: 'Erlaubte Browser-Origins, kommagetrennt (hat Vorrang)',
-        defaultValue: 'dev: localhost/127.0.0.1; deployed: gleicher Host', consequence: 'Default-Regel',
+        purpose: 'Erlaubte Browser-Origins, kommagetrennt (hat Vorrang; nicht im lokalen Modus)',
+        defaultValue: 'dev: Namen der Netzgrenze; deployed: gleicher Host', consequence: 'Default-Regel',
     },
     {
         name: 'CORS_ORIGIN', section: 'operations', since: 'vor P1',
@@ -628,6 +658,7 @@ function isSet(env: NodeJS.ProcessEnv, name: string): boolean {
 function conditionHolds(env: NodeJS.ProcessEnv, when: EnvCondition | undefined): boolean {
     if (when === 'authRequired') return env.MCP_AUTH_REQUIRED === 'true';
     if (when === 'storeNotPostgres') return !/^postgres(ql)?:\/\//i.test((env.DATABASE_URL || '').trim());
+    if (when === 'notLocalMode') return !LocalMode.isEnabled(env);
     return true;
 }
 

@@ -34,6 +34,11 @@ interface Room {
     lastPopulatedAt: number;
 }
 
+export interface ChannelHubAttachOptions {
+    /** false = Upgrade mit 403 abweisen (NetworkBoundary.admitsUpgrade). Ohne Option wird jeder angenommen. */
+    admitUpgrade?: (req: IncomingMessage) => boolean;
+}
+
 export interface ChannelHubOptions {
     heartbeatSec?: number;
     /** Empty-Room-TTL in Sekunden — leere Raeume werden danach entsorgt. */
@@ -45,6 +50,9 @@ export interface ChannelHubOptions {
     /** WS-Pfad (Default: /api/channels) */
     path?: string;
 }
+
+/** Zeilenende der HTTP-Antwort beim abgewiesenen Upgrade. */
+const CRLF = String.fromCharCode(13, 10);
 
 const DEFAULTS = {
     heartbeatSec: 20,
@@ -108,7 +116,7 @@ export class ChannelHub implements IChannelHub {
      * Lazy-importiert `ws`, damit core unabhaengig bleibt und Tests
      * ohne installiertes ws-Modul laufen koennen.
      */
-    async attach(server: HttpServer): Promise<void> {
+    async attach(server: HttpServer, options: ChannelHubAttachOptions = {}): Promise<void> {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const wsMod = require("ws");
         const WebSocketServer = wsMod.WebSocketServer ?? wsMod.Server;
@@ -118,6 +126,13 @@ export class ChannelHub implements IChannelHub {
         const path = this.opts.path;
 
         server.on("upgrade", (req: IncomingMessage, socket: any, head: Buffer) => {
+            // Netzgrenze (Spur L2): Socket-Adresse, Host und Origin wie bei HTTP — vor jedem Pfad, denn
+            // dieser Hub ist der einzige Upgrade-Handler am Server.
+            if (options.admitUpgrade && !options.admitUpgrade(req)) {
+                socket.write(["HTTP/1.1 403 Forbidden", "Content-Type: application/json", "Connection: close", "", JSON.stringify({ error: "forbidden" })].join(CRLF));
+                socket.destroy();
+                return;
+            }
             const url = new URL(req.url || "/", "http://x");
             if (url.pathname !== path) return; // andere Upgrade-Handler bedienen sich
             const channelId = (url.searchParams.get("channelId") || "").trim().toLowerCase();

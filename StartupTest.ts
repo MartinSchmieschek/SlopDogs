@@ -40,6 +40,9 @@ import { DogStatsService } from './services/DogStatsService';
 import { EXPRESS_APP_ROUTES, FRONTEND_ROUTES, LEGACY_ROUTE } from './api/routes/routeTable';
 import { KeyStoreService, type KeyStorePrisma } from './services/KeyStoreService';
 import { PackageCandidateTests } from './test/startup/packageCandidates';
+import { LocalMode } from './server-app/LocalMode';
+import { authModeBootError } from './mcp/auth/middleware';
+import { AllowedHosts, NetworkBoundary } from './server-app/NetworkBoundary';
 
 /**
  * Arr, the testament of a single trial endured upon the eldritch seas —
@@ -126,6 +129,9 @@ export class StartupTest {
             await this.testPrivateKennelHiddenFromAnon(nodesStore, kennelsController as KennelController, baseDogsMap);
             await this.testRunnerSeesOutputNotCode(nodesStore, kennelsStore, nodesController, kennelsController as KennelController, baseDogsMap);
             await this.testLeadFailureIsNot200(nodesStore, kennelsController as KennelController, baseDogsMap);
+            // Spur L: der lokale Modus hat keinen Login — Boot-Guard und Netzgrenze sind dort die Zugriffspruefung.
+            this.testLocalModeBootGuard();
+            this.testLocalNetworkBoundary(app);
 
             // Block 2 — Paket-Kandidaten: wandern in P4 als Paket-Tests nach slopdogs-core bzw. slopdogs-base-dogs.
             await new PackageCandidateTests((name, passed, error) => this.addResult(name, passed, error)).run(baseDogsMap);
@@ -635,6 +641,117 @@ export class StartupTest {
             this.addResult(testName, false, String(error));
         } finally {
             try { await kennelsController.delete(kennelId); } catch { /* ignore */ }
+        }
+    }
+
+    /**
+     * Spur L1: SLOPDOGS_MODE=local startet nur ohne Zeichen eines Deployments. Jede der vier verbotenen
+     * Konfigurationen (oeffentliche Basis-URL, Proxy-Hops, Login an, Render) liefert eine Fehlerzeile; die
+     * erlaubte Grundform und der Betrieb ohne Schalter liefern keine.
+     */
+    private testLocalModeBootGuard(): void {
+        const testName = 'Spur L1: Boot-Guard lokal verweigert Deployment-Zeichen';
+        try {
+            const base = { NODE_ENV: 'production', SLOPDOGS_MODE: 'local', PUBLIC_API_BASE_URL: 'http://raspberrypi.local:3000' };
+            // Container-Indiz ersetzbar: der Test laeuft auf Rechnern und in der CI, nicht im Container.
+            const noContainer = () => null;
+            const inContainer = () => '/.dockerenv';
+            if (LocalMode.bootError(base, noContainer) !== null) throw new Error(`Grundform abgewiesen: ${LocalMode.bootError(base, noContainer)}`);
+            if (LocalMode.bootError({ NODE_ENV: 'production' }, inContainer) !== null) throw new Error('ohne Schalter abgewiesen');
+            if (LocalMode.bootError(base, inContainer) === null) throw new Error('Container: nicht abgewiesen');
+            if (LocalMode.bootError({ ...base, SLOPDOGS_LOCAL_ALLOW_CONTAINER: '1' }, inContainer) !== null) throw new Error('Container mit Freigabe abgewiesen');
+            const forbidden: Record<string, NodeJS.ProcessEnv> = {
+                'PUBLIC_API_BASE_URL oeffentlich': { ...base, PUBLIC_API_BASE_URL: 'https://example.com' },
+                'TRUST_PROXY_HOPS=1': { ...base, TRUST_PROXY_HOPS: '1' },
+                'MCP_AUTH_REQUIRED=true': { ...base, MCP_AUTH_REQUIRED: 'true' },
+                'RENDER gesetzt': { ...base, RENDER: 'true' },
+            };
+            const alsoForbidden: Record<string, NodeJS.ProcessEnv> = {
+                'Tippfehler SLOPDOGS_MODE=Local': { ...base, SLOPDOGS_MODE: 'Local' },
+                'NODE_ENV=development': { ...base, NODE_ENV: 'development' },
+                'LOCAL_ALLOWED_HOSTS oeffentlich': { ...base, LOCAL_ALLOWED_HOSTS: 'raspberrypi.home.arpa,slopdogs.example.com' },
+                'MCP_BASE_URL oeffentlich': { ...base, MCP_BASE_URL: 'https://mcp.example.com' },
+            };
+            for (const [label, env] of Object.entries({ ...forbidden, ...alsoForbidden })) {
+                if (LocalMode.bootError(env, noContainer) === null) throw new Error(`${label}: nicht abgewiesen`);
+            }
+            // Der Auth-Guard laesst production ohne Login nur im lokalen Modus durch — und nie an dessen Guard vorbei.
+            if (authModeBootError(base, undefined, noContainer) !== null) throw new Error('authModeBootError weist die lokale Grundform ab');
+            if (authModeBootError(forbidden['TRUST_PROXY_HOPS=1'], undefined, noContainer) === null) throw new Error('authModeBootError laesst TRUST_PROXY_HOPS=1 lokal durch');
+            if (authModeBootError({ NODE_ENV: 'production' }) === null) throw new Error('authModeBootError laesst production ohne Login durch');
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        }
+    }
+
+    /**
+     * Spur L2: die Netzgrenze des lokalen Modus, direkt mit Fake-Anfragen (kein listen). Oeffentliche
+     * Socket-Adresse, fremder Host-Header und fremde Origin bei POST -> 403; erlaubter Host von privater
+     * Adresse -> durch. X-Forwarded-For darf eine oeffentliche Adresse nicht privat machen.
+     */
+    private testLocalNetworkBoundary(app: any): void {
+        const testName = 'Spur L2: Netzgrenze lokal (Socket, Host, Origin)';
+        try {
+            const system = {
+                hostname: () => 'raspberrypi',
+                interfaceAddresses: () => ['192.168.1.20', '127.0.0.1', '::1', '2001:db8:1:2::5'],
+                interfaceCidrs: () => ['192.168.1.20/24', '2001:db8:1:2::5/64'],
+            };
+            // Ueber dieselbe Fabrik wie der Server: lokal mit Socket-Pruefung, production ohne Modus keine Grenze.
+            const boundary = NetworkBoundary.forEnvironment({ PORT: '3000' }, { nodeEnv: 'production', localMode: true }, system);
+            if (!boundary) throw new Error('forEnvironment liefert lokal keine Grenze');
+            if (NetworkBoundary.forEnvironment({}, { nodeEnv: 'production', localMode: false }, system) !== null) {
+                throw new Error('production ohne lokalen Modus bekommt eine Grenze (Verhalten heute: keine)');
+            }
+            const call = (req: { method?: string; url?: string; remoteAddress: string; host: string; headers?: Record<string, string> }, b: NetworkBoundary = boundary) => {
+                const { res, out } = this.fakeResponse();
+                let passed = false;
+                const headers: Record<string, string> = { host: req.host, ...(req.headers ?? {}) };
+                b.middleware()({ method: req.method ?? 'GET', url: req.url ?? '/', headers, socket: { remoteAddress: req.remoteAddress } } as any, res, () => { passed = true; });
+                return { passed, status: out.statusCode, error: out.body?.error, headers: out.headers };
+            };
+            const crossSite = (dest: string) => ({ 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': dest === 'image' ? 'no-cors' : 'navigate', 'sec-fetch-dest': dest });
+            const expectBlocked = (label: string, r: ReturnType<typeof call>, error: string) => {
+                if (r.passed || r.status !== 403 || r.error !== error) throw new Error(`${label}: erwartet 403 ${error}, erhalten ${JSON.stringify(r)}`);
+            };
+            const expectPassed = (label: string, r: ReturnType<typeof call>) => {
+                if (!r.passed) throw new Error(`${label}: abgewiesen ${JSON.stringify(r)}`);
+            };
+            expectBlocked('oeffentliche Socket-Adresse', call({ remoteAddress: '203.0.113.5', host: 'raspberrypi.local:3000', headers: { 'x-forwarded-for': '192.168.1.30' } }), 'client_not_in_lan');
+            expectBlocked('Tunnel auf dem Pi (Loopback + Weiterleitungs-Header)', call({ remoteAddress: '127.0.0.1', host: 'localhost:3000', headers: { 'x-forwarded-for': '198.51.100.7' } }), 'proxied_request');
+            expectBlocked('fremder Host', call({ remoteAddress: '192.168.1.30', host: 'evil.example:3000' }), 'host_not_allowed');
+            expectBlocked('fremde Origin bei POST', call({ method: 'POST', remoteAddress: '192.168.1.30', host: 'raspberrypi.local:3000', headers: { origin: 'http://evil.example' } }), 'origin_not_allowed');
+            expectBlocked('fremde Seite per GET (img/fetch)', call({ remoteAddress: '192.168.1.30', host: 'raspberrypi.local:3000', headers: { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'no-cors' } }), 'cross_site');
+            expectBlocked('fremde Seite bettet einen Lauf ein (iframe)', call({ url: '/k/slopdogs-landing?x=1', remoteAddress: '192.168.1.30', host: 'raspberrypi.local:3000', headers: crossSite('iframe') }), 'cross_site');
+            expectBlocked('Cross-Site-Navigation auf die API', call({ url: '/api/kennels/x/run', remoteAddress: '192.168.1.30', host: 'raspberrypi.local:3000', headers: crossSite('document') }), 'cross_site');
+            expectPassed('Cross-Site-Navigation auf eine UI-Seite', call({ url: '/kennels', remoteAddress: '192.168.1.30', host: 'raspberrypi.local:3000', headers: crossSite('document') }));
+            expectPassed('globale IPv6 im eigenen On-Link-Praefix', call({ remoteAddress: '2001:db8:1:2::77', host: 'raspberrypi.local:3000' }));
+            expectBlocked('globale IPv6 ausserhalb des Praefixes', call({ remoteAddress: '2001:db8:9::1', host: 'raspberrypi.local:3000' }), 'client_not_in_lan');
+            const framed = call({ remoteAddress: '192.168.1.30', host: 'raspberrypi.local:3000' });
+            if (framed.headers['content-security-policy'] !== "frame-ancestors 'self'" || framed.headers['x-frame-options'] !== 'SAMEORIGIN') {
+                throw new Error(`Rahmenschutz fehlt: ${JSON.stringify(framed.headers)}`);
+            }
+            expectPassed('erlaubter Host, private Adresse', call({ remoteAddress: '192.168.1.30', host: 'raspberrypi.local:3000' }));
+            expectPassed('LAN-IP als Host, IPv4-mapped', call({ method: 'POST', remoteAddress: '::ffff:10.0.0.4', host: '192.168.1.20:3000', headers: { origin: 'http://192.168.1.20:3000' } }));
+            const upgrade = { headers: { host: 'raspberrypi.local:3000', origin: 'http://evil.example' }, socket: { remoteAddress: '192.168.1.30' } };
+            if (boundary.admitsUpgrade(upgrade as any)) throw new Error('WebSocket-Upgrade mit fremder Origin angenommen');
+
+            // Dev: dieselbe Host-/Origin-Pruefung, aber keine Socket-Pruefung (heutiges Verhalten im LAN bleibt).
+            const dev = NetworkBoundary.forEnvironment({ PORT: '3000' }, { nodeEnv: 'development', localMode: false, devUiOrigin: 'http://localhost:4300' }, system);
+            if (!dev) throw new Error('forEnvironment liefert in dev keine Grenze');
+            expectPassed('dev: ng-serve-Origin bei POST', call({ method: 'POST', remoteAddress: '203.0.113.5', host: '127.0.0.1:3000', headers: { origin: 'http://localhost:4300' } }, dev));
+            expectBlocked('dev: fremder Host', call({ remoteAddress: '127.0.0.1', host: 'evil.example:3000' }, dev), 'host_not_allowed');
+
+            // Die Grenze im montierten Server (test:startup bootet dev) ist die erste eigene Middleware — vor CORS und Routen.
+            const stack: any[] = app?.router?.stack ?? app?._router?.stack ?? [];
+            const own = stack.filter((layer) => !['query', 'expressInit'].includes(layer?.name));
+            if (own[0]?.name !== NetworkBoundary.MIDDLEWARE_NAME) {
+                throw new Error(`erste Middleware ist "${own[0]?.name}", nicht ${NetworkBoundary.MIDDLEWARE_NAME}`);
+            }
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
         }
     }
 

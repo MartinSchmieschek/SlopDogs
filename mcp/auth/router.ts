@@ -18,8 +18,20 @@ import { createPersonalTokensRouter } from './personal-tokens';
 import { BetaKeyError, BetaKeys, type BetaKeyPrisma } from './betaKeys';
 import { renderBetaKeyPage } from './beta-page';
 
-export function createAuthRouter(prisma: PrismaClient): Router {
+export type AuthRouterOptions = {
+    /**
+     * Lokaler Modus (Spur L): kein Login — nur /me und /logout. OAuth-AS, PATs und Google sind nicht montiert
+     * (404), damit kein MCP-Client einen Login-Weg entdeckt, der ins Leere fuehrt.
+     */
+    localMode?: boolean;
+};
+
+export function createAuthRouter(prisma: PrismaClient, options: AuthRouterOptions = {}): Router {
     const router = Router();
+    if (options.localMode) {
+        mountSessionRoutes(router, prisma);
+        return router;
+    }
     const betaKeys = new BetaKeys(prisma as unknown as BetaKeyPrisma);
 
     // OAuth 2.1 AS endpoints — /authorize, /token, /revoke, /register
@@ -127,7 +139,18 @@ export function createAuthRouter(prisma: PrismaClient): Router {
         }
     });
 
+    mountSessionRoutes(router, prisma);
+    return router;
+}
+
+/** /me und /logout — in jedem Modus. */
+function mountSessionRoutes(router: Router, prisma: PrismaClient): void {
     router.get('/me', async (req: Request, res: Response) => {
+        // Lokaler Modus: der Nutzer kommt aus dem Kontext, nicht aus der Session — die UI gilt als angemeldet.
+        if (req.ctx?.via === 'local' && req.ctx.user) {
+            res.json({ authenticated: true, mode: 'local', user: { ...req.ctx.user, picture: null } });
+            return;
+        }
         if (!req.session.userId) {
             res.status(401).json({ authenticated: false });
             return;
@@ -154,6 +177,4 @@ export function createAuthRouter(prisma: PrismaClient): Router {
             res.json({ ok: true });
         });
     });
-
-    return router;
 }

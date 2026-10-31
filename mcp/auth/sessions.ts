@@ -6,6 +6,7 @@
 import session from 'express-session';
 import type { RequestHandler } from 'express';
 import { BoundedSessionStore } from './BoundedSessionStore';
+import { LocalMode } from '../../server-app/LocalMode';
 
 declare module 'express-session' {
     interface SessionData {
@@ -30,9 +31,10 @@ export function createSessionMiddleware(): RequestHandler {
     // zusammen mit `trust proxy` (siehe createHttpApplication) wird es dann korrekt
     // gesetzt. Lokal (development, http://localhost) MUSS secure:false sein, sonst
     // liefert der Browser das Cookie nie aus -> kein Login noetig, aber Flows testbar.
-    // Default nach NODE_ENV; SESSION_COOKIE_SECURE ueberschreibt explizit.
+    // Default nach NODE_ENV; SESSION_COOKIE_SECURE ueberschreibt explizit. Der lokale Modus (Spur L)
+    // laeuft mit NODE_ENV=production, aber ueber http im LAN — dort ist er nicht deployed.
     const nodeEnv = process.env.NODE_ENV || 'development';
-    const isDeployed = nodeEnv === 'production' || nodeEnv === 'integration';
+    const isDeployed = (nodeEnv === 'production' || nodeEnv === 'integration') && !LocalMode.isEnabled(process.env);
     const secureOverride = process.env.SESSION_COOKIE_SECURE;
     const secure =
         secureOverride != null && secureOverride.trim() !== ''

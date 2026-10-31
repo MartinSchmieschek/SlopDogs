@@ -48,10 +48,14 @@ import type { BaseDogInfo } from '../mcp/tools/types';
 import type { HttpFrontEndBinder, HttpFrontEndContext } from './httpFrontEndTypes';
 import { LandingPage } from './LandingPage';
 import { ResponseCompression } from './ResponseCompression';
+import { LOCAL_USER } from './LocalMode';
+import { NetworkBoundary } from './NetworkBoundary';
 import type { TestResult } from '../StartupTest';
 
 export type CreateHttpApplicationInput = {
     nodeEnv: string;
+    /** Lokaler Modus (Spur L, SLOPDOGS_MODE=local): Netzgrenze LAN, fester lokaler Nutzer, kein OAuth. */
+    localMode?: boolean;
     devUiOrigin: string;
     /** `__dirname` des Einstiegspunkts (main), für ReadmeRouteHandler und Pfadauflösung. */
     serverRootDir: string;
@@ -91,6 +95,8 @@ export type CreateHttpApplicationResult = {
     disconnect: () => Promise<void>;
     /** Der Key-Store (P4c) — main.ts registriert damit die VM-Capability `keys`. */
     keyStore: KeyStoreService;
+    /** Netzgrenze (Spur L2) fuer den WebSocket-Upgrade; null in integration/production ohne lokalen Modus. */
+    networkBoundary: NetworkBoundary | null;
 };
 
 /**
@@ -108,8 +114,10 @@ function shouldRunStartupTests(nodeEnv: string): boolean {
 /**
  * Proxy-Hops vor der App (siehe `trust proxy` unten). Deployed Default 1 (Render), lokal 0.
  * TRUST_PROXY_HOPS ueberschreibt in beide Richtungen; nur ein Integer >= 0 zaehlt.
+ * Der lokale Modus hat nie einen Proxy: immer 0 (der Boot-Guard verweigert TRUST_PROXY_HOPS > 0 ohnehin).
  */
-export function resolveTrustProxyHops(nodeEnv: string): number {
+export function resolveTrustProxyHops(nodeEnv: string, localMode = false): number {
+    if (localMode) return 0;
     const raw = (process.env.TRUST_PROXY_HOPS || '').trim();
     if (raw !== '') {
         const parsed = Number(raw);
@@ -124,6 +132,7 @@ export function resolveTrustProxyHops(nodeEnv: string): number {
  */
 export async function createHttpApplication(input: CreateHttpApplicationInput): Promise<CreateHttpApplicationResult> {
     const { nodeEnv, devUiOrigin, serverRootDir, nodesStore, kennelsStore, allBaseDogs, baseDogsMap } = input;
+    const localMode = input.localMode === true;
     const serveBuiltAngular = nodeEnv === 'production' || nodeEnv === 'integration';
     const angularBrowserDir = serveBuiltAngular ? resolveAngularBrowserDir(serverRootDir) : null;
 
@@ -138,6 +147,11 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     const frontCtx: HttpFrontEndContext = { devUiOrigin, angularBrowserDir, publicDir, landingPage };
 
     const app = express();
+
+    // Netzgrenze (Spur L2) VOR allem anderen — vor CORS, Landing, /static und jeder Route: Socket-Adresse
+    // (nur lokal), Host-Header, Origin bei Schreibzugriffen. Dev und lokal; integration/production: null.
+    const networkBoundary = NetworkBoundary.forEnvironment(process.env, { nodeEnv, localMode, devUiOrigin });
+    if (networkBoundary) app.use(networkBoundary.middleware());
 
     // Hinter Renders TLS-Proxy terminiert HTTPS am Proxy; die App sieht intern HTTP.
     // Ohne `trust proxy` haelt express req.secure fuer false und express-session
@@ -154,22 +168,10 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     // (z. B. ein CDN), ist die rechte Adresse dessen Kante — dann TRUST_PROXY_HOPS=2. Zu hoch gesetzt,
     // wird die Adresse faelschbar; zu niedrig, teilen sich alle Anonymen die Adresse des Proxys.
     // TRUST_PROXY_HOPS=0 schaltet ab.
-    const trustProxyHops = resolveTrustProxyHops(nodeEnv);
+    const trustProxyHops = resolveTrustProxyHops(nodeEnv, localMode);
     if (trustProxyHops > 0) {
         app.set('trust proxy', trustProxyHops);
     }
-
-    const isLocalDevOrigin = (origin: string): boolean => {
-        try {
-            const u = new URL(origin);
-            return (
-                (u.protocol === 'http:' || u.protocol === 'https:') &&
-                (u.hostname === 'localhost' || u.hostname === '127.0.0.1')
-            );
-        } catch {
-            return false;
-        }
-    };
 
     const originMatchesRequestHost = (req: any, origin: string): boolean => {
         try {
@@ -184,6 +186,8 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     const allowedOriginForRequest = (req: any): string | undefined => {
         const origin = req.headers.origin as string | undefined;
         if (!origin) return undefined;
+        // Lokal: CORS nur fuer die eigenen Namen — dieselbe Liste wie Host- und Origin-Pruefung.
+        if (localMode) return networkBoundary?.corsOriginFor(origin);
 
         const list = process.env.CORS_ALLOWED_ORIGINS?.split(',').map((s) => s.trim()).filter(Boolean);
         if (list?.length) {
@@ -199,7 +203,8 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
             return originMatchesRequestHost(req, origin) ? origin : undefined;
         }
 
-        return isLocalDevOrigin(origin) ? origin : undefined;
+        // Dev: frueher jede localhost-Origin jedes Ports — jetzt nur die Namen der Netzgrenze (Server- und UI-Port).
+        return networkBoundary?.corsOriginFor(origin);
     };
 
     app.use((req: any, res: any, next: any) => {
@@ -225,14 +230,18 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     app.use(express.json({ limit: '5mb' }));
 
     const authPrisma = createPrismaAuthClient();
+    // Lokaler Modus (Spur L3): der eine Nutzer liegt als echte Zeile in der Auth-DB — grant_access und die
+    // ACL-Ansicht loesen ihn auf wie jeden anderen. Idempotent, jeder Boot.
+    const localUser = localMode ? await upsertLocalUser(authPrisma) : undefined;
     // Key-Store (P4c): im Auth-Client, Master-Key aus der Env; ohne KEYSTORE_MASTER_KEY_V1 aus (503).
     const keyStore = KeyStoreService.fromEnv(authPrisma);
     app.use(cookieParser());
     app.use(express.urlencoded({ extended: false, limit: '1mb' }));
     app.use(createSessionMiddleware());
-    app.use(createAuthContextMiddleware(authPrisma));
-    app.use('/auth', createAuthRouter(authPrisma));
-    app.use('/.well-known', createDiscoveryRouter());
+    app.use(createAuthContextMiddleware(authPrisma, { localUser }));
+    app.use('/auth', createAuthRouter(authPrisma, { localMode }));
+    // Lokal keine OAuth-Discovery: ein MCP-Client soll keinen Login-Weg finden, den es dort nicht gibt.
+    if (!localMode) app.use('/.well-known', createDiscoveryRouter());
 
     // Schleuse vor den teuren Pfaden — MUSS vor allen Route-Handlern montiert sein.
     // Body-Limits deckeln nur die Eingabe; die Spitze entsteht durch parallele Runs
@@ -467,5 +476,15 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
         ]);
     };
 
-    return { app, serveBuiltAngular, runStartupTests, runStartupSuite, disconnect, keyStore };
+    return { app, serveBuiltAngular, runStartupTests, runStartupSuite, disconnect, keyStore, networkBoundary };
+}
+
+async function upsertLocalUser(prisma: ReturnType<typeof createPrismaAuthClient>): Promise<{ id: string; email: string; name: string | null }> {
+    const { id, email, name, googleSub } = LOCAL_USER;
+    return prisma.user.upsert({
+        where: { id },
+        create: { id, email, name, googleSub },
+        update: {},
+        select: { id: true, email: true, name: true },
+    });
 }

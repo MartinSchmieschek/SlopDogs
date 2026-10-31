@@ -23,6 +23,7 @@ import { WebSocketChannelRetriever, registerVmGlobalCapability, setVmConsoleSink
 import http from 'http';
 import type { Application } from 'express';
 import fs from 'fs';
+import os from 'os';
 import { ChannelHub } from './services/ChannelHub';
 import { IStore } from './store/IStore';
 import { PrismaStore } from './store/PrismaStore';
@@ -33,6 +34,8 @@ import { TypeDefBuilder } from './services/TypeDefBuilder';
 import { CompilerCache } from './services/CompilerCache';
 import { createHttpApplication } from './server-app/createHttpApplication';
 import { EX_CONFIG, authModeBootError } from './mcp/auth/middleware';
+import { EX_LOCAL_MODE, LocalMode } from './server-app/LocalMode';
+import type { NetworkBoundary } from './server-app/NetworkBoundary';
 import { warnMissingEnv } from './server-app/startupEnvCheck';
 import { KennelCallCounter } from './services/KennelCallCounter';
 import { DogReferenceIndex } from './services/DogReferenceIndex';
@@ -68,6 +71,8 @@ export type BootedApplication = {
     serveBuiltAngular: boolean;
     devUiOrigin: string;
     channelHub: ChannelHub;
+    /** Netzgrenze (Spur L2) — auch fuer den WebSocket-Upgrade; null in integration/production ohne lokalen Modus. */
+    networkBoundary: NetworkBoundary | null;
     refIndex: DogReferenceIndex;
     callCounter: KennelCallCounter;
     store: PrismaStore;
@@ -87,25 +92,36 @@ export type BootOptions = {
 
 async function start() {
     const booted = await bootApplication();
-    const { app, serveBuiltAngular, devUiOrigin, channelHub, refIndex, callCounter, store, jsonStorageService, disconnectHttpApplication, runStartupTests } = booted;
+    const { app, serveBuiltAngular, devUiOrigin, channelHub, networkBoundary, refIndex, callCounter, store, jsonStorageService, disconnectHttpApplication, runStartupTests } = booted;
 
     const port = Number(process.env.PORT) || 3000;
 
     // Eigener http.Server, damit der ChannelHub seinen WebSocketServer per Upgrade-Handler anhaengen kann.
     const httpServer = http.createServer(app);
-    await channelHub.attach(httpServer);
+    await channelHub.attach(httpServer, networkBoundary ? { admitUpgrade: (req) => networkBoundary.admitsUpgrade(req) } : {});
 
     registerGracefulShutdown({ httpServer, callCounter, store, jsonStorageService, disconnectHttpApplication });
 
     console.log('App started.');
     logBootMemory('App started');
-    // Render u. a.: öffentlich erreichbar nur bei Bind an 0.0.0.0; PORT kommt von der Plattform.
-    httpServer.listen(port, '0.0.0.0', () => {
+    // Render u. a.: öffentlich erreichbar nur bei Bind an 0.0.0.0; PORT kommt von der Plattform. Der lokale
+    // Modus lauscht dual-stack (`::`) im LAN, damit auch IPv6-Clients des Heimnetzes hereinkommen — die
+    // Netzgrenze (Socket-Adresse, Host, Origin) haelt alles andere draussen. Ohne IPv6 auf dem Geraet: 0.0.0.0.
+    const listenHost = LocalMode.isEnabled(process.env) ? '::' : '0.0.0.0';
+    httpServer.once('error', (err: NodeJS.ErrnoException) => {
+        if (listenHost !== '::' || (err.code !== 'EAFNOSUPPORT' && err.code !== 'EADDRNOTAVAIL')) throw err;
+        console.warn(`[local] kein IPv6 (${err.code}) — lausche nur auf 0.0.0.0`);
+        httpServer.listen(port, '0.0.0.0');
+    });
+    httpServer.listen(port, listenHost, () => {
         const base = `http://localhost:${port}`;
         if (!serveBuiltAngular) {
             console.log(`API ${base} — Dev-UI-Redirect: ${base}/ → ${devUiOrigin}/`);
         }
         console.log(`Server läuft auf Port ${port}`);
+        if (LocalMode.isEnabled(process.env)) {
+            console.log(`[local] UI und MCP im LAN: http://${os.hostname().toLowerCase()}.local:${port}/ — MCP: /mcp, ohne Token`);
+        }
         // ERST JETZT Referenzindex und Selbsttests: der Port ist offen, die Plattform sieht einen gesunden
         // Dienst. Die Selbsttests warten auf den Rebuild — sie schreiben in dieselbe Referenztabelle.
         // Beide fangen intern alles ab und werfen nie.
@@ -119,6 +135,15 @@ async function start() {
 export async function bootApplication(options: BootOptions = {}): Promise<BootedApplication> {
     // Vor allem anderen — vor der Datenbank und vor createHttpApplication: ein Dienst, in dem
     // jeder Besucher Super-User ist, darf ausserhalb von dev gar nicht erst hochkommen (P3.5).
+    // Zuerst der lokale Modus (Spur L1): ohne Login nie mit oeffentlicher Adresse, Proxy oder auf Render.
+    const localModeError = LocalMode.bootError(process.env);
+    if (localModeError) {
+        console.error(localModeError);
+        process.exit(EX_LOCAL_MODE);
+    }
+    const localMode = LocalMode.isEnabled(process.env);
+    const containerWarning = LocalMode.containerWarning(process.env);
+    if (containerWarning) console.warn(containerWarning);
     const bootError = authModeBootError(process.env, (line) => console.log(line));
     if (bootError) {
         console.error(bootError);
@@ -219,8 +244,11 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
     WebSocketChannelRetriever.initService(channelHub);
 
     const nodeEnvForRegistry = process.env.NODE_ENV || 'development';
-    /** Nur lokal (development): volle Dog-Registry. Production + Integration: schlanke Registry, weniger Imports/Heap. */
-    const useSlimBaseDogRegistry = nodeEnvForRegistry === 'production' || nodeEnvForRegistry === 'integration';
+    /**
+     * development und lokaler Modus: volle Dog-Registry (lokal mit dogs-hue und den anderen Heimnetz-Dogs).
+     * Production + Integration: schlanke Registry, weniger Imports/Heap.
+     */
+    const useSlimBaseDogRegistry = (nodeEnvForRegistry === 'production' || nodeEnvForRegistry === 'integration') && !localMode;
     const registryModule = useSlimBaseDogRegistry
         ? await import('./server-registries/slimDeployRegistry')
         : await import('./server-registries/fullRegistry');
@@ -287,8 +315,9 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
     const nodeEnv = process.env.NODE_ENV || 'development';
     const devUiOrigin = (process.env.DEV_UI_ORIGIN || 'http://localhost:4300').replace(/\/$/, '');
 
-    const { app, serveBuiltAngular, runStartupTests, runStartupSuite, disconnect: disconnectHttpApplication, keyStore } = await createHttpApplication({
+    const { app, serveBuiltAngular, runStartupTests, runStartupSuite, disconnect: disconnectHttpApplication, keyStore, networkBoundary } = await createHttpApplication({
         nodeEnv,
+        localMode,
         devUiOrigin,
         serverRootDir: __dirname,
         nodesStore,
@@ -314,6 +343,7 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
         serveBuiltAngular,
         devUiOrigin,
         channelHub,
+        networkBoundary,
         refIndex,
         callCounter,
         store,
