@@ -3,8 +3,8 @@
  *
  * EINE Liste (`ENV_CATALOG`) traegt je Variable Abschnitt, Zweck, Default, Phase, Folge bei Fehlen und
  * die Pflicht-Regeln je NODE_ENV. Dieselbe Liste gliedert `.env.example` und `.env.integration.example`
- * (gleiche Abschnitte, gleiche Reihenfolge). Der StartupTest, der das pruefte, ist mit P0.1 (PLAN-DOG-PAKETE)
- * entfallen; die Pruefung Katalog <-> Beispiele <-> Code folgt in P1.5.
+ * (gleiche Abschnitte, gleiche Reihenfolge). Beides prueft scripts/check-env-catalog.cjs (P1.5, in npm test):
+ * jede Variable, die der Code liest, steht hier; jeder Eintrag hier steht in beiden Beispielen.
  *
  * Die Warnung beendet den Prozess NIE. Die harten Guards bleiben, wo sie sind:
  *   - scripts/load-env.cjs -> dbEnv.assertRequiredDbEnv (DbEnvError, Exit 1)
@@ -242,11 +242,6 @@ export const ENV_CATALOG: readonly EnvVarSpec[] = [
         defaultValue: '~/.slopdogs/local-secrets.env', consequence: 'Default-Pfad',
     },
     {
-        name: 'RENDER', section: 'internal', since: 'Spur L',
-        purpose: 'Setzt Render selbst; mit SLOPDOGS_MODE=local bricht der Start ab (Exit 79)',
-        defaultValue: '—', consequence: '—',
-    },
-    {
         name: 'CORS_ALLOWED_ORIGINS', section: 'operations', since: 'vor P1',
         purpose: 'Erlaubte Browser-Origins, kommagetrennt (hat Vorrang; nicht im lokalen Modus)',
         defaultValue: 'dev: Namen der Netzgrenze; deployed: gleicher Host', consequence: 'Default-Regel',
@@ -263,8 +258,8 @@ export const ENV_CATALOG: readonly EnvVarSpec[] = [
     },
     {
         name: 'DB_CONNECTION_LIMIT', section: 'operations', since: 'vor P1',
-        purpose: 'Verbindungen je Prisma-Pool (nur Postgres)',
-        defaultValue: '4', consequence: 'Default',
+        purpose: 'Verbindungen je Prisma-Pool (nur Postgres); ohne Wert 4 je Teil auf derselben URL',
+        defaultValue: '4 je Teil (Single-DB 16)', consequence: 'Default',
     },
     {
         name: 'DB_POOL_TIMEOUT', section: 'operations', since: 'vor P1',
@@ -365,6 +360,41 @@ export const ENV_CATALOG: readonly EnvVarSpec[] = [
         name: 'MEMORY_RUNTIME_CHECK_MS', section: 'operations', since: 'OOM-Fix',
         purpose: 'Takt des Laufzeit-Waechters, solange Dog-Isolate laufen (ms)',
         defaultValue: '100', consequence: 'Default',
+    },
+    {
+        name: 'SLOPDOGS_WATCHPOST', section: 'operations', since: 'OOM-Fix',
+        purpose: 'Wachposten-Thread: meldet Blockaden des Haupt-Threads und Speicher-Stufen 80/90/95 % direkt nach stderr, greift nie ein; 1/true/on erzwingt, 0/false/off schaltet ab',
+        defaultValue: 'auto (AN ausser NODE_ENV=development)', consequence: 'Default',
+    },
+    {
+        name: 'WATCHPOST_STALL_MS', section: 'operations', since: 'OOM-Fix',
+        purpose: 'Ab so langer Stille des Haupt-Thread-Pulses (ms) meldet der Wachposten eine Blockade (min. 100)',
+        defaultValue: '1000', consequence: 'Default',
+    },
+    {
+        name: 'WATCHPOST_POLL_MS', section: 'operations', since: 'OOM-Fix',
+        purpose: 'Takt des Wachpostens (ms, 10 bis 1000): Puls pruefen, cgroup lesen',
+        defaultValue: '100', consequence: 'Default',
+    },
+    {
+        name: 'SLOPDOGS_MEMLOG', section: 'operations', since: 'OOM-Fix',
+        purpose: 'Speicher-Log (Zeile je Kennel-Lauf und Boot-Phase, Heartbeat); 1/true/on erzwingt, 0/false/off schaltet ab',
+        defaultValue: 'auto (AN ausser NODE_ENV=development)', consequence: 'Default',
+    },
+    {
+        name: 'MEMORY_LOG_INTERVAL_MS', section: 'operations', since: 'OOM-Fix',
+        purpose: 'Messtakt des Speicher-Heartbeats (ms, min. 5000); geschrieben wird nur bei Bewegung oder nach langer Stille',
+        defaultValue: '30000', consequence: 'Default',
+    },
+    {
+        name: 'MEMORY_LOG_DELTA_MB', section: 'operations', since: 'OOM-Fix',
+        purpose: 'Heartbeat-Zeile erst, wenn sich die RSS seit der letzten Zeile um so viele MB bewegt hat',
+        defaultValue: '16', consequence: 'Default',
+    },
+    {
+        name: 'MEMORY_LOG_MAX_SILENCE_MS', section: 'operations', since: 'OOM-Fix',
+        purpose: 'Spaetestens nach so langer Stille (ms) schreibt der Heartbeat trotzdem eine Zeile',
+        defaultValue: '300000 (5 min)', consequence: 'Default',
     },
     {
         name: 'DOG_FETCH_MAX_BODY_MB', section: 'operations', since: 'OOM-Fix',
@@ -587,10 +617,6 @@ export const ENV_CATALOG: readonly EnvVarSpec[] = [
         purpose: 'Selbsttests nach dem Start: 1 = ueberall, 0 = nie', defaultValue: 'nur development', consequence: 'nur development',
     },
     {
-        name: 'P4B_MEASURE_RUNS', section: 'development', since: 'P4b',
-        purpose: 'StartupTest: n Zusatzlaeufe fuer die Heap-Messung (P4b Test 14)', defaultValue: '0', consequence: 'keine Zusatzlaeufe',
-    },
-    {
         name: 'KEYSTORE_SUPERUSER_OWNER', section: 'development', since: 'P4c',
         purpose: 'Nur development: User-Id, deren Keys Super-User-Laeufe nutzen', defaultValue: '—', consequence: 'Super-User-Laeufe ohne Keys',
     },
@@ -641,9 +667,19 @@ export const ENV_CATALOG: readonly EnvVarSpec[] = [
         name: 'NO_COLOR', section: 'internal', since: 'vor P1',
         purpose: 'Terminal-Farben der Bibliotheken (wie TERM_PROGRAM, PATH)', defaultValue: '—', consequence: '—',
     },
+    {
+        name: 'RENDER', section: 'internal', since: 'Spur L',
+        purpose: 'Setzt Render selbst; mit SLOPDOGS_MODE=local bricht der Start ab (Exit 79)',
+        defaultValue: '—', consequence: '—',
+    },
+    {
+        name: 'PRISMA_SYNC_PUSH_ONLY', section: 'internal', since: 'Spur L',
+        purpose: 'Setzt run-prisma-sync.cjs --push-only fuer seine Helfer (db push mit --skip-generate)',
+        defaultValue: '—', consequence: '—',
+    },
 ];
 
-/** Alle Namen des Katalogs, in Katalog-Reihenfolge — ein Test sucht jeden in den .env-Beispielen. */
+/** Alle Namen des Katalogs, in Katalog-Reihenfolge. */
 export const ENV_CATALOG_NAMES: readonly string[] = ENV_CATALOG.map((v) => v.name);
 
 function nodeEnvOf(env: NodeJS.ProcessEnv): NodeEnvName {
