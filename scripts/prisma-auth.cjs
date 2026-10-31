@@ -13,7 +13,7 @@ const authSchema = usePostgres ? 'store/prisma-auth/schema.postgres.prisma' : 's
 
 const cmd =
     process.argv[2] === 'push'
-        ? `db push --schema ${authSchema} --accept-data-loss`
+        ? `db push --schema ${authSchema} --accept-data-loss${process.env.PRISMA_SYNC_PUSH_ONLY === '1' ? ' --skip-generate' : ''}`
         : `generate --schema ${authSchema}`;
 execSync(`npx prisma ${cmd}`, {
     stdio: 'inherit',

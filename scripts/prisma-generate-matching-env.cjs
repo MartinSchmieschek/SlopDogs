@@ -1,14 +1,14 @@
 'use strict';
 
 /**
- * Erzeugt @prisma/client + Cache-Client passend zu NODE_ENV (SQLite vs PostgreSQL).
+ * Erzeugt @prisma/client + Cache-Client passend zur DATABASE_URL (SQLite vs PostgreSQL,
+ * siehe prismaVariantFor in dbEnv.cjs — nicht nach NODE_ENV).
  * Ohne db push — für Startskripte, wenn zuletzt das andere Schema generiert wurde.
  */
 const { execSync } = require('child_process');
+const { prismaVariantFor } = require('./dbEnv.cjs');
 
-const usePostgres = ['production', 'integration'].includes(process.env.NODE_ENV || 'development');
-const storeSchema = usePostgres ? 'store/prisma/schema.postgres.prisma' : 'store/prisma/schema.prisma';
-const cacheSuffix = usePostgres ? ' postgres' : '';
+const { storeSchema, cacheSuffix } = prismaVariantFor(process.env);
 
 execSync(`npx prisma generate --schema ${storeSchema} && node scripts/prisma-cache.cjs generate${cacheSuffix}`, {
     stdio: 'inherit',

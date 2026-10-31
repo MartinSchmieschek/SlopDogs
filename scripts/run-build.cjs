@@ -1,10 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const { prismaVariantFor } = require('./dbEnv.cjs');
 
-const usePostgres = ['production', 'integration'].includes(process.env.NODE_ENV || 'development');
-const storeSchema = usePostgres ? 'store/prisma/schema.postgres.prisma' : 'store/prisma/schema.prisma';
-const cacheSuffix = usePostgres ? ' postgres' : '';
+// Postgres oder SQLite nach DATABASE_URL, nicht nach NODE_ENV (lokaler Modus: production + SQLite).
+const { storeSchema, cacheSuffix } = prismaVariantFor(process.env);
+const nodeEnv = process.env.NODE_ENV || 'development';
 
 /**
  * Die Pakete baut die Installation (postinstall, `npm ci`/`npm install`) — ein Render-Build
@@ -49,8 +50,9 @@ execSync(
     },
 );
 
-// Nur in production/integration die TypeDefs vorbereiten — dev nutzt weiter Live-Compilation.
-if (usePostgres) {
+// Nur in production/integration die TypeDefs vorbereiten (unabhaengig von der DB-Art,
+// auch der lokale Modus braucht dist/type-defs.json) — dev nutzt weiter Live-Compilation.
+if (nodeEnv === 'production' || nodeEnv === 'integration') {
     execSync('node scripts/precompile-typedefs.cjs', {
         stdio: 'inherit',
         env: process.env,

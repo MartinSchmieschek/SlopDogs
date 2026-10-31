@@ -3,10 +3,16 @@
 /**
  * Zentrale Pruefung und Aufloesung der DB-URLs.
  *
- * Dev (SQLite, Default): drei separate Files (DATABASE_URL, CACHE_DATABASE_URL,
+ * Welche DB-Art gilt, entscheidet die URL, nicht NODE_ENV: DATABASE_URL mit
+ * postgres://… bzw. postgresql://… → Postgres, sonst SQLite (prismaVariantFor;
+ * Build, Prisma-Generierung und Sync waehlen ihre Schemas danach). Damit laeuft
+ * auch NODE_ENV=production mit SQLite (lokaler Modus auf dem Pi). integration
+ * erzwingt weiterhin Postgres (Pruefung in assertRequiredDbEnv).
+ *
+ * SQLite (Dev, lokaler Modus): drei separate Files (DATABASE_URL, CACHE_DATABASE_URL,
  * JSON_STORAGE_DATABASE_URL) — jede Connection hat ihre eigene Datei.
  *
- * Postgres (integration/production): nur DATABASE_URL ist Pflicht. Cache- und
+ * Postgres (Render: integration/production): nur DATABASE_URL ist Pflicht. Cache- und
  * JSON-Storage-URL werden, falls nicht explizit gesetzt, einfach auf
  * DATABASE_URL gespiegelt — alle Tabellen liegen in derselben physischen DB
  * (Schema `public`). Damit sich die `db push`-Laeufe nicht gegenseitig
@@ -176,6 +182,31 @@ function isPostgresUrl(raw) {
     return typeof raw === 'string' && /^postgres(ql)?:\/\//i.test(raw);
 }
 
+/**
+ * Prisma-Variante fuer Build, Generierung und Sync — rein, ohne Seiteneffekte.
+ * Postgres genau dann, wenn DATABASE_URL eine Postgres-URL ist; NODE_ENV spielt
+ * keine Rolle (auf Render ist DATABASE_URL Postgres, dort bleibt alles gleich).
+ * cacheSuffix ist das Argument fuer prisma-cache/-json-storage/-auth.cjs.
+ */
+function prismaVariantFor(env = process.env) {
+    const usePostgres = isPostgresUrl((env.DATABASE_URL || '').trim());
+    // Render (RENDER gesetzt) laeuft nur mit Postgres. Frueher erzwang NODE_ENV dort die Postgres-Schemas; eine
+    // andere URL-Form (prisma://, prisma+postgres://, Anfuehrungszeichen) wuerde jetzt still SQLite-Clients bauen.
+    if (!usePostgres && (env.RENDER || '').trim() !== '') {
+        const err = new Error(
+            '\n[ENV] RENDER ist gesetzt, aber DATABASE_URL beginnt nicht mit postgres:// oder postgresql:// — '
+            + 'Build und Prisma-Generierung waehlen das Schema nach der URL. Wert im Render-Dashboard pruefen.',
+        );
+        err.name = 'DbEnvError';
+        throw err;
+    }
+    return {
+        usePostgres,
+        storeSchema: usePostgres ? 'store/prisma/schema.postgres.prisma' : 'store/prisma/schema.prisma',
+        cacheSuffix: usePostgres ? ' postgres' : '',
+    };
+}
+
 function assertNoExplicitPostgresSchemaConflict(urls) {
     const parsed = [];
     for (const [name, raw] of Object.entries(urls)) {
@@ -339,4 +370,13 @@ function resolveAuthDatabaseUrl() {
     return `file:${pathOnly.replace(/\\/g, '/')}`;
 }
 
-module.exports = { assertRequiredDbEnv, resolveStoreDatabaseUrl, resolveCacheDatabaseUrl, resolveJsonStorageDatabaseUrl, resolveAuthDatabaseUrl, authSharesStoreDatabase };
+module.exports = {
+    assertRequiredDbEnv,
+    resolveStoreDatabaseUrl,
+    resolveCacheDatabaseUrl,
+    resolveJsonStorageDatabaseUrl,
+    resolveAuthDatabaseUrl,
+    authSharesStoreDatabase,
+    isPostgresUrl,
+    prismaVariantFor,
+};

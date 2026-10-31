@@ -17,7 +17,7 @@ const pushResetFlag = forceResetIntegration ? ' --force-reset' : '';
 
 const cmd =
     process.argv[2] === 'push'
-        ? `db push --schema ${cacheSchema} --accept-data-loss${pushResetFlag}`
+        ? `db push --schema ${cacheSchema} --accept-data-loss${pushResetFlag}${process.env.PRISMA_SYNC_PUSH_ONLY === '1' ? ' --skip-generate' : ''}`
         : `generate --schema ${cacheSchema}`;
 execSync(`npx prisma ${cmd}`, {
     stdio: 'inherit',
