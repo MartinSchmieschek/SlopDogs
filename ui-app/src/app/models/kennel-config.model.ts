@@ -33,6 +33,8 @@ export interface IKennelConfig {
   updatedAt?: string;
   /** Aufrufe und Sterne (P4) — fehlt bei einem Server vor P4. */
   stats?: IKennelStats;
+  /** List entries only: the signed-in caller marked this kennel as a favorite (anonymous: always false). */
+  favorite?: boolean;
 }
 
 export type KennelVisibility = 'public' | 'run-only' | 'private';

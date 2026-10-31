@@ -4,14 +4,16 @@
   <div class="main">
     <span class="line1">
       <span class="emoji" aria-hidden="true">{{ emoji() }}</span>
+      <!-- Stretched over the whole row (::after): a click anywhere loads the kennel in a new tab. -->
       <a
         class="name"
         [href]="publicHref() || null"
         target="_blank"
         rel="noopener"
-        [attr.aria-label]="title() + ', public page, opens in a new tab'"
+        [attr.aria-current]="current() ? 'true' : null"
+        [attr.aria-label]="title() + (current() ? ', opened last' : '') + ', public page, opens in a new tab'"
         title="Open the public page in a new tab"
-        (click)="opened.emit('public')">{{ title() }}</a>
+        (click)="opened.emit()">{{ title() }}</a>
       @if (runOnly()) {
         <span class="sd-chip">run only</span>
       } @else if (isPrivate()) {
@@ -27,11 +29,7 @@
         <span class="sd-chip last">last opened</span>
       }
     </span>
-    <a
-      class="open"
-      [routerLink]="['/kennels', ref()]"
-      [attr.aria-current]="current() ? 'true' : null"
-      (click)="opened.emit('page')"><span class="sd-sr-only">Open {{ title() }}{{ current() ? ', opened last' : '' }}: </span><span class="meta sd-small">{{ meta() }}</span></a>
+    <span class="meta sd-small">{{ meta() }}</span>
   </div>
 
   <span class="data">
@@ -42,6 +40,22 @@
   </span>
 
   <span class="act">
+    <button
+      type="button"
+      class="sd-btn sd-btn--icon sd-btn--bare fav"
+      [class.on]="favorite()"
+      [attr.aria-pressed]="favorite()"
+      [attr.aria-busy]="favoriteBusy() ? 'true' : null"
+      [attr.aria-label]="'Favorite ' + title()"
+      [title]="favorite() ? 'Remove from favorites' : 'Add to favorites'"
+      (click)="toggleFavorite($event)">
+      <!-- A flag, not a star: stars are ratings (sd-stars). Filled = favorite. -->
+      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+        <path d="M3.5 1.5v13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" />
+        <path d="M4.25 2.25h8.5l-2 3.25 2 3.25h-8.5z" [attr.fill]="favorite() ? 'currentColor' : 'none'"
+          stroke="currentColor" stroke-width="1.5" stroke-linejoin="miter" />
+      </svg>
+    </button>
     <button
       type="button"
       class="sd-btn sd-btn--icon sd-btn--bare"
@@ -62,8 +76,9 @@
           <button type="button" (click)="pick('docs')">Docs</button>
           <button type="button" (click)="pick('copy-link')">Copy link</button>
           @if (!runOnly()) {
-            @if (frozen()) {
-              <button type="button" disabled title="Frozen. Unfreeze in settings.">Frozen</button>
+            @if (editLock(); as lock) {
+              <button type="button" disabled [title]="lock" [attr.aria-describedby]="editHintId">Edit</button>
+              <span class="hint sd-small" [id]="editHintId">{{ lock }}</span>
             } @else if (canEdit()) {
               <button type="button" (click)="pick('edit')">Edit</button>
             }

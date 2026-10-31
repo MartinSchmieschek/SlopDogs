@@ -54,29 +54,6 @@
   color: var(--ink);
 }
 
-// The rest of the row opens the kennel page: the link stretches over the whole row, the name, `⏵` and `⋯`
-// sit above it as their own targets.
-.open {
-  display: block;
-  color: inherit;
-  text-decoration: none;
-
-  &::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-  }
-
-  &:focus-visible {
-    outline: none;
-  }
-
-  &:focus-visible::after {
-    outline: 3px solid var(--focus);
-    outline-offset: -3px;
-  }
-}
-
 .line1 {
   display: flex;
   align-items: center;
@@ -89,9 +66,9 @@
   line-height: 1;
 }
 
+// The name is the row's one link (public page, new tab): `::after` stretches it over the whole row, so a
+// click anywhere loads the kennel. Chips and data stay below it; the flag, `⏵` and `⋯` sit above (`.act`).
 .name {
-  position: relative;
-  z-index: 1;
   color: var(--ink);
   text-decoration: none;
   font-family: var(--font-display);
@@ -102,10 +79,25 @@
   padding-top: 2px;
   overflow-wrap: anywhere;
 
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
   &:hover {
     text-decoration: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;
+  }
+
+  &:focus-visible {
+    outline: none;
+  }
+
+  &:focus-visible::after {
+    outline: 3px solid var(--focus);
+    outline-offset: -3px;
   }
 }
 
@@ -148,19 +140,37 @@
   position: relative;
 }
 
-// `⋯` shows on hover and keyboard focus; always on touch screens.
-.dots {
+// Favorite flag: a set one is ink and always visible; an empty one is --ink-2. Never yellow or orange.
+.fav {
+  color: var(--ink-2);
+
+  &.on {
+    color: var(--ink);
+  }
+
+  svg {
+    display: block;
+  }
+}
+
+// `⋯` and the empty flag show on hover and keyboard focus; always on touch screens.
+.dots,
+.fav:not(.on) {
   opacity: 0;
 }
 
 .row:hover .dots,
 .row:focus-within .dots,
-.menu-on .dots {
+.menu-on .dots,
+.row:hover .fav,
+.row:focus-within .fav,
+.menu-on .fav {
   opacity: 1;
 }
 
 @media (hover: none) {
-  .dots {
+  .dots,
+  .fav:not(.on) {
     opacity: 1;
   }
 }
@@ -202,6 +212,13 @@
 
   .danger {
     color: var(--danger-ink);
+  }
+
+  // Why `Edit` is locked — visible, not only on hover.
+  .hint {
+    padding: 0 var(--s3) var(--s2);
+    margin-top: -6px;
+    color: var(--ink-2);
   }
 }
 

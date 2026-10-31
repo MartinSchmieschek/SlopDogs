@@ -42,6 +42,8 @@ export interface KennelPageQuery {
   q?: string;
   /** Nur eigene Einträge; ohne Anmeldung leer. */
   mine?: boolean;
+  /** Nur Favoriten des angemeldeten Nutzers; ohne Anmeldung leer. */
+  favorites?: boolean;
   sort?: KennelSortKey;
   dir?: KennelSortDir;
   /** Nur Kennels mit Rohschnitt >= minStars (1..5). */
@@ -61,6 +63,13 @@ export interface IRatingView {
   score: number;
   histogram: { 1: number; 2: number; 3: number; 4: number; 5: number };
   mine: number | null;
+}
+
+/** Antwort von PUT/DELETE /api/kennels/:id/favorite — beide idempotent, `favorite` ist der neue Stand. */
+export interface IFavoriteView {
+  ok: boolean;
+  lineageId: string;
+  favorite: boolean;
 }
 
 export interface RunResponse {
@@ -105,6 +114,7 @@ export class KennelService {
     const q = query.q?.trim();
     if (q) params = params.set('q', q);
     if (query.mine) params = params.set('mine', '1');
+    if (query.favorites) params = params.set('favorites', '1');
     if (query.sort) params = params.set('sort', query.sort);
     if (query.dir) params = params.set('dir', query.dir);
     if (query.minStars !== undefined) params = params.set('minStars', String(query.minStars));
@@ -175,6 +185,15 @@ export class KennelService {
 
   deleteRating(id: string): Observable<IRatingView> {
     return this.http.delete<IRatingView>(`${this.baseUrl}/${encodeURIComponent(id)}/rating`);
+  }
+
+  /** Favoriten: zaehlt das Run-Recht (auch eigene, frozen und Landing-Kennels). 401 anonym, 403 no_identity im Super-User-Modus. */
+  setFavorite(id: string): Observable<IFavoriteView> {
+    return this.http.put<IFavoriteView>(`${this.baseUrl}/${encodeURIComponent(id)}/favorite`, null);
+  }
+
+  clearFavorite(id: string): Observable<IFavoriteView> {
+    return this.http.delete<IFavoriteView>(`${this.baseUrl}/${encodeURIComponent(id)}/favorite`);
   }
 
   getVersions(id: string): Observable<ApiResponse<KennelVersionEntry[]>> {

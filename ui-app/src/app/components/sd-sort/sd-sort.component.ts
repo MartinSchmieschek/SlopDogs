@@ -7,7 +7,8 @@ export interface SdSortOption<K extends string = string> {
 
 /**
  * Sort chips (6.5 `sd-sort`, variant kennels): outline chips, the active one is ink (never orange),
- * `⇅` flips the direction, an optional `mine only` filter. On narrow screens the row wraps.
+ * `⇅` flips the direction, optional `mine only` and `favorites` filters (both off by default). On narrow
+ * screens the row wraps.
  */
 @Component({
   selector: 'sd-sort',
@@ -26,6 +27,10 @@ export interface SdSortOption<K extends string = string> {
         <button type="button" class="sd-chip sd-chip--outline" [attr.aria-pressed]="mine()"
           (click)="mineToggle.emit()">{{ mine() ? '● mine only' : '○ mine only' }}</button>
       }
+      @if (showFavorites()) {
+        <button type="button" class="sd-chip sd-chip--outline" [attr.aria-pressed]="favorites()"
+          (click)="favoritesToggle.emit()">{{ favorites() ? '⚑ favorites' : '⚐ favorites' }}</button>
+      }
     </div>
   `,
   styles: [`
@@ -41,7 +46,10 @@ export class SdSortComponent {
   readonly dir = input<'asc' | 'desc'>('asc');
   readonly showMine = input(false);
   readonly mine = input(false);
+  readonly showFavorites = input(false);
+  readonly favorites = input(false);
   readonly keyChange = output<string>();
   readonly dirToggle = output<void>();
   readonly mineToggle = output<void>();
+  readonly favoritesToggle = output<void>();
 }

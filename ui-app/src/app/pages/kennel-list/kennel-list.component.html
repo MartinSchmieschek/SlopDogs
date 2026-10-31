@@ -11,7 +11,9 @@
 
   <div class="tools">
     <sd-sort [options]="sortOptions" [active]="sortKey()" [dir]="sortDir()" [showMine]="!!authUser()"
-      [mine]="onlyMine()" (keyChange)="onSortKey($event)" (dirToggle)="toggleSortDir()" (mineToggle)="toggleMine()" />
+      [mine]="onlyMine()" [showFavorites]="!!authUser()" [favorites]="onlyFavorites()"
+      (keyChange)="onSortKey($event)" (dirToggle)="toggleSortDir()" (mineToggle)="toggleMine()"
+      (favoritesToggle)="toggleFavoritesFilter()" />
     <button type="button" class="sd-btn sd-btn--sm import" title="Import a kennel bundle from the clipboard"
       (click)="importFromClipboard()">Import</button>
   </div>
@@ -31,7 +33,9 @@
         @for (kennel of kennels(); track kennel.id + '@' + listEpoch(); let i = $index) {
           <sd-track-row [kennel]="kennel" [index]="i" [staggerIndex]="i % 20" [yours]="isYours(kennel)"
             [publicHref]="publicHref(kennel)" [current]="kennelRef(kennel) === lastOpened()"
-            (opened)="markOpened(kennel)" (action)="onRowAction(kennel, $event)" />
+            [favoriteBusy]="favoritePending().has(kennel.id)"
+            (opened)="markOpened(kennel)" (action)="onRowAction(kennel, $event)"
+            (favoriteToggle)="toggleFavorite(kennel)" />
         }
       </div>
 
@@ -41,6 +45,9 @@
             @if (appliedQuery()) {
               <p>Nothing matches "{{ appliedQuery() }}".</p>
               <button type="button" class="sd-btn" (click)="clearFilters()">Clear search</button>
+            } @else if (onlyFavorites()) {
+              <p>No favorites yet.</p>
+              <button type="button" class="sd-btn" (click)="clearFilters()">Show all</button>
             } @else {
               <p>Nothing matches. You own no kennel yet.</p>
               <button type="button" class="sd-btn" (click)="clearFilters()">Show all</button>
