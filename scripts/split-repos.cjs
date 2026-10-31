@@ -344,6 +344,8 @@ function splitCore(opts) {
     copyTemplate(path.join(TEMPLATES, '_shared'), dir);
     copyTemplate(path.join(TEMPLATES, 'slopdogs-core'), dir);
     for (const f of ['.prettierrc.json', '.nvmrc']) fs.copyFileSync(path.join(work, f), path.join(dir, f));
+    // MIT-Lizenz aus SlopDogs: Repo-Wurzel (= Paket core) und typedefs/, damit jeder Tarball sie traegt.
+    for (const to of ['LICENSE', path.join('typedefs', 'LICENSE')]) fs.copyFileSync(path.join(work, 'LICENSE'), path.join(dir, to));
     writeJson(
         path.join(dir, 'eslint-suppressions.json'),
         filteredSuppressions(work, [
@@ -378,7 +380,7 @@ function splitBaseDogs(opts) {
     const rootFiles = path.join(opts.target, '.split-work-base-dogs-root');
     fs.rmSync(rootFiles, { recursive: true, force: true });
     fs.mkdirSync(rootFiles, { recursive: true });
-    for (const f of ['package.json', '.prettierrc.json', '.nvmrc', 'eslint-suppressions.json']) {
+    for (const f of ['package.json', '.prettierrc.json', '.nvmrc', 'eslint-suppressions.json', 'LICENSE']) {
         if (fs.existsSync(path.join(work, f))) fs.copyFileSync(path.join(work, f), path.join(rootFiles, f));
     }
     git(work, ['checkout', '--quiet', '-b', 'split-base-dogs', rev]);
@@ -464,6 +466,9 @@ function splitBaseDogs(opts) {
     copyTemplate(path.join(TEMPLATES, '_shared'), dir);
     copyTemplate(path.join(TEMPLATES, 'slopdogs-base-dogs'), dir);
     for (const f of ['.prettierrc.json', '.nvmrc']) fs.copyFileSync(path.join(rootFiles, f), path.join(dir, f));
+    // MIT-Lizenz aus SlopDogs: Repo-Wurzel und jedes Paket (npm pack eines Unterordners nimmt die Wurzel nicht mit).
+    for (const to of ['LICENSE', ...names.map((n) => path.join('packages', n, 'LICENSE'))])
+        fs.copyFileSync(path.join(rootFiles, 'LICENSE'), path.join(dir, to));
     writeJson(
         path.join(dir, 'eslint-suppressions.json'),
         filteredSuppressions(
