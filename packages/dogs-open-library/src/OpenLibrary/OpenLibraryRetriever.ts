@@ -9,7 +9,7 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { searchOpenLibrary } from './openLibraryApiClient';
 import type { OpenLibraryResult } from './interfaces/openLibraryTypes';
 import { OpenLibraryQueryPact, type OpenLibraryQuery } from './pacts';

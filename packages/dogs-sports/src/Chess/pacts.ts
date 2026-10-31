@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 export interface ChessQuery {
     /** Endpoint: profile, stats, puzzleDaily, tournament, topPlayers — default "profile" */

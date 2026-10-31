@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { PopCultureQueryPact, type PopCultureQuery } from '../shared/pacts';
 import type { PopCultureResult } from '../shared/types';
 import { popCultureFetch } from '../shared/popCultureApiClient';

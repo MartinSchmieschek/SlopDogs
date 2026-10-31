@@ -4,7 +4,7 @@
  * =========================================================================
  */
 
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 /** Optionale IP-Adresse fuer die Geolocation-Abfrage */
 export interface IPGeoQuery {

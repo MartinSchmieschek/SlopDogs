@@ -1,7 +1,16 @@
-import { IKennelConfig, Dog, IHuntingDog, createPact, MimicDog, IMimicDogConfig, KennelRun, type ChannelState } from '@slopdogs/core';
+import {
+    IKennelConfig,
+    Dog,
+    IHuntingDog,
+    createPact,
+    MimicDog,
+    IMimicDogConfig,
+    KennelRun,
+    type ChannelState,
+} from '@martinschmieschek/slopdogs-core';
 import { TypeDefBuilder } from '../../services/TypeDefBuilder';
 import { CompilerCache } from '../../services/CompilerCache';
-import { BloodhoundIsochronePact, type BloodhoundIsochroneInput, NearbyLandmarksPact } from '@slopdogs/dogs-geo';
+import { BloodhoundIsochronePact, type BloodhoundIsochroneInput, NearbyLandmarksPact } from '@martinschmieschek/slopdogs-dogs-geo';
 
 /** Nimmt ein Testergebnis entgegen — die Sammlung und Ausgabe besitzt StartupTest. */
 export type TestResultSink = (name: string, passed: boolean, error?: string) => void;

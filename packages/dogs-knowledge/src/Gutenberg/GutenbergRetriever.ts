@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { searchGutenberg } from './gutenbergApiClient';
 import type { GutenbergResult } from './interfaces/gutenbergTypes';
 import { GutenbergQueryPact, type GutenbergQuery } from './pacts';

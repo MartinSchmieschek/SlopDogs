@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 /** Abfrage fuer chucknorris.io */
 export interface ChuckNorrisQuery {

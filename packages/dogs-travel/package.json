@@ -1,5 +1,5 @@
 {
-  "name": "@slopdogs/dogs-travel",
+  "name": "@martinschmieschek/slopdogs-dogs-travel",
   "version": "0.2.0-beta.0",
   "description": "Travel: Airport-Lookup, GeoNames (GeoPointPact), Wikivoyage",
   "main": "dist/index.js",
@@ -24,8 +24,8 @@
   "license": "MIT",
   "private": true,
   "dependencies": {
-    "@slopdogs/core": "file:../core",
-    "@slopdogs/geo-pact": "file:../geo-pact"
+    "@martinschmieschek/slopdogs-core": "file:../core",
+    "@martinschmieschek/slopdogs-geo-pact": "file:../geo-pact"
   },
   "scripts": {
     "build": "tsc"

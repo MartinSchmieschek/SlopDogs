@@ -12,7 +12,7 @@
  * ============================================================
  */
 
-import { Dog, IHuntingSeason } from '@slopdogs/core';
+import { Dog, IHuntingSeason } from '@martinschmieschek/slopdogs-core';
 import { RandomRecipesRetriever } from './RandomRecipesRetriever';
 
 /**

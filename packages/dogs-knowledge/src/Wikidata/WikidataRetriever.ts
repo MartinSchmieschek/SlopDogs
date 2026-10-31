@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { queryWikidata } from './wikidataApiClient';
 import type { WikidataResult } from './interfaces/wikidataTypes';
 import { WikidataQueryPact, type WikidataQuery } from './pacts';

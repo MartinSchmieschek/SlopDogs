@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { queryTvMaze } from './tvMazeApiClient';
 import type { TvMazeResult } from './interfaces/tvMazeTypes';
 import { TvMazeQueryPact, type TvMazeQuery } from './pacts';

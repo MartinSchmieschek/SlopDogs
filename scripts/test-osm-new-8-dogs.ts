@@ -25,8 +25,8 @@ import {
     OsmShopsPact,
     OsmSportsRecreationRetriever,
     OsmSportsRecreationPact,
-} from '@slopdogs/dogs-geo';
-import type { IHuntingSeason, IHuntingDog } from '@slopdogs/core';
+} from '@martinschmieschek/slopdogs-dogs-geo';
+import type { IHuntingSeason, IHuntingDog } from '@martinschmieschek/slopdogs-core';
 
 function mockSeason(pactClass: new () => IHuntingDog<unknown>, query: unknown): IHuntingSeason {
     const pactInstance = new pactClass();

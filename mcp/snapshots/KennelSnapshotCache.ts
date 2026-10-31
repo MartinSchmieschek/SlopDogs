@@ -13,7 +13,7 @@
 // Daten dieses Nutzers. Ein Snapshot gehoert deshalb dem, der ihn ausgeloest hat, und nur
 // der liest ihn; jeder andere loest seinen eigenen aus und sieht, was /run IHM zeigen wuerde.
 
-import type { IKennelConfig } from '@slopdogs/core';
+import type { IKennelConfig } from '@martinschmieschek/slopdogs-core';
 import type { AuthCtx } from '../auth/middleware';
 import type { Waves } from '../../services/WavesConverter';
 import type { KennelSnapshotEntry } from './types';

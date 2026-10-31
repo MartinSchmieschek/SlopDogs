@@ -6,7 +6,7 @@
 
 import type { OpenRouteServiceResponse, IsochroneResponse } from './interfaces/openRouteServiceResponse';
 import type { TravelStepJson } from './interfaces/bloodhoundTypes';
-import type { GeoPoint } from '@slopdogs/geo-pact';
+import type { GeoPoint } from '@martinschmieschek/slopdogs-geo-pact';
 
 const apiKeys: string[] = process.env.ORS_API_KEYS?.split(',') || [];
 let currentApiKeyIndex = 0;

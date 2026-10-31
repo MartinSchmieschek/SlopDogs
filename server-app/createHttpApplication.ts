@@ -1,6 +1,6 @@
 import express, { type Application } from 'express';
 import cookieParser from 'cookie-parser';
-import { ISerializedDogConfig, SerializedDog, MimicDog, type ICacheHandler } from '@slopdogs/core';
+import { ISerializedDogConfig, SerializedDog, MimicDog, type ICacheHandler } from '@martinschmieschek/slopdogs-core';
 import { IStore } from '../store/IStore';
 import { Controller } from '../api/Controller';
 import { KennelController } from '../api/KennelController';

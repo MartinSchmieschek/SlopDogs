@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 export interface DiseaseQuery {
     /** Krankheit: covid-19, influenza, ebola — default "covid-19" */

@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { queryChess } from './chessApiClient';
 import type { ChessResult } from './interfaces/chessTypes';
 import { ChessQueryPact, type ChessQuery } from './pacts';

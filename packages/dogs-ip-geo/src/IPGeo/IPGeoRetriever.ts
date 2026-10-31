@@ -9,7 +9,7 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getIPGeoData } from './ipGeoApiClient';
 import type { IPGeoResult } from './interfaces/ipGeoTypes';
 import { IPGeoQueryPact, type IPGeoQuery } from './pacts';

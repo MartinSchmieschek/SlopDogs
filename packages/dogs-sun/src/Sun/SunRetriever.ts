@@ -8,7 +8,7 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason } from '@martinschmieschek/slopdogs-core';
 import { getSunData } from './sunApiClient';
 import type { SunResult } from './interfaces/sunTypes';
 import { SunQueryPact, type SunQuery } from './pacts';

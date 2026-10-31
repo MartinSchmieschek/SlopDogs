@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { querySportsDb } from './sportsDbApiClient';
 import type { SportsDbResult } from './interfaces/sportsDbTypes';
 import { SportsDbQueryPact, type SportsDbQuery } from './pacts';

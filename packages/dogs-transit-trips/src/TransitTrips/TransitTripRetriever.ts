@@ -14,7 +14,7 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@martinschmieschek/slopdogs-core';
 import { fetchLocalTransitNetwork } from './transitTripApiClient';
 import type { TransitTripResult } from './interfaces/transitTripTypes';
 import { TransitTripQueryPact, type TransitTripQuery } from './pacts';

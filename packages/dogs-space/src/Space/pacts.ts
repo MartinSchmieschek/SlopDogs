@@ -4,7 +4,7 @@
  * =========================================================================
  */
 
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 /** Query for space data — optional body name for solar system lookup */
 export interface SpaceQuery {

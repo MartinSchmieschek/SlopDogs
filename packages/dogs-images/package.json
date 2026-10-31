@@ -1,5 +1,5 @@
 {
-  "name": "@slopdogs/dogs-images",
+  "name": "@martinschmieschek/slopdogs-dogs-images",
   "version": "0.2.0-beta.0",
   "description": "Images: DogCeo, Shibe, Picsum, NasaApod",
   "main": "dist/index.js",
@@ -23,7 +23,7 @@
   },
   "license": "MIT",
   "private": true,
-  "dependencies": { "@slopdogs/core": "file:../core" },
+  "dependencies": { "@martinschmieschek/slopdogs-core": "file:../core" },
   "scripts": { "build": "tsc" },
   "devDependencies": { "@types/node": "^20.0.0", "typescript": "^5.0.0" }
 }

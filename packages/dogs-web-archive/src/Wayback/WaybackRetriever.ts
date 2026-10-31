@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getWaybackSnapshot } from './waybackApiClient';
 import type { WaybackResult } from './interfaces/waybackTypes';
 import { WaybackQueryPact, type WaybackQuery } from './pacts';

@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 export interface BoredQuery {
     /** Typ: education, recreational, social, diy, charity, cooking, relaxation, music, busywork */

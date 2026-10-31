@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 export interface BibleQuery {
     /** Referenz im bible-api-Format: "John 3:16" oder "john 3:16-17" */

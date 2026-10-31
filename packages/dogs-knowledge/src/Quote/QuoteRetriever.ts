@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getRandomQuote } from './quoteApiClient';
 import type { QuoteResult } from './interfaces/quoteTypes';
 import { QuoteQueryPact, type QuoteQuery } from './pacts';

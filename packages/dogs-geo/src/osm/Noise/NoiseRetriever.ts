@@ -1,4 +1,4 @@
-import { IHuntingSeason } from '@slopdogs/core';
+import { IHuntingSeason } from '@martinschmieschek/slopdogs-core';
 import { OsmFeatureRetriever, type OsmQueryBase } from '../base/OsmFeatureRetriever';
 import { type OverpassRawElement, overpassElementRepresentativePoint } from '../base/overpassMirrorChain';
 import { NoiseQueryPact, type NoiseQuery } from './pacts';

@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { queryOpenFda } from './openFdaApiClient';
 import type { OpenFdaResult } from './interfaces/openFdaTypes';
 import { OpenFdaQueryPact, type OpenFdaQuery } from './pacts';

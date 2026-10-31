@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { queryHackerNews } from './hackerNewsApiClient';
 import type { HackerNewsResult } from './interfaces/hackerNewsTypes';
 import { HackerNewsQueryPact, type HackerNewsQuery } from './pacts';

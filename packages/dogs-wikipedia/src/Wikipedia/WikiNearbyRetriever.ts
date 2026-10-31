@@ -9,7 +9,7 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@martinschmieschek/slopdogs-core';
 import { getWikiNearby } from './wikipediaApiClient';
 import type { WikiNearbyResult } from './interfaces/wikipediaTypes';
 import { WikiNearbyQueryPact, type WikiNearbyQuery } from './pacts';

@@ -1,5 +1,5 @@
 {
-  "name": "@slopdogs/dogs-geocoding",
+  "name": "@martinschmieschek/slopdogs-dogs-geocoding",
   "version": "0.2.0-beta.0",
   "description": "Geocoding: Adresse zu GPS und GPS zu Adresse via Nominatim (OSM)",
   "main": "dist/index.js",
@@ -24,7 +24,7 @@
   "license": "MIT",
   "private": true,
   "dependencies": {
-    "@slopdogs/core": "file:../core"
+    "@martinschmieschek/slopdogs-core": "file:../core"
   },
   "scripts": {
     "build": "tsc"

@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getRandomUsers } from './randomUserApiClient';
 import type { RandomUserResult } from './interfaces/randomUserTypes';
 import { RandomUserQueryPact, type RandomUserQuery } from './pacts';

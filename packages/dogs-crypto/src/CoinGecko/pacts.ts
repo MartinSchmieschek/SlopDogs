@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 export interface CoinGeckoQuery {
     /** Modus: price (simple/price), markets (top coins), coin (Detail-Info), trending,

@@ -11,7 +11,7 @@ import {
     type VmGlobalCapabilityContext,
     isRuntimeLogVerbose,
     publicKennelPath,
-} from '@slopdogs/core';
+} from '@martinschmieschek/slopdogs-core';
 import { FIXED_TOP_LEVEL } from './spaRouteConstants';
 import { API_ROUTE, LEGACY_ROUTE, PUBLIC_ROUTE } from './routeTable';
 import { IStore, type MimicHeadRow } from '../../store/IStore';

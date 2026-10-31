@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getDatamuseWords } from './datamuseApiClient';
 import type { DatamuseResult } from './interfaces/datamuseTypes';
 import { DatamuseQueryPact, type DatamuseQuery } from './pacts';

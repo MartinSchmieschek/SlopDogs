@@ -11,7 +11,7 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@martinschmieschek/slopdogs-core';
 import { forwardGeocode, reverseGeocode } from './geocodingApiClient';
 import type { GeocodingResult } from './interfaces/geocodingTypes';
 import { GeocodingQueryPact, type GeocodingQuery } from './pacts';

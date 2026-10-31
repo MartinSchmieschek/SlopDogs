@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { translateText } from './libreTranslateApiClient';
 import type { LibreTranslateResult } from './interfaces/libreTranslateTypes';
 import { LibreTranslateQueryPact, type LibreTranslateQuery } from './pacts';

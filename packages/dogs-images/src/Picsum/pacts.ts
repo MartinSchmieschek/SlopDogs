@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 export interface PicsumQuery {
     /** Modus: list (JSON-Metadaten), info (zu einer ID), randomUrl (direkte Bild-URL) — default "list" */

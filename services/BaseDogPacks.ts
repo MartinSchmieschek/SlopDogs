@@ -1,7 +1,7 @@
 // BaseDogPacks — which package a base dog comes from (P6 U5, `pack` in GET /api/nodes).
 //
 // The registries (server-registries/*Registry.ts) import every base dog from its package
-// (`@slopdogs/dogs-weather`, `@slopdogs/core`, ...) and hand out a flat list of classes. The package
+// (`@martinschmieschek/slopdogs-dogs-weather`, `@martinschmieschek/slopdogs-core`, ...) and hand out a flat list of classes. The package
 // is not written anywhere else, and a second hand-kept table would rot. So the name is read from the
 // module graph the registry has just loaded: every module under `packages/<name>/` whose exports hold
 // the class. The defining file wins over an index that only re-exports it.

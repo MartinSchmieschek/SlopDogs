@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getChuckNorris } from './chuckNorrisApiClient';
 import type { ChuckNorrisResult } from './interfaces/chuckNorrisTypes';
 import { ChuckNorrisQueryPact, type ChuckNorrisQuery } from './pacts';

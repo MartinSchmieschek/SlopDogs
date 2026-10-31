@@ -9,7 +9,7 @@
  * =========================================================================
  */
 
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 /** Query parameters for the biodiversity hunt */
 export interface BiodiversityQuery {

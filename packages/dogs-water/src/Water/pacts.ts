@@ -4,7 +4,7 @@
  * =========================================================================
  */
 
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 /** GPS coordinates for marine/water query */
 export interface WaterQuery {

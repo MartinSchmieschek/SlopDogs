@@ -8,7 +8,7 @@ import type { AuthCtx } from '../auth/middleware';
 import type { NodeEntry, Waves, ReadTrackingEntry } from '../../services/WavesConverter';
 import type { KennelSnapshotEntry } from '../snapshots/types';
 import { KennelSnapshotCache } from '../snapshots/KennelSnapshotCache';
-import type { IKennelConfig } from '@slopdogs/core';
+import type { IKennelConfig } from '@martinschmieschek/slopdogs-core';
 import { REDACTED_TEXT, redactWavesForCtx } from '../../services/wavesRedaction';
 
 /**

@@ -9,7 +9,7 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@martinschmieschek/slopdogs-core';
 import { getWaterConditions } from './waterApiClient';
 import type { WaterResult } from './interfaces/waterTypes';
 import { WaterQueryPact, type WaterQuery } from './pacts';

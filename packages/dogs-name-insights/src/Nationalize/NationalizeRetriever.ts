@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getNationalize } from './nationalizeApiClient';
 import type { NationalizeResult } from './interfaces/nationalizeTypes';
 import { NameQueryPact, type NameQuery } from '../shared/pacts';

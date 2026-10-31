@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { queryQuran } from './quranApiClient';
 import type { QuranResult } from './interfaces/quranTypes';
 import { QuranQueryPact, type QuranQuery } from './pacts';

@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { queryCocktail } from './cocktailApiClient';
 import type { RecipeResult } from '../shared/recipeTypes';
 import { CocktailQueryPact, type CocktailQuery } from './pacts';

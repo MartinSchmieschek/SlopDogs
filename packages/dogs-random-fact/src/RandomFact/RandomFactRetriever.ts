@@ -9,7 +9,7 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getRandomFact } from './randomFactApiClient';
 import type { RandomFactResult } from './interfaces/randomFactTypes';
 import { RandomFactQueryPact, type RandomFactQuery } from './pacts';

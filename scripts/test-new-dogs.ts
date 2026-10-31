@@ -21,7 +21,7 @@ async function main() {
     const results: TestResult[] = [];
 
     // --- Humor ---
-    const { getJoke } = await import('@slopdogs/dogs-humor');
+    const { getJoke } = await import('@martinschmieschek/slopdogs-dogs-humor');
     results.push(
         await run(
             'Joke',
@@ -30,7 +30,7 @@ async function main() {
         ),
     );
 
-    const { getDadJoke } = await import('@slopdogs/dogs-humor');
+    const { getDadJoke } = await import('@martinschmieschek/slopdogs-dogs-humor');
     results.push(
         await run(
             'DadJoke',
@@ -39,7 +39,7 @@ async function main() {
         ),
     );
 
-    const { getChuckNorris } = await import('@slopdogs/dogs-humor');
+    const { getChuckNorris } = await import('@martinschmieschek/slopdogs-dogs-humor');
     results.push(
         await run(
             'ChuckNorris',
@@ -49,7 +49,7 @@ async function main() {
     );
 
     // --- Animals-Random ---
-    const { getCatFact } = await import('@slopdogs/dogs-animals-random');
+    const { getCatFact } = await import('@martinschmieschek/slopdogs-dogs-animals-random');
     results.push(
         await run(
             'CatFact',
@@ -58,7 +58,7 @@ async function main() {
         ),
     );
 
-    const { getRandomFox } = await import('@slopdogs/dogs-animals-random');
+    const { getRandomFox } = await import('@martinschmieschek/slopdogs-dogs-animals-random');
     results.push(
         await run(
             'Fox',
@@ -67,7 +67,7 @@ async function main() {
         ),
     );
 
-    const { getRandomDuck } = await import('@slopdogs/dogs-animals-random');
+    const { getRandomDuck } = await import('@martinschmieschek/slopdogs-dogs-animals-random');
     results.push(
         await run(
             'Duck',
@@ -77,7 +77,7 @@ async function main() {
     );
 
     // --- Dictionary ---
-    const { getDictionaryEntry } = await import('@slopdogs/dogs-dictionary');
+    const { getDictionaryEntry } = await import('@martinschmieschek/slopdogs-dogs-dictionary');
     results.push(
         await run(
             'Dictionary',
@@ -86,7 +86,7 @@ async function main() {
         ),
     );
 
-    const { getDatamuseWords } = await import('@slopdogs/dogs-dictionary');
+    const { getDatamuseWords } = await import('@martinschmieschek/slopdogs-dogs-dictionary');
     results.push(
         await run(
             'Datamuse',
@@ -100,7 +100,7 @@ async function main() {
     );
 
     // --- Knowledge ---
-    const { getRandomQuote } = await import('@slopdogs/dogs-knowledge');
+    const { getRandomQuote } = await import('@martinschmieschek/slopdogs-dogs-knowledge');
     results.push(
         await run(
             'Quote',
@@ -109,7 +109,7 @@ async function main() {
         ),
     );
 
-    const { searchGutenberg } = await import('@slopdogs/dogs-knowledge');
+    const { searchGutenberg } = await import('@martinschmieschek/slopdogs-dogs-knowledge');
     results.push(
         await run(
             'Gutenberg',
@@ -118,7 +118,7 @@ async function main() {
         ),
     );
 
-    const { queryWikidata } = await import('@slopdogs/dogs-knowledge');
+    const { queryWikidata } = await import('@martinschmieschek/slopdogs-dogs-knowledge');
     results.push(
         await run(
             'Wikidata',
@@ -128,7 +128,7 @@ async function main() {
     );
 
     // --- Pop-Culture ---
-    const { popCultureFetch } = await import('@slopdogs/dogs-pop-culture');
+    const { popCultureFetch } = await import('@martinschmieschek/slopdogs-dogs-pop-culture');
     results.push(
         await run(
             'StarWars (swapi)',
@@ -159,7 +159,7 @@ async function main() {
     );
 
     // --- Music ---
-    const { queryMusicBrainz } = await import('@slopdogs/dogs-music');
+    const { queryMusicBrainz } = await import('@martinschmieschek/slopdogs-dogs-music');
     results.push(
         await run(
             'MusicBrainz',
@@ -168,7 +168,7 @@ async function main() {
         ),
     );
 
-    const { getLyrics } = await import('@slopdogs/dogs-music');
+    const { getLyrics } = await import('@martinschmieschek/slopdogs-dogs-music');
     results.push(
         await run(
             'Lyrics',
@@ -177,7 +177,7 @@ async function main() {
         ),
     );
 
-    const { queryRadioBrowser } = await import('@slopdogs/dogs-music');
+    const { queryRadioBrowser } = await import('@martinschmieschek/slopdogs-dogs-music');
     results.push(
         await run(
             'RadioBrowser',
@@ -187,7 +187,7 @@ async function main() {
     );
 
     // --- Sports ---
-    const { getF1 } = await import('@slopdogs/dogs-sports');
+    const { getF1 } = await import('@martinschmieschek/slopdogs-dogs-sports');
     results.push(
         await run(
             'F1',
@@ -199,7 +199,7 @@ async function main() {
         ),
     );
 
-    const { querySportsDb } = await import('@slopdogs/dogs-sports');
+    const { querySportsDb } = await import('@martinschmieschek/slopdogs-dogs-sports');
     results.push(
         await run(
             'SportsDB',
@@ -208,7 +208,7 @@ async function main() {
         ),
     );
 
-    const { queryChess } = await import('@slopdogs/dogs-sports');
+    const { queryChess } = await import('@martinschmieschek/slopdogs-dogs-sports');
     results.push(
         await run(
             'Chess (puzzle daily)',
@@ -218,7 +218,7 @@ async function main() {
     );
 
     // --- Dev ---
-    const { queryNpm } = await import('@slopdogs/dogs-dev');
+    const { queryNpm } = await import('@martinschmieschek/slopdogs-dogs-dev');
     results.push(
         await run(
             'Npm',
@@ -227,7 +227,7 @@ async function main() {
         ),
     );
 
-    const { queryStackExchange } = await import('@slopdogs/dogs-dev');
+    const { queryStackExchange } = await import('@martinschmieschek/slopdogs-dogs-dev');
     results.push(
         await run(
             'StackExchange',
@@ -236,7 +236,7 @@ async function main() {
         ),
     );
 
-    const { queryGitHubPublic } = await import('@slopdogs/dogs-dev');
+    const { queryGitHubPublic } = await import('@martinschmieschek/slopdogs-dogs-dev');
     results.push(
         await run(
             'GitHubPublic',
@@ -246,7 +246,7 @@ async function main() {
     );
 
     // --- Travel ---
-    const { fetchAirportIndex, resolveAirport } = await import('@slopdogs/dogs-travel');
+    const { fetchAirportIndex, resolveAirport } = await import('@martinschmieschek/slopdogs-dogs-travel');
     results.push(
         await run(
             'Airport (FRA)',
@@ -258,7 +258,7 @@ async function main() {
         ),
     );
 
-    const { getNearbyPlaces } = await import('@slopdogs/dogs-travel');
+    const { getNearbyPlaces } = await import('@martinschmieschek/slopdogs-dogs-travel');
     results.push(
         await run(
             'GeoNames (demo-user)',
@@ -267,7 +267,7 @@ async function main() {
         ),
     );
 
-    const { getWikivoyageSnippet } = await import('@slopdogs/dogs-travel');
+    const { getWikivoyageSnippet } = await import('@martinschmieschek/slopdogs-dogs-travel');
     results.push(
         await run(
             'Wikivoyage',
@@ -277,7 +277,7 @@ async function main() {
     );
 
     // --- Quiz ---
-    const { getTrivia } = await import('@slopdogs/dogs-quiz');
+    const { getTrivia } = await import('@martinschmieschek/slopdogs-dogs-quiz');
     results.push(
         await run(
             'Trivia',
@@ -286,7 +286,7 @@ async function main() {
         ),
     );
 
-    const { getBoredActivity } = await import('@slopdogs/dogs-quiz');
+    const { getBoredActivity } = await import('@martinschmieschek/slopdogs-dogs-quiz');
     results.push(
         await run(
             'Bored',
@@ -295,7 +295,7 @@ async function main() {
         ),
     );
 
-    const { getRandomUsers } = await import('@slopdogs/dogs-quiz');
+    const { getRandomUsers } = await import('@martinschmieschek/slopdogs-dogs-quiz');
     results.push(
         await run(
             'RandomUser',
@@ -305,7 +305,7 @@ async function main() {
     );
 
     // --- Religion ---
-    const { getBibleReference } = await import('@slopdogs/dogs-religion');
+    const { getBibleReference } = await import('@martinschmieschek/slopdogs-dogs-religion');
     results.push(
         await run(
             'Bible',
@@ -314,7 +314,7 @@ async function main() {
         ),
     );
 
-    const { queryQuran } = await import('@slopdogs/dogs-religion');
+    const { queryQuran } = await import('@martinschmieschek/slopdogs-dogs-religion');
     results.push(
         await run(
             'Quran (ayah 2:255)',
@@ -324,7 +324,7 @@ async function main() {
     );
 
     // --- Health ---
-    const { queryDisease } = await import('@slopdogs/dogs-health');
+    const { queryDisease } = await import('@martinschmieschek/slopdogs-dogs-health');
     results.push(
         await run(
             'Disease (COVID all)',
@@ -333,7 +333,7 @@ async function main() {
         ),
     );
 
-    const { queryOpenFda } = await import('@slopdogs/dogs-health');
+    const { queryOpenFda } = await import('@martinschmieschek/slopdogs-dogs-health');
     results.push(
         await run(
             'OpenFDA',
@@ -343,7 +343,7 @@ async function main() {
     );
 
     // --- Cuisine ---
-    const { queryCocktail } = await import('@slopdogs/dogs-cuisine');
+    const { queryCocktail } = await import('@martinschmieschek/slopdogs-dogs-cuisine');
     results.push(
         await run(
             'Cocktail (random)',
@@ -352,7 +352,7 @@ async function main() {
         ),
     );
 
-    const { queryMeal } = await import('@slopdogs/dogs-cuisine');
+    const { queryMeal } = await import('@martinschmieschek/slopdogs-dogs-cuisine');
     results.push(
         await run(
             'Meal (search=pasta)',
@@ -362,7 +362,7 @@ async function main() {
     );
 
     // --- Web-Archive ---
-    const { getWaybackSnapshot } = await import('@slopdogs/dogs-web-archive');
+    const { getWaybackSnapshot } = await import('@martinschmieschek/slopdogs-dogs-web-archive');
     results.push(
         await run(
             'Wayback',

@@ -8,7 +8,7 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getJoke } from './jokeApiClient';
 import type { JokeResult } from './interfaces/jokeTypes';
 import { JokeQueryPact, type JokeQuery } from './pacts';

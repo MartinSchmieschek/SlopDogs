@@ -2,7 +2,7 @@
  * Resolves kennel id and display name for import/export bundles in one place
  * (phase 1: id collision with an existing kennel; phase 2: display name already taken).
  * Used by the API import flow and the UI import preview; the Angular app mirrors logic in
- * `ui-app/src/app/utils/kennel-import-target.ts` to avoid Vite subpath issues with @slopdogs/core.
+ * `ui-app/src/app/utils/kennel-import-target.ts` to avoid Vite subpath issues with @martinschmieschek/slopdogs-core.
  */
 
 export type KennelIdNameListEntry = {

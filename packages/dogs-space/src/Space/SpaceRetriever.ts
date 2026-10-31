@@ -9,7 +9,7 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getSpace } from './spaceApiClient';
 import type { SpaceResult } from './interfaces/spaceTypes';
 import { SpaceQueryPact, type SpaceQuery } from './pacts';

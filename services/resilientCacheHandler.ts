@@ -5,7 +5,7 @@
  * Brückenmodell: Spaeter soll eine schnelle Cache-Anbindung (Postgres o. a.) im Fokus sein;
  * dieses Wrapper ist nur Dev-Schutz, kein Ersatz fuer Cache-Tuning oder Monitoring.
  */
-import type { ICacheHandler, ITileFeatureCache, TileCoverageResult, TileKey } from '@slopdogs/core';
+import type { ICacheHandler, ITileFeatureCache, TileCoverageResult, TileKey } from '@martinschmieschek/slopdogs-core';
 
 export function isCacheInfraError(err: unknown): boolean {
     const code = (err as { code?: string })?.code;

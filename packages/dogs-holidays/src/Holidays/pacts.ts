@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 export interface HolidayQuery {
     /** ISO 3166-1 alpha-2 country code (e.g. "DE", "US") */

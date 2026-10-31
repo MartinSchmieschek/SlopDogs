@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getNasaApod } from './nasaApodApiClient';
 import type { NasaApodResult } from './interfaces/nasaApodTypes';
 import { NasaApodQueryPact, type NasaApodQuery } from './pacts';

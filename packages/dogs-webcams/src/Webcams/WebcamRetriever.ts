@@ -13,7 +13,7 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@martinschmieschek/slopdogs-core';
 import { fetchNearbyWebcams } from './webcamApiClient';
 import type { WebcamResult } from './interfaces/webcamTypes';
 import { WebcamQueryPact, type WebcamQuery } from './pacts';

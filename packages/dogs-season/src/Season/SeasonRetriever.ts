@@ -9,7 +9,7 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketCenter } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketCenter } from '@martinschmieschek/slopdogs-core';
 import { calculateSeason } from './seasonCalculator';
 import type { SeasonResult } from './interfaces/seasonTypes';
 import { SeasonQueryPact, type SeasonQuery } from './pacts';

@@ -16,7 +16,15 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey, GEO_CACHE_TTL_OSM_MS } from '@slopdogs/core';
+import {
+    Dog,
+    IHuntingDog,
+    IHuntingSeason,
+    type ICacheHandler,
+    type ICacheable,
+    geoBucketKey,
+    GEO_CACHE_TTL_OSM_MS,
+} from '@martinschmieschek/slopdogs-core';
 import { BloodhoundIsochronePact, BloodhoundProfile, DEFAULT_BLOODHOUND_PROFILE, type BloodhoundIsochroneInput } from './pacts';
 import { calculateIsochrone } from './routeCalculator';
 import type { BloodhoundIsochroneResult, IsochroneFeatureResult } from './interfaces/bloodhoundTypes';

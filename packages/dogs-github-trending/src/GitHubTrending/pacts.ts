@@ -4,7 +4,7 @@
  * =========================================================================
  */
 
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 /** Query for GitHub trending repositories */
 export interface GitHubTrendingQuery {

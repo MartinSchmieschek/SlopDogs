@@ -16,8 +16,8 @@ import {
     type ICacheable,
     geoBucketCenter,
     GEO_CACHE_TTL_OSM_MS,
-} from '@slopdogs/core';
-import type { GeoPoint } from '@slopdogs/geo-pact';
+} from '@martinschmieschek/slopdogs-core';
+import type { GeoPoint } from '@martinschmieschek/slopdogs-geo-pact';
 import { calculateRoute, processRouteResponse } from './routeCalculator';
 import type { BloodhoundRouteResult, RouteSegment } from './interfaces/bloodhoundTypes';
 import {

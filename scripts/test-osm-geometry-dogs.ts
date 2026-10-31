@@ -16,8 +16,8 @@ import {
     OsmRailsGeometryPact,
     OsmLandscapeFeaturesRetriever,
     OsmLandscapeFeaturesPact,
-} from '@slopdogs/dogs-geo';
-import type { IHuntingSeason, IHuntingDog } from '@slopdogs/core';
+} from '@martinschmieschek/slopdogs-dogs-geo';
+import type { IHuntingSeason, IHuntingDog } from '@martinschmieschek/slopdogs-core';
 
 /**
  * Stellt eine Mock-Season her, in der ein Pact-Hund bereits "exhausted" ist

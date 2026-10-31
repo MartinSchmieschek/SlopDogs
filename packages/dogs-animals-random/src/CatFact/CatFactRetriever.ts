@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getCatFact } from './catFactApiClient';
 import type { CatFactResult } from './interfaces/catFactTypes';
 import { CatFactQueryPact, type CatFactQuery } from './pacts';

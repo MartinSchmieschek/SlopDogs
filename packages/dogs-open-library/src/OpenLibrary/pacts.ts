@@ -4,7 +4,7 @@
  * =========================================================================
  */
 
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 /** Query for Open Library book search */
 export interface OpenLibraryQuery {

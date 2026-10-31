@@ -4,7 +4,7 @@
  * =========================================================================
  */
 
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 /** GPS coordinates and optional date range for historical weather query */
 export interface HistoricalWeatherQuery {

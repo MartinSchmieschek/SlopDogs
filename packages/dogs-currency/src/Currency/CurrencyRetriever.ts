@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { CurrencyQueryPact, type CurrencyQuery } from './pacts';
 
 const FRANKFURTER_BASE = 'https://api.frankfurter.app';

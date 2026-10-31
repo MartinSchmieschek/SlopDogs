@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 export interface DogCeoQuery {
     /** Rasse (lowercase, e.g. "husky", "labrador"). Leer = zufaellige Rasse. */

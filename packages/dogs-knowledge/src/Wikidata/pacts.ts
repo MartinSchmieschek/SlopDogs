@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 export interface WikidataQuery {
     /** Roh-SPARQL (wenn gesetzt, werden search/entity ignoriert) */

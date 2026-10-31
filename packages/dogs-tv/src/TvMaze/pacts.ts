@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 export interface TvMazeQuery {
     /** Modus: search (Serien suchen), singleSearch (erster Treffer), show (nach ID),

@@ -12,7 +12,7 @@
  * ============================================================
  */
 
-import { Dog, IHuntingSeason } from '@slopdogs/core';
+import { Dog, IHuntingSeason } from '@martinschmieschek/slopdogs-core';
 
 /**
  * Arr, the RandomEveryThingRetriever -- a mad vessel that sails every cursed

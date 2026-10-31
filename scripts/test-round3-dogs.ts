@@ -20,7 +20,7 @@ async function main() {
     const results: TestResult[] = [];
 
     // --- Images ---
-    const { getDogImages, queryPicsum, getNasaApod } = await import('@slopdogs/dogs-images');
+    const { getDogImages, queryPicsum, getNasaApod } = await import('@martinschmieschek/slopdogs-dogs-images');
     results.push(
         await run(
             'DogCeo',
@@ -51,7 +51,7 @@ async function main() {
     );
 
     // --- Name-Insights ---
-    const { getAgify, getNationalize, getGenderize } = await import('@slopdogs/dogs-name-insights');
+    const { getAgify, getNationalize, getGenderize } = await import('@martinschmieschek/slopdogs-dogs-name-insights');
     results.push(
         await run(
             'Agify (martin,DE)',
@@ -75,7 +75,7 @@ async function main() {
     );
 
     // --- Gaming ---
-    const { queryPokeApi, queryDeckOfCards, queryScryfall } = await import('@slopdogs/dogs-gaming');
+    const { queryPokeApi, queryDeckOfCards, queryScryfall } = await import('@martinschmieschek/slopdogs-dogs-gaming');
     results.push(
         await run(
             'PokeApi (ditto)',
@@ -97,7 +97,7 @@ async function main() {
         await run(
             'DeckOfCards new+draw',
             async () => {
-                const { queryDeckOfCards: q } = await import('@slopdogs/dogs-gaming');
+                const { queryDeckOfCards: q } = await import('@martinschmieschek/slopdogs-dogs-gaming');
                 const deck = await q('newShuffled', undefined, 1);
                 const drawn = await q('draw', deck.deckId, 1, 3);
                 return { deckId: deck.deckId, drew: drawn.cards?.length ?? 0, remaining: drawn.remaining };
@@ -121,7 +121,7 @@ async function main() {
     );
 
     // --- Translate ---
-    const { translateText } = await import('@slopdogs/dogs-translate');
+    const { translateText } = await import('@martinschmieschek/slopdogs-dogs-translate');
     results.push(
         await run(
             'LibreTranslate',
@@ -131,7 +131,7 @@ async function main() {
     );
 
     // --- TV ---
-    const { queryTvMaze } = await import('@slopdogs/dogs-tv');
+    const { queryTvMaze } = await import('@martinschmieschek/slopdogs-dogs-tv');
     results.push(
         await run(
             'TvMaze search',
@@ -155,7 +155,7 @@ async function main() {
     );
 
     // --- Social ---
-    const { queryHackerNews } = await import('@slopdogs/dogs-social');
+    const { queryHackerNews } = await import('@martinschmieschek/slopdogs-dogs-social');
     results.push(
         await run(
             'HN top 3 (hydrated)',
@@ -176,7 +176,7 @@ async function main() {
         ),
     );
 
-    const { queryLemmy } = await import('@slopdogs/dogs-social');
+    const { queryLemmy } = await import('@martinschmieschek/slopdogs-dogs-social');
     results.push(
         await run(
             'Lemmy postList (lemmy.world)',
@@ -194,7 +194,7 @@ async function main() {
     );
 
     // --- Crypto ---
-    const { queryCoinGecko } = await import('@slopdogs/dogs-crypto');
+    const { queryCoinGecko } = await import('@martinschmieschek/slopdogs-dogs-crypto');
     results.push(
         await run(
             'CoinGecko price btc+eth',

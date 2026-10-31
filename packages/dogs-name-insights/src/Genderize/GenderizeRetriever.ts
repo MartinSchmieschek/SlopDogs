@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getGenderize } from './genderizeApiClient';
 import type { GenderizeResult } from './interfaces/genderizeTypes';
 import { NameQueryPact, type NameQuery } from '../shared/pacts';

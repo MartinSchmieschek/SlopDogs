@@ -7,7 +7,7 @@
 // Anonymer ausfuehren darf (dieselbe Regel wie die Kennel-Listen); Base-Dogs nie (Infrastruktur dominiert).
 import { createHash } from 'crypto';
 import { Request, Response } from 'express';
-import { publicKennelPath } from '@slopdogs/core';
+import { publicKennelPath } from '@martinschmieschek/slopdogs-core';
 import { KennelController } from '../KennelController';
 import { canRead, filterRunnable } from '../../mcp/auth/visibility';
 import type { AuthCtx } from '../../mcp/auth/middleware';

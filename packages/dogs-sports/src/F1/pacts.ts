@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 export interface F1Query {
     /** Saison: 4-stellig oder "current" — default "current" */

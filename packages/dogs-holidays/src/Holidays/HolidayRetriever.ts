@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { HolidayQueryPact, type HolidayQuery } from './pacts';
 
 const NAGER_BASE = 'https://date.nager.at/api/v3/publicholidays';

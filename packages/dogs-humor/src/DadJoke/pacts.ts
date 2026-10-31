@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 /** Abfrage fuer icanhazdadjoke — Input ist optional, Default: zufaelliger Dad-Joke */
 export interface DadJokeQuery {

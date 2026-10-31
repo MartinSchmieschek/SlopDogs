@@ -7,8 +7,8 @@
  * through waters no sane soul would sail. To cosmic madness laws submit,
  * though stalwart minds entreat.
  */
-import { Dog, IHuntingDog, IHuntingSeason } from '@slopdogs/core';
-import { FoodPornRetriever, DishFlagBlackLab } from '@slopdogs/dogs-demo';
+import { Dog, IHuntingDog, IHuntingSeason } from '@martinschmieschek/slopdogs-core';
+import { FoodPornRetriever, DishFlagBlackLab } from '@martinschmieschek/slopdogs-dogs-demo';
 import { LayoutInputPact } from './renderer/layouts/ILayoutInput';
 import { LayoutRenderer } from './renderer/LayoutRenderer';
 import { TinderLayout } from './renderer/layouts/tinderLayout';

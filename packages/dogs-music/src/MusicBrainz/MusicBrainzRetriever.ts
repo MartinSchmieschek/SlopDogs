@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { queryMusicBrainz } from './musicBrainzApiClient';
 import type { MusicBrainzResult } from './interfaces/musicBrainzTypes';
 import { MusicBrainzQueryPact, type MusicBrainzQuery } from './pacts';

@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { queryLemmy } from './lemmyApiClient';
 import type { LemmyResult } from './interfaces/lemmyTypes';
 import { LemmyQueryPact, type LemmyQuery } from './pacts';

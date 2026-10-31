@@ -1,5 +1,5 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@slopdogs/core';
-import { GeoPointPact, type GeoPoint } from '@slopdogs/geo-pact';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@martinschmieschek/slopdogs-core';
+import { GeoPointPact, type GeoPoint } from '@martinschmieschek/slopdogs-geo-pact';
 import { getNearbyPlaces } from './geoNamesApiClient';
 import type { GeoNamesResult } from './interfaces/geoNamesTypes';
 

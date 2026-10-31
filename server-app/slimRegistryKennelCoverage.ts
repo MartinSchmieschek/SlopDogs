@@ -1,4 +1,4 @@
-import { BASE_DOG_PREFIX } from '@slopdogs/core';
+import { BASE_DOG_PREFIX } from '@martinschmieschek/slopdogs-core';
 import type { IStore } from '../store/IStore';
 
 function parseDogIdsFromKennelRow(row: any): string[] {

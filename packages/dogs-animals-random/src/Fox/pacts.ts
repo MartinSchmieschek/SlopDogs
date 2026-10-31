@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 export interface FoxQuery {
     /** Ohne Effekt — Pact dient nur als Form-Anker */

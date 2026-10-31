@@ -4,7 +4,7 @@
  * =========================================================================
  */
 
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 import type { LandmarksOverpassFacet } from './overpassLandmarks';
 import type { TracksOverpassFacet } from './overpassTracks';
 import type { VegetationOverpassFacet } from './overpassVegetation';

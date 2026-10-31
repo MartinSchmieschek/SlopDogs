@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { queryPicsum } from './picsumApiClient';
 import type { PicsumResult } from './interfaces/picsumTypes';
 import { PicsumQueryPact, type PicsumQuery } from './pacts';

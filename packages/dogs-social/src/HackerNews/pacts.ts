@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 export interface HackerNewsQuery {
     /** Endpoint: top, new, best, ask, show, job — oder "item" fuer Einzeleintrag, "user" fuer Profil */

@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { queryRadioBrowser } from './radioBrowserApiClient';
 import type { RadioBrowserResult } from './interfaces/radioBrowserTypes';
 import { RadioBrowserQueryPact, type RadioBrowserQuery } from './pacts';

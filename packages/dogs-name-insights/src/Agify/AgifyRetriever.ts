@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getAgify } from './agifyApiClient';
 import type { AgifyResult } from './interfaces/agifyTypes';
 import { NameQueryPact, type NameQuery } from '../shared/pacts';

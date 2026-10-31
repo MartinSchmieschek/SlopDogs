@@ -1,4 +1,4 @@
-# @slopdogs/geo-pact
+# @martinschmieschek/slopdogs-geo-pact
 
 Einheitlicher Vertrag fuer Geo-Koordinaten in SlopDogs.
 
@@ -25,7 +25,7 @@ interface GeoRoute { start: GeoPoint; end: GeoPoint; waypoints?: GeoPoint[] }
 ## Parser
 
 ```ts
-import { parseGeoPoint, parseGeoArea, parseGeoRoute } from "@slopdogs/geo-pact";
+import { parseGeoPoint, parseGeoArea, parseGeoRoute } from "@martinschmieschek/slopdogs-geo-pact";
 
 const point = parseGeoPoint(QueryRetriever);                 // wirft, wenn ungueltig
 const area  = parseGeoArea(QueryRetriever, /* default */ 1000);

@@ -17,7 +17,7 @@ import {
     type ICacheable,
     geoBucketKey,
     GEO_CACHE_TTL_AIR_QUALITY_MS,
-} from '@slopdogs/core';
+} from '@martinschmieschek/slopdogs-core';
 import { getAirQuality } from './airQualityApiClient';
 import type { AirQualityResult } from './interfaces/airQualityTypes';
 import { AirQualityQueryPact, type AirQualityQuery } from './pacts';

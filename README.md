@@ -329,7 +329,7 @@ In `dogIds`, BaseDogs are prefixed (`base:QueryRetriever`), SerializedDogs are r
 
 **Kennel versioning** -- Every Kennel carries a stable **lineageId** (the name you chose) and a chain of **versionIds** (GUIDs). Each save creates a new version with a `parentId` pointing back. The full history is navigable -- branch off, revert, compare. The Kennel remembers its past lives.
 
-**Kennel export & import** -- `GET /api/kennels/:id/export` returns a **bundle** (format `bundleVersion: 2`): current Kennel config plus transitively collected SerializedDogs and MimicDogs; `base:` dog IDs stay as references. `POST /api/kennels/import` mints **new** GUIDs for serialized dogs and creates a **single** fresh Kennel version (no version history from the source). **Optional body field** `importTarget: { "kennelId": string, "name": string }` — when both strings are set, the imported Kennel uses that id and display name. If you omit it, the server **suggests** an id and name (collision-safe; see `suggestKennelImportTarget` in `@slopdogs/core`). All `base:` refs in the bundle must exist on the target server or import fails with 400. **In the browser UI** (Kennel list on `:4300`), the same workflow is copy-and-paste: **Export** in a row's `⋯` menu copies that bundle JSON to the clipboard; the **Import** button pastes bundle JSON from the clipboard and imports it. See [Kennel list copy and paste](#kennel-list-copy-and-paste). Copy and paste across instances or between UI, terminal, and other tools.
+**Kennel export & import** -- `GET /api/kennels/:id/export` returns a **bundle** (format `bundleVersion: 2`): current Kennel config plus transitively collected SerializedDogs and MimicDogs; `base:` dog IDs stay as references. `POST /api/kennels/import` mints **new** GUIDs for serialized dogs and creates a **single** fresh Kennel version (no version history from the source). **Optional body field** `importTarget: { "kennelId": string, "name": string }` — when both strings are set, the imported Kennel uses that id and display name. If you omit it, the server **suggests** an id and name (collision-safe; see `suggestKennelImportTarget` in `@martinschmieschek/slopdogs-core`). All `base:` refs in the bundle must exist on the target server or import fails with 400. **In the browser UI** (Kennel list on `:4300`), the same workflow is copy-and-paste: **Export** in a row's `⋯` menu copies that bundle JSON to the clipboard; the **Import** button pastes bundle JSON from the clipboard and imports it. See [Kennel list copy and paste](#kennel-list-copy-and-paste). Copy and paste across instances or between UI, terminal, and other tools.
 
 **Caching** -- Two-tier memory so dogs don't repeat themselves:
 - **KV cache** (`CacheHandler`) -- TTL-based key-value store with in-flight request deduplication plus negative-caching for 429/504 to break provider retry storms.
@@ -758,14 +758,14 @@ Create three files:
 **`packages/dogs-mydog/package.json`**
 ```json
 {
-  "name": "@slopdogs/dogs-mydog",
+  "name": "@martinschmieschek/slopdogs-dogs-mydog",
   "version": "0.1.0-alpha.1",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
   "private": true,
-  "dependencies": { "@slopdogs/core": "file:../core" },
-  "peerDependencies": { "@slopdogs/core": "0.1.0-alpha.1" },
+  "dependencies": { "@martinschmieschek/slopdogs-core": "file:../core" },
+  "peerDependencies": { "@martinschmieschek/slopdogs-core": "0.1.0-alpha.1" },
   "scripts": { "build": "tsc" },
   "devDependencies": { "typescript": "^5.0.0" }
 }
@@ -788,7 +788,7 @@ Create three files:
 A Pact declares _what data shape_ the Dog requires, without specifying _who provides it_. At runtime, a MimicDog or another Dog fulfills it.
 
 ```typescript
-import { createPact } from "@slopdogs/core";
+import { createPact } from "@martinschmieschek/slopdogs-core";
 
 export interface MyDogQuery {
     someParam: string;
@@ -813,7 +813,7 @@ Extend `Dog<YieldType>` and implement:
 | `yieldCollectorFactory` | Async function that does the actual work |
 
 ```typescript
-import { Dog, IHuntingDog, IHuntingSeason } from "@slopdogs/core";
+import { Dog, IHuntingDog, IHuntingSeason } from "@martinschmieschek/slopdogs-core";
 import { MyDogQueryPact, type MyDogQuery } from "./pacts";
 
 export class MyRetriever extends Dog<MyResult> {
@@ -834,32 +834,32 @@ export class MyRetriever extends Dog<MyResult> {
 
 **`main.ts`** — two touches: register the class and any Pacts it introduces (same pattern as existing dogs at the bottom of the file):
 ```typescript
-import { MyRetriever, MyDogQueryPact } from '@slopdogs/dogs-mydog';
+import { MyRetriever, MyDogQueryPact } from '@martinschmieschek/slopdogs-dogs-mydog';
 // add to allBaseDogClasses array:
 const allBaseDogClasses = [ ..., MyRetriever ];
 // add Pact to allPacts array:
 const allPacts = [ ..., MyDogQueryPact ];
 ```
 
-*(Geo-related dogs that use shared coordinate types also wire `GeoPointPact` from `@slopdogs/geo-pact` in `allPacts` if your package needs it — copy a similar dog from `dogs-geo`.)*
+*(Geo-related dogs that use shared coordinate types also wire `GeoPointPact` from `@martinschmieschek/slopdogs-geo-pact` in `allPacts` if your package needs it — copy a similar dog from `dogs-geo`.)*
 
 ### 5. Wire up the build
 
 **Root `tsconfig.json`** — add path mapping:
 ```json
-"@slopdogs/dogs-mydog": ["packages/dogs-mydog/src/index.ts"]
+"@martinschmieschek/slopdogs-dogs-mydog": ["packages/dogs-mydog/src/index.ts"]
 ```
 
 **Root `package.json`** — add the dependency:
 ```json
-"dependencies": { "@slopdogs/dogs-mydog": "file:packages/dogs-mydog" }
+"dependencies": { "@martinschmieschek/slopdogs-dogs-mydog": "file:packages/dogs-mydog" }
 ```
 
 **Root `tsconfig.packages.json`** — add the package to `references` (`{ "path": "./packages/dogs-mydog" }`); `npm run build:packages` then builds it with the others.
 
 The package's own `package.json` declares `typescript` and `@types/node` as devDependencies, so it also builds outside the monorepo.
 
-Then run `npm install` so the symlink in `node_modules/@slopdogs/dogs-mydog` is created.
+Then run `npm install` so the symlink in `node_modules/@martinschmieschek/slopdogs-dogs-mydog` is created.
 
 ### 6. Seed a Kennel (optional)
 
@@ -925,7 +925,7 @@ services/
   WavesConverter.ts           Converts execution results to Wave format
   TypeDefBuilder.ts           Generates TypeScript definitions for VM context
   CompilerCache.ts            Caches compiled TypeScript
-  swaggridAdapter.ts          Maps Kennel runs to @slopdogs/swaggrid
+  swaggridAdapter.ts          Maps Kennel runs to @martinschmieschek/slopdogs-swaggrid
   CacheHandler.ts             KV cache with TTL and in-flight deduplication
   AreaCacheStrategy.ts        Geographic area cache (Haversine containment)
 packages/

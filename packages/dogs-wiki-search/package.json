@@ -1,5 +1,5 @@
 {
-  "name": "@slopdogs/dogs-wiki-search",
+  "name": "@martinschmieschek/slopdogs-dogs-wiki-search",
   "version": "0.2.0-beta.0",
   "description": "Wikipedia article search by keyword",
   "main": "dist/index.js",
@@ -24,7 +24,7 @@
   "license": "MIT",
   "private": true,
   "dependencies": {
-    "@slopdogs/core": "file:../core"
+    "@martinschmieschek/slopdogs-core": "file:../core"
   },
   "scripts": {
     "build": "tsc"

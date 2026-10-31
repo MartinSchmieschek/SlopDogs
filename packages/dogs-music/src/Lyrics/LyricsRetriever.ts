@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getLyrics } from './lyricsApiClient';
 import type { LyricsResult } from './interfaces/lyricsTypes';
 import { LyricsQueryPact, type LyricsQuery } from './pacts';

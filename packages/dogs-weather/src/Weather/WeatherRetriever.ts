@@ -20,7 +20,7 @@ import {
     type ICacheable,
     geoBucketKey,
     GEO_CACHE_TTL_WEATHER_MS,
-} from '@slopdogs/core';
+} from '@martinschmieschek/slopdogs-core';
 import { getWeather } from './weatherApiClient';
 import type { WeatherResult } from './interfaces/weatherTypes';
 import { WeatherQueryPact, type WeatherQuery } from './pacts';

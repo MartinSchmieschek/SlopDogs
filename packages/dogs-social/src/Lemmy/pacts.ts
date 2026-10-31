@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 export interface LemmyQuery {
     /** Fediverse-Instanz (z.B. "lemmy.world", "beehaw.org") — default "lemmy.world" */

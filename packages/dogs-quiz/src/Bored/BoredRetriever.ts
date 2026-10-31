@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getBoredActivity } from './boredApiClient';
 import type { BoredResult } from './interfaces/boredTypes';
 import { BoredQueryPact, type BoredQuery } from './pacts';

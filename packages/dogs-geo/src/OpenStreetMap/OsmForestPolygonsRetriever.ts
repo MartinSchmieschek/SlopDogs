@@ -4,7 +4,7 @@
  * Facets kodieren Key:Value (z.B. "landuse:forest", "natural:wood").
  */
 
-import { type IHuntingSeason } from '@slopdogs/core';
+import { type IHuntingSeason } from '@martinschmieschek/slopdogs-core';
 import osmtogeojson from 'osmtogeojson';
 import type { FeatureCollection, GeometryObject } from 'geojson';
 import { OsmFeatureRetriever, type OsmQueryBase } from '../osm/base/OsmFeatureRetriever';

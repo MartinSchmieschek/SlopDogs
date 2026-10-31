@@ -18,7 +18,7 @@ import {
 import { canMutateNode } from '../auth/permissions';
 import { ListQuery, USAGE_FILTERS, USAGE_FILTER_HELP } from '../../api/routes/ListQuery';
 import { type ToolDef, ok, fail, resolveTsCode, codeHinweise } from './types';
-import { checkSerializedDogCode, sanitizeLineDocs, selectLineDocs, sliceDogCodeLines } from '@slopdogs/core';
+import { checkSerializedDogCode, sanitizeLineDocs, selectLineDocs, sliceDogCodeLines } from '@martinschmieschek/slopdogs-core';
 
 /** JSON-Schema fragment for the optional lineDocs field — shared by create_node / save_node. */
 const LINE_DOCS_SCHEMA = {

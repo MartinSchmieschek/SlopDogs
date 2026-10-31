@@ -3,7 +3,7 @@
 // dann darf die Pack-Inspektion granular zugreifen — ohne die volle Beute jedesmal zu schleppen.
 
 import type { Waves } from '../../services/WavesConverter';
-import type { IKennelConfig } from '@slopdogs/core';
+import type { IKennelConfig } from '@martinschmieschek/slopdogs-core';
 
 export type SnapshotStatus = 'running' | 'ok' | 'failed';
 

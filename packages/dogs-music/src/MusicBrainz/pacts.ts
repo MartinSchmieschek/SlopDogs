@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 export interface MusicBrainzQuery {
     /** Entity-Typ: artist, release, recording, release-group, work, label (default: artist) */

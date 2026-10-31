@@ -3,7 +3,7 @@
   // tsconfig.build.json gegen packages/*/src; nur hier fallen die Pfade weg.
   "extends": "./tsconfig.build.json",
   "compilerOptions": {
-    // Keine Pfade auf packages/*/src: der Server baut gegen die gebauten Pakete (node_modules/@slopdogs/* ->
+    // Keine Pfade auf packages/*/src: der Server baut gegen die gebauten Pakete (node_modules/@martinschmieschek/slopdogs-* ->
     // packages/<name>/dist), so wie dist/main.js sie zur Laufzeit laedt. Mit den Pfaden uebersetzte tsc die
     // Paket-Quellen mit nach dist/packages -- 458 JS-Dateien, die niemand laedt.
     "paths": {}

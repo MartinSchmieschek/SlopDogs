@@ -2,11 +2,11 @@
 
 /**
  * Vor jedem `npm run build:packages` (postinstall, build, typecheck): stehen alle Pakete in
- * tsconfig.packages.json, und nennt jedes Paket seine @slopdogs-Abhaengigkeiten als `references`?
+ * tsconfig.packages.json, und nennt jedes Paket seine @martinschmieschek/slopdogs-*-Abhaengigkeiten als `references`?
  *
  * `tsc -b tsconfig.packages.json` baut nur, was dort steht. Ein neues packages/<x> ohne Eintrag wuerde
  * still weder gebaut noch typgeprueft — lokal faellt das wegen eines alten dist nicht auf, auf Render
- * scheitert dann `require('@slopdogs/<x>')` beim Boot. Frueher fand scripts/typecheck-packages.cjs neue
+ * scheitert dann `require('@martinschmieschek/slopdogs-<x>')` beim Boot. Frueher fand scripts/typecheck-packages.cjs neue
  * Pakete selbst; diese Pruefung haelt dieselbe Zusage. Exit 1 mit Liste, sonst eine Zeile.
  */
 const fs = require('fs');
@@ -15,7 +15,7 @@ const ts = require('typescript');
 
 const root = path.resolve(__dirname, '..');
 const packagesDir = path.join(root, 'packages');
-const SCOPE = '@slopdogs/';
+const SCOPE = '@martinschmieschek/slopdogs-';
 
 function readTsconfig(file) {
     const { config, error } = ts.readConfigFile(file, ts.sys.readFile);

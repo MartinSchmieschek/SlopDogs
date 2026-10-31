@@ -1,7 +1,15 @@
 // The WavesConverter — the chronicler of the hunt, who turns the raw season into Waves of plunder.
 // After the dogs have hunted, their season must be charted in a form the crew can read.
 // Carrion hordes trill their profane accord with eldritch plans: each wave is a tide of results.
-import { IHuntingSeason, IWaveEntry, IReadTrackingEntry, IHuntingDog, SerializedDog, MimicDog, IKennelConfig } from '@slopdogs/core';
+import {
+    IHuntingSeason,
+    IWaveEntry,
+    IReadTrackingEntry,
+    IHuntingDog,
+    SerializedDog,
+    MimicDog,
+    IKennelConfig,
+} from '@martinschmieschek/slopdogs-core';
 import { TypeDefBuilder } from './TypeDefBuilder';
 
 /**
@@ -89,7 +97,7 @@ function resolveInstanceId(instance: any): string {
 }
 
 /**
- * Lead-Knoten aus den Waves — gleiche Semantik wie @slopdogs/swaggrid (Herald) / öffentliche API:
+ * Lead-Knoten aus den Waves — gleiche Semantik wie @martinschmieschek/slopdogs-swaggrid (Herald) / öffentliche API:
  * erster `dogIds`-Eintrag; `base:`-Prefix optional; Versions-Suffix optional;
  * bei SerializedDogs oft `lineageId` in der Kennel-Charter, `id` in den Waves = `storageId`.
  */

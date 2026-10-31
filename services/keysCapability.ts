@@ -12,7 +12,12 @@ import http from 'http';
 import https from 'https';
 import zlib from 'zlib';
 import { isIP } from 'net';
-import { envFirst, isPrivateNetworkAddress, registerVmGlobalCapability, type VmGlobalCapabilityContext } from '@slopdogs/core';
+import {
+    envFirst,
+    isPrivateNetworkAddress,
+    registerVmGlobalCapability,
+    type VmGlobalCapabilityContext,
+} from '@martinschmieschek/slopdogs-core';
 import { KeyStoreService, hostAllowedBy, type UserKeyRow } from './KeyStoreService';
 
 /** Was an die Stelle eines Werts tritt — in Antworten, Waves, Snapshot, Fehlern und Log. */

@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getRandomFox } from './foxApiClient';
 import type { FoxResult } from './interfaces/foxTypes';
 import { FoxQueryPact } from './pacts';

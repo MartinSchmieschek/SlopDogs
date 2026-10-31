@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 export interface SportsDbQuery {
     /** Endpoint: searchteams, searchplayers, searchevents, all_leagues, lookupteam, lookupleague, lookupplayer, eventsnext, eventslast, eventsround, eventsseason */

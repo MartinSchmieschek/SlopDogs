@@ -13,7 +13,7 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason } from '@martinschmieschek/slopdogs-core';
 import { fetchNearbyStations, fetchDepartures } from './publicTransportApiClient';
 import type { PublicTransportNearbyResult, TransitStationDepartures } from './interfaces/publicTransportTypes';
 import { PublicTransportQueryPact, type PublicTransportQuery } from './pacts';

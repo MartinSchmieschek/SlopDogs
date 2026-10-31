@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 export interface CurrencyQuery {
     /** Base currency code (e.g. "EUR", "USD"). Defaults to EUR. */

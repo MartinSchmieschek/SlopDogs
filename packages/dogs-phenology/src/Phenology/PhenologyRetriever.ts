@@ -13,7 +13,7 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getPhenologicalPhase } from './phenologyData';
 import type { PhenologyResult } from './interfaces/phenologyTypes';
 import { PhenologyQueryPact, type PhenologyQuery } from './pacts';

@@ -4,10 +4,15 @@
  * Lokal unter NODE_ENV=development wird stattdessen fullRegistry geladen.
  * @see server-registries/fullRegistry.ts für die volle Liste.
  */
-import { QueryRetriever, BodyRetriever, WebSocketChannelRetriever, ChannelLiveSnippetRetriever } from '@slopdogs/core';
-import { RandomRecipesRetriever, RandomEveryThingRetriever, CountryFlagBlackLab, DishFlagBlackLab } from '@slopdogs/dogs-demo';
-import { TalkingDog, LayoutInputPact } from '@slopdogs/dogs-talking';
-import { WarframeAlertsRetriever } from '@slopdogs/dogs-warframe';
+import { QueryRetriever, BodyRetriever, WebSocketChannelRetriever, ChannelLiveSnippetRetriever } from '@martinschmieschek/slopdogs-core';
+import {
+    RandomRecipesRetriever,
+    RandomEveryThingRetriever,
+    CountryFlagBlackLab,
+    DishFlagBlackLab,
+} from '@martinschmieschek/slopdogs-dogs-demo';
+import { TalkingDog, LayoutInputPact } from '@martinschmieschek/slopdogs-dogs-talking';
+import { WarframeAlertsRetriever } from '@martinschmieschek/slopdogs-dogs-warframe';
 import {
     BloodhoundIsochroneRetriever,
     OsmLandmarksRetriever,
@@ -15,19 +20,19 @@ import {
     NearbyLandmarksPact,
     TrailRetriever,
     TrailQueryPact,
-} from '@slopdogs/dogs-geo';
-import { PublicTransportRetriever, PublicTransportQueryPact } from '@slopdogs/dogs-public-transport';
-import { WeatherRetriever, WeatherQueryPact } from '@slopdogs/dogs-weather';
-import { AirQualityRetriever, AirQualityQueryPact } from '@slopdogs/dogs-air-quality';
-import { GeocodingRetriever, GeocodingQueryPact, ElevationRetriever, ElevationQueryPact } from '@slopdogs/dogs-geocoding';
-import { WikiNearbyRetriever, WikiNearbyQueryPact } from '@slopdogs/dogs-wikipedia';
-import { SunRetriever, SunQueryPact } from '@slopdogs/dogs-sun';
-import { SpeciesRetriever, BiodiversityQueryPact } from '@slopdogs/dogs-biodiversity';
-import { BirdRetriever, BirdQueryPact } from '@slopdogs/dogs-birds';
-import { PhenologyRetriever, PhenologyQueryPact } from '@slopdogs/dogs-phenology';
-import { WebcamRetriever, WebcamQueryPact } from '@slopdogs/dogs-webcams';
-import { RegionalNewsRetriever, RegionalNewsQueryPact } from '@slopdogs/dogs-regional-news';
-import { TransitTripRetriever, TransitTripQueryPact } from '@slopdogs/dogs-transit-trips';
+} from '@martinschmieschek/slopdogs-dogs-geo';
+import { PublicTransportRetriever, PublicTransportQueryPact } from '@martinschmieschek/slopdogs-dogs-public-transport';
+import { WeatherRetriever, WeatherQueryPact } from '@martinschmieschek/slopdogs-dogs-weather';
+import { AirQualityRetriever, AirQualityQueryPact } from '@martinschmieschek/slopdogs-dogs-air-quality';
+import { GeocodingRetriever, GeocodingQueryPact, ElevationRetriever, ElevationQueryPact } from '@martinschmieschek/slopdogs-dogs-geocoding';
+import { WikiNearbyRetriever, WikiNearbyQueryPact } from '@martinschmieschek/slopdogs-dogs-wikipedia';
+import { SunRetriever, SunQueryPact } from '@martinschmieschek/slopdogs-dogs-sun';
+import { SpeciesRetriever, BiodiversityQueryPact } from '@martinschmieschek/slopdogs-dogs-biodiversity';
+import { BirdRetriever, BirdQueryPact } from '@martinschmieschek/slopdogs-dogs-birds';
+import { PhenologyRetriever, PhenologyQueryPact } from '@martinschmieschek/slopdogs-dogs-phenology';
+import { WebcamRetriever, WebcamQueryPact } from '@martinschmieschek/slopdogs-dogs-webcams';
+import { RegionalNewsRetriever, RegionalNewsQueryPact } from '@martinschmieschek/slopdogs-dogs-regional-news';
+import { TransitTripRetriever, TransitTripQueryPact } from '@martinschmieschek/slopdogs-dogs-transit-trips';
 
 export const allBaseDogClasses = [
     TalkingDog,

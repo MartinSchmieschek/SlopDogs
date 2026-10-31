@@ -13,7 +13,7 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@martinschmieschek/slopdogs-core';
 import { getSpecies } from './biodiversityApiClient';
 import type { BiodiversityResult } from './interfaces/biodiversityTypes';
 import { BiodiversityQueryPact, type BiodiversityQuery } from './pacts';

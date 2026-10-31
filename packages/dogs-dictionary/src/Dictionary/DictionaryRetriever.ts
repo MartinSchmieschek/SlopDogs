@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getDictionaryEntry } from './dictionaryApiClient';
 import type { DictionaryResult } from './interfaces/dictionaryTypes';
 import { WordQueryPact, type WordQuery } from '../shared/pacts';

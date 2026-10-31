@@ -1,5 +1,5 @@
 {
-  "name": "@slopdogs/dogs-phenology",
+  "name": "@martinschmieschek/slopdogs-dogs-phenology",
   "version": "0.2.0-beta.0",
   "description": "Phenology: Phaenologische Jahreszeiten und Bluehphasen aus dem Void",
   "main": "dist/index.js",
@@ -24,7 +24,7 @@
   "license": "MIT",
   "private": true,
   "dependencies": {
-    "@slopdogs/core": "file:../core"
+    "@martinschmieschek/slopdogs-core": "file:../core"
   },
   "scripts": {
     "build": "tsc"

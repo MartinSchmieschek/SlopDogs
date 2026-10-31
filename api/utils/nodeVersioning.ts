@@ -2,7 +2,7 @@
 // The old linear lineage is broken; now each save forges a GUID in the void,
 // and the spirit's parentId traces the branch back to its ancestor.
 import { IStore } from '../../store/IStore';
-import { ISerializedDogConfig } from '@slopdogs/core';
+import { ISerializedDogConfig } from '@martinschmieschek/slopdogs-core';
 import { generateVersionId, generateLineageId } from './versioning';
 
 /**

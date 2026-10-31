@@ -17,7 +17,7 @@
 
 import path from 'path';
 import type { PrismaClient } from '../store/generated/prisma-cache-client';
-import { ICacheHandler, isRuntimeLogVerbose, type ITileFeatureCache } from '@slopdogs/core';
+import { ICacheHandler, isRuntimeLogVerbose, type ITileFeatureCache } from '@martinschmieschek/slopdogs-core';
 import { PrismaTileFeatureCache } from './PrismaTileFeatureCache';
 import { isCacheInfraError } from './resilientCacheHandler';
 import type { PrismaClientLease, SharedPrismaClients } from '../store/SharedPrismaClients';

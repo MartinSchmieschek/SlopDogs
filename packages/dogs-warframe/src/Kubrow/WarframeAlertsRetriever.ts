@@ -5,7 +5,7 @@
  * It fetches the accursed JSON, and from it spawns a Kubrow -- our faithful hound
  * amidst the cosmic madness. To cosmic madness laws submit, though stalwart minds entreat.
  */
-import { FetchBaseDog, type ICacheHandler, type ICacheable, type IHuntingSeason } from '@slopdogs/core';
+import { FetchBaseDog, type ICacheHandler, type ICacheable, type IHuntingSeason } from '@martinschmieschek/slopdogs-core';
 import type { IWarframeWorldState } from './interfaces/warframeWorldState';
 import { Kubrow } from './Kubrow';
 

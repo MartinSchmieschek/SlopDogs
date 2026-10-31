@@ -4,7 +4,7 @@
  * =========================================================================
  */
 
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 /** GPS-Koordinaten und Optionen fuer die Wikipedia-Nearby-Suche */
 export interface WikiNearbyQuery {

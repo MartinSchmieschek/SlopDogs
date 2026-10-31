@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { IStore } from '../../store/IStore';
-import { SerializedDog, IKennelConfig, BASE_DOG_PREFIX, type IMimicDogConfig } from '@slopdogs/core';
+import { SerializedDog, IKennelConfig, BASE_DOG_PREFIX, type IMimicDogConfig } from '@martinschmieschek/slopdogs-core';
 import { kennelExists, saveKennelSeed, saveMimic } from '../seed-helpers';
 export async function seedCompareKennel(nodesStore: IStore, kennelsStore: IStore): Promise<void> {
     const kennelId = 'compare-locations';

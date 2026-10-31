@@ -2,7 +2,13 @@
 // Now versioned: every save breeds a new incarnation, and the lineage branches like cursed coral.
 import { AbstractController, ICreateInput, IUpdateInput, IControllerResponse } from './AbstractController';
 import { IStore } from '../store/IStore';
-import { IKennelConfig, IKennelNodeAnnotation, IKennelEdgeAnnotation, isRuntimeLogVerbose, kennelIdBlockedReason } from '@slopdogs/core';
+import {
+    IKennelConfig,
+    IKennelNodeAnnotation,
+    IKennelEdgeAnnotation,
+    isRuntimeLogVerbose,
+    kennelIdBlockedReason,
+} from '@martinschmieschek/slopdogs-core';
 import { generateVersionId } from './utils/versioning';
 import { aclOf, normalizeVisibility, type Visibility } from '../mcp/auth/visibility';
 

@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getBibleReference } from './bibleApiClient';
 import type { BibleResult } from './interfaces/bibleTypes';
 import { BibleQueryPact, type BibleQuery } from './pacts';

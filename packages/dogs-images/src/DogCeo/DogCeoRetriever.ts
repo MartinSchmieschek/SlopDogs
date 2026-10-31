@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { getDogImages } from './dogCeoApiClient';
 import type { DogCeoResult } from './interfaces/dogCeoTypes';
 import { DogCeoQueryPact, type DogCeoQuery } from './pacts';

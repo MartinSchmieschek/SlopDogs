@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { queryGitHubPublic } from './gitHubPublicApiClient';
 import type { GitHubPublicResult } from './interfaces/gitHubPublicTypes';
 import { GitHubPublicQueryPact, type GitHubPublicQuery } from './pacts';

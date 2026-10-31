@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 export interface AirportQuery {
     /** IATA-Code (3 Buchstaben, z.B. "FRA", "JFK") */

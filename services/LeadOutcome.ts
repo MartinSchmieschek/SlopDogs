@@ -15,7 +15,7 @@
  *   not_run  — Lead lief nie (nicht bereit, weil Eltern fehlten, oder nicht erlaubt in diesem Kennel).
  */
 
-import { DOG_MEMPRESSURE_MARKER, SerializedDog, type IHuntingSeason } from '@slopdogs/core';
+import { DOG_MEMPRESSURE_MARKER, SerializedDog, type IHuntingSeason } from '@martinschmieschek/slopdogs-core';
 import type { NodeEntry, Waves } from './WavesConverter';
 
 export type LeadStatus = 'ok' | 'empty' | 'failed' | 'not_run';

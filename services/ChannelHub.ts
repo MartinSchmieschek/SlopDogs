@@ -19,7 +19,7 @@
 
 import type { IncomingMessage, Server as HttpServer } from 'http';
 import { randomUUID } from 'crypto';
-import type { ChannelPeer, IChannelHub } from '@slopdogs/core';
+import type { ChannelPeer, IChannelHub } from '@martinschmieschek/slopdogs-core';
 
 interface InternalPeer {
     peerId: string;

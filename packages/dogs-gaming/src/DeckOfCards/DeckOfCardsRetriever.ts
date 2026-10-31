@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { queryDeckOfCards } from './deckOfCardsApiClient';
 import type { DeckOfCardsResult } from './interfaces/deckOfCardsTypes';
 import { DeckOfCardsQueryPact, type DeckOfCardsQuery } from './pacts';

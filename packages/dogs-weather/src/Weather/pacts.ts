@@ -10,7 +10,7 @@
  * =========================================================================
  */
 
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 /** GPS-Koordinaten und optionale Uhrzeit fuer die Wetterabfrage */
 export interface WeatherQuery {

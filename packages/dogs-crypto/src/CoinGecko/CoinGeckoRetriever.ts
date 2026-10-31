@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@martinschmieschek/slopdogs-core';
 import { queryCoinGecko } from './coinGeckoApiClient';
 import type { CoinGeckoResult } from './interfaces/coinGeckoTypes';
 import { CoinGeckoQueryPact, type CoinGeckoQuery } from './pacts';

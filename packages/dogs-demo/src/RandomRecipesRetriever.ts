@@ -13,7 +13,7 @@
  * ============================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason } from '@martinschmieschek/slopdogs-core';
 
 /**
  * Arr, the shape of the data plundered from the recipe abyss, matey.

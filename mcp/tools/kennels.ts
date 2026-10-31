@@ -29,7 +29,7 @@ import {
     publicKennelPath,
     sanitizeLineDocs,
     type ILineDoc,
-} from '@slopdogs/core';
+} from '@martinschmieschek/slopdogs-core';
 import type { AuthCtx } from '../auth/middleware';
 import { SPUREN_NODES_FIELD_HINT, SPUREN_TASK_FIELD_HINT } from '../spuren-brief';
 import { REDACTED_TEXT, kennelRunView, redactWavesForCtx } from '../../services/wavesRedaction';

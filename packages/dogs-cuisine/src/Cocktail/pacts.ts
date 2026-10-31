@@ -1,4 +1,4 @@
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 export interface CocktailQuery {
     /** Modus: search (nach Name), lookup (nach ID), random, filter (nach Zutat/Glas/Alkohol) */

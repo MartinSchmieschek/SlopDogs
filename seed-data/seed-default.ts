@@ -1,8 +1,13 @@
 import { randomUUID } from 'crypto';
 import { IStore } from '../store/IStore';
-import { SerializedDog, IKennelConfig, BASE_DOG_PREFIX, type IMimicDogConfig } from '@slopdogs/core';
-import { TalkingDog } from '@slopdogs/dogs-talking';
-import { RandomRecipesRetriever, CountryFlagBlackLab, DishFlagBlackLab, RandomEveryThingRetriever } from '@slopdogs/dogs-demo';
+import { SerializedDog, IKennelConfig, BASE_DOG_PREFIX, type IMimicDogConfig } from '@martinschmieschek/slopdogs-core';
+import { TalkingDog } from '@martinschmieschek/slopdogs-dogs-talking';
+import {
+    RandomRecipesRetriever,
+    CountryFlagBlackLab,
+    DishFlagBlackLab,
+    RandomEveryThingRetriever,
+} from '@martinschmieschek/slopdogs-dogs-demo';
 import { saveKennelSeed } from './seed-helpers';
 
 export async function seedSerializedDog(nodesStore: IStore): Promise<string | null> {

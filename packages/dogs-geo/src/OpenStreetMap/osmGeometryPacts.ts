@@ -2,7 +2,7 @@
  * Pacts for OSM circle-based geometry queries — lat, lng, radius (meters) only.
  */
 
-import { createPact } from '@slopdogs/core';
+import { createPact } from '@martinschmieschek/slopdogs-core';
 
 /** Query input for forest / area polygon geometry */
 export interface OsmForestGeometryQueryInput {

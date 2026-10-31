@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { IStore } from '../store/IStore';
-import { SerializedDog, type IMimicDogConfig } from '@slopdogs/core';
+import { SerializedDog, type IMimicDogConfig } from '@martinschmieschek/slopdogs-core';
 
 /**
  * Check if a kennel with this lineageId already exists.

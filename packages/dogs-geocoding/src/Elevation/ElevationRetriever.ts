@@ -1,4 +1,4 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketCenter } from '@slopdogs/core';
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketCenter } from '@martinschmieschek/slopdogs-core';
 import { ElevationQueryPact, type ElevationQuery, type ElevationResult, type ElevationPoint } from './pacts';
 
 export type { ElevationResult, ElevationPoint };

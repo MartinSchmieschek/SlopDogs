@@ -34,7 +34,7 @@ import {
     type TileCoverageResult,
     type TileFetchResult,
     type TileKey,
-} from '@slopdogs/core';
+} from '@martinschmieschek/slopdogs-core';
 
 interface CoverageRow {
     dogType: string;
