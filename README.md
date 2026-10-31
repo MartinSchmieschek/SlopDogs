@@ -41,7 +41,7 @@ And around it:
 ## Run it locally
     npm install
     npm run dev
-API on `:3000`, UI on `:4300`.
+API on `:3000`, UI on `:4300`. On a Raspberry Pi in your home network, without login: [SlopDogs auf dem Pi](#slopdogs-auf-dem-pi).
 ---
 *What follows is the lore, then the full reference.*
 
@@ -661,7 +661,7 @@ If you ever see a `.js` file inside `packages/*/src/`, `api/`, `mcp/`, `services
 
 Typical flow: configure `.env.integration` with your hosted URLs, run `npm run prisma:sync:integration` to align schemas, build the backend with **`npm run build:prod`**, the frontend with **`npm run ui:build:integration`** (injects `PUBLIC_API_BASE_URL` using `NODE_ENV=integration`), then start locally with **`npm run start:integration`** (runs `main.ts` via ts-node). On a host that serves **compiled** output only (e.g. **Render**), use **Build Command** **`npm run render:integration:build`** (runs `npm ci` — whose postinstall builds the packages once —, then `build:prod`, then `ui:build:integration`) and **Start Command** **`npm run start:integration:dist`** — it runs `dist/main.js` with `NODE_ENV=integration`. Use this as a **pre-release** checkpoint before going fully online.
 
-**Production** and **integration** both load the **reduced Base-Dog registry** (`server-registries/slimDeployRegistry.ts`); only **`NODE_ENV=development`** uses the full set (`fullRegistry.ts`). On slim profiles, startup **fails fast** if any **latest** Kennel row in the DB references a `base:…` dog that is not registered — so RAM stays minimal without silently breaking existing kennels. After adding seed kennels that reference new `BASE_DOG_PREFIX + '…'` names, extend that slim registry (or keep **`npm run check:integration-dogs`** green — it scans `seed-data/**/*.ts` against `SLIM_DEPLOY_BASE_DOG_NAMES`).
+**Production** and **integration** both load the **reduced Base-Dog registry** (`server-registries/slimDeployRegistry.ts`); only **`NODE_ENV=development`** and the local mode on the Pi (`SLOPDOGS_MODE=local`) use the full set (`fullRegistry.ts`). On slim profiles, startup **fails fast** if any **latest** Kennel row in the DB references a `base:…` dog that is not registered — so RAM stays minimal without silently breaking existing kennels. After adding seed kennels that reference new `BASE_DOG_PREFIX + '…'` names, extend that slim registry (or keep **`npm run check:integration-dogs`** green — it scans `seed-data/**/*.ts` against `SLIM_DEPLOY_BASE_DOG_NAMES`).
 
 ### Quick Hunt
 
@@ -676,6 +676,71 @@ curl http://localhost:3000/k/my-kennel
 ```
 
 Or skip the terminal -- the [UI](ui-app/README.md) does all of this with a few clicks.
+
+---
+
+## SlopDogs auf dem Pi
+
+Local mode (`SLOPDOGS_MODE=local`, always together with `NODE_ENV=production`) runs SlopDogs on a Raspberry Pi in your home network, like a Hue bridge: no login, no PAT, no OAuth. Every device in the LAN uses the UI and MCP; all of them share one built-in user (`local`), so a key stored in the key store is usable by everyone on the network. Login routes are not mounted, and MCP needs no token. The full Base-Dog registry is loaded, including `dogs-hue`.
+
+**The risk you accept.** Dog code is not securely sandboxed. Without auth, **every device on your Wi-Fi — guests, a compromised IoT gadget — can run code on the Pi.** Never expose it to the internet. That includes every forwarder that replaces the client address, because then an internet client looks like a LAN client and passes the boundary below: no router port forwarding to a container, no `ssh -R`, no `socat`/`netsh portproxy`, no frp/rathole or other TCP tunnels, no tunnel services (ngrok, cloudflared, Tailscale Funnel), no reverse proxy, no `docker run -p` (the Docker proxy replaces the source with the gateway address). HTTP tunnels and proxies are refused by their headers; TCP forwarders cannot be detected. Inside a container the start aborts (exit 79) unless `SLOPDOGS_LOCAL_ALLOW_CONTAINER=1` is set, which logs a warning on every start.
+
+**Network boundary** (instead of auth):
+- Only clients whose *socket* address is private or loopback (10/8, 172.16/12, 192.168/16, 169.254/16, 127/8, ::1, fc00::/7, fe80::/10, plus global IPv6 inside the on-link prefix of the Pi's own interfaces) get in; `X-Forwarded-For` is ignored, `trust proxy` is off. Local mode listens dual-stack (`::`), falling back to `0.0.0.0` without IPv6.
+- The `Host` header must be on an allowlist — the Pi's hostname, `<hostname>.local`, its interface IPs, `localhost`, `127.0.0.1`, `[::1]`, each with `PORT`; extend it with `LOCAL_ALLOWED_HOSTS` (`name` or `name:port`, comma-separated). This stops DNS rebinding: a foreign web page open in a LAN browser cannot reach the Pi through a DNS name it controls.
+- Writes and WebSocket upgrades also check `Origin` against the same list; CORS answers only those origins. Requests carrying proxy/tunnel headers (`X-Forwarded-*`, `Forwarded`, `Via`, `CF-*`, `Tailscale-*`, …) are refused.
+- Browser fetch metadata: `/api`, `/mcp`, `/actions`, `/save`, `/k/…` and `/auth` accept only same-origin requests — no cross-site or same-site request, not even a link click, starts a kennel or reads data. UI pages accept a cross-site request only as a visible top-level navigation (`Sec-Fetch-Dest: document`), never in an iframe, object, embed, image or fetch. Every response carries `Content-Security-Policy: frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN` (also in dev). Consequence: a `/k/<name>` link opened from another website shows 403; typed, bookmarked or opened from a native app it works.
+- **Remaining gap:** browsers that send no `Sec-Fetch-*` headers (very old ones) are judged by Host and Origin alone — there a foreign page can still trigger a GET run (`<img src="http://<pi>/k/…">`) without seeing the result. Writes stay blocked by the Origin check.
+- Start aborts with **exit 79** on a public `PUBLIC_API_BASE_URL`, `MCP_BASE_URL` or `LOCAL_ALLOWED_HOSTS` entry (allowed: loopback, private IPs, `localhost`, `*.local`, dot-less hostnames, `*.home.arpa`), `TRUST_PROXY_HOPS` > 0, `MCP_AUTH_REQUIRED=true`, `RENDER` set, or inside a container (see above).
+
+**Dogs and the home network.** User code (SerializedDogs) stays blocked from private networks. Only Base-Dogs from packages reach the LAN, e.g. `dogs-hue` with `HUE_BRIDGE_HOST` / `HUE_BRIDGE_USER`.
+
+**Requirements.** Pi 4 or 5 with 64-bit Raspberry Pi OS (arm64). Node from [`.nvmrc`](.nvmrc) (22.16.0), installed system-wide — the unit expects `/usr/local/bin/node`. Prisma (5.22.0) runs `prisma generate` on the Pi itself (inside `build:local`); the default `binaryTargets = native` picks the arm64 engine there, so the schemas stay unchanged. Only if you build for the Pi on another machine, add `binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]` to the generators yourself — not in the repo, because every extra engine would also be downloaded on each generate on dev machines and Render.
+
+**Two users.** Dog code can break out of its sandbox, so the service must not be able to change its own code or anything the update runs. `slopdogs-deploy` owns `/opt/slopdogs` and runs `git pull` / `npm ci` / `build:local` with its own HOME. `slopdogs` runs the service: it reads `/opt/slopdogs` only and writes only `/var/lib/slopdogs` (SQLite files, `secrets/`). Its HOME `/var/lib/slopdogs` is never read by an update, so a planted `~/.npmrc` or `~/.gitconfig` there only acts inside the sandboxed unit.
+
+**Install** (as root/sudo):
+
+```bash
+# Node 22.16.0 (official arm64 build)
+curl -fsSLO https://nodejs.org/dist/v22.16.0/node-v22.16.0-linux-arm64.tar.xz
+tar -xJf node-v22.16.0-linux-arm64.tar.xz -C /usr/local --strip-components=1
+
+useradd --system --create-home --home-dir /home/slopdogs-deploy --shell /bin/bash slopdogs-deploy
+useradd --system --home-dir /var/lib/slopdogs --no-create-home --shell /usr/sbin/nologin slopdogs
+install -d -o slopdogs-deploy -g slopdogs-deploy -m 0755 /opt/slopdogs
+sudo -u slopdogs-deploy -H git clone <repo-url> /opt/slopdogs
+cd /opt/slopdogs
+sudo -u slopdogs-deploy -H cp .env.local.example .env.local   # before npm ci: postinstall needs the DB variables
+sudo -u slopdogs-deploy -H npm ci
+sudo -u slopdogs-deploy -H npm run build:local                # server, packages, UI, Prisma clients — no database
+cp deploy/pi/slopdogs.service /etc/systemd/system/
+systemctl daemon-reload && systemctl enable --now slopdogs     # creates /var/lib/slopdogs, syncs the tables, starts
+journalctl -u slopdogs -f
+```
+
+`build:local` builds the server (and the packages if stale), the precompiled TypeDefs (`dist/type-defs.json`), the UI (`ui-app/dist`) and the four Prisma clients matching the URLs in `.env.local` — it never touches a database. The tables are synced by the service itself before each start (`ExecStartPre`: `prisma db push --skip-generate`); `npm run start:local` does the same on a dev machine. The unit does not restart on exit 78/79 (configuration errors). Note: `scripts/load-env.cjs` loads the `.env*` files in `/opt/slopdogs` with priority over the unit's `Environment=` lines. Build time and the unit's hardening are unmeasured on the Pi.
+
+**Use it.** Open `http://<hostname>.local:3000` from any device in the LAN. Add it to an AI in the LAN, no token:
+
+```bash
+claude mcp add --transport http slopdogs http://<hostname>.local:3000/mcp
+```
+
+Reaching the Pi under another name (router DNS, `*.home.arpa`, another port) needs that name in `LOCAL_ALLOWED_HOSTS`.
+
+**Keys.** `scripts/local-secrets.cjs` creates `SESSION_SECRET` and `KEYSTORE_MASTER_KEY_V1` on first start (32 random bytes each) in `LOCAL_SECRETS_FILE` — the unit sets `/var/lib/slopdogs/secrets/local-secrets.env`, elsewhere the default is `~/.slopdogs/local-secrets.env` (directory 0700, file 0600, looser permissions are tightened). Values already in the environment win; creation is exclusive (lock file), so two starts never end up with two master keys. A path inside the repo aborts with exit 79, and so does a *new* master key when the auth database already holds stored keys (they would become unreadable — restore the old file instead). The master key lives on the same device as the encrypted key-store rows: that protects a leaked database or backup, not someone with file access on the Pi — so back up the `*.db` files without `secrets/`.
+
+**Update.**
+
+```bash
+systemctl stop slopdogs
+mkdir -p /root/slopdogs-backup && cp -a /var/lib/slopdogs/*.db /root/slopdogs-backup/   # prisma db push runs with --accept-data-loss
+cd /opt/slopdogs && sudo -u slopdogs-deploy -H git pull && sudo -u slopdogs-deploy -H npm ci && sudo -u slopdogs-deploy -H npm run build:local
+systemctl start slopdogs
+```
+
+**Memory.** The code defaults assume a 512 MB container: memory guard on outside development, `MEMORY_LIMIT_MB=512`, soft limit 85 %, `DOG_WORKER_GLOBAL_LIMIT=2`. [`.env.local.example`](.env.local.example) lists higher values for a 4 GB Pi as commented suggestions — **unmeasured on the Pi**; `NODE_OPTIONS` and `MemoryMax=` belong in the unit, not in `.env.local`.
 
 ---
 

@@ -1,0 +1,71 @@
+# SlopDogs im lokalen Modus (SLOPDOGS_MODE=local) als systemd-Dienst auf dem Pi.
+# Anleitung: README.md, Abschnitt "SlopDogs auf dem Pi".
+#
+#   sudo cp deploy/pi/slopdogs.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now slopdogs
+#   journalctl -u slopdogs -f
+#
+# Zwei Nutzer (Dog-Code ist nicht sicher eingesperrt — der Dienst darf seinen eigenen Code nicht aendern):
+#   slopdogs-deploy  besitzt /opt/slopdogs, fuehrt git pull / npm ci / npm run build:local aus (eigenes HOME
+#                    /home/slopdogs-deploy, das der Dienst weder lesen noch schreiben kann).
+#   slopdogs         der Dienst: liest /opt/slopdogs nur, schreibt nur /var/lib/slopdogs (SQLite, Schluessel).
+#                    Sein HOME (/var/lib/slopdogs) liest kein Update — ~/.npmrc oder ~/.gitconfig dort wirken
+#                    nur innerhalb dieser Unit, nie beim Build.
+# Voraussetzungen: .env.local aus .env.local.example, npm run build:local als slopdogs-deploy gelaufen,
+# Node 22.16.0 unter /usr/local/bin (Pfad bei anderer Installation anpassen: `command -v node`).
+# Achtung: scripts/load-env.cjs laedt .env* aus /opt/slopdogs mit Vorrang vor Environment= unten.
+
+[Unit]
+Description=SlopDogs (lokaler Modus, Heimnetz)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=slopdogs
+Group=slopdogs
+WorkingDirectory=/opt/slopdogs
+Environment=NODE_ENV=production SLOPDOGS_MODE=local
+Environment=LOCAL_SECRETS_FILE=/var/lib/slopdogs/secrets/local-secrets.env
+Environment=CHECKPOINT_DISABLE=1 PRISMA_HIDE_UPDATE_MESSAGE=1 npm_config_update_notifier=false
+# Speicher — Vorschlag, ungemessen auf dem Pi (NODE_OPTIONS wirkt nur hier, nicht in .env.local):
+# Environment=NODE_OPTIONS=--max-old-space-size=768
+# MemoryMax=1536M
+# Tabellen angleichen (prisma db push --skip-generate, --accept-data-loss wie im ganzen Projekt) — vor jedem Start.
+ExecStartPre=/usr/local/bin/node -r ./scripts/load-env.cjs ./scripts/run-prisma-sync.cjs --push-only
+ExecStart=/usr/local/bin/node --expose-gc -r ./scripts/load-env.cjs -r ./scripts/local-secrets.cjs dist/main.js
+Restart=on-failure
+RestartSec=5
+# 78 = Auth-Guard, 79 = Guard des lokalen Modus: Konfigurationsfehler, nicht endlos neu starten.
+RestartPreventExitStatus=78 79
+
+# Datenverzeichnis /var/lib/slopdogs (SQLite-Dateien, secrets/), nur fuer slopdogs.
+StateDirectory=slopdogs
+StateDirectoryMode=0700
+UMask=0077
+
+# Haertung — ungemessen auf dem Pi. Alles ausser StateDirectory ist nur lesbar (ProtectSystem=strict),
+# /opt/slopdogs damit auch. Bewusst NICHT: MemoryDenyWriteExecute (bricht den V8-JIT), IPAddressDeny
+# (Dogs brauchen das Internet). AF_NETLINK braucht os.networkInterfaces() fuer die Host-Liste.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target
