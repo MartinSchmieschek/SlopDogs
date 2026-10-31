@@ -232,6 +232,10 @@ Ist-Stand: Die Landing (`seed-data/kennels/slopdogs-landing/`) ist das Schaufens
 3. **`/kennels` zeigt auf den Kennel**; der Editor `/kennels/<ref>` bleibt Angular.
 4. **Angular-Liste faellt erst weg, wenn der Kennel alles kann**, was sie heute kann (Favoriten, Suche, Sortierung, Anlegen, Import/Export, Teilen, Edit-Menue, anonym, Handybreite ohne Seitwaerts-Scrollen).
 
+**Befund Sitzungsmodell (Nira 31.10. abends, von Lotus an den tragenden Stellen nachgelesen, alles schon auf main `8a746db`):** `/k/` laeuft in production auf demselben Origin wie `/api`, `/auth`, `/mcp`, ohne Script-CSP oder `sandbox` (CSP setzt nur die NetworkBoundary, `NetworkBoundary.ts:113`, deployed aus); `POST /auth/tokens` gibt mit Session-Cookie ein Jahres-PAT als JSON aus, ohne CSRF-/Origin-Pruefung (`mcp/auth/personal-tokens.ts:103-142`); Landing-Dogs sind ohne `ownerId` geseedet und damit fuer jeden Eingeloggten aenderbar (`visibility.ts:112,222`). Folgen: ein beliebiger oeffentlicher Kennel kann im Browser eines eingeloggten Besuchers ein PAT holen und ausleiten (kritisch); eine neue Version der Landing-Dogs liefert Fremd-Script unter `/` aus (hoch); fremde oeffentliche Dogs laufen auf `/k/` mit den Keys des Besuchers (hoch, Vertragsfrage — 10-0: spaeter entscheiden); kein `frame-ancestors` deployed (mittel). Fix-Vorschlag: `/k/` mit `CSP sandbox` ohne `allow-same-origin`, `frame-ancestors`/`nosniff` deployed, Origin-Pruefung an `POST /auth/tokens`, Landing-Dogs System-Konto + frozen + gepinnt. **Nicht beauftragt** — gebaut wird nur auf Wort des 10-0.
+
+Folge fuer Spur K: Ein Listen-Kennel, der die Sitzung des Besuchers braucht (Favoriten, eigene Kennels, Edit), ist erst mit Sandbox und Ausnahme fuer gesperrte, gepinnte Dogs vertretbar — dann aber nicht mehr „einfach live anpassbar". Sinnvoll ohne Vorbedingung ist nur der oeffentliche, nur lesende Katalog-Teil als Kennel.
+
 **Abnahme K:** gleicher Funktionsumfang per Klicktest (Headless-Chrome, 320/375 px und Desktop); Sitzungsmodell-Befunde der Nira geschlossen oder vom 10-0 bewusst getragen; Landing und Liste beide gesperrt.
 
 ## Risiken
