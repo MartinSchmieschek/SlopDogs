@@ -25,7 +25,8 @@ import { NodesRouteHandler } from '../api/routes/NodesRouteHandler';
 import { ReadmeRouteHandler } from '../api/routes/ReadmeRouteHandler';
 import { PrismaCacheHandler } from '../services/PrismaCacheHandler';
 import { withResilientCacheInfra } from '../services/resilientCacheHandler';
-import { createPrismaAuthClient } from '../store/createPrismaAuthClient';
+import { createPrismaAuthClient, openPrismaAuthClient } from '../store/createPrismaAuthClient';
+import type { SharedPrismaClients } from '../store/SharedPrismaClients';
 import { createSessionMiddleware } from '../mcp/auth/sessions';
 import { createAuthRouter } from '../mcp/auth/router';
 import { createAuthContextMiddleware } from '../mcp/auth/middleware';
@@ -64,6 +65,11 @@ export type CreateHttpApplicationInput = {
     allBaseDogs: any[];
     baseDogsMap: Map<string, new () => any>;
     resolveCacheDatabaseUrl: () => string;
+    /**
+     * Der Store-Client fuer Auth und Run-Cache, soweit sie in der Store-Datenbank liegen (P1.4);
+     * sonst entstehen hier eigene Clients. Besitzer des Store-Clients bleibt main.ts (store.disconnect()).
+     */
+    prismaClients: SharedPrismaClients;
     /** Zaehlt jeden Kennel-Lauf (P4); main.ts besitzt ihn und flusht ihn beim Shutdown. */
     callCounter: KennelCallCounter;
     /** Aufrufe und Sterne (P4) — derselbe Store-Client wie die Kennels, kein eigener Pool. */
@@ -88,9 +94,10 @@ export type CreateHttpApplicationResult = {
      */
     runStartupSuite: () => Promise<TestResult[]>;
     /**
-     * Aufraeum-Zusage fuer die Pools, die NUR hier drin entstehen (Auth-Client, Run-Cache).
-     * main.ts kennt sie sonst nicht und koennte sie beim SIGTERM nicht freigeben — eine
-     * globale Variable dafuer waere ein schlechterer Handel. Wirft nie.
+     * Aufraeum-Zusage fuer die Pools, die NUR hier drin entstehen (eigener Auth-Client, eigener
+     * Run-Cache-Client — im Single-DB-Betrieb keiner, dann stoppt sie nur den Prune-Timer; den
+     * geliehenen Store-Client trennt main.ts). main.ts kennt sie sonst nicht und koennte sie beim
+     * SIGTERM nicht freigeben — eine globale Variable dafuer waere ein schlechterer Handel. Wirft nie.
      */
     disconnect: () => Promise<void>;
     /** Der Key-Store (P4c) — main.ts registriert damit die VM-Capability `keys`. */
@@ -229,7 +236,8 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
 
     app.use(express.json({ limit: '5mb' }));
 
-    const authPrisma = createPrismaAuthClient();
+    const authLease = openPrismaAuthClient(input.prismaClients);
+    const authPrisma = authLease.client;
     // Lokaler Modus (Spur L3): der eine Nutzer liegt als echte Zeile in der Auth-DB — grant_access und die
     // ACL-Ansicht loesen ihn auf wie jeden anderen. Idempotent, jeder Boot.
     const localUser = localMode ? await upsertLocalUser(authPrisma) : undefined;
@@ -369,7 +377,7 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
 
     // Die rohe Referenz bleibt erhalten: die Resilienz-Huelle reicht disconnect() nicht
     // durch, und nur der Handler selbst kennt seinen Pool und seinen Prune-Timer.
-    const prismaCacheHandler = new PrismaCacheHandler(input.resolveCacheDatabaseUrl());
+    const prismaCacheHandler = new PrismaCacheHandler(input.prismaClients, input.resolveCacheDatabaseUrl());
     const cacheHandler: ICacheHandler = withResilientCacheInfra(prismaCacheHandler);
 
     const kennelRunHandler = new KennelRunHandler({ kennelsController, nodesStore, baseDogsMap, cacheHandler, callCounter: input.callCounter });
@@ -468,11 +476,11 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     startMemoryHeartbeat();
 
     // Jeder Disconnect fuer sich gekapselt: ein sterbender Pool darf den naechsten
-    // nicht mit in die Tiefe ziehen.
+    // nicht mit in die Tiefe ziehen. Geliehene Store-Clients bleiben verbunden (release trennt nur eigene).
     const disconnect = async (): Promise<void> => {
         await Promise.allSettled([
             prismaCacheHandler.disconnect(),
-            authPrisma.$disconnect(),
+            authLease.release(),
         ]);
     };
 

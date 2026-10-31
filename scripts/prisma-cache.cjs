@@ -2,9 +2,16 @@
  * Stellt CACHE_DATABASE_URL für store/prisma-cache bereit (nach Validierung in dbEnv.cjs).
  */
 const { execSync } = require('child_process');
-const { assertRequiredDbEnv, resolveCacheDatabaseUrl } = require('./dbEnv.cjs');
+const { assertRequiredDbEnv, resolveCacheDatabaseUrl, sharesStoreDatabase } = require('./dbEnv.cjs');
 
 assertRequiredDbEnv();
+
+// Liegt Cache in der Store-Datenbank, fuehrt das Store-Schema die Tabellen; ein Push dieses Teil-Schemas
+// (--accept-data-loss) wuerde dort die Store-Tabellen droppen. Siehe run-prisma-sync.cjs.
+if (process.argv[2] === 'push' && sharesStoreDatabase('cache')) {
+    console.log('[prisma-cache] db push uebersprungen — Cache liegt in der Store-Datenbank, Tabellen kommen aus dem Store-Schema.');
+    process.exit(0);
+}
 process.env.CACHE_DATABASE_URL = resolveCacheDatabaseUrl();
 
 const variant = process.argv[3];

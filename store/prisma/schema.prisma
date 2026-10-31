@@ -128,6 +128,190 @@ model DogReference {
   @@index([fromKey])
 }
 
-// Auth + OAuth tables moved to store/prisma-auth/ (own DATABASE: AUTH_DATABASE_URL).
-// Kennel.ownerId / Dog.editors / Dog.viewers stay here as plain User-ID strings —
-// the FK is logical, not enforced at DB level (cross-DB).
+// Kennel.ownerId / Dog.editors / Dog.viewers sind reine User-ID-Strings — die FK ist logisch,
+// nicht in der DB erzwungen (Auth kann eine eigene Datenbank sein).
+
+// ---------------------------------------------------------------------------
+// SQLite-Single-File (P1.4): zeigen Cache-, JSON-Storage- oder Auth-URL auf dieselbe Datei
+// wie DATABASE_URL (gleicher absoluter Pfad, siehe scripts/dbEnv.cjs sharesStoreDatabase),
+// legt dieses Schema ihre Tabellen an, die Teil-Schemas werden nicht gepusht
+// (run-prisma-sync.cjs), und zur Laufzeit bedient der Store-Client sie mit
+// (store/SharedPrismaClients.ts). Ohne die Tabellen hier wuerde jeder Push des einen Schemas
+// die Tabellen des anderen droppen (`db push --accept-data-loss`).
+//
+// Mehr-Datei-Betrieb (eigene cache.db, json-storage.db, auth.db): die Tabellen entstehen hier
+// zusaetzlich leer in der Store-Datei, gelesen und geschrieben wird in den eigenen Dateien.
+//
+// Die Modelle muessen 1:1 mit den Teil-Schemas uebereinstimmen — der Store-Client wird auf
+// deren Client-Typen gecastet. Aenderungen hier UND in store/prisma-cache, store/prisma-json-storage
+// bzw. store/prisma-auth gleich halten; scripts/check-prisma-schemas.cjs prueft das.
+// ---------------------------------------------------------------------------
+
+// --- 1:1 mit store/prisma-cache/schema.prisma ---
+
+model CacheEntry {
+  key       String @id
+  value     String
+  // Unix-Zeit in ms — Prisma BigInt
+  expiresAt BigInt
+}
+
+// Tile-Feature-Cache: atomarer Geo-Feature-Store.
+// Jedes OSM-Feature genau einmal pro (dogType, osmType, osmId).
+// payload trägt das volle Overpass-Element; primaryKey/primaryValue/name
+// machen das Feature auch ohne Geometrie semantisch erkennbar.
+model GeoFeature {
+  dogType      String
+  osmType      String
+  osmId        BigInt
+  primaryKey   String?
+  primaryValue String?
+  name         String?
+  hasGeom      Boolean
+  lat          Float?
+  lng          Float?
+  bboxMinLat   Float?
+  bboxMinLng   Float?
+  bboxMaxLat   Float?
+  bboxMaxLng   Float?
+  payload      String
+  updatedAt    BigInt
+
+  @@id([dogType, osmType, osmId])
+  @@index([dogType, primaryKey, primaryValue])
+  @@index([dogType, bboxMinLat, bboxMaxLat])
+}
+
+// Welches Feature liegt in welcher Tile auf welchem Zoom für welche Facet.
+// Ein Feature kann in N Tiles und M Facets referenziert sein (BBox-Tiles * Facet-Matches).
+model FeatureTileMembership {
+  dogType String
+  osmType String
+  osmId   BigInt
+  zoom    Int
+  tileX   Int
+  tileY   Int
+  facet   String
+
+  @@id([dogType, osmType, osmId, zoom, tileX, tileY, facet])
+  @@index([dogType, zoom, tileX, tileY, facet])
+}
+
+// Coverage-Log: diese (tile, facet) wurde abgefragt — pro Facet getrennt,
+// damit partielle Queries sinnvoll funktionieren.
+model TileCoverage {
+  dogType   String
+  zoom      Int
+  tileX     Int
+  tileY     Int
+  facet     String
+  fetchedAt BigInt
+  expiresAt BigInt
+
+  @@id([dogType, zoom, tileX, tileY, facet])
+  @@index([expiresAt])
+  @@index([dogType, zoom, tileX, tileY])
+}
+
+// --- 1:1 mit store/prisma-json-storage/schema.prisma ---
+
+model JsonEntry {
+  key       String @id
+  value     String
+  updatedAt BigInt
+}
+
+// --- 1:1 mit store/prisma-auth/schema.prisma ---
+
+model User {
+  id          String   @id @default(uuid())
+  googleSub   String   @unique
+  email       String   @unique
+  name        String?
+  picture     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model OAuthClient {
+  id            String   @id @default(uuid())
+  clientId      String   @unique
+  clientSecret  String?
+  name          String
+  redirectUris  String              // comma-separated, SQLite parity
+  createdAt     DateTime @default(now())
+}
+
+model AuthorizationCode {
+  code                 String   @id
+  clientId             String
+  userId               String
+  redirectUri          String
+  codeChallenge        String?
+  codeChallengeMethod  String?
+  scope                String
+  expiresAt            DateTime
+  createdAt            DateTime @default(now())
+}
+
+model AccessToken {
+  jti          String   @id
+  userId       String
+  clientId     String
+  scope        String
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime @default(now())
+  name         String?
+  lastUsedAt   DateTime?
+  useCount     Int       @default(0)
+  recentCalls  String?
+}
+
+model RefreshToken {
+  token        String   @id        // SHA-256 hashed, never the raw value
+  userId       String
+  clientId     String
+  scope        String
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime @default(now())
+}
+
+// Nutzergebundener Key-Store (P4c): Schluessel liegen nur verschluesselt (AES-256-GCM) hier,
+// nie in jsonStore, nie im Klartext; keine Read-API gibt den Wert zurueck.
+model UserKey {
+  id             String    @id @default(uuid())
+  ownerId        String                      // User.id — der Besitzer des Schluessels
+  alias          String                      // z. B. "openai" — im Dog referenziert
+  last4          String                      // maskierte Anzeige, nie mehr
+  ciphertext     String                      // AES-256-GCM, base64
+  iv             String                      // base64
+  authTag        String                      // base64
+  keyVersion     Int       @default(1)       // welcher Master-Key
+  allowedDomains String                      // CSV erlaubter Zieldomains (Egress-Allowlist) — Pflicht, mindestens eine
+  kennelGrants   String?                     // optional: CSV kennelLineageIds, die diesen Key in oeffentlichen Laeufen nutzen duerfen (Entscheidung 8.8)
+  quotaPerDay    Int?                        // Pflicht, sobald kennelGrants gesetzt ist
+  usedToday      Int       @default(0)
+  usedDayStamp   String?                     // YYYY-MM-DD Reset-Marke
+  createdAt      DateTime  @default(now())
+  lastUsedAt     DateTime?
+
+  @@unique([ownerId, alias])
+  @@index([ownerId])
+}
+
+// Beta-Keys (2026-09-26, "ein key ein google user"): mit SLOPDOGS_STAGE=beta (und Auth an) braucht jedes Google-Konto
+// einmal einen Key; ein Key schaltet genau ein Konto frei (usedByUserId unique), laeuft nicht ab, endet durch
+// Einloesen oder Widerruf. Klartext nie gespeichert, nur SHA-256.
+model BetaKey {
+  id           String    @id @default(uuid())
+  codeHash     String    @unique              // SHA-256 des Keys, nie der Klartext
+  last4        String                         // maskierte Anzeige
+  note         String?                        // fuer wen, wozu
+  createdBy    String?                        // E-Mail des Anlegenden; null = lokaler Super-User
+  createdAt    DateTime  @default(now())
+  revokedAt    DateTime?
+  usedByUserId String?   @unique              // das eine Google-Konto, das dieser Key freigeschaltet hat
+  usedAt       DateTime?
+}

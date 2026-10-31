@@ -19,6 +19,7 @@ import {
   type KennelRatingHistogram,
 } from './IKennelStatsStore';
 import path from 'path';
+import { SharedPrismaClients } from './SharedPrismaClients';
 
 export class PrismaStore implements IStore, IKennelStatsStore, IDogStatsStore {
   private prisma: PrismaClient;
@@ -36,6 +37,15 @@ export class PrismaStore implements IStore, IKennelStatsStore, IDogStatsStore {
     } else {
       this.prisma = new PrismaClient();
     }
+  }
+
+  /**
+   * Der Store-Client fuer Cache, JSON-Storage und Auth, soweit sie dieselbe Datenbank nutzen
+   * (P1.4, Regel in scripts/dbEnv.cjs). Besitzer bleibt der Store: nur disconnect() trennt ihn.
+   * Einmal je Prozess aufrufen (main.ts) und das Ergebnis weiterreichen.
+   */
+  public sharedClients(): SharedPrismaClients {
+    return new SharedPrismaClients(this.prisma);
   }
 
   public async init(): Promise<void> {

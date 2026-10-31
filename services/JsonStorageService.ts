@@ -1,8 +1,10 @@
 /**
  * ~~~ JSON-STORAGE-SERVICE — fachlich getrennte KV-Ablage ~~~
  *
- * Eigene DB (JSON_STORAGE_DATABASE_URL), Schema: store/prisma-json-storage/schema.prisma.
- * Bewusst unabhaengig vom Run-Cache (PrismaCacheHandler) und vom Nodes/Kennels-Store.
+ * DB aus JSON_STORAGE_DATABASE_URL, Schema: store/prisma-json-storage/schema.prisma.
+ * Fachlich unabhaengig vom Run-Cache (PrismaCacheHandler) und vom Nodes/Kennels-Store; liegt die
+ * Tabelle physisch in der Store-Datenbank (Single-DB), nutzt der Service den Store-Client mit
+ * (store/SharedPrismaClients.ts), sonst einen eigenen.
  *
  * Wird in main.ts ueber `registerVmGlobalCapability('jsonStore', ...)` als
  * VM-Global-Capability registriert -- jeder SerializedDog sieht jsonStore.get/
@@ -14,6 +16,7 @@
 
 import path from 'path';
 import type { PrismaClient } from '../store/generated/prisma-json-storage-client';
+import type { PrismaClientLease, SharedPrismaClients } from '../store/SharedPrismaClients';
 
 function createPrismaJsonStorageClient(dbUrl: string): PrismaClient {
     const mod = require(path.join(process.cwd(), 'store/generated/prisma-json-storage-client')) as typeof import('../store/generated/prisma-json-storage-client');
@@ -29,10 +32,16 @@ export interface JsonEntrySnapshot {
 }
 
 export class JsonStorageService {
+    private readonly lease: PrismaClientLease<PrismaClient>;
     private prisma: PrismaClient;
 
-    constructor(databaseUrl: string) {
-        this.prisma = createPrismaJsonStorageClient(databaseUrl);
+    /**
+     * @param clients liefert den Store-Client, wenn die JSON-Ablage in der Store-Datenbank liegt —
+     *   sonst entsteht ein eigener Client auf `databaseUrl`.
+     */
+    constructor(clients: SharedPrismaClients, databaseUrl: string) {
+        this.lease = clients.lease('jsonStorage', () => createPrismaJsonStorageClient(databaseUrl));
+        this.prisma = this.lease.client;
     }
 
     async get<T = unknown>(key: string): Promise<T | undefined> {
@@ -75,8 +84,11 @@ export class JsonStorageService {
         }));
     }
 
-    /** Gibt den Connection-Pool frei — der geordnete Shutdown in main.ts ruft das. */
+    /**
+     * Gibt den eigenen Connection-Pool frei — der geordnete Shutdown in main.ts ruft das. Ein
+     * geliehener Store-Client bleibt verbunden (den trennt store.disconnect()).
+     */
     async disconnect(): Promise<void> {
-        await this.prisma.$disconnect();
+        await this.lease.release();
     }
 }

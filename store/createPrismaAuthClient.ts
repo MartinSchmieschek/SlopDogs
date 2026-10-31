@@ -2,16 +2,27 @@
  * Auth-Prisma-Client aus store/generated/prisma-auth-client — Pfad relativ zum
  * Projektroot (process.cwd()), damit dist/server-app/main.js nicht nach
  * dist/store/generated sucht.
+ *
+ * Liegt Auth physisch in der Store-Datenbank (Single-DB, scripts/dbEnv.cjs sharesStoreDatabase),
+ * bedient der Store-Client sie mit (openPrismaAuthClient); der generierte Auth-Client wird dann
+ * gar nicht geladen.
  */
 
 import path from 'path';
 import type { PrismaClient } from './generated/prisma-auth-client';
+import type { PrismaClientLease, SharedPrismaClients } from './SharedPrismaClients';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const dbEnv = require(path.join(process.cwd(), 'scripts', 'dbEnv.cjs')) as {
     resolveAuthDatabaseUrl: () => string;
 };
 
+/** Auth-Client fuer den Server: der Store-Client (geliehen) oder ein eigener (createPrismaAuthClient). */
+export function openPrismaAuthClient(clients: SharedPrismaClients): PrismaClientLease<PrismaClient> {
+    return clients.lease('auth', createPrismaAuthClient);
+}
+
+/** Ein eigener Auth-Client auf AUTH_DATABASE_URL (Mehr-DB). */
 export function createPrismaAuthClient(): PrismaClient {
     const mod = require(path.join(process.cwd(), 'store/generated/prisma-auth-client')) as typeof import('./generated/prisma-auth-client');
     // Die URL MUSS ueber resolveAuthDatabaseUrl kommen: nur dort haengt

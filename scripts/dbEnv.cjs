@@ -1,5 +1,8 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
+
 /**
  * Zentrale Pruefung und Aufloesung der DB-URLs.
  *
@@ -9,8 +12,10 @@
  * auch NODE_ENV=production mit SQLite (lokaler Modus auf dem Pi). integration
  * erzwingt weiterhin Postgres (Pruefung in assertRequiredDbEnv).
  *
- * SQLite (Dev, lokaler Modus): drei separate Files (DATABASE_URL, CACHE_DATABASE_URL,
- * JSON_STORAGE_DATABASE_URL) — jede Connection hat ihre eigene Datei.
+ * SQLite (Dev, lokaler Modus): standardmaessig vier Dateien (DATABASE_URL, CACHE_DATABASE_URL,
+ * JSON_STORAGE_DATABASE_URL, AUTH_DATABASE_URL). Zeigen Teil-URLs auf die Store-Datei, gilt
+ * dieselbe Regel wie bei Postgres: das Store-Schema (store/prisma/schema.prisma) fuehrt alle
+ * Tabellen, nur dieses wird gepusht, und zur Laufzeit gibt es einen Client (sharesStoreDatabase).
  *
  * Postgres (Render: integration/production): nur DATABASE_URL ist Pflicht. Cache- und
  * JSON-Storage-URL werden, falls nicht explizit gesetzt, einfach auf
@@ -295,25 +300,38 @@ function positiveIntFromEnv(name, fallback) {
 
 /**
  * Haengt Postgres-URLs ein Pool-Budget an. Ohne `connection_limit` nimmt jeder
- * Prisma-Client Prismas Default (num_cpus * 2 + 1) — und auf integration teilen sich
- * VIER Pools (Store, Auth, Cache, JSON-Storage) EINE physische Postgres, weil
- * assertRequiredDbEnv alle URLs auf DATABASE_URL spiegelt. 4 x 4 = 16 Verbindungen im
- * Normalbetrieb; waehrend eines Render-Deploys laeuft der alte Prozess kurz parallel
- * zum neuen, also kurzzeitig bis zu doppelt so viele.
+ * Prisma-Client Prismas Default (num_cpus * 2 + 1).
  *
- * Vier sind es exakt: PrismaStore (main.ts), Auth-Client (createHttpApplication),
- * PrismaCacheHandler und JsonStorageService — mehr PrismaClient-Instanzen entstehen im
- * Server-Prozess nicht (PrismaTileFeatureCache teilt sich den Cache-Client, der Session-
- * Store liegt im Speicher).
+ * Single-DB (integration/production: assertRequiredDbEnv spiegelt Cache, JSON-Storage und
+ * Auth auf DATABASE_URL): EIN Prisma-Client fuer Store, Cache, JSON-Storage und Auth
+ * (store/SharedPrismaClients.ts, Regel: sharesStoreDatabase), also EIN Pool. Ohne
+ * DB_CONNECTION_LIMIT bekommt er 4 je Teil, der auf diese URL zeigt (Single-DB: 4 x 4 = 16) —
+ * so viele wie vor P1.4 die vier getrennten Pools zusammen; ein Geo-Lauf mit langer
+ * Tile-Transaktion laesst Auth und Store damit nicht schneller warten als vorher. Waehrend eines Render-Deploys laeuft der alte Prozess
+ * kurz parallel zum neuen, also kurzzeitig doppelt so viele.
  *
- * Die 4 sind ein bewusst konservativ gewaehltes Budget, KEIN gemessener Wert. Wer
+ * Mehr-DB (Teil-URL auf anderen host/db oder anderes ?schema=): jeder getrennte Teil hat
+ * seinen eigenen Client und Pool mit demselben Budget — hoechstens vier Pools (Store, Auth,
+ * Cache, JSON-Storage); PrismaTileFeatureCache teilt sich den Cache-Client, der Session-
+ * Store liegt im Speicher.
+ *
+ * Die 4 je Teil sind ein bewusst konservativ gewaehltes Budget, KEIN gemessener Wert. Wer
  * misst, setzt DB_CONNECTION_LIMIT / DB_POOL_TIMEOUT — oder schreibt die Parameter
  * direkt in die URL, dann bleibt sie hier unangetastet.
  */
+const POOL_BUDGET_PER_PART = 4;
+const DB_PART_URL_VARS = ['DATABASE_URL', 'CACHE_DATABASE_URL', 'JSON_STORAGE_DATABASE_URL', 'AUTH_DATABASE_URL'];
+
+/** Wie viele der vier Teile (Store, Cache, JSON-Storage, Auth) auf genau diese URL zeigen, mindestens 1. */
+function partsOnUrl(url) {
+    const count = DB_PART_URL_VARS.filter((name) => (process.env[name] || '').trim() === url).length;
+    return Math.max(1, count);
+}
+
 function withPostgresPoolLimit(url) {
     if (!isPostgresUrl(url)) return url;
     if (/[?&](connection_limit|pool_timeout)=/i.test(url)) return url;
-    const connectionLimit = positiveIntFromEnv('DB_CONNECTION_LIMIT', 4);
+    const connectionLimit = positiveIntFromEnv('DB_CONNECTION_LIMIT', POOL_BUDGET_PER_PART * partsOnUrl(url));
     const poolTimeout = positiveIntFromEnv('DB_POOL_TIMEOUT', 20);
     return `${url}${url.includes('?') ? '&' : '?'}connection_limit=${connectionLimit}&pool_timeout=${poolTimeout}`;
 }
@@ -370,8 +388,79 @@ function resolveAuthDatabaseUrl() {
     return `file:${pathOnly.replace(/\\/g, '/')}`;
 }
 
+/**
+ * Teil-Datenbanken neben dem Store: Schema-Verzeichnis (dort loest Prisma relative SQLite-Pfade
+ * auf) und die URL-Aufloesung, die auch der Laufzeit-Client nutzt.
+ */
+const STORE_SCHEMA_DIR = 'store/prisma';
+const SUB_DATABASES = {
+    cache: { schemaDir: 'store/prisma-cache', resolveUrl: resolveCacheDatabaseUrl },
+    jsonStorage: { schemaDir: 'store/prisma-json-storage', resolveUrl: resolveJsonStorageDatabaseUrl },
+    auth: { schemaDir: 'store/prisma-auth', resolveUrl: resolveAuthDatabaseUrl },
+};
+const PROJECT_ROOT = path.resolve(__dirname, '..');
+
+/**
+ * Absoluter Dateipfad einer SQLite-URL, so wie Prisma ihn aufloest: relativ zum Verzeichnis
+ * des Schemas, das die URL liest (file:./dev.db -> store/prisma/dev.db, file:./cache.db ->
+ * store/prisma-cache/cache.db). Die gleiche Zeichenkette heisst also nicht die gleiche Datei.
+ * Query-Teil (?busy_timeout=…) zaehlt nicht. Windows: ohne Gross-/Kleinschreibung. Existiert die
+ * Datei schon, zaehlt ihr echter Pfad (Symlink/Hardlink-Ziel, Schreibweise des Dateisystems) — sonst
+ * hielte die Regel zwei Namen derselben Datei fuer getrennt, und ein Teil-Push droppte Store-Tabellen.
+ * Keine file:-URL -> null.
+ */
+function sqliteFilePath(url, schemaDir) {
+    if (typeof url !== 'string' || !url.startsWith('file:')) return null;
+    let file = url.slice('file:'.length);
+    const query = file.indexOf('?');
+    if (query >= 0) file = file.slice(0, query);
+    if (file.startsWith('//')) file = file.slice(2);
+    if (/^\/[A-Za-z]:/.test(file)) file = file.slice(1);
+    if (!file) return null;
+    let absolute = path.resolve(PROJECT_ROOT, schemaDir, file);
+    try {
+        absolute = fs.realpathSync.native(absolute);
+    } catch {
+        // Datei gibt es noch nicht (erster Push): dann zaehlt der aufgeloeste Pfad.
+    }
+    return process.platform === 'win32' ? absolute.toLowerCase() : absolute;
+}
+
+/**
+ * True, wenn die Teil-Datenbank `kind` (cache | jsonStorage | auth) physisch die Store-Datenbank
+ * ist. Dann fuehrt das Store-Schema ihre Tabellen, nur das Store-Schema wird gepusht
+ * (run-prisma-sync.cjs) und zur Laufzeit bedient der Store-Client sie mit (store/SharedPrismaClients.ts).
+ *
+ *   Postgres: die aufgeloesten URLs sind zeichengleich. Das ist nach assertRequiredDbEnv genau der
+ *     gespiegelte Fall (Cache/JSON ohne eigene URL, Auth auf demselben host/port/db). Ein bewusst
+ *     anderes ?schema=, ein anderer Host oder eine andere DB bleibt getrennt. Gleicher Namespace
+ *     mit anderer Zeichenkette kommt nicht vor: assertNoExplicitPostgresSchemaConflict bricht ab.
+ *   SQLite: derselbe absolute Dateipfad (sqliteFilePath).
+ *
+ * Erst nach assertRequiredDbEnv aufrufen (load-env.cjs tut das an jedem Entrypoint).
+ */
+function sharesStoreDatabase(kind) {
+    const sub = SUB_DATABASES[kind];
+    if (!sub) throw new Error(`sharesStoreDatabase: unbekannte Teil-Datenbank "${kind}" (cache | jsonStorage | auth).`);
+    const storeUrl = resolveStoreDatabaseUrl();
+    const subUrl = sub.resolveUrl();
+    if (isPostgresUrl(storeUrl) || isPostgresUrl(subUrl)) return storeUrl === subUrl;
+    const storeFile = sqliteFilePath(storeUrl, STORE_SCHEMA_DIR);
+    return storeFile !== null && storeFile === sqliteFilePath(subUrl, sub.schemaDir);
+}
+
+/** Absoluter SQLite-Dateipfad der Teil-Datenbank `kind`, sonst null (Postgres). */
+function subDatabaseSqliteFile(kind) {
+    const sub = SUB_DATABASES[kind];
+    if (!sub) throw new Error(`subDatabaseSqliteFile: unbekannte Teil-Datenbank "${kind}".`);
+    return sqliteFilePath(sub.resolveUrl(), sub.schemaDir);
+}
+
 module.exports = {
     assertRequiredDbEnv,
+    sharesStoreDatabase,
+    subDatabaseSqliteFile,
+    SUB_DATABASE_KINDS: Object.freeze(Object.keys(SUB_DATABASES)),
     resolveStoreDatabaseUrl,
     resolveCacheDatabaseUrl,
     resolveJsonStorageDatabaseUrl,

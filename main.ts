@@ -169,24 +169,30 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
     // Rouse the store from its slumber lest the connection rot in the bilge.
     await store.init();
 
+    // Ein Prisma-Client statt vier (P1.4): JSON-Storage, Auth und Run-Cache nutzen den Store-Client
+    // mit, wo sie physisch in der Store-Datenbank liegen (scripts/dbEnv.cjs sharesStoreDatabase);
+    // nur getrennte Datenbanken bekommen eigene Clients. Besitzer bleibt der Store (store.disconnect()).
+    const prismaClients = store.sharedClients();
+
     // Plant the first bones in the earth — the seeds from which our pack shall grow.
     await runSeeds(nodesStore, kennelsStore);
     logBootMemory('Seeds');
 
     // Aufrufe je Kennel (P4): im Speicher gezaehlt, alle KENNEL_CALL_FLUSH_MS in einer Transaktion
-    // geschrieben. Die Tabellen haengen am Store-Client — kein fuenfter PrismaClient.
+    // geschrieben. Die Tabellen haengen am Store-Client — kein eigener PrismaClient.
     const callCounter = new KennelCallCounter(store);
     callCounter.start();
 
-    // Fachliche JSON-Ablage: eigene SQLite (JSON_STORAGE_DATABASE_URL), bewusst getrennt
-    // von Nodes/Kennels (DATABASE_URL) und Run-Cache (CACHE_DATABASE_URL).
+    // Fachliche JSON-Ablage (JSON_STORAGE_DATABASE_URL), fachlich getrennt von Nodes/Kennels
+    // (DATABASE_URL) und Run-Cache (CACHE_DATABASE_URL); physisch dieselbe Datenbank wie der
+    // Store (Single-DB) -> derselbe Client, sonst ein eigener.
     //
     // Welle 7: jsonStore ist VM-Infrastruktur, kein Daten-Pakt. Statt einen BaseDog
     // (JsonStorageRetriever) zu registrieren, legen wir die Bruecke direkt als VM-Global-
     // Capability beim Core ab. Jeder SerializedDog sieht `jsonStore` damit automatisch im
     // VM-Context, ohne einen Parent zu deklarieren -- so wie er auch `fetch` und `console`
     // sieht.
-    const jsonStorageService = new JsonStorageService(dbEnv.resolveJsonStorageDatabaseUrl());
+    const jsonStorageService = new JsonStorageService(prismaClients, dbEnv.resolveJsonStorageDatabaseUrl());
     // Die Doku reist mit der Registrierung: der MCP kuendigt jsonStore dadurch von
     // selbst an. Ohne das ist er im MCP unsichtbar (kein Dog, kein Node, kein Tool)
     // und ein Agent bastelt sich stattdessen eine eigene Ablage.
@@ -325,6 +331,7 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
         allBaseDogs,
         baseDogsMap,
         resolveCacheDatabaseUrl: dbEnv.resolveCacheDatabaseUrl,
+        prismaClients,
         callCounter,
         statsStore: store,
         refIndex,
@@ -337,6 +344,9 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
     // wird vor der Ausgabe um die im Lauf benutzten Werte bereinigt (Leck L7).
     new KeysCapability(keyStore).register();
     setVmConsoleSink(scrubbingConsoleSink);
+
+    // Eine Zeile im (Render-)Log: welche Teile den Store-Client teilen, welche eigene Clients haben.
+    console.log(prismaClients.describe());
 
     return {
         app,
@@ -412,6 +422,8 @@ function registerGracefulShutdown(targets: ShutdownTargets): void {
         // gezaehlt), der letzte Flush braucht den Store-Pool noch. stop() wirft nie.
         await targets.callCounter.stop();
 
+        // Der geteilte Prisma-Client (Single-DB) endet mit store.disconnect(); JSON-Storage und
+        // HTTP-App trennen nur ihre eigenen Clients (store/SharedPrismaClients.ts).
         await Promise.allSettled([
             targets.store.disconnect(),
             targets.jsonStorageService.disconnect(),

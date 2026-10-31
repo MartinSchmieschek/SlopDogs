@@ -1,8 +1,9 @@
 /**
  * ~~~ PRISMA CACHE HANDLER — persistent memory via dieselben ORM-Pfade wie der Store ~~~
  *
- * Eigene DB (CACHE_DATABASE_URL), Schema: store/prisma-cache/schema.prisma.
- * Kein zweites natives SQL-API — nur Prisma.
+ * DB aus CACHE_DATABASE_URL, Schema: store/prisma-cache/schema.prisma. Ist das physisch die
+ * Store-Datenbank (Single-DB), nutzt der Handler den Store-Client mit (store/SharedPrismaClients.ts);
+ * sonst einen eigenen. Kein zweites natives SQL-API — nur Prisma.
  *
  * Enthaelt zwei Caches:
  *  - CacheEntry (key/value) fuer klassische getOrFetch-Calls mit TTL + in-flight-dedup.
@@ -19,6 +20,7 @@ import type { PrismaClient } from '../store/generated/prisma-cache-client';
 import { ICacheHandler, isRuntimeLogVerbose, type ITileFeatureCache } from '@slopdogs/core';
 import { PrismaTileFeatureCache } from './PrismaTileFeatureCache';
 import { isCacheInfraError } from './resilientCacheHandler';
+import type { PrismaClientLease, SharedPrismaClients } from '../store/SharedPrismaClients';
 
 function createPrismaCacheClient(dbUrl: string): PrismaClient {
     const mod = require(path.join(process.cwd(), 'store/generated/prisma-cache-client')) as typeof import('../store/generated/prisma-cache-client');
@@ -72,16 +74,23 @@ function isTransientProviderError(err: unknown): boolean {
 }
 
 export class PrismaCacheHandler implements ICacheHandler {
+    private readonly lease: PrismaClientLease<PrismaClient>;
     private prisma: PrismaClient;
     private inflight = new Map<string, Promise<unknown>>();
     private pruneTimer: ReturnType<typeof setInterval> | null;
     private tileFeatureCache: PrismaTileFeatureCache;
 
+    /**
+     * @param clients liefert den Store-Client, wenn der Cache in der Store-Datenbank liegt — sonst
+     *   entsteht ein eigener Client auf `cacheDatabaseUrl`.
+     */
     constructor(
+        clients: SharedPrismaClients,
         cacheDatabaseUrl: string,
         pruneIntervalMs: number = positiveIntFromEnv('CACHE_PRUNE_INTERVAL_MS', DEFAULT_PRUNE_INTERVAL_MS),
     ) {
-        this.prisma = createPrismaCacheClient(cacheDatabaseUrl);
+        this.lease = clients.lease('cache', () => createPrismaCacheClient(cacheDatabaseUrl));
+        this.prisma = this.lease.client;
         this.tileFeatureCache = new PrismaTileFeatureCache(this.prisma);
 
         this.pruneTimer = setInterval(() => {
@@ -103,7 +112,8 @@ export class PrismaCacheHandler implements ICacheHandler {
     }
 
     /**
-     * Gibt Prune-Timer und Connection-Pool frei. Idempotent — ein zweites Signal
+     * Gibt Prune-Timer und den eigenen Connection-Pool frei; ein geliehener Store-Client bleibt
+     * verbunden (den trennt store.disconnect()). Idempotent — ein zweites Signal
      * darf nicht ueber einen bereits geschlossenen Handler stolpern.
      */
     public async disconnect(): Promise<void> {
@@ -111,7 +121,7 @@ export class PrismaCacheHandler implements ICacheHandler {
             clearInterval(this.pruneTimer);
             this.pruneTimer = null;
         }
-        await this.prisma.$disconnect();
+        await this.lease.release();
     }
 
     async get<T>(key: string): Promise<T | undefined> {

@@ -5,7 +5,15 @@
 require('./load-env.cjs');
 
 const { execSync } = require('child_process');
-const { resolveCacheDatabaseUrl, resolveJsonStorageDatabaseUrl, authSharesStoreDatabase, prismaVariantFor } = require('./dbEnv.cjs');
+const {
+    resolveCacheDatabaseUrl,
+    resolveJsonStorageDatabaseUrl,
+    authSharesStoreDatabase,
+    prismaVariantFor,
+    sharesStoreDatabase,
+    subDatabaseSqliteFile,
+    SUB_DATABASE_KINDS,
+} = require('./dbEnv.cjs');
 
 function redactedConn(url) {
     if (!url || typeof url !== 'string') return '(nicht gesetzt)';
@@ -43,13 +51,39 @@ const storePushExtra = forceResetIntegration ? ' --force-reset' : '';
 
 /**
  * Push-Strategie:
- *   - SQLite (Dev, lokaler Modus): Store, Cache, JSON-Storage und Auth pushen in getrennte DBs.
+ *   - SQLite (Dev, lokaler Modus): das Store-Schema fuehrt alle Tabellen. Ein Teil-Schema
+ *     (Cache, JSON-Storage, Auth) wird nur in seine EIGENE Datei gepusht; liegt es in der
+ *     Store-Datei (sharesStoreDatabase, gleicher absoluter Pfad), legt der Store-Push seine
+ *     Tabellen an und der Teil-Push entfaellt — sonst droppte jeder Push die Tabellen des anderen.
  *   - Postgres (Render: integration/production): EINE physische DB fuer Store+Cache+JSON
  *     (+Auth, wenn Auth dieselbe DB teilt). Das Haupt-Schema definiert alle
  *     Tabellen; Cache/JSON/Auth werden dann nur generiert, nicht gepusht.
  *     Eine bewusst GETRENNTE Auth-DB (eigener host/db) wird weiterhin gepusht.
+ * Generiert werden immer alle vier Clients (Typen; der Server laedt nur die getrennten).
  */
 const authInMainSchema = usePostgres && authSharesStoreDatabase();
+const sqliteSharesStore = usePostgres ? {} : Object.fromEntries(SUB_DATABASE_KINDS.map((kind) => [kind, sharesStoreDatabase(kind)]));
+
+/**
+ * SQLite: zwei getrennte Teil-Schemas in DERSELBEN Datei (aber nicht der Store-Datei) wuerden sich
+ * beim Push gegenseitig die Tabellen droppen. Das ist keine gueltige Konfiguration — vor jedem Push abbrechen.
+ */
+if (!usePostgres) {
+    const byFile = new Map();
+    for (const kind of SUB_DATABASE_KINDS) {
+        if (sqliteSharesStore[kind]) continue;
+        const file = subDatabaseSqliteFile(kind);
+        if (!file) continue;
+        if (byFile.has(file)) {
+            console.error(
+                `[prisma-sync] ${byFile.get(file)} und ${kind} zeigen auf dieselbe SQLite-Datei (${file}), die nicht die Store-Datei ist.\n`
+                + '  Entweder getrennte Dateien oder beide auf die Datei von DATABASE_URL (dann fuehrt das Store-Schema alle Tabellen).',
+            );
+            process.exit(1);
+        }
+        byFile.set(file, kind);
+    }
+}
 
 /**
  * `--push-only` (lokaler Modus, ExecStartPre der systemd-Unit): nur die Tabellen angleichen, keine Clients
@@ -87,9 +121,14 @@ const cmds = [
     `npx prisma db push --schema ${storeSchemaFile} --accept-data-loss${storePushExtra}${skipGenerate}`,
 ];
 if (!usePostgres) {
-    cmds.push(`node scripts/prisma-cache.cjs push${cacheSuffix}`);
-    cmds.push(`node scripts/prisma-json-storage.cjs push${cacheSuffix}`);
-    cmds.push(`node scripts/prisma-auth.cjs push${cacheSuffix}`);
+    const helpers = { cache: 'prisma-cache.cjs', jsonStorage: 'prisma-json-storage.cjs', auth: 'prisma-auth.cjs' };
+    const inStoreFile = SUB_DATABASE_KINDS.filter((kind) => sqliteSharesStore[kind]);
+    for (const kind of SUB_DATABASE_KINDS) {
+        if (!sqliteSharesStore[kind]) cmds.push(`node scripts/${helpers[kind]} push${cacheSuffix}`);
+    }
+    if (inStoreFile.length) {
+        console.log(`[prisma-sync] SQLite: ${inStoreFile.join(', ')} ${inStoreFile.length > 1 ? 'liegen' : 'liegt'} in der Store-Datei — db push uebersprungen, Tabellen kommen aus ${storeSchemaFile}.`);
+    }
 } else {
     console.log('[prisma-sync] Postgres-Mode: Cache/JSON-Storage db push uebersprungen — Tabellen liegen im Haupt-Schema.');
     if (authInMainSchema) {

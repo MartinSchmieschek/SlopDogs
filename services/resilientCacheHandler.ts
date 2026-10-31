@@ -14,7 +14,8 @@ import type {
 
 export function isCacheInfraError(err: unknown): boolean {
     const code = (err as { code?: string })?.code;
-    if (code === 'P1008' || code === 'P2034') return true;
+    // P2024: kein freier Platz im Pool (pool_timeout). Seit P1.4 teilt der Cache in Single-DB den Pool mit Store und Auth.
+    if (code === 'P1008' || code === 'P2024' || code === 'P2034') return true;
     const msg = (err as Error)?.message ?? String(err);
     return /failed to respond to a query within the configured timeout|Operations timed out|SQLite busy|database is locked/i.test(
         msg,
