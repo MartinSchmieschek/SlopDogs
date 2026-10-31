@@ -161,6 +161,10 @@ Ist-Stand (Amar 31.10.): Ohne Auth gibt es heute nur den Super-User-Modus bei `N
 
 **Bewusst getragenes Risiko (10-0, 31.10.):** Dog-Code ist nicht sicher eingesperrt (`PLAN.md:2277`, isolated-vm aus P8 nicht umgesetzt). Ohne Auth kann jedes Geraet im lokalen Netz Code auf dem Pi ausfuehren, auch Gaeste im WLAN oder ein gekapertes IoT-Geraet. Die Netzgrenze aus L1/L2 verhindert, dass daraus ein offenes Gateway im Internet wird.
 
+**Ebenfalls getragen (Nira 31.10.):** Eine selbst eingerichtete Weiterleitung auf TCP-Ebene (`ssh -R`, socat, frp, Tunnel-Dienste) kommt von Loopback und mit erlaubtem Host-Header und hebelt die Netzgrenze aus; das README warnt davor, im Container bricht der Start ohne `SLOPDOGS_LOCAL_ALLOW_CONTAINER=1` ab. Browser ohne `Sec-Fetch`-Header koennen per `<img>` einen GET-Lauf ausloesen, ohne das Ergebnis zu sehen. Ein `/k/`-Link auf einer fremden Website zeigt lokal 403.
+
+**Umgesetzt 31.10.** (`77ae74c`, `f1026fe`, `2870a95`, `658ffa9`), auf dem Desktop gemessen: Abnahmeskript ueber die LAN-IP 27/27, Boot-Guard Exit 79 bei oeffentlicher URL, Proxy-Hops und neuem Master-Key auf vorhandenen Schluesseln. **Folgen fuer den Dev-Modus:** Host-, Origin- und Rahmenpruefung sind an; CORS nur noch fuer Server- und UI-Port; Docker-Portmapping, Codespaces und Werkzeuge auf anderen Ports bekommen 403, bis `LOCAL_ALLOWED_HOSTS` sie erlaubt. `build:prod` erzeugt bei einer SQLite-URL SQLite-Clients. Offen: Pi-Messung (Speicher, Hue-Dog, Unit-Haertung, cgroup), Pruefwert fuer den Master-Key, Dev-Bind nur auf 127.0.0.1.
+
 **Abnahme L:** Pi im LAN, ein zweiter Rechner nutzt UI und MCP ohne Login; fremder Host-Header → 403; Anfrage von einer oeffentlichen Adresse → abgewiesen; gesetzte oeffentliche Basis-URL → Start bricht ab; der Hue-Dog laeuft; Speicherwerte des Pi im Plan nachgetragen.
 
 ## Risiken
