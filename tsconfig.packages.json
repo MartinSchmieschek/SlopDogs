@@ -1,0 +1,167 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./packages/core"
+    },
+    {
+      "path": "./packages/dogs-air-quality"
+    },
+    {
+      "path": "./packages/dogs-animals-random"
+    },
+    {
+      "path": "./packages/dogs-astronomy"
+    },
+    {
+      "path": "./packages/dogs-biodiversity"
+    },
+    {
+      "path": "./packages/dogs-birds"
+    },
+    {
+      "path": "./packages/dogs-charging"
+    },
+    {
+      "path": "./packages/dogs-crypto"
+    },
+    {
+      "path": "./packages/dogs-cuisine"
+    },
+    {
+      "path": "./packages/dogs-currency"
+    },
+    {
+      "path": "./packages/dogs-demo"
+    },
+    {
+      "path": "./packages/dogs-dev"
+    },
+    {
+      "path": "./packages/dogs-dictionary"
+    },
+    {
+      "path": "./packages/dogs-gaming"
+    },
+    {
+      "path": "./packages/dogs-geo"
+    },
+    {
+      "path": "./packages/dogs-geocoding"
+    },
+    {
+      "path": "./packages/dogs-github-trending"
+    },
+    {
+      "path": "./packages/dogs-health"
+    },
+    {
+      "path": "./packages/dogs-historical-weather"
+    },
+    {
+      "path": "./packages/dogs-holidays"
+    },
+    {
+      "path": "./packages/dogs-hue"
+    },
+    {
+      "path": "./packages/dogs-humor"
+    },
+    {
+      "path": "./packages/dogs-images"
+    },
+    {
+      "path": "./packages/dogs-ip-geo"
+    },
+    {
+      "path": "./packages/dogs-knowledge"
+    },
+    {
+      "path": "./packages/dogs-music"
+    },
+    {
+      "path": "./packages/dogs-name-insights"
+    },
+    {
+      "path": "./packages/dogs-open-library"
+    },
+    {
+      "path": "./packages/dogs-phenology"
+    },
+    {
+      "path": "./packages/dogs-pop-culture"
+    },
+    {
+      "path": "./packages/dogs-public-transport"
+    },
+    {
+      "path": "./packages/dogs-quiz"
+    },
+    {
+      "path": "./packages/dogs-random-fact"
+    },
+    {
+      "path": "./packages/dogs-regional-news"
+    },
+    {
+      "path": "./packages/dogs-religion"
+    },
+    {
+      "path": "./packages/dogs-season"
+    },
+    {
+      "path": "./packages/dogs-social"
+    },
+    {
+      "path": "./packages/dogs-space"
+    },
+    {
+      "path": "./packages/dogs-sports"
+    },
+    {
+      "path": "./packages/dogs-sun"
+    },
+    {
+      "path": "./packages/dogs-talking"
+    },
+    {
+      "path": "./packages/dogs-transit-trips"
+    },
+    {
+      "path": "./packages/dogs-translate"
+    },
+    {
+      "path": "./packages/dogs-travel"
+    },
+    {
+      "path": "./packages/dogs-tv"
+    },
+    {
+      "path": "./packages/dogs-warframe"
+    },
+    {
+      "path": "./packages/dogs-water"
+    },
+    {
+      "path": "./packages/dogs-weather"
+    },
+    {
+      "path": "./packages/dogs-web-archive"
+    },
+    {
+      "path": "./packages/dogs-webcams"
+    },
+    {
+      "path": "./packages/dogs-wiki-search"
+    },
+    {
+      "path": "./packages/dogs-wikipedia"
+    },
+    {
+      "path": "./packages/geo-pact"
+    },
+    {
+      "path": "./packages/swaggrid"
+    }
+  ]
+}

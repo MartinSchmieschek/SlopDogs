@@ -8,6 +8,9 @@
  * madness lost shall die. Optional pill inputs float like cursed doubloons
  * upon a glass card — the void demands ye choose.
  */
+// Die Next-Aktion unten laeuft im Browser: FragmentBase.getScript schreibt sie per toString() in die Seite.
+// Nur deshalb braucht diese Datei die DOM-Typen (`window`) — das Paket selbst baut ohne lib dom.
+/// <reference lib="dom" />
 import { ButtonFragment } from "../fragments/ButtonFragment";
 import { ImageFragment } from "../fragments/ImageFragment";
 import { TextFragment } from "../fragments/TextFragment";

@@ -650,8 +650,7 @@ The real build runs through dedicated configs that write into `dist/` only:
 | Script | Config | Output |
 |--------|--------|--------|
 | `npm run build` | root [`tsconfig.emit.json`](tsconfig.emit.json) (= `tsconfig.build.json` without the `packages/*/src` paths, so no `dist/packages`) | `./dist` (main.ts + api/services/store/mcp) |
-| `npm run build:core` | [`packages/core/tsconfig.json`](packages/core/tsconfig.json) | `packages/core/dist` |
-| `npm run build:dogs-<x>` | `packages/dogs-<x>/tsconfig.json` | `packages/dogs-<x>/dist` |
+| `npm run build:packages` | [`tsconfig.packages.json`](tsconfig.packages.json) (`tsc -b` over all `packages/*/tsconfig.json`, each extends [`tsconfig.base.json`](tsconfig.base.json) and lists its `references`; incremental) | `packages/<x>/dist` |
 
 If you ever see a `.js` file inside `packages/*/src/`, `api/`, `mcp/`, `services/`, or `store/` -- delete it. `.gitignore` blocks them from being committed; the root `noEmit: true` prevents new ones from being created. Build output lives in `dist/` and `packages/*/dist/` only.
 
@@ -775,13 +774,10 @@ Create three files:
 **`packages/dogs-mydog/tsconfig.json`**
 ```json
 {
-  "compilerOptions": {
-    "target": "es2016", "module": "commonjs", "lib": ["ES2020"],
-    "strict": true, "esModuleInterop": true, "skipLibCheck": true,
-    "moduleResolution": "node", "declaration": true,
-    "outDir": "./dist", "rootDir": "./src"
-  },
-  "include": ["src/**/*"]
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "outDir": "./dist", "rootDir": "./src", "tsBuildInfoFile": "./dist/tsconfig.tsbuildinfo" },
+  "include": ["src/**/*"],
+  "references": [{ "path": "../core" }]
 }
 ```
 
@@ -854,14 +850,12 @@ const allPacts = [ ..., MyDogQueryPact ];
 "@slopdogs/dogs-mydog": ["packages/dogs-mydog/src/index.ts"]
 ```
 
-**Root `package.json`** — add dependency and build script (`npm run typecheck:packages` finds the new package by itself):
+**Root `package.json`** — add the dependency:
 ```json
 "dependencies": { "@slopdogs/dogs-mydog": "file:packages/dogs-mydog" }
-"scripts": {
-  "build:dogs-mydog": "cd packages/dogs-mydog && npx tsc",
-  "build:dogs": "... && npm run build:dogs-mydog"
-}
 ```
+
+**Root `tsconfig.packages.json`** — add the package to `references` (`{ "path": "./packages/dogs-mydog" }`); `npm run build:packages` then builds it with the others.
 
 The package's own `package.json` declares `typescript` and `@types/node` as devDependencies, so it also builds outside the monorepo.
 
@@ -889,7 +883,7 @@ theRun: `return { someParam: QueryRetriever.someparam }`
 ### 7. Verify
 
 ```bash
-npm run build:dogs-mydog          # compiles the package
+npm run build:packages            # compiles all packages (incremental, tsc -b)
 npx tsc --noEmit -p tsconfig.build.json  # typechecks the whole project
 npm start                         # server starts, seed runs, kennel is callable
 curl http://localhost:3000/k/my-kennel?someParam=test
@@ -938,7 +932,7 @@ packages/
   core/                       slopdogs library (Dog, Kennel, Wave engine, Pacts, cache, WebSocket channel retrievers, JSON storage, kennel import helpers)
   geo-pact/                   Shared GeoPoint pact for coordinate-shaped inputs
   swaggrid/                   OpenAPI generation (castGrimoire) — no domain deps
-  dogs-*/                     One npm package per BaseDog domain (many — see root package.json `build:dogs-*` scripts)
+  dogs-*/                     One npm package per BaseDog domain (many — see `tsconfig.packages.json`)
   ...                         (demo, geo, weather, warframe, etc. — same pattern: retriever + optional pacts + `get icon()`)
 ui-app/                       Angular frontend (see ui-app/README.md)
 ```

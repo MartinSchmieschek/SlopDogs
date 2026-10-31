@@ -1,9 +1,16 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "es2016", "module": "commonjs", "lib": ["ES2020"],
-    "strict": true, "esModuleInterop": true, "skipLibCheck": true,
-    "moduleResolution": "node", "declaration": true,
-    "outDir": "./dist", "rootDir": "./src"
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "tsBuildInfoFile": "./dist/tsconfig.tsbuildinfo"
   },
-  "include": ["src/**/*"]
+  "include": [
+    "src/**/*"
+  ],
+  "references": [
+    {
+      "path": "../core"
+    }
+  ]
 }
