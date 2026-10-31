@@ -92,5 +92,9 @@
       "@martinschmieschek/slopdogs-dogs-social": ["packages/dogs-social/src/index.ts"],
       "@martinschmieschek/slopdogs-dogs-crypto": ["packages/dogs-crypto/src/index.ts"]
     }
-  }
+  },
+  // Ohne "include" gilt jede .ts unter der Wurzel. repo-templates/ (PLAN-DOG-PAKETE P3) sind Dateien fuer die
+  // Paket-Repos: sie gehoeren nicht ins Server-Programm (CompilerCache-Typen, Editor). Die ersten drei Eintraege
+  // sind die Vorgaben von TypeScript, die ein eigenes "exclude" sonst aufhebt.
+  "exclude": ["node_modules", "bower_components", "jspm_packages", "repo-templates"]
 }

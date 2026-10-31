@@ -1,0 +1,7 @@
+# Prettier liest zusaetzlich .gitignore (node_modules/, dist/, .test-build/).
+# Markdown (README, CHANGELOG, Changesets) und JSON (package.json, Lockfile, eslint-suppressions.json,
+# tsconfig*.json, type-defs/surface) schreiben Werkzeuge oder Menschen als Fliesstext — Prettier bleibt draussen.
+*.md
+*.json
+**/dist/
+.test-build/

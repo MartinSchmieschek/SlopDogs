@@ -1,0 +1,40 @@
+# CI von slopdogs-core (PLAN-DOG-PAKETE P3): bauen, Paket-Tests, Lint/Format, Surface gegen die zuletzt
+# veroeffentlichte Fassung. Nur Lesen: GITHUB_TOKEN mit packages: read fuer `npm view`/`npm pack` aus GitHub Packages.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Tags fuer die Gegenprobe der Surface-Pruefung
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          registry-url: https://npm.pkg.github.com
+          scope: '@martinschmieschek'
+      - name: npm ci (baut ueber prepare)
+        run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npm run lint
+      - run: npm run format:check
+      - name: Surface gegen die zuletzt veroeffentlichte Fassung
+        run: node scripts/surface-check.cjs

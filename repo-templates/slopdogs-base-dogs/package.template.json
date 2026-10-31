@@ -1,0 +1,38 @@
+{
+  "name": "slopdogs-base-dogs",
+  "private": true,
+  "description": "SlopDogs Base-Dogs: alle Dog-Pakete samt geo-pact und dogs-demo, jedes mit eigener Version und eigenem Release",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MartinSchmieschek/slopdogs-base-dogs.git"
+  },
+  "engines": {
+    "node": ">=18.19.0"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "prepare": "npm run build",
+    "build": "node scripts/build-packages.cjs",
+    "test": "tsc -p tsconfig.test.json && node --test \".test-build/**/*.test.js\"",
+    "lint": "eslint .",
+    "lint:prune": "eslint . --prune-suppressions",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "surface:check": "node scripts/surface-check.cjs",
+    "changeset": "changeset",
+    "version-packages": "changeset version"
+  },
+  "devDependencies": {
+    "@changesets/cli": "3.0.3",
+    "@martinschmieschek/slopdogs-core": "{{CORE_SPEC}}",
+    "@martinschmieschek/slopdogs-typedefs": "{{TYPEDEFS_SPEC}}",
+    "@types/node": "^20.0.0",
+    "eslint": "{{ESLINT_VERSION}}",
+    "prettier": "{{PRETTIER_VERSION}}",
+    "typescript": "{{TYPESCRIPT_VERSION}}",
+    "typescript-eslint": "{{TYPESCRIPT_ESLINT_VERSION}}"
+  }
+}

@@ -1,0 +1,76 @@
+# Release von slopdogs-core (PLAN-DOG-PAKETE P3.3, E6, F4): ein Tag v<version> baut, prueft und veroeffentlicht
+# core und das Typ-Werkzeug (typedefs/, gleiche Version) nach GitHub Packages und haengt beide npm-pack-Tarballs
+# an den GitHub-Release. Der Tag selbst ist der Git-Weg: `github:MartinSchmieschek/slopdogs-core#v<version>`
+# (prepare baut). Nur GITHUB_TOKEN: packages: write fuer npm publish, contents: write fuer den Release.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'vorhandener Tag v<version>, der (erneut) veroeffentlicht werden soll'
+        required: true
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0 # Tags fuer die Gegenprobe der Surface-Pruefung
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          registry-url: https://npm.pkg.github.com
+          scope: '@martinschmieschek'
+      - name: Tag passt zu den Versionen
+        run: |
+          core=$(node -p "require('./package.json').version")
+          tool=$(node -p "require('./typedefs/package.json').version")
+          [ "$TAG" = "v$core" ] || { echo "::error::Tag $TAG passt nicht zu core $core"; exit 1; }
+          [ "$tool" = "$core" ] || { echo "::error::typedefs $tool weicht von core $core ab (npm run version-packages)"; exit 1; }
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npm run lint
+      - name: Surface gegen die zuletzt veroeffentlichte Fassung
+        run: node scripts/surface-check.cjs
+      - name: Veroeffentlichen (GitHub Packages)
+        run: |
+          for dir in typedefs .; do
+            name=$(node -p "require('./$dir/package.json').name")
+            version=$(node -p "require('./$dir/package.json').version")
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "$name@$version ist schon veroeffentlicht — uebersprungen"
+            else
+              npm publish "./$dir"
+            fi
+          done
+      - name: Tarballs packen
+        run: |
+          mkdir -p release
+          npm pack . ./typedefs --pack-destination release
+          ls -l release
+      - name: GitHub-Release mit Tarballs
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" release/*.tgz --clobber
+          else
+            gh release create "$TAG" release/*.tgz --title "$TAG" --generate-notes --verify-tag
+          fi

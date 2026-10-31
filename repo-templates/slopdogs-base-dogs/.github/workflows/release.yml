@@ -1,0 +1,79 @@
+# Release eines Pakets aus slopdogs-base-dogs (PLAN-DOG-PAKETE P3.3, E6, F4). Ein Tag <paket>@<version>
+# (von `npx changeset tag`) baut alle Pakete, prueft und veroeffentlicht genau dieses Paket nach GitHub Packages
+# und haengt seinen npm-pack-Tarball an den GitHub-Release. Der Tarball ist der Git-Weg fuer Dog-Pakete: npm
+# installiert nicht aus einem Unterordner eines Repos (F4), wohl aber die Tarball-URL des Releases.
+# Nur GITHUB_TOKEN: packages: write fuer npm publish, contents: write fuer den Release.
+#
+# GitHub startet bei mehr als drei Tags in einem Push keinen Workflow: Tags einzeln pushen, oder einen
+# vorhandenen Tag ueber workflow_dispatch nachholen.
+name: release
+
+on:
+  push:
+    tags: ['@martinschmieschek/slopdogs-*@*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'vorhandener Tag <paket>@<version>, der (erneut) veroeffentlicht werden soll'
+        required: true
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0 # Tags fuer die Gegenprobe der Surface-Pruefung
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          registry-url: https://npm.pkg.github.com
+          scope: '@martinschmieschek'
+      - name: Paket zum Tag finden
+        id: pkg
+        run: |
+          dir=$(node scripts/package-for-tag.cjs "$TAG")
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+          echo "Tag $TAG -> $dir"
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npm run lint
+      - name: Surface gegen die zuletzt veroeffentlichte Fassung
+        run: node scripts/surface-check.cjs "${{ steps.pkg.outputs.dir }}"
+      - name: Veroeffentlichen (GitHub Packages)
+        run: |
+          dir="${{ steps.pkg.outputs.dir }}"
+          name=$(node -p "require('./$dir/package.json').name")
+          version=$(node -p "require('./$dir/package.json').version")
+          if npm view "$name@$version" version >/dev/null 2>&1; then
+            echo "$name@$version ist schon veroeffentlicht — uebersprungen"
+          else
+            npm publish --workspace "$dir"
+          fi
+      - name: Tarball packen
+        run: |
+          mkdir -p release
+          npm pack --workspace "${{ steps.pkg.outputs.dir }}" --pack-destination release
+          ls -l release
+      - name: GitHub-Release mit Tarball
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" release/*.tgz --clobber
+          else
+            gh release create "$TAG" release/*.tgz --title "$TAG" --generate-notes --verify-tag
+          fi
