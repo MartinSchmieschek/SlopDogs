@@ -128,7 +128,8 @@ export class SdRatingComponent {
     return (this.editors() ?? '').split(',').map((s) => s.trim()).includes(me);
   });
   readonly state = computed<RatingState>(() => {
-    if (this.loading()) return 'loading';
+    // Before /auth/me answers nobody is known: no `Sign in to rate` for someone signed in (or local).
+    if (this.loading() || !this.auth.isReady()) return 'loading';
     if (!this.auth.user() || this.sessionLost()) return 'anonymous';
     if (this.isOwn()) return 'readonly-owner';
     if (this.saving()) return 'saving';

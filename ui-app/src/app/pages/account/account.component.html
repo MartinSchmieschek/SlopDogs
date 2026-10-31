@@ -29,12 +29,19 @@
               <h2 class="sd-h1">{{ user()!.name || 'Signed in' }}</h2>
               <p class="sd-data sd-muted">{{ user()!.email }}</p>
             </div>
-            <button type="button" class="sd-btn" (click)="signOut()">Sign out</button>
+            @if (!localMode()) {
+              <button type="button" class="sd-btn" (click)="signOut()">Sign out</button>
+            }
           </div>
           <h3 class="sd-h2">Connect your AI</h3>
-          <p class="sd-small sd-muted">Claude and other MCP clients sign in on their own with this address.</p>
-          <sd-url-chip [text]="mcpCommand" />
-          <p class="sd-small sd-muted">Scripts and GPTs use a personal token instead: see <button type="button" class="lnk" (click)="select('tokens')">tokens</button>.</p>
+          @if (localMode()) {
+            <p class="sd-small sd-muted">This server runs locally: Claude and other MCP clients connect with this address, no sign-in.</p>
+            <sd-url-chip [text]="mcpCommand" />
+          } @else {
+            <p class="sd-small sd-muted">Claude and other MCP clients sign in on their own with this address.</p>
+            <sd-url-chip [text]="mcpCommand" />
+            <p class="sd-small sd-muted">Scripts and GPTs use a personal token instead: see <button type="button" class="lnk" (click)="select('tokens')">tokens</button>.</p>
+          }
         </section>
       }
 

@@ -10,6 +10,8 @@ export interface IUser {
 export interface IAuthState {
   authenticated: boolean;
   user?: IUser;
+  /** Only in the server's local mode: everyone is the one local user, there is no sign-in. */
+  mode?: 'local';
 }
 
 /** The four roles of the access panel (P3.5, 6.4 S8). `reader` is the UI name of `viewers[]`. */

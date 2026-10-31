@@ -1,11 +1,11 @@
 @if (!isReady()) {
   <div class="auth-badge auth-badge--loading" aria-hidden="true"></div>
-} @else if (!user()) {
+} @else if (!user() && !localMode()) {
   <button class="auth-badge auth-badge--login" type="button" aria-label="Sign in" (click)="onLogin()">
     <span class="g-icon" aria-hidden="true">G</span>
     <span class="label">Sign in</span>
   </button>
-} @else {
+} @else if (user()) {
   <div class="auth-badge auth-badge--user" [class.is-open]="menuOpen()">
     <button
       class="trigger"
@@ -30,9 +30,11 @@
         </div>
         <a class="menu-row menu-action" role="menuitem" routerLink="/account" (click)="closeMenu()">Account</a>
         <a class="menu-row menu-action" role="menuitem" routerLink="/account" [queryParams]="{ tab: 'keys' }" (click)="closeMenu()">Keys</a>
-        <button class="menu-row menu-action" type="button" role="menuitem" (click)="onLogout()">
-          Sign out
-        </button>
+        @if (!localMode()) {
+          <button class="menu-row menu-action" type="button" role="menuitem" (click)="onLogout()">
+            Sign out
+          </button>
+        }
       </div>
     }
   </div>

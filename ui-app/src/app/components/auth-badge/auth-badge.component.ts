@@ -5,7 +5,8 @@ import { escapeLayerWhile } from '../../utils/escape-layers';
 
 /**
  * Top-right badge (6.5 `sd-auth-badge`): signed out a quiet `Sign in` that goes to `/login` with the
- * way back; signed in the avatar and a menu — Account, Keys, Sign out (P6 U7).
+ * way back; signed in the avatar and a menu — Account, Keys, Sign out (P6 U7). Server in local mode: the local
+ * user's avatar and menu, never `Sign in` or `Sign out`.
  */
 @Component({
     selector: 'app-auth-badge',
@@ -20,6 +21,7 @@ export class AuthBadgeComponent implements OnInit {
 
     readonly user = this.auth.user;
     readonly isReady = this.auth.isReady;
+    readonly localMode = this.auth.localMode;
     readonly menuOpen = signal(false);
 
     readonly initial = computed(() => {

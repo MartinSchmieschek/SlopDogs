@@ -10,7 +10,7 @@ import { safeReturnTo } from '../../utils/account';
 /**
  * S10 Login (P6 U7, 6.4): centred emblem and `SLOPDOGS` in Bebas 28, one quiet 44 px button
  * `[CONTINUE WITH GOOGLE]`, one random verse (small italic, its name as a teal label). `?returnTo=`
- * takes you back after Google — only to a path on this site. Already signed in: straight there. Closed beta
+ * takes you back after Google — only to a path on this site. Already signed in, or the server in local mode (no Google there): straight there. Closed beta
  * (SLOPDOGS_STAGE=beta, sign-in on): a beta-key field above the button; the key rides to Google and back once.
  */
 @Component({
@@ -80,7 +80,7 @@ export class LoginComponent {
   constructor() {
     void this.beta.load();
     effect(() => {
-      if (!this.auth.isReady() || !this.auth.user()) return;
+      if (!this.auth.isReady() || (!this.auth.user() && !this.auth.localMode())) return;
       const to = this.target();
       untracked(() => void this.router.navigateByUrl(to, { replaceUrl: true }));
     });

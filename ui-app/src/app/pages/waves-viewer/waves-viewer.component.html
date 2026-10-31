@@ -44,7 +44,7 @@
           <p class="sd-muted">It may be private, or the address has changed.</p>
           <div class="row">
             <a class="sd-btn sd-btn--primary" routerLink="/kennels">Back to kennels</a>
-            @if (auth.isReady() && !auth.user()) {
+            @if (auth.isReady() && !auth.user() && !auth.localMode()) {
               <button type="button" class="sd-btn" (click)="auth.login()">Sign in</button>
             }
           </div>

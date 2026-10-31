@@ -27,7 +27,7 @@ type ListState = 'idle' | 'loading' | 'ready' | 'error' | 'disabled';
  * (P4c) — masked rows, the add sheet, delete with a question, the notice that a database reset takes
  * them, and `The key store is off on this server.` without a master key. beta (admins only): closed-beta keys —
  * one key unlocks one Google account, once, no expiry; a new key shows its value once. Signed out: `/login?returnTo=`, except the local
- * super-user, who sees only the beta tab.
+ * super-user, who sees only the beta tab. Server in local mode: no sign out, no tokens tab.
  */
 @Component({
   selector: 'app-account',
@@ -49,7 +49,9 @@ export class AccountComponent {
   private readonly betaApi = inject(BetaService);
 
   readonly beta = this.betaApi.status;
-  readonly tabs = computed(() => visibleAccountTabs(!!this.user(), !!this.beta()?.admin));
+  /** Server in local mode: no sign-out, no personal tokens. */
+  readonly localMode = this.auth.localMode;
+  readonly tabs = computed(() => visibleAccountTabs(!!this.user(), !!this.beta()?.admin, this.localMode()));
   readonly keysNotice = KEYS_NOTICE;
   readonly keystoreOff = KEYSTORE_OFF;
   readonly tab = signal<AccountTab>('profile');
