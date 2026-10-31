@@ -771,7 +771,7 @@ Create four files (copy them from a similar package, e.g. `dogs-weather`):
   "private": true,
   "scripts": {
     "build": "tsc -p tsconfig.json && slopdogs-typedefs build",
-    "prepare": "node -e \"process.exit(require('fs').existsSync('../../tsconfig.packages.json') ? 0 : 1)\" || npm run build"
+    "prepare": "node -e \"let p=require('path'),d=process.cwd();while(d!==(d=p.dirname(d)))try{if(require(p.join(d,'package.json')).workspaces)process.exit(0)}catch{}process.exit(1)\" || npm run build"
   },
   "peerDependencies": { "@martinschmieschek/slopdogs-core": "^0.2.0-beta.0" },
   "devDependencies": {
@@ -785,7 +785,7 @@ Create four files (copy them from a similar package, e.g. `dogs-weather`):
 
 - **core is a peerDependency, never a dependency** (same for `geo-pact` and `dogs-demo` if you use them): the server must hold exactly one copy. Parents are matched by class identity (`instanceof`), and core keeps singletons (slot gate, capability registry) — a second copy would match no parent and double the slot cap without a word. The devDependency `file:../core` is only there so the package builds by itself.
 - `build` compiles and then writes `dist/type-defs.json` (pact and class types — the server merges them at build time, it reads no `.d.ts`) and `dist/surface.json` (exports, classes, pact-type hashes) with `slopdogs-typedefs`. `slopdogs-typedefs surface --check <old surface.json>` exits 1 when something was removed, renamed or a pact type changed without a major version bump.
-- `prepare` builds when the package is installed from git or packed on its own; inside this monorepo it does nothing, because the root build (`npm run build:packages`) builds all packages in order.
+- `prepare` builds when the package lies on its own (installed from git, fresh clone, packed alone); inside an npm workspace (this monorepo, later `slopdogs-base-dogs`) it does nothing, because npm starts `prepare` of all workspaces in parallel and in no order — the root build (`npm run build:packages`) builds all packages in order instead. It detects the workspace by looking for a `package.json` with `workspaces` in any parent folder.
 - Import only `@martinschmieschek/slopdogs-core`, never `@martinschmieschek/slopdogs-core/runtime` (sandbox, gate, kennel run — the server's side); ESLint refuses it in `packages/`.
 
 **`packages/dogs-mydog/tsconfig.json`** — stands alone (no `../` in it), so the package builds without this repo:
@@ -911,6 +911,41 @@ npx tsc --noEmit -p tsconfig.build.json  # typechecks the whole project
 npm start                         # server starts, seed runs, kennel is callable
 curl http://localhost:3000/k/my-kennel?someParam=test
 ```
+
+---
+
+## Working on a Dog package
+
+> **Prepared — applies from PLAN-DOG-PAKETE P4 on**, once `packages/core`, `packages/typedefs`, `packages/geo-pact`, `packages/dogs-demo` and `packages/dogs-*` have left this repository for [`slopdogs-core`](https://github.com/MartinSchmieschek/slopdogs-core) and [`slopdogs-base-dogs`](https://github.com/MartinSchmieschek/slopdogs-base-dogs). Until then the packages live under `packages/` and the section above (*Creating a new BaseDog Package*) is the way. `scripts/split-repos.cjs` performs the cut; `repo-templates/` holds what the two package repositories carry beyond the cut sources (CI, release workflow, Changesets, ESLint/Prettier copies, package tests, README).
+
+After P4 the server installs every SlopDogs package with an **exact** version from GitHub Packages (`.npmrc` with `@martinschmieschek:registry=https://npm.pkg.github.com` and `//npm.pkg.github.com/:_authToken=${NPM_TOKEN}`, token with `read:packages`), pinned by the lockfile. Only `packages/swaggrid` stays here.
+
+To change a Dog and try it in the server:
+
+```bash
+# in slopdogs-base-dogs: build, then pack the changed package
+npm ci
+npm pack --workspace packages/dogs-weather --pack-destination ../tarballs
+
+# in this repository: install the tarball over the pinned version, then build as usual
+npm install --no-save ../tarballs/martinschmieschek-slopdogs-dogs-weather-<version>.tgz
+npm run build:prod          # merges the package's dist/type-defs.json
+```
+
+- Repeat both steps after each change; the server loads the package's `dist/`, not its sources. `tsconfig.json` here no longer maps the moved packages to `packages/*/src` — in dev they also resolve from `node_modules`.
+- **One copy of core, `geo-pact` and `dogs-demo` (F1).** A tarball is installed like a release: its peers resolve to the server's copy. `npm link` (`cd packages/dogs-weather && npm link` there, `npm link @martinschmieschek/slopdogs-dogs-weather` here) saves the repacking, but the linked folder resolves its peers from *its own* repository: `slopdogs-base-dogs/node_modules/@martinschmieschek/slopdogs-core` becomes a second copy, and parents stop matching without an error (`instanceof`, slot gate, capability registry). Measured on the probe of 31.10.: resolving core from `slopdogs-base-dogs/packages/dogs-weather` lands in `slopdogs-base-dogs/node_modules`. Link only together with core (`npm link @martinschmieschek/slopdogs-core` in the package repo, pointing at the server's copy), and check before starting that `node -p "require.resolve('@martinschmieschek/slopdogs-core', { paths: [require('fs').realpathSync('node_modules/@martinschmieschek/slopdogs-dogs-weather')] })"` prints a path in this repository's `node_modules`.
+- The same holds for every way of installing from Git or tarballs: name core, `geo-pact` and `dogs-demo` with the **identical specification** everywhere. `npm ls @martinschmieschek/slopdogs-core` must list one version, deduped everywhere else.
+- `npm unlink` and `npm ci` return to the pinned versions. A change ships through a changeset and a release of the package repo; Renovate (P5) then opens the version bump here.
+
+### Deploying from packages (Render)
+
+Also from P4 on; nothing of this is active yet — this repository has **no** `.npmrc` with a token today (npm aborts when `${NPM_TOKEN}` is referenced but not set).
+
+1. A GitHub token with `read:packages` only (classic personal access token; GitHub Packages' npm registry takes no other kind for reading), from the account that owns the packages.
+2. Render → service → Environment: `NPM_TOKEN` = that token (secret). Nothing else changes in the environment.
+3. The cut (`node scripts/split-repos.cjs server . --registry --in-place` on a branch) writes `.npmrc` with `@martinschmieschek:registry=https://npm.pkg.github.com` and `//npm.pkg.github.com/:_authToken=${NPM_TOKEN}`, pins every package exactly and refreshes the lockfile with `npm install`.
+4. The build command stays `npm ci && npm run build:prod`; `npm ci` reads `.npmrc` and pulls the pinned tarballs.
+5. First deploy: the boot guard passes, `GET /api/nodes` lists the same names as before with `packageVersion` of the new release. Rotating the token = new token, update `NPM_TOKEN`, redeploy.
 
 ---
 
