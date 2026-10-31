@@ -22,6 +22,9 @@
       @if (frozen()) {
         <span class="sd-chip sd-chip--frozen">frozen</span>
       }
+      @if (maintained()) {
+        <span class="sd-chip sd-chip--soft">maintained</span>
+      }
       @if (yours()) {
         <span class="sd-chip sd-chip--live">yours</span>
       }
@@ -81,6 +84,9 @@
               <span class="hint sd-small" [id]="editHintId">{{ lock }}</span>
             } @else if (canEdit()) {
               <button type="button" (click)="pick('edit')">Edit</button>
+              @if (maintainerNote(); as note) {
+                <span class="hint sd-small">{{ note }}</span>
+              }
             }
             <button type="button" (click)="pick('export')">Export</button>
             @if (canDelete()) {

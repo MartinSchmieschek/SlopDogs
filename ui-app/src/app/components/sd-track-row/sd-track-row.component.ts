@@ -75,12 +75,21 @@ export class SdTrackRowComponent {
   readonly number = computed(() => String(this.index() + 1).padStart(2, '0'));
   readonly frozen = computed(() => !!(this.kennel().frozen ?? this.kennel().myRights?.frozen));
   readonly favorite = computed(() => !!this.kennel().favorite);
-  /** Server-side landing lock (LANDING_KENNEL_IDS) — wins over frozen, as `lockOf` does on the server. */
-  readonly landing = computed(() => this.kennel().myRights?.locked === 'landing');
-  /** Why `Edit` is disabled, or null when it is not locked. */
+  /**
+   * Maintained kennel (server lock `landing`: LANDING_KENNEL_IDS, the seeded landing and the seeded curated kennels
+   * such as `slopdogs-kennels`). Only maintainers (SLOPDOGS_MAINTAINER_EMAILS) change it; for them `edit` is true.
+   */
+  readonly maintained = computed(() => this.kennel().myRights?.locked === 'landing');
+  /** Why `Edit` is disabled, or null when it is not locked. A maintainer edits a maintained kennel. */
   readonly editLock = computed(() =>
-    this.landing() ? 'Landing kennel. Locked on this server.' : this.frozen() ? 'Frozen. Unfreeze in settings.' : null,
+    this.frozen()
+      ? 'Frozen. Unfreeze in settings.'
+      : this.maintained() && !this.kennel().myRights?.edit
+        ? 'Maintained. Only maintainers change it.'
+        : null,
   );
+  /** The note under an enabled Edit of a maintained kennel (the caller is a maintainer). */
+  readonly maintainerNote = computed(() => (this.maintained() && !this.editLock() ? 'Maintained. You are a maintainer.' : null));
   readonly editHintId = `sd-track-row-edit-hint-${++editHintSeq}`;
   /** Run without read (P3.5 stage 1): name, emoji, description only; no code behind the row. */
   readonly runOnly = computed(() => {
@@ -89,7 +98,17 @@ export class SdTrackRowComponent {
   });
   readonly isPrivate = computed(() => this.kennel().visibility === 'private');
   readonly canEdit = computed(() => this.kennel().myRights?.edit ?? true);
-  readonly canDelete = computed(() => (this.kennel().myRights?.own ?? true) && !this.frozen());
+  /**
+   * Owner or editor — the server deletes for both (canMutate). Not on a community kennel (no owner: every signed-in
+   * user may edit it, but the list does not offer to delete it), not maintained, not frozen.
+   */
+  readonly canDelete = computed(() => {
+    const k = this.kennel();
+    const r = k.myRights;
+    if (this.frozen() || this.maintained()) return false;
+    if (!r) return true;
+    return r.own || (r.edit && !!k.ownerId);
+  });
   readonly meta = computed(() => {
     const k = this.kennel();
     const parts = [this.ref()];

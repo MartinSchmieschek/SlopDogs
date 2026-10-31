@@ -93,11 +93,14 @@
 
   &:focus-visible {
     outline: none;
+    box-shadow: none;
   }
 
+  // The focus ring over the whole row: tape orange plus an inner ink ring (orange alone is 2.30:1 on paper).
   &:focus-visible::after {
     outline: 3px solid var(--focus);
     outline-offset: -3px;
+    box-shadow: inset 0 0 0 5px var(--ink);
   }
 }
 
