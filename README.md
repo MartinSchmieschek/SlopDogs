@@ -465,7 +465,7 @@ The MCP server returns **Spuren rules + a pointer to the full guide** as the `in
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| `GET` | `/api/kennels` | Survey all Kennels — every entry carries `stats` {calls, rating}; `?q=`, `?mine=1`, `?sort=name|createdAt|updatedAt|calls|calls30d|rating|failures30d&dir=desc`, `?minStars=4`, `?minCalls=20`, `?usage=top|never_used|never_worked|failing|dormant`, `?limit=&offset=` |
+| `GET` | `/api/kennels` | Survey all Kennels — every entry carries `stats` {calls, rating} and `favorite` (yours; always false when anonymous); `?q=`, `?mine=1`, `?favorites=1`, `?sort=name|createdAt|updatedAt|calls|calls30d|rating|failures30d&dir=desc`, `?minStars=4`, `?minCalls=20`, `?usage=top|never_used|never_worked|failing|dormant`, `?limit=&offset=` |
 | `GET` | `/api/kennels/:id` | Load a Kennel's covenant |
 | `POST` | `/api/kennels` | Forge a new Kennel |
 | `PUT` | `/api/kennels/:id` | Rewrite the covenant |
@@ -476,6 +476,8 @@ The MCP server returns **Spuren rules + a pointer to the full guide** as the `in
 | `GET` | `/api/kennels/:id/rating` | Stars: `{avg, count, score, histogram, mine}` (run right needed; `mine` null when anonymous or unrated) |
 | `PUT` | `/api/kennels/:id/rating` | Rate 1-5 (`{ "stars": 4 }`) — logged in, not the owner, not an editor |
 | `DELETE` | `/api/kennels/:id/rating` | Take your rating back (idempotent) |
+| `PUT` | `/api/kennels/:id/favorite` | Mark the kennel as one of your favourites: `{ok, lineageId, favorite}` — logged in (401), run right needed (404), idempotent; owners and editors may favourite their own, frozen and landing kennels too |
+| `DELETE` | `/api/kennels/:id/favorite` | Drop the favourite (idempotent) |
 | `GET` | `/api/kennels/:id/acl` | Read visibility, owner, editors/viewers/runners, `myRights` (owner/editor only) |
 | `PUT` | `/api/kennels/:id/acl` | Set visibility and editors/viewers/runners (owner only) |
 | `POST` | `/api/kennels/:id/acl/transfer` | Transfer ownership (owner only) |
@@ -533,7 +535,7 @@ Login required. Keys are AES-256-GCM encrypted in the auth database and never re
 | `GET` | `/api/readme` | Project README as rendered HTML |
 | `GET` | `/api/landing` | The landing's two rankings `{generatedAt, windowDays, topByCalls30d, topByRating}` plus `provenDogs` (dogs with the proven badge, by score) — only what an anonymous visitor may run; `?limit=` (default 10, max 50); 60 s memo, `ETag` |
 
-Calls: every kennel run is counted once, per day (UTC) and source; `stats.calls.ranked`/`ranked30d` count only real use (`/k/:id`, `/api/kennels/:id/execute`, MCP `execute_kennel`), `leadFailed` the runs whose lead errored (`leadFailed30d` in the last 30 days); a dog run fails when it ends in error, timeout or oom (`stats.calls.failures`, `failures30d`). Usage filter (`?usage=`, MCP `list_kennels`/`list_nodes` `usage`), applied after the rights filter and combinable with `q`/`search` and `sort`: `top` = called at least once, most calls first unless `sort` is given; `never_used` = 0 calls; `never_worked` = called, every run failed; `failing` = a failed run in the last 30 days; `dormant` = called before, 0 calls in the last 30 days. Counts live in memory and are flushed every `KENNEL_CALL_FLUSH_MS` (30 s) in one transaction. Stars: 1-5 per user and kennel; `score` is a Bayes average `(5·m + sum) / (5 + count)` with `m` the mean over all ratings — it ranks; `avg` is the raw mean.
+Calls: every kennel run is counted once, per day (UTC) and source; `stats.calls.ranked`/`ranked30d` count only real use (`/k/:id`, `/api/kennels/:id/execute`, MCP `execute_kennel`), `leadFailed` the runs whose lead errored (`leadFailed30d` in the last 30 days); a dog run fails when it ends in error, timeout or oom (`stats.calls.failures`, `failures30d`). Usage filter (`?usage=`, MCP `list_kennels`/`list_nodes` `usage`), applied after the rights filter and combinable with `q`/`search` and `sort`: `top` = called at least once, most calls first unless `sort` is given; `never_used` = 0 calls; `never_worked` = called, every run failed; `failing` = a failed run in the last 30 days; `dormant` = called before, 0 calls in the last 30 days. Counts live in memory and are flushed every `KENNEL_CALL_FLUSH_MS` (30 s) in one transaction. Stars: 1-5 per user and kennel; `score` is a Bayes average `(5·m + sum) / (5 + count)` with `m` the mean over all ratings — it ranks; `avg` is the raw mean. Favourites: one per user and kennel lineage (table `KennelFavorite`, user id without a foreign key like the ratings), only for kennels, never for dogs; `?favorites=1` keeps yours after the rights filter, before search, sort and paging; deleting a kennel drops its favourites. In super-user mode (no `MCP_AUTH_REQUIRED`) there is no user, so favourites answer 403 `no_identity`.
 
 ---
 
@@ -604,7 +606,7 @@ The Angular app (`SPA_ROUTES` in `api/routes/routeTable.ts`; Express serves `ind
 
 | Route | Screen |
 |---|---|
-| `/kennels` | Kennel list (side A): `?q=`, `?sort=`, `?dir=`, `?mine=1`, `?new=1` |
+| `/kennels` | Kennel list (side A): `?q=`, `?sort=`, `?dir=`, `?mine=1`, `?favorites=1`, `?new=1`. A click anywhere on a row opens the public page `/k/:id` (with its default query) in a new tab; the flag marks a favourite (signed in; anonymous visitors are sent to the login); `⋯` → Edit opens the kennel page |
 | `/kennels/:id` | Kennel page: canvas, inspector (`?panel=brief\|versions\|rating\|stats`), run |
 | `/kennels/:id/edit` | The same page with the settings drawer open — name, access, freeze, dog order, defaults (there is no separate edit page) |
 | `/dogs` | Dog browser (side B): `?q=&sort=&group=&pack=&owner=`; `?dog=<lineageId>` opens the preview — a dog is never a page of its own |

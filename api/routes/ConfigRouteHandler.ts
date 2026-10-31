@@ -23,6 +23,7 @@ import { paramString } from '../utils/routeParams';
 import { ListQuery } from './ListQuery';
 import { firstRefusedDogRef, refusedDogRefMessage, type RefusedDogRef } from '../../services/dogAccess';
 import type { KennelStatsService } from '../../services/KennelStatsService';
+import type { KennelFavoriteService } from '../../services/KennelFavoriteService';
 import type { DogStatsService } from '../../services/DogStatsService';
 
 /**
@@ -97,11 +98,21 @@ export class ConfigRouteHandler {
     /** P4b: haengt `stats` an den Einzelabruf eines Dogs (die Liste bedient NodesRouteHandler). */
     private dogStats?: DogStatsService;
 
-    constructor(registry: ControllerRegistry, kennelStore?: IStore, kennelStats?: KennelStatsService, dogStats?: DogStatsService) {
+    /** Spur U: haengt `favorite` des Aufrufers an jeden Listeneintrag. */
+    private kennelFavorites?: KennelFavoriteService;
+
+    constructor(
+        registry: ControllerRegistry,
+        kennelStore?: IStore,
+        kennelStats?: KennelStatsService,
+        dogStats?: DogStatsService,
+        kennelFavorites?: KennelFavoriteService,
+    ) {
         this.registry = registry;
         this.kennelStore = kennelStore;
         this.kennelStats = kennelStats;
         this.dogStats = dogStats;
+        this.kennelFavorites = kennelFavorites;
     }
 
     /** True if subpath==='nodes' and the user can mutate this node (owner / editor / community / super). */
@@ -244,6 +255,8 @@ export class ConfigRouteHandler {
                 // P4: stats haengen VOR ListQuery.apply — sortiert und gefiltert wird nach ihnen, und
                 // nur an dem, was der Rechtefilter schon durchgelassen hat.
                 if (subpath === 'kennels' && this.kennelStats) await this.kennelStats.attach(visible as any[]);
+                // Spur U: `favorite` des Aufrufers ebenso VOR apply — `favorites=1` filtert danach.
+                if (subpath === 'kennels' && this.kennelFavorites) await this.kennelFavorites.attach(visible as any[], req.ctx);
                 const listQuery = ListQuery.from(req.query);
                 res.status(200).json(listQuery.envelope(listQuery.apply(visible, req.ctx)));
             } else {

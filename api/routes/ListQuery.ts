@@ -7,7 +7,7 @@
 //
 // Order of operations is fixed and must not be reordered:
 //   ACL visibility (the caller applies it BEFORE handing the list in)
-//     -> mine -> q -> minStars -> minCalls -> proven -> minReliability -> usage -> sort -> offset/limit
+//     -> mine -> favorites -> q -> minStars -> minCalls -> proven -> minReliability -> usage -> sort -> offset/limit
 // `total` counts after the filters, before the page is cut. Slicing earlier yields
 // wrong pages; counting before the ACL filter would leak how many private entries of
 // other users exist.
@@ -79,6 +79,8 @@ export class ListQuery {
         readonly sortGiven: boolean = false,
         /** Dogs: keep those whose `stats.proven.reliability` (0..1) is >= this, or no filter. */
         readonly minReliability: number | null = null,
+        /** Keep only the caller's favourites (`favorites=1`, Spur U) — needs `favorite` on the items. */
+        readonly favoritesOnly: boolean = false,
     ) { }
 
     /**
@@ -100,6 +102,7 @@ export class ListQuery {
             ListQuery.parseUsage(q.usage),
             ListQuery.SORT_FIELDS.includes(ListQuery.first(q.sort) as string),
             ListQuery.parseMinReliability(q.minReliability),
+            ListQuery.parseFlag(q.favorites),
         );
     }
 
@@ -117,10 +120,11 @@ export class ListQuery {
         return this.limit !== null;
     }
 
-    /** Apply mine -> q -> minStars -> minCalls -> proven -> minReliability -> usage -> sort -> page. The caller has already applied the ACL filter. */
+    /** Apply mine -> favorites -> q -> minStars -> minCalls -> proven -> minReliability -> usage -> sort -> page. The caller has already applied the ACL filter. */
     apply<T>(items: T[], ctx: AuthCtx | undefined): IListPage<T> {
         const owned = this.mineOnly ? items.filter(item => ListQuery.isOwnedBy(item, ctx)) : items;
-        const found = this.search ? owned.filter(item => this.matches(item)) : owned;
+        const favorites = this.favoritesOnly ? owned.filter(item => ListQuery.isFavorite(item)) : owned;
+        const found = this.search ? favorites.filter(item => this.matches(item)) : favorites;
         const starred = this.minStars === null ? found : found.filter(item => (ListQuery.statsOf(item)?.rating?.avg ?? -1) >= this.minStars!);
         const called = this.minCalls === null ? starred : starred.filter(item => (ListQuery.statsOf(item)?.calls?.ranked ?? 0) >= this.minCalls!);
         const proven = this.provenOnly ? called.filter(item => ListQuery.statsOf(item)?.proven?.badge === true) : called;
@@ -151,6 +155,14 @@ export class ListQuery {
         const userId = ctx?.user?.id;
         if (!userId) return false;
         return (item as { ownerId?: string | null })?.ownerId === userId;
+    }
+
+    /**
+     * The flag KennelFavoriteService.attach set for the caller — anonymous callers and callers that did
+     * not attach have none, so `favorites=1` yields nothing for them.
+     */
+    private static isFavorite(item: unknown): boolean {
+        return (item as { favorite?: unknown })?.favorite === true;
     }
 
     private matches(item: unknown): boolean {

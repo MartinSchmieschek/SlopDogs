@@ -993,10 +993,33 @@ export class PrismaStore implements IStore, IKennelStatsStore, IDogStatsStore {
     return (await this.prisma.kennelRating.deleteMany({ where: { lineageId, userId } })).count > 0;
   }
 
+  public async readKennelFavoriteIds(userId: string): Promise<string[]> {
+    const rows = await this.prisma.kennelFavorite.findMany({ where: { userId }, select: { lineageId: true } });
+    return rows.map((r) => r.lineageId);
+  }
+
+  public async addKennelFavorite(lineageId: string, userId: string): Promise<void> {
+    try {
+      await this.prisma.kennelFavorite.upsert({
+        where: { lineageId_userId: { lineageId, userId } },
+        create: { lineageId, userId },
+        update: {},
+      });
+    } catch (err) {
+      // Zwei gleichzeitige PUTs (zwei Tabs): der zweite Insert trifft den Schluessel — der Favorit steht, Ziel erreicht.
+      if ((err as { code?: string })?.code !== 'P2002') throw err;
+    }
+  }
+
+  public async deleteKennelFavorite(lineageId: string, userId: string): Promise<boolean> {
+    return (await this.prisma.kennelFavorite.deleteMany({ where: { lineageId, userId } })).count > 0;
+  }
+
   public async deleteKennelStats(lineageId: string): Promise<void> {
     await this.prisma.$transaction([
       this.prisma.kennelCallDaily.deleteMany({ where: { lineageId } }),
       this.prisma.kennelRating.deleteMany({ where: { lineageId } }),
+      this.prisma.kennelFavorite.deleteMany({ where: { lineageId } }),
     ]);
   }
 

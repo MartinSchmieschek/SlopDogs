@@ -1,6 +1,6 @@
-// Aufrufe und Sterne je Kennel-Lineage (P4) — der Vertrag, den der Zaehler und der
-// Stats-Dienst gegen den Store sprechen. Reine Zahlen: keine IP, kein User-Agent; die
-// einzige Identitaet ist die userId einer Bewertung.
+// Aufrufe, Sterne und Favoriten je Kennel-Lineage (P4, Spur U) — der Vertrag, den der Zaehler,
+// der Stats-Dienst und der Favoriten-Dienst gegen den Store sprechen. Keine IP, kein User-Agent;
+// die einzige Identitaet ist die userId einer Bewertung oder eines Favoriten.
 
 export const KENNEL_CALL_SOURCES = [
     'public', 'api-execute', 'mcp-execute',                                 // "Nutzung" — rankt
@@ -31,7 +31,13 @@ export interface IKennelStatsStore {
     readKennelRating(lineageId: string, userId: string): Promise<number | null>;
     upsertKennelRating(lineageId: string, userId: string, stars: number): Promise<void>;
     deleteKennelRating(lineageId: string, userId: string): Promise<boolean>;
-    /** Loescht alle Zaehler und Bewertungen der Lineage (Kennel-Delete). */
+    /** Die Lineages, die dieser Nutzer favorisiert hat (Spur U) — eine Abfrage ueber den userId-Index. */
+    readKennelFavoriteIds(userId: string): Promise<string[]>;
+    /** Merkt den Favoriten; idempotent (ein zweites Setzen aendert nichts). */
+    addKennelFavorite(lineageId: string, userId: string): Promise<void>;
+    /** Vergisst den Favoriten; true, wenn es ihn gab. */
+    deleteKennelFavorite(lineageId: string, userId: string): Promise<boolean>;
+    /** Loescht alle Zaehler, Bewertungen und Favoriten der Lineage (Kennel-Delete). */
     deleteKennelStats(lineageId: string): Promise<void>;
 }
 

@@ -77,6 +77,9 @@ export class StartupTest {
         readKennelRating: async () => null,
         upsertKennelRating: async () => {},
         deleteKennelRating: async () => false,
+        readKennelFavoriteIds: async () => [],
+        addKennelFavorite: async () => {},
+        deleteKennelFavorite: async () => false,
         deleteKennelStats: async () => {},
     };
 

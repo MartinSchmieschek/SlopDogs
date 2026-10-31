@@ -15,6 +15,7 @@ import { KennelRunHandler } from '../api/routes/KennelRunHandler';
 import { KennelSwaggerHandler } from '../api/routes/KennelSwaggerHandler';
 import { KennelBundleHandler } from '../api/routes/KennelBundleHandler';
 import { KennelRatingHandler } from '../api/routes/KennelRatingHandler';
+import { KennelFavoriteHandler } from '../api/routes/KennelFavoriteHandler';
 import { LandingRouteHandler } from '../api/routes/LandingRouteHandler';
 import { KeysRouteHandler } from '../api/routes/KeysRouteHandler';
 import { BetaRouteHandler } from '../api/routes/BetaRouteHandler';
@@ -37,6 +38,7 @@ import { HeavyRequestLimiter } from './heavyRequestLimiter';
 import { RunGates } from './runAdmission';
 import type { KennelCallCounter } from '../services/KennelCallCounter';
 import { KennelStatsService } from '../services/KennelStatsService';
+import { KennelFavoriteService } from '../services/KennelFavoriteService';
 import type { IDogStatsStore, IKennelStatsStore } from '../store/IKennelStatsStore';
 import type { DogReferenceIndex } from '../services/DogReferenceIndex';
 import { DogStatsService } from '../services/DogStatsService';
@@ -259,6 +261,8 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     // P4: stats an jeder Kennel-Antwort. Ein Flush und ein Kennel-Delete machen das Memo ungueltig.
     const kennelStats = new KennelStatsService(input.statsStore, input.callCounter);
     kennelsController.setStatsJanitor(kennelStats);
+    // Spur U: Favoriten je Nutzer — derselbe Store; Kennel-Delete raeumt sie ueber deleteKennelStats mit.
+    const kennelFavorites = new KennelFavoriteService(input.statsStore);
 
     // P4b: stats an jeder Dog-Antwort — derselbe Store-Client, dasselbe Zaehler-Objekt. Ein Flush, eine
     // Referenz-Aenderung (Save/Delete/Rebuild) und eine Bewertung machen das Memo ungueltig.
@@ -348,7 +352,7 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
         ? '[beta] SLOPDOGS_STAGE=beta, Auth an: jedes Google-Konto braucht einmal einen Beta-Key'
         : `[beta] Stage ${stage || '(keine)'}: Anmeldung ohne Beta-Key${stage === BetaKeys.BETA_STAGE ? ' (Auth aus, lokal)' : ''}`);
 
-    const routeHandler = new ConfigRouteHandler(registry, kennelsStore, kennelStats, dogStats);
+    const routeHandler = new ConfigRouteHandler(registry, kennelsStore, kennelStats, dogStats, kennelFavorites);
     routeHandler.registerRoutes(app, '/api');
     // Rechte v2 (P3.5): /api/:subpath/:id/acl, …/acl/transfer, …/freeze, …/unfreeze.
     const aclRouteHandler = new AclRouteHandler(kennelsController, nodesController, authPrisma);
@@ -446,6 +450,8 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     kennelRunHandler.registerRoutes(app);
     // Sterne (P4): /api/kennels/:id/rating — anderes Literal als /versions und /run, keine Kollision.
     new KennelRatingHandler(kennelsController, kennelStats).registerRoutes(app);
+    // Favoriten (Spur U): /api/kennels/:id/favorite — eigenes Literal, keine Kollision.
+    new KennelFavoriteHandler(kennelsController, kennelFavorites).registerRoutes(app);
 
     frontBinder.afterKennelRoutes(app, frontCtx);
 

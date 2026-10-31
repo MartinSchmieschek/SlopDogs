@@ -80,6 +80,17 @@ model KennelRating {
   @@id([lineageId, userId])
 }
 
+// Ein Favorit je Nutzer und Kennel-Lineage (Spur U). userId = Auth-User.id (andere DB, keine FK).
+// Auf die Lineage gespeichert wie die Sterne — ein neuer Kennel-Stand behaelt den Favoriten.
+model KennelFavorite {
+  lineageId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@id([lineageId, userId])
+  @@index([userId])                  // Liste: alle Favoriten eines Nutzers
+}
+
 // Dog-Laeufe je Dog-Schluessel, Kennel-Lineage, Tag (UTC) und Quelle (P4b). dogKey = Dog-lineageId oder 'base:<Klasse>'.
 model DogCallDaily {
   dogKey          String
