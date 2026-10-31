@@ -11,7 +11,8 @@
  *                                                 [--core-spec <spec>] [--typedefs-spec <spec>] [--no-lock]
  *   node scripts/split-repos.cjs all       <ziel> [Optionen wie oben]
  *   node scripts/split-repos.cjs server    <ordner> [--ref <rev>] [--with-worktree] [--version 0.3.0]
- *                                                 [--registry | --core-spec <spec> --tarballs <ordner>] [--in-place]
+ *                                                 [--registry | --core-spec <spec> (--tarballs <ordner> | --release-urls)]
+ *                                                 [--typedefs-spec <spec>] [--in-place]
  *
  * core       -> <ziel>/slopdogs-core: `git subtree split` von packages/core (Historie bleibt) als Wurzel, dazu
  *               packages/typedefs per `git subtree split` + `git subtree add` unter typedefs/ (Historie bleibt).
@@ -26,7 +27,8 @@
  * server     -> P4.4 an einer Kopie des Server-Baums (oder mit --in-place am Ordner selbst): Pakete raus (bis auf
  *               swaggrid), Abhaengigkeiten exakt auf die Pakete, Projekt-Referenzen, tsconfig-Pfade und ESLint-
  *               Ausgangsliste nachgezogen. --registry: exakte Versionen aus GitHub Packages plus .npmrc mit
- *               ${NPM_TOKEN} (erst mit P4); sonst --core-spec (z. B. Git-Tag) und Tarballs aus --tarballs.
+ *               ${NPM_TOKEN} (erst mit P4); sonst --core-spec (z. B. Git-Tag) und Tarballs aus --tarballs, oder mit
+ *               --release-urls die Tarballs der GitHub-Releases von slopdogs-base-dogs (Tag <paket>@<version>).
  *
  * Quelle ist immer ein Klon des Repos unter <ziel>/.split-work-*, nie dieser Arbeitsbaum: `git subtree split` und
  * `filter-branch` schreiben Objekte und Refs. --ref waehlt den Commit (Standard HEAD). --with-worktree legt im
@@ -87,6 +89,7 @@ function parseArgs(argv) {
         else if (a === '--tarballs') opts.tarballs = path.resolve(rest[++i]);
         else if (a === '--registry') opts.registry = true;
         else if (a === '--in-place') opts.inPlace = true;
+        else if (a === '--release-urls') opts.releaseUrls = true;
         else throw new Error(`unbekannte Option ${a}`);
     }
     if (!['core', 'base-dogs', 'all', 'server'].includes(command) || !target) {
@@ -510,6 +513,13 @@ function copyServerTree(opts) {
     return dir;
 }
 
+/** Tarball am GitHub-Release von slopdogs-base-dogs (Tag <paket>@<version>, Datei wie npm pack sie nennt). */
+function releaseTarballUrl(name, version) {
+    const tag = encodeURIComponent(`${name}@${version}`);
+    const file = `${name.replace(/^@/, '').replace('/', '-')}-${version}.tgz`;
+    return `https://github.com/MartinSchmieschek/slopdogs-base-dogs/releases/download/${tag}/${file}`;
+}
+
 function tarballFor(dir, name, version) {
     const file = path.join(dir, `${name.replace(/^@/, '').replace('/', '-')}-${version}.tgz`);
     if (!fs.existsSync(file)) throw new Error(`Tarball fehlt: ${file}`);
@@ -518,7 +528,8 @@ function tarballFor(dir, name, version) {
 
 function cutServer(opts) {
     log(`\n[server] P4.4 ${opts.inPlace ? 'am Ordner' : 'an einer Kopie'}: ${opts.target}`);
-    if (!opts.registry && !(opts.coreSpec && opts.tarballs)) throw new Error('server braucht --registry oder --core-spec und --tarballs');
+    if (!opts.registry && !(opts.coreSpec && (opts.tarballs || opts.releaseUrls)))
+        throw new Error('server braucht --registry oder --core-spec und --tarballs/--release-urls');
     const dir = opts.inPlace ? opts.target : copyServerTree(opts);
     const packagesDir = path.join(dir, 'packages');
     const removed = fs
@@ -530,6 +541,8 @@ function cutServer(opts) {
         const name = SCOPE + short;
         if (opts.registry) return opts.version;
         if (short === 'core') return opts.coreSpec;
+        if (short === 'typedefs' && opts.typedefsSpec) return opts.typedefsSpec;
+        if (opts.releaseUrls) return releaseTarballUrl(name, opts.version);
         return tarballFor(opts.tarballs, name, opts.version);
     };
     const pkgFile = path.join(dir, 'package.json');
@@ -588,7 +601,10 @@ function cutServer(opts) {
         );
     }
     if (!opts.inPlace)
-        commitAll(dir, `P4.4: Pakete aus ${opts.registry ? 'GitHub Packages' : 'Git-Tag und Tarballs'} statt packages/ (Probe)`);
+        commitAll(
+            dir,
+            `P4.4: Pakete aus ${opts.registry ? 'GitHub Packages' : opts.releaseUrls ? 'Git-Tag und Release-Tarballs' : 'Git-Tag und Tarballs'} statt packages/ (Probe)`,
+        );
     log(
         `[server] ${removed.length} Pakete entfernt, ${rewired} Abhaengigkeiten umgestellt, tsconfig-Pfade ${before.length - after.length} weniger, ` +
             `ESLint-Ausgangsliste ${Object.keys(sup).length} -> ${Object.keys(kept).length} Dateien${opts.registry ? ', .npmrc geschrieben' : ''}`,
