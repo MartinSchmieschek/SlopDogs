@@ -1,0 +1,13 @@
+{
+  // Der Emit des Servers nach ./dist (scripts/run-build.cjs). Der Typecheck (`npm test`) laeuft weiter ueber
+  // tsconfig.build.json gegen packages/*/src; nur hier fallen die Pfade weg.
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    // Keine Pfade auf packages/*/src: der Server baut gegen die gebauten Pakete (node_modules/@slopdogs/* ->
+    // packages/<name>/dist), so wie dist/main.js sie zur Laufzeit laedt. Mit den Pfaden uebersetzte tsc die
+    // Paket-Quellen mit nach dist/packages -- 458 JS-Dateien, die niemand laedt.
+    "paths": {}
+  },
+  // Der Runner von `npm run test:startup` gehoert nicht in den Produktions-dist (er startet beim Laden).
+  "exclude": ["node_modules", "ui-app", "dist", "packages", "test/startup/runStartupTests.ts"]
+}
