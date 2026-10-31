@@ -194,7 +194,8 @@ export function createActionsRouter(deps: ToolDeps): Router {
             res.status(500).json({ error: 'no auth context' });
             return;
         }
-        if (!ctx.user && !ctx.isSuperUser) {
+        // Wie /mcp: nur Bearer. Dieselben Werkzeuge, also auch hier keine Anmeldung per Session-Cookie.
+        if ((!ctx.user && !ctx.isSuperUser) || (ctx.via === 'session' && !ctx.isSuperUser)) {
             const base = baseUrl(req);
             res.setHeader(
                 'WWW-Authenticate',

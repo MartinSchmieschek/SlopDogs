@@ -9,6 +9,7 @@ import {
     canRun,
     canMutate,
     isFrozen,
+    landingRefuses,
     normalizeVisibility,
     filterRunnable,
     applyCreateDefaults,
@@ -16,9 +17,17 @@ import {
     VISIBILITIES,
 } from '../auth/visibility';
 import { canMutateNode } from '../auth/permissions';
+import { LandingKennels } from '../auth/landingKennels';
+import type { AuthCtx } from '../auth/middleware';
 import { ListQuery, USAGE_FILTERS, USAGE_FILTER_HELP } from '../../api/routes/ListQuery';
 import { type ToolDef, ok, fail, resolveTsCode, codeHinweise } from './types';
 import { checkSerializedDogCode, sanitizeLineDocs, selectLineDocs, sliceDogCodeLines } from '@martinschmieschek/slopdogs-core/runtime';
+
+/** Warum save_node/delete_node abgewiesen wird (der Aufrufer darf lesen): Landing-Sperre, frozen, sonst keine Rechte. */
+function nodeMutationRefusal(node: any, id: string, ctx: AuthCtx | undefined): string {
+    if (landingRefuses(node, ctx)) return `${LandingKennels.LOCK_CODE}: ${LandingKennels.LOCK_DOG_MESSAGE}`;
+    return isFrozen(node) ? `Node ${id} is frozen — unfreeze it first` : 'Not authorized';
+}
 
 /** JSON-Schema fragment for the optional lineDocs field — shared by create_node / save_node. */
 const LINE_DOCS_SCHEMA = {
@@ -468,7 +477,7 @@ export function getNodeTools(): ToolDef[] {
                 const allowed = await canMutateNode(existing.data as any, ctx, deps.kennelsStore);
                 if (!allowed) {
                     if (!canRead(existing.data as any, ctx)) return fail(`Node ${id} not found`);
-                    return fail(isFrozen(existing.data as any) ? `Node ${id} is frozen — unfreeze it first` : 'Not authorized');
+                    return fail(nodeMutationRefusal(existing.data, id, ctx));
                 }
                 // OWN changes visibility (3.5.2): an editor saves code, not who may see it.
                 const nextVisibility = normalizeVisibility(args.visibility);
@@ -528,7 +537,7 @@ export function getNodeTools(): ToolDef[] {
                 const allowed = await canMutateNode(existing.data as any, ctx, deps.kennelsStore);
                 if (!allowed) {
                     if (!canRead(existing.data as any, ctx)) return fail(`Node ${id} not found`);
-                    return fail(isFrozen(existing.data as any) ? `Node ${id} is frozen — unfreeze it first` : 'Not authorized');
+                    return fail(nodeMutationRefusal(existing.data, id, ctx));
                 }
                 const outcome = await deps.nodesController.deleteRef(id);
                 if (!outcome.ok)

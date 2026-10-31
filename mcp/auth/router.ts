@@ -17,6 +17,7 @@ import { createOAuthRouter } from './oauth-as';
 import { createPersonalTokensRouter } from './personal-tokens';
 import { BetaKeyError, BetaKeys, type BetaKeyPrisma } from './betaKeys';
 import { renderBetaKeyPage } from './beta-page';
+import type { SameOriginGuard } from './sameOriginGuard';
 
 export type AuthRouterOptions = {
     /**
@@ -26,7 +27,11 @@ export type AuthRouterOptions = {
     localMode?: boolean;
 };
 
-export function createAuthRouter(prisma: PrismaClient, options: AuthRouterOptions = {}): Router {
+/**
+ * `sameOrigin` haelt die Pfade, die mit der Session Zugaenge ausgeben oder widerrufen (PATs, OAuth-Zustimmung),
+ * bei den eigenen Seiten (SameOriginGuard).
+ */
+export function createAuthRouter(prisma: PrismaClient, sameOrigin: SameOriginGuard, options: AuthRouterOptions = {}): Router {
     const router = Router();
     if (options.localMode) {
         mountSessionRoutes(router, prisma);
@@ -34,11 +39,13 @@ export function createAuthRouter(prisma: PrismaClient, options: AuthRouterOption
     }
     const betaKeys = new BetaKeys(prisma as unknown as BetaKeyPrisma);
 
-    // OAuth 2.1 AS endpoints — /authorize, /token, /revoke, /register
+    // OAuth 2.1 AS endpoints — /authorize, /token, /revoke, /register. Die Zustimmung (POST /authorize) stellt mit
+    // der Session einen Code aus: nur von der eigenen Zustimmungsseite.
+    router.post('/authorize', sameOrigin.middleware());
     router.use('/', createOAuthRouter(prisma));
 
-    // Personal Access Tokens — /tokens (HTML UI + form posts)
-    router.use('/tokens', createPersonalTokensRouter(prisma));
+    // Personal Access Tokens — /tokens (HTML UI + form posts). Ausgabe und Widerruf nur von den eigenen Seiten.
+    router.use('/tokens', sameOrigin.middleware(), createPersonalTokensRouter(prisma));
 
     // Only allow returnTo values that are same-origin paths (start with "/" but not "//").
     // Prevents open-redirect via ?returnTo=https://attacker.example/.

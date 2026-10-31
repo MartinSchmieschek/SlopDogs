@@ -58,3 +58,4 @@ store/prisma-auth/auth.db
 
 # Cursor IDE local config — not part of the repo
 .cursor/
+*.db-journal

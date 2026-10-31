@@ -43,6 +43,12 @@ import { PackageCandidateTests } from './test/startup/packageCandidates';
 import { LocalMode } from './server-app/LocalMode';
 import { authModeBootError } from './mcp/auth/middleware';
 import { AllowedHosts, NetworkBoundary } from './server-app/NetworkBoundary';
+import { ChannelTickets } from './server-app/ChannelTickets';
+import { SecurityHeaders } from './server-app/SecurityHeaders';
+import type { Request as ExpressRequest, Response as ExpressResponse } from 'express';
+import { TrustedKennels } from './mcp/auth/trustedKennels';
+import { LandingKennels } from './mcp/auth/landingKennels';
+import { Maintainers } from './mcp/auth/maintainers';
 
 /**
  * Arr, the testament of a single trial endured upon the eldritch seas —
@@ -138,6 +144,7 @@ export class StartupTest {
             // Spur L: der lokale Modus hat keinen Login — Boot-Guard und Netzgrenze sind dort die Zugriffspruefung.
             this.testLocalModeBootGuard();
             this.testLocalNetworkBoundary(app);
+            this.testKennelHardening();
 
             // Block 2 — Paket-Kandidaten: wandern in P4 als Paket-Tests nach slopdogs-core bzw. slopdogs-base-dogs.
             await new PackageCandidateTests((name, passed, error) => this.addResult(name, passed, error)).run(baseDogsMap);
@@ -940,6 +947,100 @@ export class StartupTest {
             this.addResult(testName, true);
         } catch (error) {
             this.addResult(testName, false, String(error));
+        }
+    }
+
+    /**
+     * fix/k-sandbox: die drei Haertungen der Kennel-Seiten in einem Fall — Sandbox-Kopfzeile, Landing-Sperre
+     * besitzerloser Dogs, Lobby-Ticket an der Netzgrenze. Ohne listen und Netz; globaler Zustand (Sperrmenge,
+     * Maintainer-Env) wird synchron gesetzt und im finally unveraendert zurueckgelegt.
+     */
+    private testKennelHardening(): void {
+        const testName = 'fix/k-sandbox: Kennel-Haertung (Sandbox, Landing-Sperre, Lobby-Ticket)';
+        const lockedBefore = LandingKennels.lockedDogsSnapshot();
+        const maintainersBefore = process.env[Maintainers.ENV];
+        try {
+            // 1. Sandbox: fremder Kennel unter /k/ mit Sandbox ohne allow-same-origin, vertrauter ohne Sandbox.
+            const kennelPageCsp = (kennel: { lineageId: string }): string => {
+                const headers: Record<string, string> = {};
+                const fake = {
+                    locals: {},
+                    headersSent: false,
+                    setHeader: (k: string, v: unknown) => {
+                        headers[k.toLowerCase()] = String(v);
+                    },
+                    getHeader: (k: string) => headers[k.toLowerCase()],
+                    writeHead: (): unknown => fake,
+                };
+                const res = fake as unknown as ExpressResponse;
+                new SecurityHeaders().middleware()({ path: `/k/${kennel.lineageId}` } as ExpressRequest, res, () => {});
+                if (TrustedKennels.isTrusted(kennel)) SecurityHeaders.trustKennelPage(res);
+                res.writeHead(200);
+                return headers['content-security-policy'] ?? '';
+            };
+            const foreignCsp = kennelPageCsp({ lineageId: 'startup-fremder-kennel' });
+            if (!foreignCsp.includes(SecurityHeaders.kennelSandbox()) || foreignCsp.includes('allow-same-origin')) {
+                throw new Error(`fremder Kennel ohne Sandbox: "${foreignCsp}"`);
+            }
+            const trustedCsp = kennelPageCsp({ lineageId: LandingKennels.DEFAULT_KENNEL_ID });
+            if (/\bsandbox\b/.test(trustedCsp)) throw new Error(`vertrauter Kennel mit Sandbox: "${trustedCsp}"`);
+
+            // 2. Landing-Sperre: ein besitzerloser Dog der Landing aendert nur ein Maintainer.
+            const landingDog = {
+                lineageId: 'startup-landing-dog',
+                type: 'SerializedDog',
+                ownerId: null,
+                visibility: 'public',
+            } as AclEntity;
+            const maintainer = this.fakeUser('UM');
+            LandingKennels.setLockedDogs([landingDog.lineageId as string]);
+            process.env[Maintainers.ENV] = maintainer.user!.email as string;
+            if (canMutate(landingDog, this.fakeUser('U9'))) throw new Error('besitzerloser Landing-Dog fuer Nicht-Maintainer aenderbar');
+            if (!canMutate(landingDog, maintainer)) throw new Error('besitzerloser Landing-Dog fuer Maintainer gesperrt');
+
+            // 3. Lobby-Ticket: Origin null am Hub-Pfad nur mit gueltigem Ticket fuer genau diese channelId.
+            let clock = 1_800_000_000_000;
+            const tickets = new ChannelTickets('/api/channels', 60_000, () => clock);
+            const boundary = NetworkBoundary.forEnvironment(
+                { PORT: '3000' },
+                { nodeEnv: 'production', localMode: true, channelTickets: tickets },
+                { hostname: () => 'raspberrypi', interfaceAddresses: () => ['127.0.0.1'] },
+            );
+            if (!boundary) throw new Error('forEnvironment liefert lokal keine Grenze');
+            const upgrade = (query: string, origin: string, path = '/api/channels') =>
+                boundary.verdict(
+                    {
+                        url: `${path}?${query}`,
+                        headers: { host: 'localhost:3000', origin, 'sec-fetch-site': 'cross-site' },
+                        socket: { remoteAddress: '127.0.0.1' },
+                    },
+                    true,
+                ) === null;
+            const ticket = tickets.issue('Lobby-1');
+            const [expiry, mac] = ticket.split('.');
+            const flipped = (mac[0] === 'A' ? 'B' : 'A') + mac.slice(1);
+            const rejected: Array<[string, string, string, string?]> = [
+                ['ohne Ticket', 'channelId=lobby-1', 'null'],
+                ['andere channelId', `channelId=lobby-2&ticket=${ticket}`, 'null'],
+                ['manipulierte MAC', `channelId=lobby-1&ticket=${expiry}.${flipped}`, 'null'],
+                ['verlaengerter Ablauf', `channelId=lobby-1&ticket=${Number(expiry) + 3600}.${mac}`, 'null'],
+                ['fremde Origin mit Ticket', `channelId=lobby-1&ticket=${ticket}`, 'http://evil.example'],
+                ['anderer Pfad', `channelId=lobby-1&ticket=${ticket}`, 'null', '/api/other'],
+            ];
+            if (!upgrade(`channelId=lobby-1&ticket=${ticket}`, 'null')) throw new Error('gueltiges Ticket abgewiesen');
+            for (const [label, query, origin, path] of rejected) {
+                if (upgrade(query, origin, path)) throw new Error(`Ticket ${label} angenommen`);
+            }
+            clock += 61_000;
+            if (upgrade(`channelId=lobby-1&ticket=${ticket}`, 'null')) throw new Error('abgelaufenes Ticket angenommen');
+
+            this.addResult(testName, true);
+        } catch (error) {
+            this.addResult(testName, false, String(error));
+        } finally {
+            LandingKennels.setLockedDogs(lockedBefore);
+            if (maintainersBefore === undefined) delete process.env[Maintainers.ENV];
+            else process.env[Maintainers.ENV] = maintainersBefore;
         }
     }
 

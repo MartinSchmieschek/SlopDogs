@@ -25,6 +25,7 @@ import type { Application } from 'express';
 import fs from 'fs';
 import os from 'os';
 import { ChannelHub } from './services/ChannelHub';
+import { ChannelTickets } from './server-app/ChannelTickets';
 import { IStore } from './store/IStore';
 import { PrismaStore } from './store/PrismaStore';
 import { JsonStorageService } from './services/JsonStorageService';
@@ -254,6 +255,8 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
         path: process.env.WS_PATH || undefined,
     });
     WebSocketChannelRetriever.initService(channelHub);
+    // Lobby-Tickets (fix/k-sandbox): Schluessel je Prozess. Ausgestellt wird nur, wo eine Netzgrenze sie prueft (unten).
+    const channelTickets = new ChannelTickets(channelHub.wsPath());
 
     const nodeEnvForRegistry = process.env.NODE_ENV || 'development';
     /**
@@ -350,7 +353,11 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
         statsStore: store,
         refIndex,
         dogStatsStore: store,
+        channelTickets,
     });
+
+    // Nur mit Netzgrenze (dev, lokal): dort weist sie `Origin: null` ohne Ticket ab. Deployed bleibt die wsUrl wie bisher.
+    WebSocketChannelRetriever.useTicketIssuer(networkBoundary ? channelTickets : undefined);
 
     // Key-Store (P4c): die zweite VM-Global-Capability neben jsonStore. Sie haengt am Auth-Client, den
     // createHttpApplication besitzt — deshalb erst hier. keys.fetch ersetzt `{{key:<alias>}}` auf dem

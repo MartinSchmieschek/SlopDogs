@@ -1,7 +1,7 @@
 import express, { type Application } from 'express';
 import cookieParser from 'cookie-parser';
 import { type ICacheHandler } from '@martinschmieschek/slopdogs-core';
-import { ISerializedDogConfig, SerializedDog, MimicDog } from '@martinschmieschek/slopdogs-core/runtime';
+import { ISerializedDogConfig, SerializedDog, MimicDog, BASE_DOG_PREFIX } from '@martinschmieschek/slopdogs-core/runtime';
 import { IStore } from '../store/IStore';
 import { Controller } from '../api/Controller';
 import { KennelController } from '../api/KennelController';
@@ -48,7 +48,11 @@ import { LandingPage } from './LandingPage';
 import { ResponseCompression } from './ResponseCompression';
 import { LOCAL_USER } from './LocalMode';
 import { NetworkBoundary } from './NetworkBoundary';
+import type { ChannelTickets } from './ChannelTickets';
 import type { TestResult } from '../StartupTest';
+import { SecurityHeaders } from './SecurityHeaders';
+import { SameOriginGuard } from '../mcp/auth/sameOriginGuard';
+import { LandingDogLock } from '../services/LandingDogLock';
 
 export type CreateHttpApplicationInput = {
     nodeEnv: string;
@@ -75,6 +79,8 @@ export type CreateHttpApplicationInput = {
     refIndex: DogReferenceIndex;
     /** Dog-Laeufe und Referenzen (P4b) — derselbe Store-Client. */
     dogStatsStore: IDogStatsStore;
+    /** Lobby-Tickets fuer Kennel-Seiten unter der Sandbox; die Netzgrenze prueft sie am Hub-Pfad. */
+    channelTickets?: ChannelTickets;
 };
 
 export type CreateHttpApplicationResult = {
@@ -154,7 +160,12 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
 
     // Netzgrenze (Spur L2) VOR allem anderen — vor CORS, Landing, /static und jeder Route: Socket-Adresse
     // (nur lokal), Host-Header, Origin bei Schreibzugriffen. Dev und lokal; integration/production: null.
-    const networkBoundary = NetworkBoundary.forEnvironment(process.env, { nodeEnv, localMode, devUiOrigin });
+    const networkBoundary = NetworkBoundary.forEnvironment(process.env, {
+        nodeEnv,
+        localMode,
+        devUiOrigin,
+        channelTickets: input.channelTickets,
+    });
     if (networkBoundary) app.use(networkBoundary.middleware());
 
     // Hinter Renders TLS-Proxy terminiert HTTPS am Proxy; die App sieht intern HTTP.
@@ -213,10 +224,19 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
         return networkBoundary?.corsOriginFor(origin);
     };
 
+    // Kopfzeilen fuer jede Antwort und die Sandbox der Kennel-Seiten (SecurityHeaders) — vor allem anderen.
+    app.use(new SecurityHeaders().middleware());
+
     app.use((req: any, res: any, next: any) => {
         const allow = allowedOriginForRequest(req);
         if (allow) {
             res.setHeader('Access-Control-Allow-Origin', allow);
+            res.setHeader('Vary', 'Origin');
+        } else if (SecurityHeaders.isKennelPath(req.path)) {
+            // Kennel-Seiten laufen unter Sandbox mit opakem Origin (`Origin: null`) — ihre Aufrufe an `/k/…` (eigener
+            // Kennel, Lesespur, Spec der Doku) sind damit cross-origin. `/k/` ist ohnehin oeffentlich und ohne Cookie
+            // gleich dem anonymen Lauf: `*` ohne Allow-Credentials, der Browser gibt keine Antwort mit Cookie frei.
+            res.setHeader('Access-Control-Allow-Origin', '*');
             res.setHeader('Vary', 'Origin');
         }
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
@@ -246,7 +266,8 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     app.use(express.urlencoded({ extended: false, limit: '1mb' }));
     app.use(createSessionMiddleware());
     app.use(createAuthContextMiddleware(authPrisma, { localUser }));
-    app.use('/auth', createAuthRouter(authPrisma, { localMode }));
+    // PAT-Ausgabe/-Widerruf und OAuth-Zustimmung nur von eigenen Seiten — dieselbe Origin-Regel wie CORS oben.
+    app.use('/auth', createAuthRouter(authPrisma, new SameOriginGuard((req) => allowedOriginForRequest(req)), { localMode }));
     // Lokal keine OAuth-Discovery: ein MCP-Client soll keinen Login-Weg finden, den es dort nicht gibt.
     if (!localMode) app.use('/.well-known', createDiscoveryRouter());
 
@@ -319,6 +340,21 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
         () => input.refIndex.referenceRows,
     );
     input.refIndex.onChange(() => dogStats.invalidate());
+
+    // Besitzerlose Dogs der Landing-Kennels: fuer alle gesperrt (isLandingLocked). Die Menge rechnet LandingDogLock im
+    // Hintergrund; bis zur ersten Berechnung gelten besitzerlose Dogs als gesperrt. Neu nach jeder Index-Aenderung.
+    new LandingDogLock({
+        kennelDogIds: async (kennelId) => {
+            const head = await kennelsController.getById(kennelId);
+            return head.ok && head.data ? (head.data.dogIds ?? []) : null;
+        },
+        lineageOf: async (ref) => {
+            const normalized = await input.refIndex.normalize(ref);
+            return normalized.toKey.startsWith(BASE_DOG_PREFIX) ? null : normalized.toKey;
+        },
+        dogHeads: listDogsOf,
+        onChange: (listener) => input.refIndex.onChange(listener),
+    }).start();
     input.callCounter.setOnFlushed(() => {
         kennelStats.invalidate();
         dogStats.invalidate();

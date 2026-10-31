@@ -30,6 +30,8 @@ export interface ChannelState {
      * - Ohne PUBLIC_API_BASE_URL: relativer Pfad (z. B. "/api/channels?channelId=xyz") —
      *   der Client setzt Protokoll/Host aus `location` davor.
      * - Mit PUBLIC_API_BASE_URL: absolute ws(s)://-URL.
+     * Stellt der Server einen Ticket-Aussteller bereit (`WebSocketChannelRetriever.useTicketIssuer`), traegt die
+     * URL zusaetzlich dessen Parameter (z. B. `&ticket=…`) — unveraendert an `new WebSocket(...)` geben.
      * Der Share-Link wird NICHT vom Dog erzeugt — der Client baut ihn aus
      * `location.origin + location.pathname + channelQuery`,
      * damit jeder Kennel der den Dog einbindet, seinen eigenen Pfad teilen kann.
@@ -67,4 +69,16 @@ export interface IChannelHub {
      * ein zweites Mal aus der Umgebung zu erraten.
      */
     wsPath(): string;
+}
+
+/**
+ * Optionale Faehigkeit des Servers: stellt je Lobby ein Verbindungs-Ticket aus, das die wsUrl als Query-Parameter
+ * traegt. Damit kann der Server einen Upgrade von einer Kennel-Seite mit opakem Origin (CSP-Sandbox) einer Lobby
+ * zuordnen, die er selbst ausgeliefert hat. core haelt kein Geheimnis: Schluessel und Pruefung bleiben beim Server.
+ */
+export interface IChannelTicketIssuer {
+    /** Name des Query-Parameters in der wsUrl (z. B. "ticket"). */
+    readonly param: string;
+    /** Ticket fuer genau diese channelId. */
+    issue(channelId: string): string;
 }

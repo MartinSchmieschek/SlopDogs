@@ -14,8 +14,11 @@
 //   runners[]       additional users who may run/reference, not read (RUN)
 //   visibility      "public" | "run-only" | "private" | null
 //   frozen          true → no mutation for anyone (owner included) until unfreeze; runs, reads, copies go on
-//   landing         kennel listed in env LANDING_KENNEL_IDS → like frozen, and no ACL change either, for as
-//                   long as it is listed (derived from the env, not stored; myRights.locked = 'landing')
+//   landing         curated kennel (env LANDING_KENNEL_IDS, the seeded default `slopdogs-landing`, seeded
+//                   curated kennels such as `slopdogs-kennels`) → only maintainers (SLOPDOGS_MAINTAINER_EMAILS)
+//                   mutate it or change its ACL; owner and super-user without an entry do not; empty env →
+//                   nobody (myRights.locked = 'landing'). Same for an ownerless dog such a kennel uses
+//                   (dogIds and parents, transitive — services/LandingDogLock.ts).
 //
 // Implicit rules
 //   ownerId = null              → community: any logged-in user reads + mutates; OWN only super-user
@@ -27,6 +30,7 @@
 
 import type { AuthCtx } from './middleware';
 import { LandingKennels } from './landingKennels';
+import { isMaintainer } from './maintainers';
 
 export type Visibility = 'public' | 'run-only' | 'private';
 
@@ -186,22 +190,31 @@ export function isFrozen(k: AclEntity | null | undefined): boolean {
     return !!k && Boolean(k.frozen);
 }
 
-/** Dog-Typen: ein Dog ist nie ein Landing-Kennel, auch wenn seine lineageId zufaellig in der Liste stuende. */
-const DOG_TYPES = ['SerializedDog', 'MimicDog', 'BaseDog'];
-
 /**
- * Landing-Kennel (Env LANDING_KENNEL_IDS): schreibgeschuetzt fuer alle, solange er dort steht — Owner und
- * Super-User eingeschlossen, auch keine ACL-Aenderung. Laeufe, Sterne, Lesen, Kopieren bleiben.
+ * Gepflegt (LandingKennels.isProtected: Env LANDING_KENNEL_IDS, der Seed-Standard `slopdogs-landing`, die
+ * Seed-Pflege-Kennels wie `slopdogs-kennels`): aendern (auch ACL, freeze) duerfen nur Maintainer
+ * (SLOPDOGS_MAINTAINER_EMAILS) — Owner und Super-User ohne Eintrag nicht; ist die Env leer, niemand. Laeufe, Sterne,
+ * Lesen, Kopieren bleiben. Ein Dog ist nie ein gepflegter Kennel, auch wenn seine lineageId zufaellig in der Liste
+ * stuende. Ein Dog OHNE Besitzer, den ein gepflegter Kennel nutzt (dogIds und Parents, transitiv;
+ * services/LandingDogLock.ts), gilt ebenso: diese Seiten laufen ohne Sandbox. Dogs mit Besitzer bleiben beim
+ * Besitzer und seinen Editoren.
  */
-export function isLandingLocked(k: (AclEntity & Record<string, any>) | null | undefined): boolean {
+export function isLandingLocked(k: AclEntity | null | undefined): boolean {
     if (!k) return false;
-    if (DOG_TYPES.includes(k.type) || k.theRun !== undefined || k.parentsRequired !== undefined) return false;
-    return LandingKennels.includes(k.lineageId || k.id);
+    const key = k.lineageId || k.id;
+    if (LandingKennels.looksLikeDog(k)) return isCommunityOwned(k) && LandingKennels.usesDog(key);
+    if (isCommunityOwned(k) && LandingKennels.knownToUseDog(key)) return true; // Dog-Zeile ohne Konfig (Meta-Listen)
+    return LandingKennels.isProtected(key);
 }
 
-/** Der Sperrgrund einer Entitaet oder null. */
+/** Weist die Landing-Sperre diesen Aufrufer ab? Gepflegt und kein Maintainer. */
+export function landingRefuses(k: AclEntity | null | undefined, ctx: AuthCtx | undefined): boolean {
+    return isLandingLocked(k) && !isMaintainer(ctx);
+}
+
+/** Der Sperrgrund einer Entitaet oder null (unabhaengig vom Aufrufer — fuer Maintainer steht `landing` als Hinweis). */
 export function lockOf(k: AclEntity | null | undefined): LockReason | null {
-    if (isLandingLocked(k as any)) return 'landing';
+    if (isLandingLocked(k)) return 'landing';
     return isFrozen(k) ? 'frozen' : null;
 }
 
@@ -214,6 +227,7 @@ export function lockOf(k: AclEntity | null | undefined): LockReason | null {
  * {@link canManageAcl} unfreezes it (8.25 a).
  */
 export function canMutate(k: AclEntity | null, ctx: AuthCtx | undefined): boolean {
+    if (isLandingLocked(k)) return !isFrozen(k) && isMaintainer(ctx);
     if (lockOf(k)) return false;
     if (ctx?.isSuperUser) return true;
     if (!ctx?.user) return false;
@@ -231,7 +245,7 @@ export function canMutate(k: AclEntity | null, ctx: AuthCtx | undefined): boolea
  * right is the super-user's (8.16): logged-in users keep editing it, but nobody claims it.
  */
 export function canManageAcl(k: AclEntity, ctx: AuthCtx | undefined): boolean {
-    if (isLandingLocked(k as any)) return false;
+    if (isLandingLocked(k)) return isMaintainer(ctx);
     if (ctx?.isSuperUser) return true;
     if (!ctx?.user) return false;
     if (isCommunityOwned(k)) return false;
@@ -241,6 +255,7 @@ export function canManageAcl(k: AclEntity, ctx: AuthCtx | undefined): boolean {
 /** Owner, editors, super-user: they see who else has access (ACL lists, e-mails). */
 export function seesCollaborators(k: AclEntity, ctx: AuthCtx | undefined): boolean {
     if (ctx?.isSuperUser) return true;
+    if (isLandingLocked(k) && isMaintainer(ctx)) return true; // wer die ACL pflegt, sieht sie
     if (!ctx?.user) return false;
     if (k.ownerId === ctx.user.id) return true;
     return parseList(k.editors).includes(ctx.user.id);

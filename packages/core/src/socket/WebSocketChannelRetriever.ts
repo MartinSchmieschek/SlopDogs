@@ -17,17 +17,26 @@ import { Dog } from '../core/entities/abstractHuntingDog';
 import { IHuntingDog } from '../core/entities/IHuntingDog';
 import { IHuntingSeason } from '../core/entities/IHuntingSeason';
 import { QueryRetriever } from '../platform/QueryRetriever';
-import type { ChannelState, IChannelHub } from './IChannelHub';
+import type { ChannelState, IChannelHub, IChannelTicketIssuer } from './IChannelHub';
 
 /** Der Query-Parameter der Einladung — derselbe, den der Hub beim Upgrade liest. */
 const CHANNEL_PARAM = 'channelId';
 
 export class WebSocketChannelRetriever extends Dog<ChannelState> {
     private static hub: IChannelHub | undefined;
+    private static ticketIssuer: IChannelTicketIssuer | undefined;
 
     /** Vom Server (main.ts) vor der Hunde-Schmiede einmal gerufen. */
     static initService(hub: IChannelHub): void {
         WebSocketChannelRetriever.hub = hub;
+    }
+
+    /**
+     * Optional vom Server: ein Ticket-Aussteller, dessen Ticket jede wsUrl als Query-Parameter mitbekommt.
+     * Ohne Aussteller (oder mit undefined) bleibt die wsUrl, wie sie war.
+     */
+    static useTicketIssuer(issuer: IChannelTicketIssuer | undefined): void {
+        WebSocketChannelRetriever.ticketIssuer = issuer;
     }
 
     /**
@@ -43,7 +52,7 @@ export class WebSocketChannelRetriever extends Dog<ChannelState> {
         'Dieser Dog ist die Lobby. Verdrahtung: `extraDogIds: ["base:WebSocketChannelRetriever", "base:QueryRetriever"]` MIT base:-Praefix — ' +
         'der QueryRetriever gehoert dazu, er traegt die Einladung (?channelId=) herein; fehlt er, ergaenzt ihn der Dienst. ' +
         'Im `parentsRequired` des Lead-Dogs dagegen OHNE Praefix als blanker Klassenname "WebSocketChannelRetriever". ' +
-        'Im Dog-Code steht er dann als Global bereit und liefert `channelId`, `wsUrl` (Form wss://…/api/channels?channelId=…), `heartbeatSec`, `created`, `peers`, ' +
+        'Im Dog-Code steht er dann als Global bereit und liefert `channelId`, `wsUrl` (Form wss://…/api/channels?channelId=…, ggf. mit weiterem Parameter — unveraendert verwenden), `heartbeatSec`, `created`, `peers`, ' +
         '`channelParam` ("channelId") und `channelQuery` ("?channelId=…", immer gefuellt, auch bei frisch erzeugter Lobby). ' +
         'Einen fertigen Teilen-Link erzeugt er NICHT — den baut die Seite aus location.origin + location.pathname + channelQuery, damit jeder Kennel seinen eigenen Pfad teilt. ' +
         'Die channelId kommt aus dem ?channelId=-Query oder wird neu erzeugt — erfinde keinen eigenen room-Parameter.';
@@ -96,7 +105,11 @@ export class WebSocketChannelRetriever extends Dog<ChannelState> {
         // und gemerkt haette man es erst an der fehlschlagenden Live-Verbindung.
         const wsPath = (hub.wsPath() || '/api/channels').replace(/\/$/, '') || '/api/channels';
         const publicBase = (process.env.PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
-        const wsUrl = publicBase ? publicBase.replace(/^http/, 'ws') + wsPath + channelQuery : wsPath + channelQuery;
+        // Das Ticket haengt nur an der wsUrl, nie an channelQuery: der Teilen-Link traegt es nicht weiter.
+        const issuer = WebSocketChannelRetriever.ticketIssuer;
+        const ticketQuery = issuer ? `&${encodeURIComponent(issuer.param)}=${encodeURIComponent(issuer.issue(channelId))}` : '';
+        const wsQuery = channelQuery + ticketQuery;
+        const wsUrl = publicBase ? publicBase.replace(/^http/, 'ws') + wsPath + wsQuery : wsPath + wsQuery;
 
         return {
             channelId,

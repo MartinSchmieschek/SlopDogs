@@ -70,4 +70,4 @@ export { BodyRetriever } from './platform/BodyRetriever';
 // WebSocket lobbies: one channel id opens a room; peers share a dedicated shared object
 export { WebSocketChannelRetriever } from './socket/WebSocketChannelRetriever';
 export { ChannelLiveSnippetRetriever } from './socket/ChannelLiveSnippetRetriever';
-export type { ChannelPeer, ChannelState, IChannelHub } from './socket/IChannelHub';
+export type { ChannelPeer, ChannelState, IChannelHub, IChannelTicketIssuer } from './socket/IChannelHub';

@@ -47,6 +47,8 @@ import { generateVersionId, generateLineageId } from '../utils/versioning';
 import { memSnapshot, logKennelRun } from '../utils/memoryLog';
 import { Watchpost } from '../../services/Watchpost';
 import { dogVersionsOf } from '../../services/dogVersions';
+import { TrustedKennels } from '../../mcp/auth/trustedKennels';
+import { SecurityHeaders } from '../../server-app/SecurityHeaders';
 
 /**
  * Ein adoptierbarer MimicDog, aus einer schmalen Kopfzeile geschaelt: der Pact, den er imitiert, steht
@@ -565,6 +567,8 @@ export class KennelRunHandler {
      */
     private sendResult(res: any, rawResult: any, req: any, waves: Waves) {
         const result = KeyRunState.forResult(waves).scrubValue(rawResult);
+        // Kennel-Ausgabe ist Inhalt des Kennel-Besitzers: Sandbox, wo immer sie ausgeliefert wird (SecurityHeaders).
+        SecurityHeaders.markKennelOutput(res);
         // Lobby-Shape { snapshot, live }: Browser bekommt das HTML, API-Clients den Snapshot.
         if (isLobbyLeadShape(result)) {
             const wantsJson = clientWantsJson(req);
@@ -757,6 +761,19 @@ export class KennelRunHandler {
         res.redirect(308, publicKennelPath(name) + query);
     }
 
+    /**
+     * `/k/:id` eines vertrauten Kennels (TrustedKennels: Landing) laeuft ohne Sandbox — nur die Kopfversion:
+     * mit `?version=` liefe eine alte Fassung, die vor der Sperre jeder aendern konnte.
+     */
+    private trustIfTrustedKennel(
+        req: { query?: { version?: unknown } },
+        res: Parameters<typeof SecurityHeaders.trustKennelPage>[0],
+        config: IKennelConfig,
+    ): void {
+        if (req.query?.version !== undefined) return;
+        if (TrustedKennels.isTrusted(config)) SecurityHeaders.trustKennelPage(res);
+    }
+
     /** Ein unbekannter oder unlesbarer Kennel sieht von aussen gleich aus: 404 JSON. */
     private sendKennelNotFound(res: any): void {
         res.status(404).json({ error: 'kennel_not_found' });
@@ -808,6 +825,7 @@ export class KennelRunHandler {
                 this.sendKennelGateOrNotFound(req, res);
                 return;
             }
+            this.trustIfTrustedKennel(req, res, config);
 
             const dogIds = config.dogIds || [];
             if (dogIds.length === 0) {
@@ -837,6 +855,7 @@ export class KennelRunHandler {
                 this.sendKennelNotFound(res);
                 return;
             }
+            this.trustIfTrustedKennel(req, res, config);
 
             const dogIds = config.dogIds || [];
             if (dogIds.length === 0) {

@@ -10,6 +10,9 @@
  *   3. Schreibende Anfragen (nicht GET/HEAD/OPTIONS) und WebSocket-Upgrades: eine gesetzte Origin muss
  *      dieselbe Liste treffen. Das bricht CSRF per Formular-POST oder fetch von fremden Seiten.
  *   4. CORS-Freigabe nur fuer diese Origins.
+ *   5. Ausnahme fuer Kennel-Seiten unter der CSP-Sandbox (opaker Origin): ihr Lobby-Upgrade am Hub-Pfad mit
+ *      `Origin: null` geht nur mit einem gueltigen Ticket fuer genau diese channelId durch (ChannelTickets).
+ *      Socket-, Proxy- und Host-Pruefung bleiben; eine gesetzte fremde Origin bleibt auch mit Ticket draussen.
  *
  * integration/production (ohne lokalen Modus) bekommen keine Grenze: dort sitzen Cloudflare/Render davor,
  * der Host-Header ist der oeffentliche Name, und der Login ist Pflicht (Exit 78).
@@ -19,6 +22,7 @@ import os from 'os';
 import type { IncomingMessage } from 'http';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { isLanAddress, parseHostEntry } from './LocalMode';
+import type { ChannelTickets } from './ChannelTickets';
 
 /** Was die Grenze von einer Anfrage liest — eine Express-Anfrage und ein Upgrade-IncomingMessage passen beide. */
 export type BoundaryRequest = {
@@ -260,6 +264,8 @@ export class NetworkBoundary {
         private readonly extraOrigins: readonly string[] = [],
         /** Lokal: globale IPv6 im On-Link-Praefix der eigenen Schnittstellen gilt als LAN. */
         private readonly onLinkIpv6: OnLinkIpv6 | null = null,
+        /** Tickets der Lobby-Upgrades von Kennel-Seiten mit opakem Origin; null = `Origin: null` nie zulassen. */
+        private readonly channelTickets: ChannelTickets | null = null,
     ) {}
 
     /** Name der Middleware im Express-Stack — der StartupTest prueft, dass sie die erste eigene ist. */
@@ -271,7 +277,7 @@ export class NetworkBoundary {
      */
     static forEnvironment(
         env: NodeJS.ProcessEnv,
-        mode: { nodeEnv: string; localMode: boolean; devUiOrigin?: string },
+        mode: { nodeEnv: string; localMode: boolean; devUiOrigin?: string; channelTickets?: ChannelTickets },
         system: SystemIdentity = OS_IDENTITY,
         now: () => number = Date.now,
     ): NetworkBoundary | null {
@@ -292,14 +298,22 @@ export class NetworkBoundary {
         if (bakedBase) extraHosts.push(`${bakedBase.hostname}:${bakedBase.port}`);
         const hosts = AllowedHosts.of([...ports], extraHosts, system, now);
         const extraOrigins = mode.localMode ? [] : AllowedHosts.parseList(env.CORS_ALLOWED_ORIGINS);
-        return new NetworkBoundary(hosts, mode.localMode, extraOrigins, mode.localMode ? new OnLinkIpv6(system, now) : null);
+        return new NetworkBoundary(
+            hosts,
+            mode.localMode,
+            extraOrigins,
+            mode.localMode ? new OnLinkIpv6(system, now) : null,
+            mode.channelTickets ?? null,
+        );
     }
 
     /** Null = durchlassen; sonst der Grund der Abweisung. Rein bis auf das gedrosselte Neulesen der Schnittstellen. */
     verdict(req: BoundaryRequest, isUpgrade = false): BoundaryRejection | null {
         const writes = isUpgrade || !SAFE_METHODS.has((req.method || 'GET').toUpperCase());
+        const origin = headerValue(req.headers, 'origin');
+        const ticketed = isUpgrade && this.isTicketedOpaqueUpgrade(req, origin);
         if (this.lanClientsOnly) {
-            const local = this.localRejection(req, isUpgrade, writes);
+            const local = this.localRejection(req, isUpgrade, writes, ticketed);
             if (local) return local;
         }
         if (!this.hosts.admitsHostHeader(headerValue(req.headers, 'host'))) {
@@ -308,8 +322,7 @@ export class NetworkBoundary {
                 error_description: "Host header is not one of this server's names (LOCAL_ALLOWED_HOSTS extends the list).",
             };
         }
-        const origin = headerValue(req.headers, 'origin');
-        if (writes && origin !== undefined && !this.admitsOrigin(origin)) {
+        if (writes && origin !== undefined && !ticketed && !this.admitsOrigin(origin)) {
             return { error: 'origin_not_allowed', error_description: "Origin is not one of this server's names." };
         }
         return null;
@@ -351,7 +364,7 @@ export class NetworkBoundary {
      * Nur lokal: Socket-Adresse, Proxy-Header, Sec-Fetch. Ohne Sec-Fetch (curl, AI-Clients, alte Browser) gelten
      * allein Host- und Origin-Pruefung — siehe README „SlopDogs auf dem Pi", Restluecke.
      */
-    private localRejection(req: BoundaryRequest, isUpgrade: boolean, writes: boolean): BoundaryRejection | null {
+    private localRejection(req: BoundaryRequest, isUpgrade: boolean, writes: boolean, ticketed: boolean): BoundaryRejection | null {
         const address = req.socket?.remoteAddress;
         if (!isLanAddress(address) && !this.onLinkIpv6?.contains(address)) {
             return { error: 'client_not_in_lan', error_description: 'This server only answers clients in the local network.' };
@@ -361,6 +374,8 @@ export class NetworkBoundary {
         }
         const site = headerValue(req.headers, 'sec-fetch-site');
         if (site === undefined || site === 'same-origin' || site === 'none') return null;
+        // Die Sandbox-Seite meldet sich mit opakem Origin als cross-site; das Ticket belegt die eigene Lobby.
+        if (ticketed) return null;
         const crossSite: BoundaryRejection = {
             error: 'cross_site',
             error_description: 'Cross-site requests are not accepted in local mode.',
@@ -373,6 +388,14 @@ export class NetworkBoundary {
         const visibleNavigation =
             headerValue(req.headers, 'sec-fetch-mode') === 'navigate' && headerValue(req.headers, 'sec-fetch-dest') === 'document';
         return visibleNavigation ? null : crossSite;
+    }
+
+    /**
+     * Lobby-Upgrade einer Kennel-Seite unter der Sandbox: genau `Origin: null`, am Hub-Pfad, mit gueltigem und
+     * nicht abgelaufenem Ticket fuer die angefragte channelId. Jede andere Origin entscheidet die normale Pruefung.
+     */
+    private isTicketedOpaqueUpgrade(req: BoundaryRequest, origin: string | undefined): boolean {
+        return origin === 'null' && this.channelTickets !== null && this.channelTickets.admitsUpgradeUrl(req.url);
     }
 
     private admitsOrigin(origin: string): boolean {

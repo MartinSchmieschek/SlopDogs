@@ -136,7 +136,7 @@
   },
   "mcp/auth/visibility.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 8
+      "count": 5
     }
   },
   "mcp/tools/acl.ts": {
@@ -154,7 +154,7 @@
   },
   "mcp/tools/nodes.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 28
+      "count": 27
     }
   },
   "mcp/tools/snapshots.ts": {
