@@ -314,7 +314,7 @@ function releaseProcessWideHeapFlagForWorkers(): void {
     if (workerHeapFlagReleased) return;
     workerHeapFlagReleased = true;
     try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         require('v8').setFlagsFromString('--max-old-space-size=0');
     } catch { /* ohne v8-Modul bleibt es beim Flag des Prozesses */ }
 }

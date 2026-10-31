@@ -1,0 +1,1200 @@
+{
+  "StartupTest.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 27
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 4
+    }
+  },
+  "api/AbstractController.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 31
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "api/Controller.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 40
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 15
+    }
+  },
+  "api/KennelController.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 32
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "api/routes/AclRouteHandler.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "api/routes/BetaRouteHandler.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "api/routes/ConfigRouteHandler.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 19
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 12
+    }
+  },
+  "api/routes/KennelBundleHandler.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 29
+    }
+  },
+  "api/routes/KennelFavoriteHandler.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "api/routes/KennelRatingHandler.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "api/routes/KennelRunHandler.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 67
+    }
+  },
+  "api/routes/KennelSwaggerHandler.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 23
+    }
+  },
+  "api/routes/KeysRouteHandler.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "api/routes/LandingRouteHandler.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 8
+    }
+  },
+  "api/routes/ListQuery.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "api/routes/NodesRouteHandler.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 28
+    }
+  },
+  "api/routes/ReadmeRouteHandler.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 5
+    }
+  },
+  "api/utils/nodeVersioning.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "main.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "mcp/auth/BoundedSessionStore.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 6
+    }
+  },
+  "mcp/auth/oauth-as.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "mcp/auth/permissions.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "mcp/auth/personal-tokens.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "mcp/auth/router.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "mcp/auth/visibility.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 8
+    }
+  },
+  "mcp/tools/acl.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 24
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "mcp/tools/kennels.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 54
+    }
+  },
+  "mcp/tools/nodes.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 28
+    }
+  },
+  "mcp/tools/snapshots.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 8
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "mcp/tools/types.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 6
+    }
+  },
+  "mcp/transports/mcp.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 5
+    }
+  },
+  "mcp/transports/openapi.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    }
+  },
+  "packages/core/src/KennelRun.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 14
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "packages/core/src/cache/ICacheable.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/core/src/core/entities/IHuntingDog.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/core/src/core/entities/abstractHuntingDog.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 15
+    },
+    "@typescript-eslint/no-this-alias": {
+      "count": 1
+    },
+    "prefer-const": {
+      "count": 2
+    }
+  },
+  "packages/core/src/dogs/DogWorkerGate.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/core/src/dogs/MimicDog.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    }
+  },
+  "packages/core/src/dogs/SerializedDog.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 44
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 3
+    }
+  },
+  "packages/core/src/dogs/createPact.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 6
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "packages/core/src/dogs/lineDocs.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    }
+  },
+  "packages/core/src/harverster.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    },
+    "@typescript-eslint/no-unused-expressions": {
+      "count": 1
+    },
+    "prefer-const": {
+      "count": 7
+    }
+  },
+  "packages/core/src/platform/BodyRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 6
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "packages/core/src/platform/FetchBaseDog.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "packages/core/src/platform/QueryRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "packages/core/src/socket/ChannelLiveSnippetRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/core/src/socket/WebSocketChannelRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-air-quality/src/AirQuality/AirQualityRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-air-quality/src/AirQuality/airQualityApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-animals-random/src/CatFact/CatFactRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-animals-random/src/Duck/DuckRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "packages/dogs-animals-random/src/Fox/FoxRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "packages/dogs-astronomy/src/Astronomy/AstronomyRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "packages/dogs-biodiversity/src/Biodiversity/SpeciesRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-biodiversity/src/Biodiversity/biodiversityApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-birds/src/Birds/BirdRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-birds/src/Birds/birdApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 5
+    }
+  },
+  "packages/dogs-charging/src/Charging/ChargingStationRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-crypto/src/CoinGecko/CoinGeckoRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-cuisine/src/Cocktail/CocktailRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-cuisine/src/Meal/MealRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-currency/src/Currency/CurrencyRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-demo/src/CountryFlagBlackLab.ts": {
+    "prefer-const": {
+      "count": 1
+    }
+  },
+  "packages/dogs-demo/src/DishFlagBlackLab.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    },
+    "prefer-const": {
+      "count": 1
+    }
+  },
+  "packages/dogs-demo/src/FoodPornRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    },
+    "prefer-const": {
+      "count": 5
+    }
+  },
+  "packages/dogs-demo/src/RandomEverthingRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    },
+    "prefer-const": {
+      "count": 2
+    }
+  },
+  "packages/dogs-demo/src/RandomRecipesRetriever.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "packages/dogs-dev/src/GitHubPublic/GitHubPublicRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-dev/src/Npm/NpmRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-dev/src/Npm/npmApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-dev/src/StackExchange/StackExchangeRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-dev/src/StackExchange/stackExchangeApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-dictionary/src/Datamuse/DatamuseRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-dictionary/src/Dictionary/DictionaryRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-gaming/src/DeckOfCards/DeckOfCardsRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-gaming/src/DeckOfCards/deckOfCardsApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "packages/dogs-gaming/src/PokeApi/PokeApiRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-gaming/src/Scryfall/ScryfallRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-gaming/src/Scryfall/scryfallApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-geo/src/Bloodhound/BloodhoundIsochroneRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "packages/dogs-geo/src/Bloodhound/BloodhoundRouteRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "packages/dogs-geo/src/OpenStreetMap/OsmAmenitiesRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-geo/src/OpenStreetMap/OsmBoundariesRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-geo/src/OpenStreetMap/OsmBuildingsRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-geo/src/OpenStreetMap/OsmFastRoadsRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-geo/src/OpenStreetMap/OsmForestPolygonsRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-geo/src/OpenStreetMap/OsmLandmarksRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-geo/src/OpenStreetMap/OsmLandscapeFeaturesRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-geo/src/OpenStreetMap/OsmLanduseRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-geo/src/OpenStreetMap/OsmPowerRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-geo/src/OpenStreetMap/OsmPublicTransitStopsRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-geo/src/OpenStreetMap/OsmRailsRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-geo/src/OpenStreetMap/OsmShopsRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-geo/src/OpenStreetMap/OsmSportsRecreationRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-geo/src/OpenStreetMap/OsmStreetsGeometryRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-geo/src/OpenStreetMap/OsmTracksRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "packages/dogs-geo/src/OpenStreetMap/OsmVegetationRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-geo/src/OpenStreetMap/OsmWaterRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-geo/src/OpenStreetMap/overpassOsmShared.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-geo/src/osm/Trail/TrailRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "packages/dogs-geo/src/osm/base/OsmFeatureRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "packages/dogs-geo/src/osm/base/overpassMirrorChain.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-geocoding/src/Elevation/ElevationRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-geocoding/src/Geocoding/GeocodingRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-geocoding/src/Geocoding/geocodingApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    }
+  },
+  "packages/dogs-github-trending/src/GitHubTrending/GitHubTrendingRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-health/src/Disease/DiseaseRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-health/src/OpenFda/OpenFdaRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-historical-weather/src/HistoricalWeather/HistoricalWeatherRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-historical-weather/src/HistoricalWeather/historicalWeatherApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-holidays/src/Holidays/HolidayRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-hue/src/HuePlayground/HueBridgeEnvRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "packages/dogs-hue/src/HuePlayground/HuePlaygroundRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-humor/src/ChuckNorris/ChuckNorrisRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-humor/src/DadJoke/DadJokeRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-humor/src/Joke/JokeRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-images/src/DogCeo/DogCeoRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-images/src/NasaApod/NasaApodRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-images/src/Picsum/PicsumRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-ip-geo/src/IPGeo/IPGeoRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-knowledge/src/Gutenberg/GutenbergRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-knowledge/src/Quote/QuoteRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-knowledge/src/Wikidata/WikidataRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-knowledge/src/Wikidata/wikidataApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    }
+  },
+  "packages/dogs-music/src/Lyrics/LyricsRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-music/src/MusicBrainz/MusicBrainzRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-music/src/RadioBrowser/RadioBrowserRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-name-insights/src/Agify/AgifyRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-name-insights/src/Genderize/GenderizeRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-name-insights/src/Nationalize/NationalizeRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-open-library/src/OpenLibrary/OpenLibraryRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-phenology/src/Phenology/PhenologyRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-pop-culture/src/Ghibli/GhibliRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-pop-culture/src/HarryPotter/HarryPotterRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-pop-culture/src/RickMorty/RickMortyRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-pop-culture/src/StarWars/StarWarsRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-public-transport/src/PublicTransport/PublicTransportRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-public-transport/src/PublicTransport/publicTransportApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    }
+  },
+  "packages/dogs-quiz/src/Bored/BoredRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-quiz/src/RandomUser/RandomUserRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-quiz/src/Trivia/TriviaRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-random-fact/src/RandomFact/RandomFactRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-regional-news/src/RegionalNews/RegionalNewsRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-religion/src/Bible/BibleRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-religion/src/Quran/QuranRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-season/src/Season/SeasonRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-social/src/HackerNews/HackerNewsRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-social/src/Lemmy/LemmyRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-space/src/Space/SpaceRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-sports/src/Chess/ChessRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-sports/src/F1/F1Retriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-sports/src/F1/f1ApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-sports/src/SportsDB/SportsDBRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-sun/src/Sun/SunRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-sun/src/Sun/sunApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-talking/src/TalkingDogs/TalkingDog.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 3
+    }
+  },
+  "packages/dogs-talking/src/TalkingDogs/renderer/LayoutRenderer.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-transit-trips/src/TransitTrips/TransitTripRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-transit-trips/src/TransitTrips/transitTripApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "packages/dogs-translate/src/LibreTranslate/LibreTranslateRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-translate/src/LibreTranslate/libreTranslateApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-travel/src/Airport/AirportRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-travel/src/GeoNames/GeoNamesRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-travel/src/GeoNames/geoNamesApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-travel/src/Wikivoyage/WikivoyageRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-travel/src/Wikivoyage/wikivoyageApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-tv/src/TvMaze/TvMazeRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-warframe/src/Kubrow/Kubrow.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "packages/dogs-warframe/src/Kubrow/WarframeAlertsRetriever.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "packages/dogs-warframe/src/Kubrow/interfaces/normalizers.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-water/src/Water/WaterRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-water/src/Water/waterApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/dogs-weather/src/Weather/WeatherRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-weather/src/Weather/weatherApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    }
+  },
+  "packages/dogs-web-archive/src/Wayback/WaybackRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-webcams/src/Webcams/WebcamRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-webcams/src/Webcams/webcamApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "packages/dogs-wiki-search/src/WikiSearch/WikiSearchRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-wikipedia/src/Wikipedia/WikiNearbyRetriever.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/dogs-wikipedia/src/Wikipedia/wikipediaApiClient.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 5
+    }
+  },
+  "scripts/test-new-dogs.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 8
+    }
+  },
+  "scripts/test-osm-geometry-dogs.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 6
+    }
+  },
+  "scripts/test-osm-new-8-dogs.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 10
+    }
+  },
+  "scripts/test-osm-power-retry.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "scripts/test-osm-power-wind.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    },
+    "prefer-const": {
+      "count": 1
+    }
+  },
+  "scripts/test-round3-dogs.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 19
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "seed-data/kennels/address-lookup.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "seed-data/kennels/compare.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "seed-data/kennels/earth-pulse.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "seed-data/kennels/geo-weather.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "seed-data/kennels/location-dashboard.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "seed-data/kennels/markdown.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 3
+    }
+  },
+  "seed-data/kennels/smart-guide.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "seed-data/kennels/transit.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "seed-data/kennels/void-storms.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "seed-data/seed-helpers.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "seed-data/seed.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "server-app/ResponseCompression.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 12
+    }
+  },
+  "server-app/createHttpApplication.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 21
+    }
+  },
+  "server-app/heavyRequestLimiter.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "server-app/httpFrontEnd.builtUi.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "server-app/httpFrontEnd.development.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "server-app/httpFrontEnd.landing.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "server-app/slimRegistryKennelCoverage.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "services/BaseDogPacks.ts": {
+    "@typescript-eslint/no-unsafe-function-type": {
+      "count": 5
+    }
+  },
+  "services/ChannelHub.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 9
+    }
+  },
+  "services/DogReferenceIndex.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 7
+    }
+  },
+  "services/DogStatsService.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    }
+  },
+  "services/JsonStorageService.ts": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 1
+    }
+  },
+  "services/LeadOutcome.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "services/PrismaCacheHandler.ts": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 1
+    }
+  },
+  "services/TypeDefBuilder.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 8
+    }
+  },
+  "services/Watchpost.ts": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 3
+    }
+  },
+  "services/WavesConverter.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 11
+    }
+  },
+  "services/dogAccess.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "services/keysCapability.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "services/wavesRedaction.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    }
+  },
+  "store/IStore.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 6
+    }
+  },
+  "store/PrismaStore.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 53
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "store/createPrismaAuthClient.ts": {
+    "@typescript-eslint/no-require-imports": {
+      "count": 1
+    }
+  },
+  "test/startup/packageCandidates.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 28
+    }
+  }
+}

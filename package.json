@@ -44,7 +44,12 @@
     "check:prisma-schemas": "node scripts/check-prisma-schemas.cjs",
     "heap:registry-compare": "node scripts/compare-registry-heap.cjs",
     "lint:docs": "node -r ts-node/register scripts/check-doc-paths.cjs",
-    "test": "npm run typecheck && npm run check:integration-dogs && npm run check:env-catalog && npm run check:prisma-schemas && npm run lint:docs",
+    "lint": "eslint .",
+    "lint:prune": "eslint . --prune-suppressions",
+    "format": "prettier --write . && node scripts/format-check.cjs --update",
+    "format:check": "node scripts/format-check.cjs",
+    "format:baseline": "node scripts/format-check.cjs --update",
+    "test": "npm run typecheck && npm run check:integration-dogs && npm run check:env-catalog && npm run check:prisma-schemas && npm run lint:docs && npm run lint && npm run format:check",
     "test:startup": "node scripts/run-startup-tests.cjs",
     "test:mcp:integration": "node mcp/integration/mcp-gateway.integration.cjs",
     "test:mcp:integration:int": "cross-env NODE_ENV=integration node -r ./scripts/load-env.cjs mcp/integration/mcp-gateway.integration.cjs"
@@ -129,8 +134,11 @@
     "@types/ws": "^8.18.1",
     "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",
+    "eslint": "10.12.0",
+    "prettier": "3.9.10",
     "prisma": "^5.5.0",
-    "tsconfig-paths": "^4.2.0"
+    "tsconfig-paths": "^4.2.0",
+    "typescript-eslint": "8.71.2"
   },
   "prisma": {
     "schema": "store/prisma/schema.prisma",

@@ -1,0 +1,24 @@
+# Prettier liest zusaetzlich .gitignore (node_modules/, dist/, store/generated/, veraltete tsc-Ausgaben).
+# Was hier steht, formatiert weder `npm run format` noch prueft es `npm run format:check`.
+
+# ui-app hat eine eigene Toolchain (Angular 18, eigene package.json, Lockfile, tsconfig und
+# .editorconfig mit 2 Leerzeichen). Ihre Formatierung gehoert zu ui-app, als eigener Schritt.
+ui-app/
+
+# Doku und Markdown: Fliesstext, Tabellen und Listen umzubrechen bringt Diff ohne Nutzen.
+docs/
+*.md
+
+# Gebaute Landing (aus seed-data/kennels/slopdogs-landing gerendert) und Deploy-Dateien.
+public/
+deploy/
+
+# Build-Ausgaben und Generiertes, auch falls es einmal nicht in .gitignore steht.
+**/dist/
+store/generated/
+*.tsbuildinfo
+
+# JSON wird von Werkzeugen geschrieben (npm: package.json und Lockfile, ESLint: eslint-suppressions.json,
+# scripts/format-check.cjs: .prettier-baseline.json) oder ist Daten (static.world.json). tsconfig*.json
+# bleiben ebenfalls aussen vor: Prettier soll keinem Werkzeug seine Ausgabe umschreiben.
+*.json

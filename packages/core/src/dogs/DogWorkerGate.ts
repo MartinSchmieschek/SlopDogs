@@ -103,7 +103,7 @@ const CGROUP_V2_STAT = '/sys/fs/cgroup/memory.stat';
 function readCgroupWorkingSetBytes(): number | null {
     let fs: typeof import('fs');
     try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         fs = require('fs');
         const current = Number(fs.readFileSync(CGROUP_V2_CURRENT, 'utf8').trim());
         if (!Number.isFinite(current)) return null;
@@ -171,9 +171,9 @@ class ProcessMemoryProbe implements MemoryProbe {
             return exposed as () => void;
         }
         try {
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
             const v8 = require('v8');
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
             const vm = require('vm');
             v8.setFlagsFromString('--expose-gc');
             const fromContext = vm.runInNewContext('gc');
