@@ -6,6 +6,9 @@
 .nira/
 amarsDumps/
 
+# Lokale Notizdateien aus Pruefungen (frueher getrackt: .tmp-check.json, .tmp-mimic.json)
+.tmp-*.json
+
 # Node modules
 node_modules/
 
@@ -14,6 +17,10 @@ dev.db
 auth.db
 store/prisma/*.db
 store/prisma-auth/*.db
+
+# Startup-Suite (npm run test:startup): eigene SQLite-Dateien neben den Schemas
+test-startup*.db
+test-startup*.db-journal
 
 # Cache DB (SQLite)
 cache.db
