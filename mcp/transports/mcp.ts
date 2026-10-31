@@ -228,7 +228,10 @@ export function createMcpRouter(deps: ToolDeps): Router {
             res.status(500).json({ error: 'no auth context — middleware misordered' });
             return;
         }
-        if (!ctx.user && !ctx.isSuperUser) {
+        // /mcp nimmt nur Bearer an: das Session-Cookie meldet hier niemanden an. Kein Client nutzt es (UI, Skill,
+        // Tests sprechen /mcp mit Bearer), und so kann keine Seite im Browser des Nutzers mit dessen Session
+        // MCP-Werkzeuge aufrufen.
+        if ((!ctx.user && !ctx.isSuperUser) || (ctx.via === 'session' && !ctx.isSuperUser)) {
             const base = process.env.MCP_BASE_URL || `${req.protocol}://${req.get('host')}`;
             res.setHeader(
                 'WWW-Authenticate',

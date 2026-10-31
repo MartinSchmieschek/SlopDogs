@@ -163,11 +163,19 @@ pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; font-size:
     return "p-" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
   }
 
-  let peerId = sessionStorage.getItem(STORAGE_KEY);
-  if (!peerId){ peerId = makePeerId(); sessionStorage.setItem(STORAGE_KEY, peerId); }
+  // Unter der CSP-Sandbox von /k/ (opaker Origin) wirft schon der Zugriff auf sessionStorage — dann haelt
+  // die Seite Peer-Id und shared nur im Speicher (ein Neuladen ist ein neuer Peer).
+  const memory = {};
+  const store = {
+    get(key){ try { return window.sessionStorage.getItem(key); } catch(_) { return memory[key] ?? null; } },
+    set(key, value){ try { window.sessionStorage.setItem(key, value); } catch(_) { memory[key] = value; } },
+  };
+
+  let peerId = store.get(STORAGE_KEY);
+  if (!peerId){ peerId = makePeerId(); store.set(STORAGE_KEY, peerId); }
 
   let myShared = {};
-  try { const stored = sessionStorage.getItem(SHARED_KEY); if (stored) myShared = JSON.parse(stored); } catch(_) {}
+  try { const stored = store.get(SHARED_KEY); if (stored) myShared = JSON.parse(stored); } catch(_) {}
 
   // peers Map: peerId -> { lastSeen, shared }
   const peers = new Map();
@@ -225,7 +233,7 @@ pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; font-size:
         throw new Error("shared must be an object");
       }
       myShared = next;
-      sessionStorage.setItem(SHARED_KEY, JSON.stringify(myShared));
+      store.set(SHARED_KEY, JSON.stringify(myShared));
       const me = peers.get(peerId) || { lastSeen: Date.now(), shared: {} };
       me.shared = myShared; me.lastSeen = Date.now();
       peers.set(peerId, me);
@@ -372,7 +380,7 @@ pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; font-size:
     setMine: (next) => {
       if (!next || typeof next !== "object" || Array.isArray(next)) throw new Error("shared must be an object");
       myShared = next;
-      sessionStorage.setItem(SHARED_KEY, JSON.stringify(myShared));
+      store.set(SHARED_KEY, JSON.stringify(myShared));
       const me = peers.get(peerId) || { lastSeen: Date.now(), shared: {} };
       me.shared = myShared; me.lastSeen = Date.now(); peers.set(peerId, me);
       sharedTA.value = JSON.stringify(myShared, null, 2);

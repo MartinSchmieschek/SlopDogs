@@ -9,7 +9,7 @@ import {
     canRead,
     canMutate,
     isFrozen,
-    isLandingLocked,
+    landingRefuses,
     normalizeVisibility,
     filterRunnable,
     applyCreateDefaults,
@@ -139,10 +139,10 @@ export class ConfigRouteHandler {
         });
     }
 
-    /** 403 locked_landing fuer einen Kennel aus LANDING_KENNEL_IDS — true, wenn geantwortet wurde. */
-    private static sendLandingLocked(res: Response, entity: any): boolean {
-        if (!isLandingLocked(entity)) return false;
-        res.status(403).json({ error: LandingKennels.LOCK_CODE, error_description: LandingKennels.LOCK_MESSAGE });
+    /** 403 locked_landing fuer gepflegte Kennels und ihre besitzerlosen Dogs (ausser Maintainer) — true, wenn geantwortet wurde. */
+    private static sendLandingLocked(res: Response, entity: any, req: Request): boolean {
+        if (!landingRefuses(entity, req.ctx)) return false;
+        res.status(403).json({ error: LandingKennels.LOCK_CODE, error_description: LandingKennels.lockMessageFor(entity) });
         return true;
     }
 
@@ -152,7 +152,7 @@ export class ConfigRouteHandler {
             res.status(404).json({ error: `Entity mit ID ${id} nicht gefunden` });
             return;
         }
-        if (ConfigRouteHandler.sendLandingLocked(res, entity)) return;
+        if (ConfigRouteHandler.sendLandingLocked(res, entity, req)) return;
         if (isFrozen(entity)) {
             res.status(409).json({ error: 'frozen', error_description: 'Frozen. Unfreeze it first.' });
             return;
@@ -559,7 +559,7 @@ export class ConfigRouteHandler {
             res.status(404).json({ error: 'not_found' });
             return;
         }
-        if (ConfigRouteHandler.sendLandingLocked(res, entity)) return;
+        if (ConfigRouteHandler.sendLandingLocked(res, entity, req)) return;
         if (isFrozen(entity)) {
             res.status(409).json({ error: 'frozen', error_description: 'Frozen. Unfreeze it first.' });
             return;

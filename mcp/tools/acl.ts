@@ -15,7 +15,7 @@ import {
     canMutate,
     canRead,
     isFrozen,
-    isLandingLocked,
+    landingRefuses,
     normalizeVisibility,
     parseList,
     serializeList,
@@ -121,8 +121,8 @@ export class AclManager {
 
     /** Ein Landing-Kennel (LANDING_KENNEL_IDS) nimmt keine Rechte-Aenderung an — Lesern sagt 403, warum. */
     private static refuseLandingLocked(entity: any, ctx: AuthCtx | undefined): void {
-        if (isLandingLocked(entity) && canRead(entity, ctx)) {
-            throw new AclError('locked_landing', LandingKennels.LOCK_MESSAGE);
+        if (landingRefuses(entity, ctx) && canRead(entity, ctx)) {
+            throw new AclError('locked_landing', LandingKennels.lockMessageFor(entity));
         }
     }
 

@@ -57,7 +57,7 @@ function positiveIntFromEnv(name: string, fallback: number): number {
  * Hintergrund. Der Host (`‹host›` in der Ausgabe) kommt je Anfrage aus MCP_BASE_URL bzw. dem Request, nie ins Memo.
  */
 export class LandingPage {
-    static readonly DEFAULT_KENNEL_ID = 'slopdogs-landing';
+    static readonly DEFAULT_KENNEL_ID = LandingKennels.DEFAULT_KENNEL_ID;
     static readonly DEFAULT_MEMO_MS = 300_000;
     static readonly CACHE_CONTROL = 'public, max-age=300';
     /** Rotiert `/` zwischen mehreren Kennels, darf kein Cache einen Besuch fuer fuenf Minuten festhalten. */

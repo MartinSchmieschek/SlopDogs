@@ -11,7 +11,7 @@ import {
     normalizeVisibility,
     rightsOf,
     isFrozen,
-    isLandingLocked,
+    landingRefuses,
     canManageAcl,
     withMyRights,
     VISIBILITIES,
@@ -257,7 +257,7 @@ function visibilityChangeRefused(existing: any, requested: unknown, ctx: AuthCtx
  */
 function kennelMutationRefusal(kennel: any, ctx: AuthCtx, id: string): string {
     if (!canRead(kennel, ctx)) return `Kennel ${id} not found`;
-    if (isLandingLocked(kennel)) return `${LandingKennels.LOCK_CODE}: ${LandingKennels.LOCK_MESSAGE}`;
+    if (landingRefuses(kennel, ctx)) return `${LandingKennels.LOCK_CODE}: ${LandingKennels.LOCK_MESSAGE}`;
     if (isFrozen(kennel)) return `Kennel ${id} is frozen — unfreeze it first`;
     return 'Not authorized';
 }

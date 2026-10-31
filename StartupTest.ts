@@ -8447,7 +8447,8 @@ export class StartupTest {
                 }
                 const stranger = await this.callHandler(handler, 'handleUpdate', { params: { subpath: 'kennels', id: kennelId }, body: { name: 'x' }, ctx: this.fakeUser('UL2'), method: 'PUT' });
                 locked('PUT Fremder', stranger);
-                if (isLandingLocked({ lineageId: LandingPage.DEFAULT_KENNEL_ID, dogIds: [] } as any)) throw new Error('Seed-Default gesperrt, ohne gelistet zu sein');
+                // Seit fix/k-sandbox gesperrt, auch ungelistet: `/` liefert den Standard ohne Sandbox aus.
+                if (!isLandingLocked({ lineageId: LandingPage.DEFAULT_KENNEL_ID, dogIds: [] } as any)) throw new Error('Seed-Default nicht gesperrt');
                 if (isLandingLocked({ lineageId: kennelId, theRun: 'return 1;' } as any)) throw new Error('ein Dog gilt als Landing-Kennel');
                 const after: any = (await kennelsController.getById(kennelId)).data;
                 if (after?.name !== 'Landing lock' || isFrozen(after)) throw new Error(`Kennel veraendert: ${after?.name}, frozen ${after?.frozen}`);

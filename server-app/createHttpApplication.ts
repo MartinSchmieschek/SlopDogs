@@ -4,6 +4,7 @@ import {
     ISerializedDogConfig,
     SerializedDog,
     MimicDog,
+    BASE_DOG_PREFIX,
     type ICacheHandler,
 } from '@slopdogs/core';
 import { IStore } from '../store/IStore';
@@ -46,6 +47,9 @@ import type { BaseDogInfo } from '../mcp/tools/types';
 import type { HttpFrontEndBinder, HttpFrontEndContext } from './httpFrontEndTypes';
 import { LandingPage } from './LandingPage';
 import { ResponseCompression } from './ResponseCompression';
+import { SecurityHeaders } from './SecurityHeaders';
+import { SameOriginGuard } from '../mcp/auth/sameOriginGuard';
+import { LandingDogLock } from '../services/LandingDogLock';
 
 export type CreateHttpApplicationInput = {
     nodeEnv: string;
@@ -194,10 +198,19 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
         return isLocalDevOrigin(origin) ? origin : undefined;
     };
 
+    // Kopfzeilen fuer jede Antwort und die Sandbox der Kennel-Seiten (SecurityHeaders) — vor allem anderen.
+    app.use(new SecurityHeaders().middleware());
+
     app.use((req: any, res: any, next: any) => {
         const allow = allowedOriginForRequest(req);
         if (allow) {
             res.setHeader('Access-Control-Allow-Origin', allow);
+            res.setHeader('Vary', 'Origin');
+        } else if (SecurityHeaders.isKennelPath(req.path)) {
+            // Kennel-Seiten laufen unter Sandbox mit opakem Origin (`Origin: null`) — ihre Aufrufe an `/k/…` (eigener
+            // Kennel, Lesespur, Spec der Doku) sind damit cross-origin. `/k/` ist ohnehin oeffentlich und ohne Cookie
+            // gleich dem anonymen Lauf: `*` ohne Allow-Credentials, der Browser gibt keine Antwort mit Cookie frei.
+            res.setHeader('Access-Control-Allow-Origin', '*');
             res.setHeader('Vary', 'Origin');
         }
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
@@ -223,7 +236,8 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     app.use(express.urlencoded({ extended: false, limit: '1mb' }));
     app.use(createSessionMiddleware());
     app.use(createAuthContextMiddleware(authPrisma));
-    app.use('/auth', createAuthRouter(authPrisma));
+    // PAT-Ausgabe/-Widerruf und OAuth-Zustimmung nur von eigenen Seiten — dieselbe Origin-Regel wie CORS oben.
+    app.use('/auth', createAuthRouter(authPrisma, new SameOriginGuard((req) => allowedOriginForRequest(req))));
     app.use('/.well-known', createDiscoveryRouter());
 
     // Schleuse vor den teuren Pfaden — MUSS vor allen Route-Handlern montiert sein.
@@ -292,6 +306,21 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
         () => input.refIndex.referenceRows,
     );
     input.refIndex.onChange(() => dogStats.invalidate());
+
+    // Besitzerlose Dogs der Landing-Kennels: fuer alle gesperrt (isLandingLocked). Die Menge rechnet LandingDogLock im
+    // Hintergrund; bis zur ersten Berechnung gelten besitzerlose Dogs als gesperrt. Neu nach jeder Index-Aenderung.
+    new LandingDogLock({
+        kennelDogIds: async (kennelId) => {
+            const head = await kennelsController.getById(kennelId);
+            return head.ok && head.data ? (head.data.dogIds ?? []) : null;
+        },
+        lineageOf: async (ref) => {
+            const normalized = await input.refIndex.normalize(ref);
+            return normalized.toKey.startsWith(BASE_DOG_PREFIX) ? null : normalized.toKey;
+        },
+        dogHeads: listDogsOf,
+        onChange: (listener) => input.refIndex.onChange(listener),
+    }).start();
     input.callCounter.setOnFlushed(() => {
         kennelStats.invalidate();
         dogStats.invalidate();
