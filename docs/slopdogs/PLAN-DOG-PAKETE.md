@@ -28,6 +28,7 @@ Was vor dem Schnitt nicht einheitlich ist, muss danach in jedem Repo einzeln nac
 | E10 | Lokaler Modus (31.10.) | **Auth-frei auf einem Pi im Heimnetz, wie eine Hue-Steuerung; jeder im lokalen Netz darf ihn nutzen.** Kein Dev-Modus (Spur L). |
 | E11 | Sichtbarkeit und Lizenz (31.10.) | **Alle SlopDogs-Repos oeffentlich, MIT-Lizenz** (Text aus `SlopDogs/LICENSE`, in jedem Repo und jedem Paket-Tarball). Repos angelegt: `MartinSchmieschek/slopdogs-core` (mit Initial-Commit samt LICENSE — der Schnitt wird beim ersten Push per `--allow-unrelated-histories` daraufgesetzt, kein Force-Push), `MartinSchmieschek/slopdogs-base-dogs` (leer). |
 | E12 | Weggefallene StartupTest-Abdeckung (31.10.) | **Bestaetigt, faellt weg** (Keys T1–T10, Worker-Env/FS/privates Netz, Super-User-Boot-Guard): „das machen die Dogs selber". |
+| E13 | Kennel-Liste (31.10. abends) | **Wird ein eigener gesperrter Kennel wie die Landing** (Spur K), nach Pruefung des Sitzungsmodells von `/k/`. |
 
 Daraus folgt zwingend:
 
@@ -219,6 +220,19 @@ Ist-Stand (Amar 31.10.): Ohne Auth gibt es heute nur den Super-User-Modus bei `N
 **Umgesetzt 31.10.** (`77ae74c`, `f1026fe`, `2870a95`, `658ffa9`), auf dem Desktop gemessen: Abnahmeskript ueber die LAN-IP 27/27, Boot-Guard Exit 79 bei oeffentlicher URL, Proxy-Hops und neuem Master-Key auf vorhandenen Schluesseln. **Folgen fuer den Dev-Modus:** Host-, Origin- und Rahmenpruefung sind an; CORS nur noch fuer Server- und UI-Port; Docker-Portmapping, Codespaces und Werkzeuge auf anderen Ports bekommen 403, bis `LOCAL_ALLOWED_HOSTS` sie erlaubt. `build:prod` erzeugt bei einer SQLite-URL SQLite-Clients. Offen: Pi-Messung (Speicher, Hue-Dog, Unit-Haertung, cgroup), Pruefwert fuer den Master-Key, Dev-Bind nur auf 127.0.0.1.
 
 **Abnahme L:** Pi im LAN, ein zweiter Rechner nutzt UI und MCP ohne Login; fremder Host-Header → 403; Anfrage von einer oeffentlichen Adresse → abgewiesen; gesetzte oeffentliche Basis-URL → Start bricht ab; der Hue-Dog laeuft; Speicherwerte des Pi im Plan nachgetragen.
+
+## Spur K — Kennel-Liste als Kennel (E13, 31.10. abends, unabhaengig vom Schnitt)
+
+Auftrag 10-0: „waere die Kennel-Liste nicht jetzt ueberfluessig, da auch schon Landing ein Kennel ist? wollten wir fuer die Liste nicht einen eigenen Kennel wie die Landing machen?" -> „weiter". Ein frueherer Beschluss dazu steht in keiner Repo-Datei (gesucht in `PLAN.md`, `BACKLOG.md`, diesem Plan).
+
+Ist-Stand: Die Landing (`seed-data/kennels/slopdogs-landing/`) ist das Schaufenster — anonym, gesperrt ueber `LANDING_KENNEL_IDS`, Daten im Browser aus `/api/landing` (`api/routes/LandingRouteHandler.ts`), Link „All kennels" auf `/kennels`. Die Angular-Liste (`ui-app/src/app/pages/kennel-list/`) ist die Werkbank — je Nutzer nach Rechten, Favoriten, Suche, Sortierung, Anlegen, Import/Export, Teilen, Edit-Menue (Spur U).
+
+1. **Vorbedingung: Sitzungsmodell von `/k/` pruefen** (Nira, laeuft). Ein Listen-Kennel ruft `/api/kennels` und `PUT/DELETE …/favorite` im Browser mit der Sitzung des Besuchers auf. Dann laeuft Kennel-Code mit dessen Login gegen die API — das betrifft jeden Kennel, nicht nur diesen. Ergebnis entscheidet, ob „gesperrt wie Landing" reicht oder `/k/` mehr Abschottung braucht.
+2. **Seed-Kennel `slopdogs-kennels`** neben `slopdogs-landing`, gesperrt, Dogs klein (Daten, Fragmente, Script, Lead getrennt); Look nach `ui-app/DESIGN.md` (Tracklist), Gestaltung Follie.
+3. **`/kennels` zeigt auf den Kennel**; der Editor `/kennels/<ref>` bleibt Angular.
+4. **Angular-Liste faellt erst weg, wenn der Kennel alles kann**, was sie heute kann (Favoriten, Suche, Sortierung, Anlegen, Import/Export, Teilen, Edit-Menue, anonym, Handybreite ohne Seitwaerts-Scrollen).
+
+**Abnahme K:** gleicher Funktionsumfang per Klicktest (Headless-Chrome, 320/375 px und Desktop); Sitzungsmodell-Befunde der Nira geschlossen oder vom 10-0 bewusst getragen; Landing und Liste beide gesperrt.
 
 ## Risiken
 
