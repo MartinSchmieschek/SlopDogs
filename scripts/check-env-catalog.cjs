@@ -341,7 +341,11 @@ class EnvCatalogCheck {
                     problems.push(`packages/${pack} liest ${name}, seine envVars (src/env.ts, Einstieg ./env) nennen es nicht: ${w}`);
             }
         }
+        // Ein installiertes Paket (Paket-Betrieb nach P4: node_modules statt packages/<x>/src) liest der Scanner nicht;
+        // seine Liste prueft das Paket-Repo selbst (slopdogs-base-dogs, Paket-Test). Hier zaehlt nur, was als Quelle da ist.
+        const hasLocalSource = (pack) => fs.existsSync(path.join(ROOT, 'packages', pack, 'src'));
         for (const [pack, vars] of declared) {
+            if (!hasLocalSource(pack)) continue;
             const reads = readsByPackage.get(pack) || new Map();
             for (const spec of vars) {
                 if (![spec.name, ...(spec.anyOf ?? []), ...(spec.aliases ?? [])].some((n) => reads.has(n)))
