@@ -20,6 +20,7 @@ import { LandingKennels } from '../../mcp/auth/landingKennels';
 import { canMutateNode } from '../../mcp/auth/permissions';
 import { IStore } from '../../store/IStore';
 import { paramString } from '../utils/routeParams';
+import { KennelController } from '../KennelController';
 import { ListQuery } from './ListQuery';
 import { firstRefusedDogRef, refusedDogRefMessage, type RefusedDogRef } from '../../services/dogAccess';
 import type { KennelStatsService } from '../../services/KennelStatsService';
@@ -349,6 +350,9 @@ export class ConfigRouteHandler {
             const result = await controller.create(input);
             if (result.ok) {
                 res.status(200).json({ ok: true, id: result.id, data: result.data });
+            } else if (result.code === KennelController.ID_TAKEN) {
+                // Doppelte Kennel-ID ist ein Konflikt, kein Serverfehler — Liste und Kennel zeigen den Text am Feld.
+                res.status(409).json({ error: KennelController.ID_TAKEN, error_description: 'That ID is taken.' });
             } else {
                 res.status(500).json({ error: result.error });
             }

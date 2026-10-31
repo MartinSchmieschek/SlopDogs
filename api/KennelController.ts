@@ -75,6 +75,8 @@ export interface KennelControllerOptions {
 }
 
 export class KennelController extends AbstractController<IKennelConfig> {
+    /** Code der Ablehnung, wenn die Kennel-ID (ohne Gross-/Kleinschreibung) schon vergeben ist — REST antwortet 409. */
+    static readonly ID_TAKEN = 'id_taken';
     private readonly KENNEL_TYPE = 'KennelConfig';
     private statsJanitor: IKennelStatsJanitor | null = null;
     private readonly refIndex: IKennelReferenceSink | null;
@@ -114,10 +116,13 @@ export class KennelController extends AbstractController<IKennelConfig> {
             if (input.id !== undefined && input.id !== null && input.id !== '') {
                 const idErr = kennelIdBlockedReason(input.id);
                 if (idErr) return { ok: false, error: idErr };
-                const clash = await this.findCaseCollision(input.id);
+                // Auch die exakt gleiche ID ist vergeben: create legt nur neue Kennels an, neue Versionen gehen ueber update.
+                const exact = (await this.store.findByLineage(this.KENNEL_TYPE, input.id)).length > 0;
+                const clash = exact ? input.id : await this.findCaseCollision(input.id);
                 if (clash) {
                     return {
                         ok: false,
+                        code: KennelController.ID_TAKEN,
                         error: `Kennel-ID ${input.id} ist schon vergeben (als ${clash}; Gross-/Kleinschreibung zaehlt nicht)`,
                     };
                 }

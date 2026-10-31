@@ -40,6 +40,8 @@ export interface IControllerResponse<T = any> {
     ok: boolean;
     data?: T;
     error?: string;
+    /** Maschinenlesbarer Grund eines Fehlschlags (z. B. `id_taken`), damit REST den Status waehlen kann. */
+    code?: string;
     id?: string;
 }
 
