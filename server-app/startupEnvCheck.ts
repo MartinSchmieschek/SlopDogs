@@ -3,7 +3,8 @@
  *
  * EINE Liste (`ENV_CATALOG`) traegt je Variable Abschnitt, Zweck, Default, Phase, Folge bei Fehlen und
  * die Pflicht-Regeln je NODE_ENV. Dieselbe Liste gliedert `.env.example` und `.env.integration.example`
- * (gleiche Abschnitte, gleiche Reihenfolge) — ein StartupTest prueft, dass jede Katalog-Variable dort steht.
+ * (gleiche Abschnitte, gleiche Reihenfolge). Der StartupTest, der das pruefte, ist mit P0.1 (PLAN-DOG-PAKETE)
+ * entfallen; die Pruefung Katalog <-> Beispiele <-> Code folgt in P1.5.
  *
  * Die Warnung beendet den Prozess NIE. Die harten Guards bleiben, wo sie sind:
  *   - scripts/load-env.cjs -> dbEnv.assertRequiredDbEnv (DbEnvError, Exit 1)
@@ -55,7 +56,7 @@ export interface EnvVarSpec {
 
 export interface EnvSectionSpec {
     readonly id: EnvSection;
-    /** Ueberschrift, wie sie in den .env-Dateien steht (ein StartupTest sucht sie dort). */
+    /** Ueberschrift, wie sie in den .env-Dateien steht. */
     readonly heading: string;
 }
 

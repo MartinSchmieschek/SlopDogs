@@ -46,6 +46,7 @@ import type { BaseDogInfo } from '../mcp/tools/types';
 import type { HttpFrontEndBinder, HttpFrontEndContext } from './httpFrontEndTypes';
 import { LandingPage } from './LandingPage';
 import { ResponseCompression } from './ResponseCompression';
+import type { TestResult } from '../StartupTest';
 
 export type CreateHttpApplicationInput = {
     nodeEnv: string;
@@ -75,6 +76,11 @@ export type CreateHttpApplicationResult = {
      * Rueckruf gereicht: main.ts ruft ihn ERST NACH httpServer.listen auf. Wirft nie.
      */
     runStartupTests: () => Promise<void>;
+    /**
+     * Die Selbsttest-Suite ohne Schalter und ohne Fang: liefert die Ergebnisse, damit
+     * `npm run test:startup` daraus einen Exit-Code machen kann. Laedt die Suite erst beim Aufruf.
+     */
+    runStartupSuite: () => Promise<TestResult[]>;
     /**
      * Aufraeum-Zusage fuer die Pools, die NUR hier drin entstehen (Auth-Client, Run-Cache).
      * main.ts kennt sie sonst nicht und koennte sie beim SIGTERM nicht freigeben — eine
@@ -302,17 +308,19 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     // damit den ganzen Dienst am Hochkommen gehindert: die Plattform sah keinen offenen Port und
     // startete in einer Schleife neu. Ein Selbsttest darf einen Dienst niemals am Start hindern.
     // Deshalb wird er nur noch als Rueckruf gereicht und von main.ts NACH dem Port-Bind gestartet.
+    const runStartupSuite = async (): Promise<TestResult[]> => {
+        // Erst hier geladen: die Suite samt ihrem Modulgraphen liegt sonst in jedem Prozess im Heap,
+        // auch dort, wo sie nie laeuft (integration ohne RUN_STARTUP_TESTS).
+        const { StartupTest } = await import('../StartupTest');
+        return new StartupTest().runAllTests(nodesStore, kennelsStore, nodesController, kennelsController, baseDogsMap, app);
+    };
     const runStartupTests = async (): Promise<void> => {
         if (!shouldRunStartupTests(input.nodeEnv)) {
             console.log(`[StartupTest] uebersprungen (NODE_ENV=${input.nodeEnv}) -- mit RUN_STARTUP_TESTS=1 erzwingbar.`);
             return;
         }
         try {
-            // Erst hier geladen: die Suite (8 000+ Zeilen samt ihrem Modulgraphen) liegt sonst in jedem
-            // Prozess im Heap, auch dort, wo sie nie laeuft (integration ohne RUN_STARTUP_TESTS).
-            const { StartupTest } = await import('../StartupTest');
-            const startupTest = new StartupTest();
-            await startupTest.runAllTests(nodesStore, kennelsStore, nodesController, kennelsController, baseDogsMap, app, authPrisma, keyStore);
+            await runStartupSuite();
         } catch (err) {
             // Laut scheitern, aber weiterlaufen -- der Dienst ist wichtiger als seine Selbstpruefung.
             console.error('[StartupTest] Suite abgebrochen -- der Dienst laeuft weiter:', err);
@@ -453,5 +461,5 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
         ]);
     };
 
-    return { app, serveBuiltAngular, runStartupTests, disconnect, keyStore };
+    return { app, serveBuiltAngular, runStartupTests, runStartupSuite, disconnect, keyStore };
 }

@@ -21,6 +21,7 @@ process.on('uncaughtException', (err) => {
 
 import { WebSocketChannelRetriever, registerVmGlobalCapability, setVmConsoleSink } from '@slopdogs/core';
 import http from 'http';
+import type { Application } from 'express';
 import fs from 'fs';
 import { ChannelHub } from './services/ChannelHub';
 import { IStore } from './store/IStore';
@@ -38,6 +39,7 @@ import { DogReferenceIndex } from './services/DogReferenceIndex';
 import { KeysCapability, scrubbingConsoleSink } from './services/keysCapability';
 import { logBootMemory } from './api/utils/memoryLog';
 import { Watchpost } from './services/Watchpost';
+import type { TestResult } from './StartupTest';
 import {
     assertSlimRegistryCoversKennelDbRefs,
     collectBaseDogNamesFromLatestKennels,
@@ -52,12 +54,69 @@ const dbEnv = require(path.join(process.cwd(), 'scripts', 'dbEnv.cjs')) as {
 };
 
 // Cast off the moorings — if our vessel fails to launch, we sink into the deep and trouble no man further.
-start().catch(e => {
-    console.error('Failed to start', e);
-    process.exit(1);
-});
+// Nur als Einstiegspunkt: `npm run test:startup` laedt dieses Modul fuer bootApplication, ohne zu lauschen.
+if (require.main === module) {
+    start().catch(e => {
+        console.error('Failed to start', e);
+        process.exit(1);
+    });
+}
+
+/** Ein hochgefahrener Server, der noch nicht lauscht — main.ts bindet ihn an den Port, der Startup-Runner nicht. */
+export type BootedApplication = {
+    app: Application;
+    serveBuiltAngular: boolean;
+    devUiOrigin: string;
+    channelHub: ChannelHub;
+    refIndex: DogReferenceIndex;
+    callCounter: KennelCallCounter;
+    store: PrismaStore;
+    jsonStorageService: JsonStorageService;
+    disconnectHttpApplication: () => Promise<void>;
+    runStartupTests: () => Promise<void>;
+    runStartupSuite: () => Promise<TestResult[]>;
+};
+
+export type BootOptions = {
+    /**
+     * Boot-Waechter (Registry deckt alle base:-Referenzen der Kennels in der DB) auch mit der vollen
+     * Registry pruefen. Ohne die Option laeuft er wie bisher nur mit der schlanken Registry (production/integration).
+     */
+    enforceKennelCoverage?: boolean;
+};
 
 async function start() {
+    const booted = await bootApplication();
+    const { app, serveBuiltAngular, devUiOrigin, channelHub, refIndex, callCounter, store, jsonStorageService, disconnectHttpApplication, runStartupTests } = booted;
+
+    const port = Number(process.env.PORT) || 3000;
+
+    // Eigener http.Server, damit der ChannelHub seinen WebSocketServer per Upgrade-Handler anhaengen kann.
+    const httpServer = http.createServer(app);
+    await channelHub.attach(httpServer);
+
+    registerGracefulShutdown({ httpServer, callCounter, store, jsonStorageService, disconnectHttpApplication });
+
+    console.log('App started.');
+    logBootMemory('App started');
+    // Render u. a.: öffentlich erreichbar nur bei Bind an 0.0.0.0; PORT kommt von der Plattform.
+    httpServer.listen(port, '0.0.0.0', () => {
+        const base = `http://localhost:${port}`;
+        if (!serveBuiltAngular) {
+            console.log(`API ${base} — Dev-UI-Redirect: ${base}/ → ${devUiOrigin}/`);
+        }
+        console.log(`Server läuft auf Port ${port}`);
+        // ERST JETZT Referenzindex und Selbsttests: der Port ist offen, die Plattform sieht einen gesunden
+        // Dienst. Die Selbsttests warten auf den Rebuild — sie schreiben in dieselbe Referenztabelle.
+        // Beide fangen intern alles ab und werfen nie.
+        void rebuildReferenceIndex(refIndex).then(() => runStartupTests());
+    });
+}
+
+/**
+ * Faehrt Stores, Seeds, Registry, Typen, Boot-Waechter und die Express-App hoch — alles bis vor listen().
+ */
+export async function bootApplication(options: BootOptions = {}): Promise<BootedApplication> {
     // Vor allem anderen — vor der Datenbank und vor createHttpApplication: ein Dienst, in dem
     // jeder Besucher Super-User ist, darf ausserhalb von dev gar nicht erst hochkommen (P3.5).
     const bootError = authModeBootError(process.env, (line) => console.log(line));
@@ -220,7 +279,7 @@ async function start() {
 
     TypeDefBuilder.registerPacts([...allPacts]);
 
-    if (useSlimBaseDogRegistry) {
+    if (useSlimBaseDogRegistry || options.enforceKennelCoverage) {
         const requiredFromDb = await collectBaseDogNamesFromLatestKennels(kennelsStore);
         assertSlimRegistryCoversKennelDbRefs(requiredFromDb, baseDogsMap, nodeEnvForRegistry, unavailableBaseDogNames);
     }
@@ -228,7 +287,7 @@ async function start() {
     const nodeEnv = process.env.NODE_ENV || 'development';
     const devUiOrigin = (process.env.DEV_UI_ORIGIN || 'http://localhost:4300').replace(/\/$/, '');
 
-    const { app, serveBuiltAngular, runStartupTests, disconnect: disconnectHttpApplication, keyStore } = await createHttpApplication({
+    const { app, serveBuiltAngular, runStartupTests, runStartupSuite, disconnect: disconnectHttpApplication, keyStore } = await createHttpApplication({
         nodeEnv,
         devUiOrigin,
         serverRootDir: __dirname,
@@ -250,28 +309,19 @@ async function start() {
     new KeysCapability(keyStore).register();
     setVmConsoleSink(scrubbingConsoleSink);
 
-    const port = Number(process.env.PORT) || 3000;
-
-    // Eigener http.Server, damit der ChannelHub seinen WebSocketServer per Upgrade-Handler anhaengen kann.
-    const httpServer = http.createServer(app);
-    await channelHub.attach(httpServer);
-
-    registerGracefulShutdown({ httpServer, callCounter, store, jsonStorageService, disconnectHttpApplication });
-
-    console.log('App started.');
-    logBootMemory('App started');
-    // Render u. a.: öffentlich erreichbar nur bei Bind an 0.0.0.0; PORT kommt von der Plattform.
-    httpServer.listen(port, '0.0.0.0', () => {
-        const base = `http://localhost:${port}`;
-        if (!serveBuiltAngular) {
-            console.log(`API ${base} — Dev-UI-Redirect: ${base}/ → ${devUiOrigin}/`);
-        }
-        console.log(`Server läuft auf Port ${port}`);
-        // ERST JETZT Referenzindex und Selbsttests: der Port ist offen, die Plattform sieht einen gesunden
-        // Dienst. Die Selbsttests warten auf den Rebuild — sie schreiben in dieselbe Referenztabelle.
-        // Beide fangen intern alles ab und werfen nie.
-        void rebuildReferenceIndex(refIndex).then(() => runStartupTests());
-    });
+    return {
+        app,
+        serveBuiltAngular,
+        devUiOrigin,
+        channelHub,
+        refIndex,
+        callCounter,
+        store,
+        jsonStorageService,
+        disconnectHttpApplication,
+        runStartupTests,
+        runStartupSuite,
+    };
 }
 
 /**
@@ -281,8 +331,8 @@ async function start() {
  */
 const REFERENCE_REBUILD_DELAY_MS = 3_000;
 
-async function rebuildReferenceIndex(refIndex: DogReferenceIndex): Promise<void> {
-    await new Promise((resolve) => setTimeout(resolve, REFERENCE_REBUILD_DELAY_MS));
+export async function rebuildReferenceIndex(refIndex: DogReferenceIndex, delayMs: number = REFERENCE_REBUILD_DELAY_MS): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
     try {
         const rebuilt = await refIndex.rebuild();
         console.log(`[DogReferenceIndex] rebuild: ${rebuilt.rows} Referenzen aus ${rebuilt.kennels} Kennels und ${rebuilt.dogs} Dogs in ${rebuilt.durationMs} ms`);

@@ -273,8 +273,7 @@ function positiveIntFromEnv(name, fallback) {
  * Vier sind es exakt: PrismaStore (main.ts), Auth-Client (createHttpApplication),
  * PrismaCacheHandler und JsonStorageService — mehr PrismaClient-Instanzen entstehen im
  * Server-Prozess nicht (PrismaTileFeatureCache teilt sich den Cache-Client, der Session-
- * Store liegt im Speicher). Nur mit RUN_STARTUP_TESTS kommt kurzzeitig ein fuenfter
- * dazu; der schliesst sich im finally von testTileFeatureCache selbst.
+ * Store liegt im Speicher).
  *
  * Die 4 sind ein bewusst konservativ gewaehltes Budget, KEIN gemessener Wert. Wer
  * misst, setzt DB_CONNECTION_LIMIT / DB_POOL_TIMEOUT — oder schreibt die Parameter

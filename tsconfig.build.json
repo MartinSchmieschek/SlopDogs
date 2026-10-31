@@ -14,7 +14,8 @@
     "services/**/*.ts",
     "server-registries/**/*.ts",
     "server-app/**/*.ts",
-    "mcp/**/*.ts"
+    "mcp/**/*.ts",
+    "test/**/*.ts"
   ],
   "exclude": ["node_modules", "ui-app", "dist", "packages"]
 }

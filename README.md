@@ -564,18 +564,16 @@ Calls: every kennel run is counted once, per day (UTC) and source; `stats.calls.
 
 ## Startup tests
 
-On every boot, `main.ts` runs [`StartupTest.runAllTests`](StartupTest.ts) — a self-check against the freshly initialised stores, controllers and BaseDogs map. Failures are logged and surface in the boot console; pass lines are summarised at the end. The suite covers Store / Controller plumbing, BaseDog availability, Pact / Mimic resolution, auto-mimic adoption, kennel export / import round-trip, the tile feature cache, and the **Kennel status-tracking contract** for `task`, `nodes` and `edges`:
+`npm run test:startup` boots the server without `listen()` (own SQLite files `test-startup*.db` next to the schemas, created fresh each run; `.env` is not read), runs the boot guard (`assertSlimRegistryCoversKennelDbRefs`), rebuilds the reference index, runs the suite and exits with **1 on any failure**, 0 otherwise. CI runs it after `npm test` (`.github/workflows/ci.yml`).
 
-| Test | What it pins |
-|------|--------------|
-| `KennelConfig: Status-Tracking Persistence` | Create → save with `task` + `nodes` + `edges` → reload — all fields, positions and comments survive verbatim. |
-| `KennelConfig: Status-Tracking Merge` | Partial saves (`{task}` only, `{nodes}` only) leave untouched fields intact — guards the merge semantics in `KennelController.save`. |
-| `KennelConfig: Status-Tracking Text-Aenderungen` | Mutating an existing `task` / `node.comment` / `edge.comment` updates the latest version while older versions keep the old text; clearing `task` with `""` doesn't wipe other fields. |
-| `KennelConfig: Node-Comment Mutationen` | Multi-node arrays: change one comment, drop one (keep position), add a fresh node, remove an old one — verified against current state **and** version history. |
-| `KennelConfig: Edge-Comment Mutationen` | Multi-edge arrays: same shape as node mutations, including removing an edge entirely and adding a feedback edge later. |
-| `KennelConfig: Status-Tracking Versioning` | Three text edits → three new versions, newest-first, each with its own snapshot. Identical no-op save produces **no** phantom version. Historical version-GUID fetches return the frozen text. |
+The suite ([`StartupTest.runAllTests`](StartupTest.ts)) has two blocks:
 
-If a status-tracking save ever stops behaving as documented, the boot console flags exactly which guarantee broke before any kennel work begins.
+| Block | Tests | Detects |
+|------|-------|---------|
+| Minimum set (`StartupTest.ts`) | `testBaseDogsAvailability`, `testRouteTableMatchesExpressStack`, `testRunnerSeesOutputNotCode`, `testLeadFailureIsNot200`, `testPrivateKennelHiddenFromAnon`, `testRightsMatrix` | a broken boot, a broken kennel run, a broken access check |
+| Package candidates ([`test/startup/packageCandidates.ts`](test/startup/packageCandidates.ts)) | core mechanics (Pact, MimicDog, `fillKennel`, `runSeason`, lobby, auto BodyRetriever) and two dog tests | move to `slopdogs-core` / `slopdogs-base-dogs` as package tests (PLAN-DOG-PAKETE P4) |
+
+The running dev server still runs the same suite after the reference index rebuild (`RUN_STARTUP_TESTS`: default on in development, off elsewhere; `1` forces it, `0` disables it). It writes test rows with their own IDs into the configured database and removes them afterwards.
 
 ## Tech Stack
 
@@ -649,7 +647,7 @@ The real build runs through dedicated configs that write into `dist/` only:
 
 | Script | Config | Output |
 |--------|--------|--------|
-| `npm run build` | root [`tsconfig.build.json`](tsconfig.build.json) | `./dist` (main.ts + api/services/store/mcp) |
+| `npm run build` | root [`tsconfig.emit.json`](tsconfig.emit.json) (= `tsconfig.build.json` without the `packages/*/src` paths, so no `dist/packages`) | `./dist` (main.ts + api/services/store/mcp) |
 | `npm run build:core` | [`packages/core/tsconfig.json`](packages/core/tsconfig.json) | `packages/core/dist` |
 | `npm run build:dogs-<x>` | `packages/dogs-<x>/tsconfig.json` | `packages/dogs-<x>/dist` |
 
@@ -659,7 +657,7 @@ If you ever see a `.js` file inside `packages/*/src/`, `api/`, `mcp/`, `services
 
 **Integration mode** (`NODE_ENV=integration`) is a **staging profile** added for the stretch between local dev and a full production deploy: exercise the app against **external databases** (PostgreSQL for the main store and the HTTP cache — see [`.env.integration.example`](.env.integration.example)) and run with the **built Angular UI only** (no `ng serve`; Express serves `ui-app/dist/.../browser` from the same port as the API).
 
-Typical flow: configure `.env.integration` with your hosted URLs, run `npm run prisma:sync:integration` to align schemas, build the backend with **`npm run build:prod`**, the frontend with **`npm run ui:build:integration`** (injects `PUBLIC_API_BASE_URL` using `NODE_ENV=integration`), then start locally with **`npm run start:integration`** (runs `main.ts` via ts-node). On a host that serves **compiled** output only (e.g. **Render**), use **Build Command** **`npm run render:integration:build`** (runs `npm install`, then `build:prod`, then `ui:build:integration`) and **Start Command** **`npm run start:integration:dist`** — it runs `dist/main.js` with `NODE_ENV=integration`. Use this as a **pre-release** checkpoint before going fully online.
+Typical flow: configure `.env.integration` with your hosted URLs, run `npm run prisma:sync:integration` to align schemas, build the backend with **`npm run build:prod`**, the frontend with **`npm run ui:build:integration`** (injects `PUBLIC_API_BASE_URL` using `NODE_ENV=integration`), then start locally with **`npm run start:integration`** (runs `main.ts` via ts-node). On a host that serves **compiled** output only (e.g. **Render**), use **Build Command** **`npm run render:integration:build`** (runs `npm ci` — whose postinstall builds the packages once —, then `build:prod`, then `ui:build:integration`) and **Start Command** **`npm run start:integration:dist`** — it runs `dist/main.js` with `NODE_ENV=integration`. Use this as a **pre-release** checkpoint before going fully online.
 
 **Production** and **integration** both load the **reduced Base-Dog registry** (`server-registries/slimDeployRegistry.ts`); only **`NODE_ENV=development`** uses the full set (`fullRegistry.ts`). On slim profiles, startup **fails fast** if any **latest** Kennel row in the DB references a `base:…` dog that is not registered — so RAM stays minimal without silently breaking existing kennels. After adding seed kennels that reference new `BASE_DOG_PREFIX + '…'` names, extend that slim registry (or keep **`npm run check:integration-dogs`** green — it scans `seed-data/**/*.ts` against `SLIM_DEPLOY_BASE_DOG_NAMES`).
 
@@ -789,15 +787,16 @@ const allPacts = [ ..., MyDogQueryPact ];
 "@slopdogs/dogs-mydog": ["packages/dogs-mydog/src/index.ts"]
 ```
 
-**Root `package.json`** — add dependency, build script, and typecheck:
+**Root `package.json`** — add dependency and build script (`npm run typecheck:packages` finds the new package by itself):
 ```json
 "dependencies": { "@slopdogs/dogs-mydog": "file:packages/dogs-mydog" }
 "scripts": {
   "build:dogs-mydog": "cd packages/dogs-mydog && npx tsc",
-  "build:dogs": "... && npm run build:dogs-mydog",
-  "typecheck:dogs": "... && cd ../dogs-mydog && npx tsc --noEmit"
+  "build:dogs": "... && npm run build:dogs-mydog"
 }
 ```
+
+The package's own `package.json` declares `typescript` and `@types/node` as devDependencies, so it also builds outside the monorepo.
 
 Then run `npm install` so the symlink in `node_modules/@slopdogs/dogs-mydog` is created.
 
