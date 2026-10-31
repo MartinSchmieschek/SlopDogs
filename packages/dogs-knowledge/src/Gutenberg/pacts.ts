@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface GutenbergQuery {
     /** Volltext-Suche (Autor, Titel, Schlagwoerter) */
@@ -11,7 +11,4 @@ export interface GutenbergQuery {
     page?: number;
 }
 
-export const GutenbergQueryPact = createPact<GutenbergQuery>(
-    "GutenbergQueryProvider",
-    { fromSourceType: "GutenbergQuery" }
-);
+export const GutenbergQueryPact = createPact<GutenbergQuery>('GutenbergQueryProvider', { fromSourceType: 'GutenbergQuery' });

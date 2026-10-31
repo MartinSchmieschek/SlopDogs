@@ -12,10 +12,12 @@ const PACKAGE_DIR = /[\\/]packages[\\/]([^\\/]+)[\\/]/;
 const INDEX_FILE = /[\\/]index\.[cm]?[jt]s$/;
 
 export class BaseDogPacks {
-    private constructor(private readonly byClass: ReadonlyMap<Function, string>) { }
+    private constructor(private readonly byClass: ReadonlyMap<Function, string>) {}
 
     /** Reads `require.cache` (CommonJS: ts-node in development, dist in production and integration). */
-    static fromLoadedModules(cache: Record<string, ModuleLike | undefined> = require.cache as Record<string, ModuleLike | undefined>): BaseDogPacks {
+    static fromLoadedModules(
+        cache: Record<string, ModuleLike | undefined> = require.cache as Record<string, ModuleLike | undefined>,
+    ): BaseDogPacks {
         const found = new Map<Function, { pack: string; viaIndex: boolean }>();
         for (const mod of Object.values(cache)) {
             const match = mod?.filename ? PACKAGE_DIR.exec(mod.filename) : null;
@@ -33,7 +35,7 @@ export class BaseDogPacks {
     packOf(dog: unknown): string | null {
         if (typeof dog === 'function') return this.byClass.get(dog) ?? null;
         const ctor = (dog as { constructor?: Function } | null)?.constructor;
-        return ctor ? this.byClass.get(ctor) ?? null : null;
+        return ctor ? (this.byClass.get(ctor) ?? null) : null;
     }
 
     private static exportedFunctions(exports: unknown): Function[] {

@@ -13,16 +13,29 @@ import { canRun } from '../mcp/auth/visibility';
 export interface DogStats {
     /** failures = error + timeout + oom ueber alle Tage, failures30d dieselben im 30-Tage-Fenster (Fehler-Tracking P4b). */
     calls: {
-        total: number; last30d: number; ranked30d: number; failures: number; failures30d: number; cached30d: number;
-        avgDurationMs: number | null; maxDurationMs: number; kennelsRun30d: number;
+        total: number;
+        last30d: number;
+        ranked30d: number;
+        failures: number;
+        failures30d: number;
+        cached30d: number;
+        avgDurationMs: number | null;
+        maxDurationMs: number;
+        kennelsRun30d: number;
     };
     reuse: { kennelsDirect: number; kennelsTransitive: number; kennelsForeign: number; owners: number; dependents: number };
     proven: { score: number; badge: boolean; reliability: number };
 }
 
 export interface DogUsageKennel {
-    lineageId: string; name: string | null; visibility: string; ownerId: string | null;
-    via: 'crew' | 'transitive'; count30d: number; failures30d: number; url: string;
+    lineageId: string;
+    name: string | null;
+    visibility: string;
+    ownerId: string | null;
+    via: 'crew' | 'transitive';
+    count30d: number;
+    failures30d: number;
+    url: string;
 }
 
 export interface DogUsage {
@@ -48,7 +61,14 @@ export interface DogStatsDirectory {
 }
 
 /** Die Groessen der Formel (4b.6). */
-export interface ProvenInput { r: number; n: number; f: number; k: number; kf: number; s: number | null }
+export interface ProvenInput {
+    r: number;
+    n: number;
+    f: number;
+    k: number;
+    kf: number;
+    s: number | null;
+}
 
 type CallCounts = Omit<DogCallAggregate, 'dogKey'>;
 
@@ -76,8 +96,16 @@ interface DogStatsMemo {
 
 const DAY_MS = 86_400_000;
 const NO_CALLS: CallCounts = {
-    total: 0, last30d: 0, ranked30d: 0, failures: 0, failures30d: 0, cached30d: 0,
-    durationMsSum30d: 0, count30d: 0, durationMsMax30d: 0, kennelsRun30d: 0,
+    total: 0,
+    last30d: 0,
+    ranked30d: 0,
+    failures: 0,
+    failures30d: 0,
+    cached30d: 0,
+    durationMsSum30d: 0,
+    count30d: 0,
+    durationMsMax30d: 0,
+    kennelsRun30d: 0,
 };
 
 function positiveIntFromEnv(name: string, fallback: number): number {
@@ -159,7 +187,10 @@ export class DogStatsService {
      * oder ueber einen Dog, der ihn braucht (via transitive) — nur, was der Aufrufer ausfuehren darf;
      * der Rest zaehlt als hiddenKennels. Die Rechte am Dog selbst prueft der Aufrufer.
      */
-    async usageOf(node: StatsDog & { parentsRequired?: string[]; parentsOptional?: string[] }, ctx: AuthCtx | undefined): Promise<DogUsage> {
+    async usageOf(
+        node: StatsDog & { parentsRequired?: string[]; parentsOptional?: string[] },
+        ctx: AuthCtx | undefined,
+    ): Promise<DogUsage> {
         const memo = await this.current();
         const dogKey = dogKeyOfNode(node);
         const reuse = this.reuseOf(memo, dogKey);
@@ -181,12 +212,20 @@ export class DogStatsService {
         let hidden = 0;
         for (const lineageId of reuse.transitive) {
             const k = kennelByLineage.get(lineageId);
-            if (!k || !canRun(k, ctx)) { hidden += 1; continue; }
+            if (!k || !canRun(k, ctx)) {
+                hidden += 1;
+                continue;
+            }
             const c = counts.get(lineageId) ?? { count30d: 0, failures30d: 0 };
             visible.push({
-                lineageId, name: k.name ?? null, visibility: k.visibility ?? 'public', ownerId: k.ownerId ?? null,
+                lineageId,
+                name: k.name ?? null,
+                visibility: k.visibility ?? 'public',
+                ownerId: k.ownerId ?? null,
                 via: reuse.direct.has(lineageId) ? 'crew' : 'transitive',
-                count30d: c.count30d, failures30d: c.failures30d, url: publicKennelPath(lineageId),
+                count30d: c.count30d,
+                failures30d: c.failures30d,
+                url: publicKennelPath(lineageId),
             });
         }
         visible.sort((a, b) => b.count30d - a.count30d || a.lineageId.localeCompare(b.lineageId));
@@ -208,8 +247,9 @@ export class DogStatsService {
 
         const own = memo.parentsOf.get(dogKey);
         const baseName = (x: string) => (x.startsWith(BASE_DOG_PREFIX) ? x : BASE_DOG_PREFIX + x);
-        const dependencies = own
-            ?? (dogKey.startsWith(BASE_DOG_PREFIX)
+        const dependencies =
+            own ??
+            (dogKey.startsWith(BASE_DOG_PREFIX)
                 ? { required: (node.parentsRequired ?? []).map(baseName), optional: (node.parentsOptional ?? []).map(baseName) }
                 : { required: [], optional: [] });
         return { ok: true, dogKey, kennels: visible, hiddenKennels: hidden, dependents, dependencies, byOwner };
@@ -221,7 +261,11 @@ export class DogStatsService {
         this.loading = null;
         this.generation += 1;
         for (const listener of this.invalidationListeners) {
-            try { listener(); } catch { /* ein Zuhoerer darf die Invalidierung nicht brechen */ }
+            try {
+                listener();
+            } catch {
+                /* ein Zuhoerer darf die Invalidierung nicht brechen */
+            }
         }
     }
 
@@ -264,7 +308,14 @@ export class DogStatsService {
                 owners,
                 dependents: reuse.dependents.size,
             },
-            proven: DogStatsService.proven({ r: calls.ranked30d, n: count30d, f: calls.failures30d, k: reuse.transitive.size, kf: kennelsForeign, s }),
+            proven: DogStatsService.proven({
+                r: calls.ranked30d,
+                n: count30d,
+                f: calls.failures30d,
+                k: reuse.transitive.size,
+                kf: kennelsForeign,
+                s,
+            }),
         };
     }
 
@@ -310,14 +361,14 @@ export class DogStatsService {
         const generation = this.generation;
         const sinceDay = utcDay(new Date(at - (DogStatsService.WINDOW_DAYS - 1) * DAY_MS));
         this.memoLoadCount += 1;
-        const [callRows, refRows] = await Promise.all([
-            this.store.readDogCallAggregates(sinceDay),
-            this.store.readAllReferences(),
-        ]);
+        const [callRows, refRows] = await Promise.all([this.store.readDogCallAggregates(sinceDay), this.store.readAllReferences()]);
         const calls = new Map<string, CallCounts>();
         for (const { dogKey, ...counts } of callRows) calls.set(dogKey, counts);
         const memo: DogStatsMemo = {
-            at, sinceDay, calls, references: refRows.length,
+            at,
+            sinceDay,
+            calls,
+            references: refRows.length,
             ...DogStatsService.indexReferences(refRows),
             reuse: new Map(),
         };
@@ -341,7 +392,7 @@ export class DogStatsService {
             const kind = r.kind === 'optional' ? 'optional' : 'required';
             if (!dependentsOf.has(r.toKey)) dependentsOf.set(r.toKey, new Map());
             const deps = dependentsOf.get(r.toKey)!;
-            if (deps.get(r.fromKey) !== 'required') deps.set(r.fromKey, kind);   // required schlaegt optional
+            if (deps.get(r.fromKey) !== 'required') deps.set(r.fromKey, kind); // required schlaegt optional
             if (!parentsOf.has(r.fromKey)) parentsOf.set(r.fromKey, { required: [], optional: [] });
             parentsOf.get(r.fromKey)![kind].push(r.toKey);
         }

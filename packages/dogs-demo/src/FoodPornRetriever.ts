@@ -12,8 +12,8 @@
  * ============================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason } from "@slopdogs/core";
-import { RandomRecipesRetriever } from "./RandomRecipesRetriever";
+import { Dog, IHuntingDog, IHuntingSeason } from '@slopdogs/core';
+import { RandomRecipesRetriever } from './RandomRecipesRetriever';
 
 /**
  * Arr, the FoodPornRetriever -- this eldritch hound scours the YouTube abyss
@@ -22,21 +22,20 @@ import { RandomRecipesRetriever } from "./RandomRecipesRetriever";
  * upon the YouTube API, forging queries from recipe names dragged out of the void.
  * Corporeal laws unwritten, the response it yields defies mortal comprehension.
  */
-export class FoodPornRetriever extends Dog<unknown>{
-
+export class FoodPornRetriever extends Dog<unknown> {
     /** Arr, no required crew -- this vessel sails alone into the nameless dark */
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
-        return []
+        return [];
     }
 
     /** No optional hands on deck neither, matey -- the void needs no witnesses */
     get optional(): (new (...args: any[]) => Dog<unknown>)[] {
-        return []
+        return [];
     }
 
     /** The name of this abyssal hound, from brooding gulfs are we beheld */
     get name(): string {
-        return FoodPornRetriever.name
+        return FoodPornRetriever.name;
     }
 
     get description(): string {
@@ -47,11 +46,9 @@ export class FoodPornRetriever extends Dog<unknown>{
      * Arr, the yield collector -- a thin anchor line cast into the season's exhausted depths.
      * It returns whatever horrors the request dredges up from the deep.
      */
-    protected yieldCollectorFactory: (season:IHuntingSeason) => Promise<unknown> = (season:IHuntingSeason) => {
-
-            return this.request(season)
-
-    }
+    protected yieldCollectorFactory: (season: IHuntingSeason) => Promise<unknown> = (season: IHuntingSeason) => {
+        return this.request(season);
+    };
 
     /**
      * Arr, we plunder the YouTube seas for visions of the dish, matey.
@@ -62,35 +59,32 @@ export class FoodPornRetriever extends Dog<unknown>{
      * @param season - The hunting season, carryin' the exhausted remains of prior voyages into the void
      * @returns The eldritch YouTube search results hauled from the deep, their form unknowable
      */
-    public async request(season:IHuntingSeason): Promise<unknown> {
-
-        let theDish = season.exhausted.find(item => item instanceof RandomRecipesRetriever)
-        if (theDish && theDish.collected && !(theDish.collected instanceof Error)){
-
+    public async request(season: IHuntingSeason): Promise<unknown> {
+        let theDish = season.exhausted.find((item) => item instanceof RandomRecipesRetriever);
+        if (theDish && theDish.collected && !(theDish.collected instanceof Error)) {
             // Arr, assemble the search text -- the dish name and "fast", whispered like a void incantation
-            let searchText = [theDish.collected.name, "fast"]
+            let searchText = [theDish.collected.name, 'fast'];
 
             // Forge the query string, matey -- corporeal laws are unwritten as we shape the URL
-            let searchString = "q=" + searchText.join(" ")
+            let searchString = 'q=' + searchText.join(' ');
 
             // Cast our net into the YouTube abyss -- may the eldritch API answer our call
             // The key comes from the environment (YOUTUBE_API_KEY), never from the code.
             const apiKey = process.env.YOUTUBE_API_KEY?.trim();
-            if (!apiKey) throw new Error('FoodPornRetriever: YOUTUBE_API_KEY not set. Create a YouTube Data API v3 key in the Google Cloud Console.');
-            let url = 'https://youtube.googleapis.com/youtube/v3/search?part=snippet&'+searchString+'&key='+encodeURIComponent(apiKey)
-            const reciepResponse = await fetch(url)
+            if (!apiKey)
+                throw new Error(
+                    'FoodPornRetriever: YOUTUBE_API_KEY not set. Create a YouTube Data API v3 key in the Google Cloud Console.',
+                );
+            let url =
+                'https://youtube.googleapis.com/youtube/v3/search?part=snippet&' + searchString + '&key=' + encodeURIComponent(apiKey);
+            const reciepResponse = await fetch(url);
 
             // Parse the response hauled from the deep -- to cosmic forms from tangent planes
-            let result = await reciepResponse.json()
+            let result = await reciepResponse.json();
             return result;
         }
 
         // Arr, if no dish was found, the void swallows us whole
-        else
-            throw new Error("No yield prequisites to build on.")
-
-
-
+        else throw new Error('No yield prequisites to build on.');
     }
-
 }

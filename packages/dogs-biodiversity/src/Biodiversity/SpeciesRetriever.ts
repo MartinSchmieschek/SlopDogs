@@ -13,10 +13,10 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from "@slopdogs/core";
-import { getSpecies } from "./biodiversityApiClient";
-import type { BiodiversityResult } from "./interfaces/biodiversityTypes";
-import { BiodiversityQueryPact, type BiodiversityQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@slopdogs/core';
+import { getSpecies } from './biodiversityApiClient';
+import type { BiodiversityResult } from './interfaces/biodiversityTypes';
+import { BiodiversityQueryPact, type BiodiversityQuery } from './pacts';
 
 /**
  * Arr, the SpeciesRetriever — a spectral hound that sniffs out
@@ -40,7 +40,7 @@ export class SpeciesRetriever extends Dog<BiodiversityResult> implements ICachea
     }
 
     get icon(): string | undefined {
-        return "\uD83E\uDD8E";
+        return '\uD83E\uDD8E';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -52,7 +52,7 @@ export class SpeciesRetriever extends Dog<BiodiversityResult> implements ICachea
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<BiodiversityResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(BiodiversityQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(BiodiversityQueryPact, d));
         const query = (queryDog?.collected as BiodiversityQuery | undefined) ?? ({} as BiodiversityQuery);
 
         const lat = parseFloat(query['lat']);
@@ -65,14 +65,12 @@ export class SpeciesRetriever extends Dog<BiodiversityResult> implements ICachea
             throw new Error('SpeciesRetriever: Missing required query params (lat, lng)');
         }
 
-        const key = geoBucketKey("species", lat, lng, radiusKm * 1000, {
+        const key = geoBucketKey('species', lat, lng, radiusKm * 1000, {
             extras: { taxon: taxon ?? 'all', months: months ?? 'all' },
         });
 
         if (this.cacheHandler) {
-            return this.cacheHandler.getOrFetch(key, 30 * 60_000, () =>
-                getSpecies(lat, lng, radiusKm, taxon, months)
-            );
+            return this.cacheHandler.getOrFetch(key, 30 * 60_000, () => getSpecies(lat, lng, radiusKm, taxon, months));
         }
         return getSpecies(lat, lng, radiusKm, taxon, months);
     };

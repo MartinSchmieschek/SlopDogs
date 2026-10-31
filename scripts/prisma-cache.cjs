@@ -18,8 +18,7 @@ const variant = process.argv[3];
 const usePostgres = variant === 'postgres';
 const cacheSchema = usePostgres ? 'store/prisma-cache/schema.postgres.prisma' : 'store/prisma-cache/schema.prisma';
 
-const forceResetIntegration =
-    process.env.PRISMA_SYNC_FORCE_RESET === '1' && process.env.NODE_ENV === 'integration';
+const forceResetIntegration = process.env.PRISMA_SYNC_FORCE_RESET === '1' && process.env.NODE_ENV === 'integration';
 const pushResetFlag = forceResetIntegration ? ' --force-reset' : '';
 
 const cmd =

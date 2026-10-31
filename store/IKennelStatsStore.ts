@@ -3,18 +3,43 @@
 // die einzige Identitaet ist die userId einer Bewertung oder eines Favoriten.
 
 export const KENNEL_CALL_SOURCES = [
-    'public', 'api-execute', 'mcp-execute',                                 // "Nutzung" — rankt
-    'api-run', 'mcp-run', 'mcp-snapshot', 'mcp-build', 'swagger', 'unknown', // gespeichert, rankt nicht
-    'landing',                                                               // Lauf fuer / (P5): gespeichert, rankt nicht
+    'public',
+    'api-execute',
+    'mcp-execute', // "Nutzung" — rankt
+    'api-run',
+    'mcp-run',
+    'mcp-snapshot',
+    'mcp-build',
+    'swagger',
+    'unknown', // gespeichert, rankt nicht
+    'landing', // Lauf fuer / (P5): gespeichert, rankt nicht
 ] as const;
-export type KennelCallSource = typeof KENNEL_CALL_SOURCES[number];
+export type KennelCallSource = (typeof KENNEL_CALL_SOURCES)[number];
 /** Quellen, die in rankedTotal/ranked30d einfliessen. Einzige Stelle fuer diese Regel. */
 export const RANKED_CALL_SOURCES: readonly KennelCallSource[] = ['public', 'api-execute', 'mcp-execute'];
 
-export interface KennelCallDelta { lineageId: string; day: string; source: KennelCallSource; count: number; leadFailed: number; }
+export interface KennelCallDelta {
+    lineageId: string;
+    day: string;
+    source: KennelCallSource;
+    count: number;
+    leadFailed: number;
+}
 /** leadFailed zaehlt ueber alle Tage, leadFailed30d im selben Fenster wie last30d (Filter usage=failing). */
-export interface KennelCallAggregate { lineageId: string; total: number; last30d: number; leadFailed: number; leadFailed30d: number; rankedTotal: number; ranked30d: number; }
-export interface KennelRatingAggregate { lineageId: string; count: number; sum: number; }
+export interface KennelCallAggregate {
+    lineageId: string;
+    total: number;
+    last30d: number;
+    leadFailed: number;
+    leadFailed30d: number;
+    rankedTotal: number;
+    ranked30d: number;
+}
+export interface KennelRatingAggregate {
+    lineageId: string;
+    count: number;
+    sum: number;
+}
 export type KennelRatingHistogram = { 1: number; 2: number; 3: number; 4: number; 5: number };
 
 export interface IKennelStatsStore {
@@ -45,24 +70,50 @@ export interface IKennelStatsStore {
 
 /** Ein Delta je (dogKey, kennelLineageId, day, source) — Zaehlungen je Ergebnisklasse plus Cache und Dauer. */
 export interface DogCallDelta {
-    dogKey: string; kennelLineageId: string; day: string; source: KennelCallSource;
-    count: number; ok: number; cached: number; errors: number; timeouts: number; oom: number;
-    cacheHits: number; cacheMisses: number; durationMsSum: number; durationMsMax: number;
+    dogKey: string;
+    kennelLineageId: string;
+    day: string;
+    source: KennelCallSource;
+    count: number;
+    ok: number;
+    cached: number;
+    errors: number;
+    timeouts: number;
+    oom: number;
+    cacheHits: number;
+    cacheMisses: number;
+    durationMsSum: number;
+    durationMsMax: number;
 }
 export interface DogCallAggregate {
     dogKey: string;
-    total: number; last30d: number; ranked30d: number;
-    failures: number;               // errors + timeouts + oom, alle Tage (Filter usage=never_worked)
-    failures30d: number;            // errors + timeouts + oom, 30 d
-    cached30d: number; durationMsSum30d: number; count30d: number; durationMsMax30d: number;
-    kennelsRun30d: number;          // distinct kennelLineageId mit count > 0 in 30 d
+    total: number;
+    last30d: number;
+    ranked30d: number;
+    failures: number; // errors + timeouts + oom, alle Tage (Filter usage=never_worked)
+    failures30d: number; // errors + timeouts + oom, 30 d
+    cached30d: number;
+    durationMsSum30d: number;
+    count30d: number;
+    durationMsMax30d: number;
+    kennelsRun30d: number; // distinct kennelLineageId mit count > 0 in 30 d
 }
-export interface DogKennelUsage { dogKey: string; kennelLineageId: string; count30d: number; failures30d: number; }
+export interface DogKennelUsage {
+    dogKey: string;
+    kennelLineageId: string;
+    count30d: number;
+    failures30d: number;
+}
 export type DogReferenceFromKind = 'kennel' | 'dog';
 export type DogReferenceKind = 'crew' | 'required' | 'optional';
 export interface DogReferenceRow {
-    fromKind: DogReferenceFromKind; fromKey: string; toKey: string; kind: DogReferenceKind;
-    position: number; fromOwnerId: string | null; resolved: 0 | 1;
+    fromKind: DogReferenceFromKind;
+    fromKey: string;
+    toKey: string;
+    kind: DogReferenceKind;
+    position: number;
+    fromOwnerId: string | null;
+    resolved: 0 | 1;
 }
 
 export interface IDogStatsStore {

@@ -1,4 +1,4 @@
-import type { GeoNamesResult, GeoNamesNearbyEntry } from "./interfaces/geoNamesTypes";
+import type { GeoNamesResult, GeoNamesNearbyEntry } from './interfaces/geoNamesTypes';
 
 /**
  * GeoNames verlangt einen kostenlosen Username. Ohne Eintrag in
@@ -6,10 +6,10 @@ import type { GeoNamesResult, GeoNamesNearbyEntry } from "./interfaces/geoNamesT
  * rate-limited und nur zum Testen geeignet.
  */
 function geoNamesUsername(): string {
-    return process.env.GEONAMES_USERNAME?.trim() || "demo";
+    return process.env.GEONAMES_USERNAME?.trim() || 'demo';
 }
 
-const GEONAMES_BASE = "https://secure.geonames.org";
+const GEONAMES_BASE = 'https://secure.geonames.org';
 
 async function geoNamesFetch<T>(url: string): Promise<T> {
     const controller = new AbortController();
@@ -17,17 +17,17 @@ async function geoNamesFetch<T>(url: string): Promise<T> {
     let res: Response;
     try {
         res = await fetch(url, {
-            headers: { "Accept": "application/json", "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)" },
+            headers: { Accept: 'application/json', 'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)' },
             signal: controller.signal,
         });
     } finally {
         clearTimeout(timer);
     }
     if (!res.ok) {
-        const text = await res.text().catch(() => "");
+        const text = await res.text().catch(() => '');
         throw new Error(`geonames failed: ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
     }
-    const body = await res.json() as any;
+    const body = (await res.json()) as any;
     if (body.status) {
         throw new Error(`geonames error: ${body.status.message ?? JSON.stringify(body.status)}`);
     }

@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface NasaApodQuery {
     /** Datum YYYY-MM-DD (default: heute) */
@@ -7,7 +7,4 @@ export interface NasaApodQuery {
     hd?: boolean;
 }
 
-export const NasaApodQueryPact = createPact<NasaApodQuery>(
-    "NasaApodQueryProvider",
-    { fromSourceType: "NasaApodQuery" }
-);
+export const NasaApodQueryPact = createPact<NasaApodQuery>('NasaApodQueryProvider', { fromSourceType: 'NasaApodQuery' });

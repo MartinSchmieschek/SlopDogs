@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface ElevationQuery {
     /** Comma-separated latitudes or single lat */
@@ -17,7 +17,4 @@ export interface ElevationResult {
     points: ElevationPoint[];
 }
 
-export const ElevationQueryPact = createPact<ElevationQuery>(
-    "ElevationQueryProvider",
-    { fromSourceType: "ElevationQuery" }
-);
+export const ElevationQueryPact = createPact<ElevationQuery>('ElevationQueryProvider', { fromSourceType: 'ElevationQuery' });

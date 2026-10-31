@@ -122,7 +122,9 @@ export function createAuthRouter(prisma: PrismaClient, options: AuthRouterOption
                     if (!(err instanceof BetaKeyError)) throw err;
                     delete req.session.betaKey;
                     delete req.session.pkce;
-                    res.status(403).type('html').send(renderBetaKeyPage({ reason: err.reason, returnTo: pkce.returnTo }));
+                    res.status(403)
+                        .type('html')
+                        .send(renderBetaKeyPage({ reason: err.reason, returnTo: pkce.returnTo }));
                     return;
                 }
             }

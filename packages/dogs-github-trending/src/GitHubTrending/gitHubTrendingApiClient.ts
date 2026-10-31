@@ -11,9 +11,9 @@
  * =========================================================================
  */
 
-import type { TrendingRepo, GitHubTrendingResult } from "./interfaces/gitHubTrendingTypes";
+import type { TrendingRepo, GitHubTrendingResult } from './interfaces/gitHubTrendingTypes';
 
-const SEARCH_API_BASE = "https://api.github.com/search/repositories";
+const SEARCH_API_BASE = 'https://api.github.com/search/repositories';
 
 interface GitHubSearchItem {
     name: string;
@@ -43,26 +43,26 @@ function getCutoffDate(since: string): string {
     let daysAgo: number;
 
     switch (since) {
-        case "weekly":
+        case 'weekly':
             daysAgo = 7;
             break;
-        case "monthly":
+        case 'monthly':
             daysAgo = 30;
             break;
-        case "daily":
+        case 'daily':
         default:
             daysAgo = 1;
             break;
     }
 
     const cutoff = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
-    return cutoff.toISOString().split("T")[0];
+    return cutoff.toISOString().split('T')[0];
 }
 
 /**
  * Fetch trending GitHub repositories.
  */
-export async function getTrending(language?: string, since: string = "daily"): Promise<GitHubTrendingResult> {
+export async function getTrending(language?: string, since: string = 'daily'): Promise<GitHubTrendingResult> {
     const date = getCutoffDate(since);
 
     let qParam = `created:>${date}`;
@@ -79,8 +79,8 @@ export async function getTrending(language?: string, since: string = "daily"): P
     try {
         res = await fetch(url, {
             headers: {
-                "Accept": "application/vnd.github.v3+json",
-                "User-Agent": "SlopDogs",
+                Accept: 'application/vnd.github.v3+json',
+                'User-Agent': 'SlopDogs',
             },
             signal: controller.signal,
         });
@@ -89,13 +89,13 @@ export async function getTrending(language?: string, since: string = "daily"): P
     }
 
     if (!res.ok) {
-        const text = await res.text().catch(() => "");
+        const text = await res.text().catch(() => '');
         throw new Error(`GitHub search API failed: ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
     }
 
-    const data = await res.json() as GitHubSearchResponse;
+    const data = (await res.json()) as GitHubSearchResponse;
 
-    const repos: TrendingRepo[] = data.items.map(item => ({
+    const repos: TrendingRepo[] = data.items.map((item) => ({
         name: item.name,
         fullName: item.full_name,
         description: item.description,

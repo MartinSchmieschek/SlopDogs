@@ -1,12 +1,9 @@
-import { IHuntingSeason } from "@slopdogs/core";
-import { OsmFeatureRetriever, type OsmQueryBase } from "../base/OsmFeatureRetriever";
-import {
-    type OverpassRawElement,
-    overpassElementRepresentativePoint,
-} from "../base/overpassMirrorChain";
-import { NoiseQueryPact, type NoiseQuery } from "./pacts";
+import { IHuntingSeason } from '@slopdogs/core';
+import { OsmFeatureRetriever, type OsmQueryBase } from '../base/OsmFeatureRetriever';
+import { type OverpassRawElement, overpassElementRepresentativePoint } from '../base/overpassMirrorChain';
+import { NoiseQueryPact, type NoiseQuery } from './pacts';
 
-export type NoiseAssessment = "very quiet" | "quiet" | "moderate" | "noisy" | "very noisy";
+export type NoiseAssessment = 'very quiet' | 'quiet' | 'moderate' | 'noisy' | 'very noisy';
 
 export interface QuietZone {
     lat: number;
@@ -39,20 +36,20 @@ export interface NoiseResult {
 }
 
 const QUIET_TAGS: Record<string, string> = {
-    park: "leisure",
-    garden: "leisure",
-    forest: "landuse",
-    wood: "natural",
-    nature_reserve: "leisure",
+    park: 'leisure',
+    garden: 'leisure',
+    forest: 'landuse',
+    wood: 'natural',
+    nature_reserve: 'leisure',
 };
 
 const NOISE_TAGS: Record<string, string> = {
-    motorway: "highway",
-    trunk: "highway",
-    primary: "highway",
-    rail: "railway",
-    aerodrome: "aeroway",
-    runway: "aeroway",
+    motorway: 'highway',
+    trunk: 'highway',
+    primary: 'highway',
+    rail: 'railway',
+    aerodrome: 'aeroway',
+    runway: 'aeroway',
 };
 
 /** Facet-ID = tag-value (eindeutig ueber beide Tabellen). */
@@ -64,9 +61,7 @@ function tagKeyForFacet(facet: string): string | null {
     return null;
 }
 
-function classifyElement(
-    tags: Record<string, string>
-): { isQuiet: boolean; type: string; subtype: string } | null {
+function classifyElement(tags: Record<string, string>): { isQuiet: boolean; type: string; subtype: string } | null {
     for (const [value, key] of Object.entries(QUIET_TAGS)) {
         if (tags[key] === value) return { isQuiet: true, type: key, subtype: value };
     }
@@ -77,17 +72,17 @@ function classifyElement(
 }
 
 function assessNoise(quietCount: number, noiseCount: number): NoiseAssessment {
-    if (noiseCount === 0) return "very quiet";
+    if (noiseCount === 0) return 'very quiet';
     const ratio = quietCount / noiseCount;
-    if (ratio > 3) return "very quiet";
-    if (ratio > 1.5) return "quiet";
-    if (ratio > 0.7) return "moderate";
-    if (ratio > 0.3) return "noisy";
-    return "very noisy";
+    if (ratio > 3) return 'very quiet';
+    if (ratio > 1.5) return 'quiet';
+    if (ratio > 0.7) return 'moderate';
+    if (ratio > 0.3) return 'noisy';
+    return 'very noisy';
 }
 
 export class NoiseRetriever extends OsmFeatureRetriever<NoiseResult, typeof NoiseQueryPact> {
-    protected readonly layer = "noise";
+    protected readonly layer = 'noise';
     protected readonly defaultRadiusM = 500;
     protected readonly maxRadiusM = 2000;
     protected readonly queryPactClass = NoiseQueryPact;
@@ -97,7 +92,7 @@ export class NoiseRetriever extends OsmFeatureRetriever<NoiseResult, typeof Nois
     }
 
     get description(): string {
-        return "Analyzes nearby quiet zones and noise sources via the Overpass/OpenStreetMap API.";
+        return 'Analyzes nearby quiet zones and noise sources via the Overpass/OpenStreetMap API.';
     }
 
     protected parseQuery(season: IHuntingSeason): OsmQueryBase {
@@ -106,15 +101,12 @@ export class NoiseRetriever extends OsmFeatureRetriever<NoiseResult, typeof Nois
         return {
             lat: parseFloat(query.lat),
             lng: parseFloat(query.lng),
-            radiusM: this.clampRadius(parseFloat(query.radius ?? "")),
+            radiusM: this.clampRadius(parseFloat(query.radius ?? '')),
             facets: ALL_NOISE_FACETS,
         };
     }
 
-    protected buildOverpassBodyForTile(
-        bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number },
-        facets: string[],
-    ): string {
+    protected buildOverpassBodyForTile(bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number }, facets: string[]): string {
         const bboxClause = `(${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng})`;
         const lines: string[] = [];
         for (const f of facets) {
@@ -123,7 +115,7 @@ export class NoiseRetriever extends OsmFeatureRetriever<NoiseResult, typeof Nois
             lines.push(`  node["${k}"="${f}"]${bboxClause};`);
             lines.push(`  way["${k}"="${f}"]${bboxClause};`);
         }
-        return lines.join("\n");
+        return lines.join('\n');
     }
 
     protected classifyElementFacets(el: OverpassRawElement, fetchedFacets: string[]): string[] {
@@ -159,15 +151,15 @@ export class NoiseRetriever extends OsmFeatureRetriever<NoiseResult, typeof Nois
                     lat: point.lat,
                     lng: point.lng,
                     type: classification.subtype,
-                    name: el.tags["name"],
-                    area: el.tags["area"],
+                    name: el.tags['name'],
+                    area: el.tags['area'],
                 });
             } else {
                 noiseSources.push({
                     lat: point.lat,
                     lng: point.lng,
                     type: classification.type,
-                    name: el.tags["name"],
+                    name: el.tags['name'],
                     subtype: classification.subtype,
                 });
             }

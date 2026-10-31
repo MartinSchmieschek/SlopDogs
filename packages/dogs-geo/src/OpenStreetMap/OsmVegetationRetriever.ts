@@ -1,9 +1,9 @@
-import { type IHuntingSeason } from "@slopdogs/core";
-import osmtogeojson from "osmtogeojson";
-import type { FeatureCollection, GeometryObject } from "geojson";
-import { OsmFeatureRetriever, type OsmQueryBase } from "../osm/base/OsmFeatureRetriever";
-import type { OverpassRawElement } from "../osm/base/overpassMirrorChain";
-import { NearbyVegetationPact, type OsmVegetationQueryInput } from "./pacts";
+import { type IHuntingSeason } from '@slopdogs/core';
+import osmtogeojson from 'osmtogeojson';
+import type { FeatureCollection, GeometryObject } from 'geojson';
+import { OsmFeatureRetriever, type OsmQueryBase } from '../osm/base/OsmFeatureRetriever';
+import type { OverpassRawElement } from '../osm/base/overpassMirrorChain';
+import { NearbyVegetationPact, type OsmVegetationQueryInput } from './pacts';
 import {
     clampVegetationRadiusM,
     parseVegetationFacets,
@@ -12,29 +12,29 @@ import {
     DEFAULT_VEGETATION_RADIUS_M,
     MAX_VEGETATION_RADIUS_M,
     type OsmVegetationResult,
-} from "./overpassVegetation";
-import { mapOverpassElement, type OsmGeoElement } from "./overpassOsmShared";
+} from './overpassVegetation';
+import { mapOverpassElement, type OsmGeoElement } from './overpassOsmShared';
 
 const FACET_TAGS: Record<string, { key: string; value: string }> = {
-    [VegetationOverpassFacet.Wood]: { key: "natural", value: "wood" },
-    [VegetationOverpassFacet.Forest]: { key: "landuse", value: "forest" },
-    [VegetationOverpassFacet.Scrub]: { key: "natural", value: "scrub" },
-    [VegetationOverpassFacet.Grassland]: { key: "natural", value: "grassland" },
-    [VegetationOverpassFacet.Meadow]: { key: "landuse", value: "meadow" },
-    [VegetationOverpassFacet.Heath]: { key: "natural", value: "heath" },
-    [VegetationOverpassFacet.Wetland]: { key: "natural", value: "wetland" },
-    [VegetationOverpassFacet.Orchard]: { key: "landuse", value: "orchard" },
-    [VegetationOverpassFacet.Vineyard]: { key: "landuse", value: "vineyard" },
-    [VegetationOverpassFacet.Park]: { key: "leisure", value: "park" },
+    [VegetationOverpassFacet.Wood]: { key: 'natural', value: 'wood' },
+    [VegetationOverpassFacet.Forest]: { key: 'landuse', value: 'forest' },
+    [VegetationOverpassFacet.Scrub]: { key: 'natural', value: 'scrub' },
+    [VegetationOverpassFacet.Grassland]: { key: 'natural', value: 'grassland' },
+    [VegetationOverpassFacet.Meadow]: { key: 'landuse', value: 'meadow' },
+    [VegetationOverpassFacet.Heath]: { key: 'natural', value: 'heath' },
+    [VegetationOverpassFacet.Wetland]: { key: 'natural', value: 'wetland' },
+    [VegetationOverpassFacet.Orchard]: { key: 'landuse', value: 'orchard' },
+    [VegetationOverpassFacet.Vineyard]: { key: 'landuse', value: 'vineyard' },
+    [VegetationOverpassFacet.Park]: { key: 'leisure', value: 'park' },
 };
 
 export class OsmVegetationRetriever extends OsmFeatureRetriever<OsmVegetationResult, typeof NearbyVegetationPact> {
-    protected readonly layer = "vegetation";
+    protected readonly layer = 'vegetation';
     protected readonly defaultRadiusM = DEFAULT_VEGETATION_RADIUS_M;
     protected readonly maxRadiusM = MAX_VEGETATION_RADIUS_M;
     protected readonly queryPactClass = NearbyVegetationPact;
     // Vegetation-Polygone: Geometrie fuer Karten-Renderer wichtig.
-    protected readonly outStatement = "out geom;";
+    protected readonly outStatement = 'out geom;';
 
     get name(): string {
         return OsmVegetationRetriever.name;
@@ -45,7 +45,7 @@ export class OsmVegetationRetriever extends OsmFeatureRetriever<OsmVegetationRes
     }
 
     get icon(): string | undefined {
-        return "\uD83C\uDF33";
+        return '\uD83C\uDF33';
     }
 
     getVmContextContributions(): Record<string, any> {
@@ -62,15 +62,12 @@ export class OsmVegetationRetriever extends OsmFeatureRetriever<OsmVegetationRes
         const query = (queryDog?.collected as OsmVegetationQueryInput | undefined) ?? ({} as OsmVegetationQueryInput);
         const lat = parseFloat(query.lat);
         const lng = parseFloat(query.lng);
-        const radiusM = clampVegetationRadiusM(parseFloat(query.radius ?? ""));
+        const radiusM = clampVegetationRadiusM(parseFloat(query.radius ?? ''));
         const facets = parseVegetationFacets(query.preset);
         return { lat, lng, radiusM, facets };
     }
 
-    protected buildOverpassBodyForTile(
-        bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number },
-        facets: string[],
-    ): string {
+    protected buildOverpassBodyForTile(bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number }, facets: string[]): string {
         const bboxClause = `(${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng})`;
         const lines: string[] = [];
         for (const f of facets) {
@@ -78,7 +75,7 @@ export class OsmVegetationRetriever extends OsmFeatureRetriever<OsmVegetationRes
             if (!c) continue;
             lines.push(`  nwr["${c.key}"="${c.value}"]${bboxClause};`);
         }
-        return lines.join("\n");
+        return lines.join('\n');
     }
 
     protected classifyElementFacets(el: OverpassRawElement, fetchedFacets: string[]): string[] {

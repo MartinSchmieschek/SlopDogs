@@ -4,7 +4,7 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** Optionale IP-Adresse fuer die Geolocation-Abfrage */
 export interface IPGeoQuery {
@@ -13,7 +13,4 @@ export interface IPGeoQuery {
 }
 
 /** Der Pact fuer IPGeo-Queries */
-export const IPGeoQueryPact = createPact<IPGeoQuery>(
-    "IPGeoQueryProvider",
-    { fromSourceType: "IPGeoQuery" }
-);
+export const IPGeoQueryPact = createPact<IPGeoQuery>('IPGeoQueryProvider', { fromSourceType: 'IPGeoQuery' });

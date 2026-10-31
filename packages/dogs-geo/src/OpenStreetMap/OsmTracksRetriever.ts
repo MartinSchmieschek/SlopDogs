@@ -1,7 +1,7 @@
-import { type IHuntingSeason } from "@slopdogs/core";
-import { OsmFeatureRetriever, type OsmQueryBase, DEFAULT_FACET } from "../osm/base/OsmFeatureRetriever";
-import type { OverpassRawElement } from "../osm/base/overpassMirrorChain";
-import { NearbyTracksPact, type OsmTracksQueryInput } from "./pacts";
+import { type IHuntingSeason } from '@slopdogs/core';
+import { OsmFeatureRetriever, type OsmQueryBase, DEFAULT_FACET } from '../osm/base/OsmFeatureRetriever';
+import type { OverpassRawElement } from '../osm/base/overpassMirrorChain';
+import { NearbyTracksPact, type OsmTracksQueryInput } from './pacts';
 import {
     clampTracksRadiusM,
     parseTracksFacets,
@@ -11,25 +11,25 @@ import {
     MAX_TRACKS_RADIUS_M,
     ALL_TRACKS_OVERPASS_FACETS,
     type OsmTracksResult,
-} from "./overpassTracks";
-import { mapOverpassElement, OsmGeoElementType, type OsmGeoElement } from "./overpassOsmShared";
+} from './overpassTracks';
+import { mapOverpassElement, OsmGeoElementType, type OsmGeoElement } from './overpassOsmShared';
 
 /** highway-Values pro Track-Facet — 1:1 Mapping. */
 const HIGHWAY_BY_FACET: Record<string, string> = {
-    [TracksOverpassFacet.Path]: "path",
-    [TracksOverpassFacet.Footway]: "footway",
-    [TracksOverpassFacet.Cycleway]: "cycleway",
-    [TracksOverpassFacet.Bridleway]: "bridleway",
-    [TracksOverpassFacet.Track]: "track",
-    [TracksOverpassFacet.Steps]: "steps",
+    [TracksOverpassFacet.Path]: 'path',
+    [TracksOverpassFacet.Footway]: 'footway',
+    [TracksOverpassFacet.Cycleway]: 'cycleway',
+    [TracksOverpassFacet.Bridleway]: 'bridleway',
+    [TracksOverpassFacet.Track]: 'track',
+    [TracksOverpassFacet.Steps]: 'steps',
 };
 
 export class OsmTracksRetriever extends OsmFeatureRetriever<OsmTracksResult, typeof NearbyTracksPact> {
-    protected readonly layer = "tracks";
+    protected readonly layer = 'tracks';
     protected readonly defaultRadiusM = DEFAULT_TRACKS_RADIUS_M;
     protected readonly maxRadiusM = MAX_TRACKS_RADIUS_M;
     protected readonly queryPactClass = NearbyTracksPact;
-    protected readonly outStatement = "out center;";
+    protected readonly outStatement = 'out center;';
 
     get name(): string {
         return OsmTracksRetriever.name;
@@ -40,7 +40,7 @@ export class OsmTracksRetriever extends OsmFeatureRetriever<OsmTracksResult, typ
     }
 
     get icon(): string | undefined {
-        return "\uD83E\uDD7E";
+        return '\uD83E\uDD7E';
     }
 
     getVmContextContributions(): Record<string, any> {
@@ -59,16 +59,13 @@ export class OsmTracksRetriever extends OsmFeatureRetriever<OsmTracksResult, typ
 
         const lat = parseFloat(query.lat);
         const lng = parseFloat(query.lng);
-        const radiusM = clampTracksRadiusM(parseFloat(query.radius ?? ""));
+        const radiusM = clampTracksRadiusM(parseFloat(query.radius ?? ''));
         const facets = parseTracksFacets(query.preset);
 
         return { lat, lng, radiusM, facets };
     }
 
-    protected buildOverpassBodyForTile(
-        bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number },
-        facets: string[],
-    ): string {
+    protected buildOverpassBodyForTile(bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number }, facets: string[]): string {
         const bboxClause = `${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng}`;
         const lines: string[] = [];
         for (const f of facets) {
@@ -76,11 +73,11 @@ export class OsmTracksRetriever extends OsmFeatureRetriever<OsmTracksResult, typ
             if (!hw) continue;
             lines.push(`  way["highway"="${hw}"](${bboxClause});`);
         }
-        return lines.join("\n");
+        return lines.join('\n');
     }
 
     protected classifyElementFacets(el: OverpassRawElement, fetchedFacets: string[]): string[] {
-        const hw = el.tags?.["highway"];
+        const hw = el.tags?.['highway'];
         if (!hw) return [];
         const match: string[] = [];
         for (const f of fetchedFacets) {

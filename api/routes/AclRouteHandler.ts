@@ -31,15 +31,16 @@ export class AclRouteHandler {
 
     registerRoutes(app: any): void {
         // GET antwortet auch Anonymen — mit 404, wie jedem, der nicht Owner oder Editor ist.
-        app.get(ACL_ROUTE.acl, (req: Request, res: Response) =>
-            this.handle(req, res, (t, id) => this.manager.view(t, id, req.ctx), false),
-        );
+        app.get(ACL_ROUTE.acl, (req: Request, res: Response) => this.handle(req, res, (t, id) => this.manager.view(t, id, req.ctx), false));
         app.put(ACL_ROUTE.acl, (req: Request, res: Response) =>
             this.handle(req, res, (t, id) => this.manager.replace(t, id, req.body ?? {}, req.ctx)),
         );
         app.post(ACL_ROUTE.transfer, (req: Request, res: Response) =>
             // Nach dem Transfer ist der Aufrufer nicht mehr Owner — die Antwort traegt den neuen.
-            this.handle(req, res, async (t, id) => ({ ok: true, ...(await this.manager.transfer(t, id, String(req.body?.toUserId ?? ''), req.ctx)) })),
+            this.handle(req, res, async (t, id) => ({
+                ok: true,
+                ...(await this.manager.transfer(t, id, String(req.body?.toUserId ?? ''), req.ctx)),
+            })),
         );
         app.post(ACL_ROUTE.freeze, (req: Request, res: Response) =>
             this.handle(req, res, async (t, id) => ({ ok: true, ...(await this.manager.setFrozen(t, id, true, req.ctx)) })),

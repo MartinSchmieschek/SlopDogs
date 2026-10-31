@@ -97,9 +97,11 @@ export class LandingPage {
             kennelIds: LandingKennels.ids(),
             memoMs: positiveIntFromEnv('LANDING_HTML_MEMO_MS', LandingPage.DEFAULT_MEMO_MS),
         });
-        console.log(landing.kennelIds.length
-            ? `[LandingPage] / rotiert zwischen ${landing.kennelIds.join(', ')} (schreibgeschuetzt); Standard ${landing.defaultKennelId}`
-            : `[LandingPage] / liefert ${landing.defaultKennelId} (LANDING_KENNEL_IDS leer)`);
+        console.log(
+            landing.kennelIds.length
+                ? `[LandingPage] / rotiert zwischen ${landing.kennelIds.join(', ')} (schreibgeschuetzt); Standard ${landing.defaultKennelId}`
+                : `[LandingPage] / liefert ${landing.defaultKennelId} (LANDING_KENNEL_IDS leer)`,
+        );
         return landing;
     }
 
@@ -120,8 +122,10 @@ export class LandingPage {
 
     /** Ein erzwungener Kennel zaehlt nur, wenn er in der Liste steht — `?landing=` oeffnet keinen beliebigen Kennel. */
     forcedOf(raw: unknown): string | null {
-        const wanted = String(Array.isArray(raw) ? raw[0] : raw ?? '').trim().toLowerCase();
-        return wanted ? this.kennelIds.find((id) => id.toLowerCase() === wanted) ?? null : null;
+        const wanted = String(Array.isArray(raw) ? raw[0] : (raw ?? ''))
+            .trim()
+            .toLowerCase();
+        return wanted ? (this.kennelIds.find((id) => id.toLowerCase() === wanted) ?? null) : null;
     }
 
     /**
@@ -267,7 +271,9 @@ export class LandingPage {
         const result = await this.runner.runLeadAsAnonymous(kennelId, {}, { source: 'landing' });
         const html = typeof result === 'string' && isHtmlResultString(result) ? result : null;
         const mb = (bytes: number) => Math.round(bytes / 1048576);
-        console.log(`[LandingPage] ${kennelId}: ${html ? `${Buffer.byteLength(html)} B` : 'keine HTML-Ausgabe (uebersprungen)'} in ${Date.now() - startedAt} ms, RSS ${mb(rssBefore)} -> ${mb(process.memoryUsage().rss)} MB`);
+        console.log(
+            `[LandingPage] ${kennelId}: ${html ? `${Buffer.byteLength(html)} B` : 'keine HTML-Ausgabe (uebersprungen)'} in ${Date.now() - startedAt} ms, RSS ${mb(rssBefore)} -> ${mb(process.memoryUsage().rss)} MB`,
+        );
         return html;
     }
 }

@@ -4,7 +4,7 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /**
  * Query fuer Geocoding — entweder Adresse ODER lat/lng.
@@ -24,7 +24,4 @@ export interface GeocodingQuery {
 }
 
 /** Der Pact fuer Geocoding-Queries */
-export const GeocodingQueryPact = createPact<GeocodingQuery>(
-    "GeocodingQueryProvider",
-    { fromSourceType: "GeocodingQuery" }
-);
+export const GeocodingQueryPact = createPact<GeocodingQuery>('GeocodingQueryProvider', { fromSourceType: 'GeocodingQuery' });

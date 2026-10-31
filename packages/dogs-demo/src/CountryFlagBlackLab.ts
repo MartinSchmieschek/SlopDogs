@@ -12,8 +12,8 @@
  * ============================================================
  */
 
-import { Dog, IHuntingSeason } from "@slopdogs/core";
-import { RandomRecipesRetriever } from "./RandomRecipesRetriever";
+import { Dog, IHuntingSeason } from '@slopdogs/core';
+import { RandomRecipesRetriever } from './RandomRecipesRetriever';
 
 /**
  * Arr, the CountryFlagBlackLab -- a cursed hound that plunders the banners
@@ -22,21 +22,20 @@ import { RandomRecipesRetriever } from "./RandomRecipesRetriever";
  * the recipe retriever dragged up from the void. Corporeal laws unwritten,
  * this beast extends the Dog of the deep and yields a URL to the nation's colours.
  */
-export class CountryFlagBlackLab extends Dog<string>{
-
+export class CountryFlagBlackLab extends Dog<string> {
     /** Arr, the crew this vessel demands before she sails -- the recipe retriever from the abyss */
     get required() {
-        return [RandomRecipesRetriever]
+        return [RandomRecipesRetriever];
     }
 
     /** No optional souls bound to this cursed voyage, matey */
     get optional() {
-        return []
+        return [];
     }
 
     /** The true name of this eldritch hound, whispered in tongues no mortal should speak */
     get name(): string {
-        return CountryFlagBlackLab.name
+        return CountryFlagBlackLab.name;
     }
 
     get description(): string {
@@ -45,7 +44,7 @@ export class CountryFlagBlackLab extends Dog<string>{
 
     /** The icon -- a sigil pulled from the deep, corporeal laws unwritten as suns retreat */
     get icon(): string | undefined {
-        return "\uD83C\uDF0D";
+        return '\uD83C\uDF0D';
     }
 
     /**
@@ -53,14 +52,12 @@ export class CountryFlagBlackLab extends Dog<string>{
      * plundering the cuisine like carrion hordes trilling their profane accord.
      * If the abyss yields nothing, we cast an error into the roiling madness.
      */
-    protected yieldCollectorFactory: (season:IHuntingSeason) => Promise<string> = (season:IHuntingSeason) => {
-        let currentYield = season.exhausted.find(item => item instanceof RandomRecipesRetriever)
+    protected yieldCollectorFactory: (season: IHuntingSeason) => Promise<string> = (season: IHuntingSeason) => {
+        let currentYield = season.exhausted.find((item) => item instanceof RandomRecipesRetriever);
         if (currentYield && currentYield.collected && !(currentYield.collected instanceof Error))
-            return this.fetchImages([currentYield.collected.cuisine])
-        else
-            throw new Error("No yield prequisites to build on.")
-    }
-
+            return this.fetchImages([currentYield.collected.cuisine]);
+        else throw new Error('No yield prequisites to build on.');
+    };
 
     /**
      * Arr, we sail the digital seas to fetch images from the deep.
@@ -69,11 +66,7 @@ export class CountryFlagBlackLab extends Dog<string>{
      * @param queries - Arr, the search terms plundered from the void, each a whisper from the eldritch deep
      * @returns A URL forged in the abyss, bearing the queries of the damned crew stitched together
      */
-public async fetchImages(
-    queries: string[],
-  ): Promise<string> {
-
-    return 'https://dummyjson.com/image/400x200/008080/ffffff?text=' + queries.join("+")
-
+    public async fetchImages(queries: string[]): Promise<string> {
+        return 'https://dummyjson.com/image/400x200/008080/ffffff?text=' + queries.join('+');
     }
 }

@@ -43,10 +43,7 @@ import { KeysCapability, scrubbingConsoleSink } from './services/keysCapability'
 import { logBootMemory } from './api/utils/memoryLog';
 import { Watchpost } from './services/Watchpost';
 import type { TestResult } from './StartupTest';
-import {
-    assertSlimRegistryCoversKennelDbRefs,
-    collectBaseDogNamesFromLatestKennels,
-} from './server-app/slimRegistryKennelCoverage';
+import { assertSlimRegistryCoversKennelDbRefs, collectBaseDogNamesFromLatestKennels } from './server-app/slimRegistryKennelCoverage';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const dbEnv = require(path.join(process.cwd(), 'scripts', 'dbEnv.cjs')) as {
@@ -59,7 +56,7 @@ const dbEnv = require(path.join(process.cwd(), 'scripts', 'dbEnv.cjs')) as {
 // Cast off the moorings — if our vessel fails to launch, we sink into the deep and trouble no man further.
 // Nur als Einstiegspunkt: `npm run test:startup` laedt dieses Modul fuer bootApplication, ohne zu lauschen.
 if (require.main === module) {
-    start().catch(e => {
+    start().catch((e) => {
         console.error('Failed to start', e);
         process.exit(1);
     });
@@ -92,7 +89,19 @@ export type BootOptions = {
 
 async function start() {
     const booted = await bootApplication();
-    const { app, serveBuiltAngular, devUiOrigin, channelHub, networkBoundary, refIndex, callCounter, store, jsonStorageService, disconnectHttpApplication, runStartupTests } = booted;
+    const {
+        app,
+        serveBuiltAngular,
+        devUiOrigin,
+        channelHub,
+        networkBoundary,
+        refIndex,
+        callCounter,
+        store,
+        jsonStorageService,
+        disconnectHttpApplication,
+        runStartupTests,
+    } = booted;
 
     const port = Number(process.env.PORT) || 3000;
 
@@ -196,48 +205,45 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
     // Die Doku reist mit der Registrierung: der MCP kuendigt jsonStore dadurch von
     // selbst an. Ohne das ist er im MCP unsichtbar (kein Dog, kein Node, kein Tool)
     // und ein Agent bastelt sich stattdessen eine eigene Ablage.
-    registerVmGlobalCapability('jsonStore', (ctx) => {
-        const userId = ctx?.userId ?? null;
-        const isSuper = ctx?.isSuperUser === true;
-        // SECURITY (2026-09-13): anonymous callers used to get the RAW, unprefixed
-        // store — so a public kennel run without a login could snapshot()/list()
-        // EVERY user's `user:<id>:*` keys and set() straight into them, overwriting
-        // other users' data. Keys must be tenant-scoped for everyone except the
-        // super-user (dev/admin). Logged-in users get `user:<id>:`; anonymous callers
-        // get a single shared, isolated `anon:` namespace — enough for public-kennel
-        // caches, but with no reach into any `user:` key. This is the isolation the
-        // MCP tool contract already promised ("Keys sind pro eingeloggtem User isoliert").
-        const prefix = isSuper
-            ? ''
-            : (typeof userId === 'string' && userId.length > 0 ? `user:${userId}:` : 'anon:');
-        const usePrefix = prefix !== '';
-        const wrap = (k: string) => prefix + k;
+    registerVmGlobalCapability(
+        'jsonStore',
+        (ctx) => {
+            const userId = ctx?.userId ?? null;
+            const isSuper = ctx?.isSuperUser === true;
+            // SECURITY (2026-09-13): anonymous callers used to get the RAW, unprefixed
+            // store — so a public kennel run without a login could snapshot()/list()
+            // EVERY user's `user:<id>:*` keys and set() straight into them, overwriting
+            // other users' data. Keys must be tenant-scoped for everyone except the
+            // super-user (dev/admin). Logged-in users get `user:<id>:`; anonymous callers
+            // get a single shared, isolated `anon:` namespace — enough for public-kennel
+            // caches, but with no reach into any `user:` key. This is the isolation the
+            // MCP tool contract already promised ("Keys sind pro eingeloggtem User isoliert").
+            const prefix = isSuper ? '' : typeof userId === 'string' && userId.length > 0 ? `user:${userId}:` : 'anon:';
+            const usePrefix = prefix !== '';
+            const wrap = (k: string) => prefix + k;
 
-        return {
-            get: (k: string) => jsonStorageService.get(wrap(k)),
-            set: (k: string, v: unknown) => jsonStorageService.set(wrap(k), v),
-            delete: (k: string) => jsonStorageService.delete(wrap(k)),
-            has: (k: string) => jsonStorageService.has(wrap(k)),
-            list: async () => {
-                const all = await jsonStorageService.list();
-                if (!usePrefix) return all;
-                return all
-                    .filter((k) => k.startsWith(prefix))
-                    .map((k) => k.substring(prefix.length));
-            },
-            snapshot: async () => {
-                const all = await jsonStorageService.snapshot();
-                if (!usePrefix) return all;
-                return all
-                    .filter((e) => e.key.startsWith(prefix))
-                    .map((e) => ({ ...e, key: e.key.substring(prefix.length) }));
-            },
-        };
-    },
-        'jsonStore.get(key) / .set(key, value) / .delete(key) / .has(key) / .list() / .snapshot() — '
-        + 'persistente JSON-Ablage, direkt als Global im Dog-Code verfuegbar (kein Parent noetig, alle Methoden async). '
-        + 'Keys sind pro eingeloggtem User isoliert. Nutze sie fuer Caches und Zustand, statt dir eine eigene Ablage zu bauen. '
-        + 'Die Ablage ist Klartext: API-Schluessel gehoeren nicht hierher, sondern in den Key-Store (set_key, dann keys.fetch).');
+            return {
+                get: (k: string) => jsonStorageService.get(wrap(k)),
+                set: (k: string, v: unknown) => jsonStorageService.set(wrap(k), v),
+                delete: (k: string) => jsonStorageService.delete(wrap(k)),
+                has: (k: string) => jsonStorageService.has(wrap(k)),
+                list: async () => {
+                    const all = await jsonStorageService.list();
+                    if (!usePrefix) return all;
+                    return all.filter((k) => k.startsWith(prefix)).map((k) => k.substring(prefix.length));
+                },
+                snapshot: async () => {
+                    const all = await jsonStorageService.snapshot();
+                    if (!usePrefix) return all;
+                    return all.filter((e) => e.key.startsWith(prefix)).map((e) => ({ ...e, key: e.key.substring(prefix.length) }));
+                },
+            };
+        },
+        'jsonStore.get(key) / .set(key, value) / .delete(key) / .has(key) / .list() / .snapshot() — ' +
+            'persistente JSON-Ablage, direkt als Global im Dog-Code verfuegbar (kein Parent noetig, alle Methoden async). ' +
+            'Keys sind pro eingeloggtem User isoliert. Nutze sie fuer Caches und Zustand, statt dir eine eigene Ablage zu bauen. ' +
+            'Die Ablage ist Klartext: API-Schluessel gehoeren nicht hierher, sondern in den Key-Store (set_key, dann keys.fetch).',
+    );
 
     // Lobby-Hub: In-Memory-Raeume fuer den WebSocketChannelRetriever.
     const channelHub = new ChannelHub({
@@ -262,7 +268,7 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
 
     // Breathe life into each hound — those who lack their credentials perish in the constructor.
     // The survivors form the pack; the fallen are mourned in the logs.
-    const allBaseDogs: InstanceType<typeof allBaseDogClasses[number]>[] = [];
+    const allBaseDogs: InstanceType<(typeof allBaseDogClasses)[number]>[] = [];
     const baseDogsMap = new Map<string, new () => any>();
     // Dogs, deren Konstruktor wirft (z. B. fehlender API-Key), landen NICHT in
     // baseDogsMap. Ihren Klassennamen merken wir uns, damit der Coverage-Guard
@@ -282,7 +288,7 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
     }
 
     // The Pacts — aus Registry-Modul (schlank unter production/integration, sonst volle Crew).
-    allPacts.forEach(PactClass => {
+    allPacts.forEach((PactClass) => {
         const instance = new PactClass();
         baseDogsMap.set(instance.name, PactClass);
     });
@@ -321,7 +327,15 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
     const nodeEnv = process.env.NODE_ENV || 'development';
     const devUiOrigin = (process.env.DEV_UI_ORIGIN || 'http://localhost:4300').replace(/\/$/, '');
 
-    const { app, serveBuiltAngular, runStartupTests, runStartupSuite, disconnect: disconnectHttpApplication, keyStore, networkBoundary } = await createHttpApplication({
+    const {
+        app,
+        serveBuiltAngular,
+        runStartupTests,
+        runStartupSuite,
+        disconnect: disconnectHttpApplication,
+        keyStore,
+        networkBoundary,
+    } = await createHttpApplication({
         nodeEnv,
         localMode,
         devUiOrigin,
@@ -375,7 +389,9 @@ export async function rebuildReferenceIndex(refIndex: DogReferenceIndex, delayMs
     await new Promise((resolve) => setTimeout(resolve, delayMs));
     try {
         const rebuilt = await refIndex.rebuild();
-        console.log(`[DogReferenceIndex] rebuild: ${rebuilt.rows} Referenzen aus ${rebuilt.kennels} Kennels und ${rebuilt.dogs} Dogs in ${rebuilt.durationMs} ms`);
+        console.log(
+            `[DogReferenceIndex] rebuild: ${rebuilt.rows} Referenzen aus ${rebuilt.kennels} Kennels und ${rebuilt.dogs} Dogs in ${rebuilt.durationMs} ms`,
+        );
     } catch (err) {
         console.error('[DogReferenceIndex] rebuild gescheitert — Referenzzahlen leer bis zum naechsten Start:', err);
     }

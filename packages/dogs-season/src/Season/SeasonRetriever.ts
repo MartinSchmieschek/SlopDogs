@@ -9,10 +9,10 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketCenter } from "@slopdogs/core";
-import { calculateSeason } from "./seasonCalculator";
-import type { SeasonResult } from "./interfaces/seasonTypes";
-import { SeasonQueryPact, type SeasonQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketCenter } from '@slopdogs/core';
+import { calculateSeason } from './seasonCalculator';
+import type { SeasonResult } from './interfaces/seasonTypes';
+import { SeasonQueryPact, type SeasonQuery } from './pacts';
 
 /**
  * Arr, the SeasonRetriever — a spectral hound that divines the
@@ -35,7 +35,7 @@ export class SeasonRetriever extends Dog<SeasonResult> implements ICacheable {
     }
 
     get icon(): string | undefined {
-        return "\uD83C\uDF43";
+        return '\uD83C\uDF43';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -47,7 +47,7 @@ export class SeasonRetriever extends Dog<SeasonResult> implements ICacheable {
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<SeasonResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(SeasonQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(SeasonQueryPact, d));
         const query = (queryDog?.collected as SeasonQuery | undefined) ?? ({} as SeasonQuery);
 
         const lat = parseFloat(query['lat']);
@@ -61,9 +61,7 @@ export class SeasonRetriever extends Dog<SeasonResult> implements ICacheable {
         const key = `season:${snapped.lat.toFixed(4)}:${query['date'] ?? 'today'}`;
 
         if (this.cacheHandler) {
-            return this.cacheHandler.getOrFetch(key, 60 * 60_000, () =>
-                Promise.resolve(calculateSeason(lat, query['date']))
-            );
+            return this.cacheHandler.getOrFetch(key, 60 * 60_000, () => Promise.resolve(calculateSeason(lat, query['date'])));
         }
         return calculateSeason(lat, query['date']);
     };

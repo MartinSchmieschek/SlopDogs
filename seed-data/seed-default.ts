@@ -49,9 +49,8 @@ return {
 
     // If a hound already lurks, extract its lineageId for the kennel manifest.
     try {
-        const config = typeof firstSeed.serializedDogConfig === 'string'
-            ? JSON.parse(firstSeed.serializedDogConfig)
-            : firstSeed.serializedDogConfig;
+        const config =
+            typeof firstSeed.serializedDogConfig === 'string' ? JSON.parse(firstSeed.serializedDogConfig) : firstSeed.serializedDogConfig;
         return config.lineageId || firstSeed.lineageId || null;
     } catch {
         return null;
@@ -66,25 +65,16 @@ return {
 export async function seedKennelConfig(kennelsStore: IStore, seedLineageId: string | null): Promise<void> {
     // The full roster of base hounds — born of the code, not the store.
     // Each is summoned fresh upon every run, like stars that fell and rose again.
-    const allBaseDogClasses = [
-        TalkingDog,
-        RandomRecipesRetriever,
-        CountryFlagBlackLab,
-        DishFlagBlackLab,
-        RandomEveryThingRetriever
-    ];
+    const allBaseDogClasses = [TalkingDog, RandomRecipesRetriever, CountryFlagBlackLab, DishFlagBlackLab, RandomEveryThingRetriever];
 
     // Rouse each hound just long enough to read its name for the kennel manifest.
-    const allBaseDogs = allBaseDogClasses.map(DogClass => new DogClass());
+    const allBaseDogs = allBaseDogClasses.map((DogClass) => new DogClass());
 
     // Nur "gibt es schon einen?" — eine Zeile, nicht alle Kennel-Versionen.
     if (!(await kennelsStore.findFirstOfType('KennelConfig'))) {
         // The kennel references the lineageId (lineage GUID), not a specific version —
         // so it always summons the latest incarnation from the branching tree.
-        const dogIds = [
-            ...(seedLineageId ? [seedLineageId] : []),
-            ...allBaseDogs.map(dog => BASE_DOG_PREFIX + dog.name)
-        ];
+        const dogIds = [...(seedLineageId ? [seedLineageId] : []), ...allBaseDogs.map((dog) => BASE_DOG_PREFIX + dog.name)];
 
         const defaultKennelConfig: IKennelConfig = {
             id: 'default-kennel',
@@ -92,7 +82,7 @@ export async function seedKennelConfig(kennelsStore: IStore, seedLineageId: stri
             description: 'Standard-Kennel mit allen verfügbaren Dogs',
             dogIds,
             createdAt: new Date(),
-            updatedAt: new Date()
+            updatedAt: new Date(),
         };
 
         // Bind the dogIds to the abyss as a JSON string — the store speaks only in primitive tongues.

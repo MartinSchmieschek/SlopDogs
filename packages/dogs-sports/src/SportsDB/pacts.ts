@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface SportsDbQuery {
     /** Endpoint: searchteams, searchplayers, searchevents, all_leagues, lookupteam, lookupleague, lookupplayer, eventsnext, eventslast, eventsround, eventsseason */
@@ -11,7 +11,4 @@ export interface SportsDbQuery {
     arg3?: string;
 }
 
-export const SportsDbQueryPact = createPact<SportsDbQuery>(
-    "SportsDbQueryProvider",
-    { fromSourceType: "SportsDbQuery" }
-);
+export const SportsDbQueryPact = createPact<SportsDbQuery>('SportsDbQueryProvider', { fromSourceType: 'SportsDbQuery' });

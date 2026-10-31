@@ -5,5 +5,5 @@ export interface DuckApiResponse {
 
 export interface DuckResult {
     mediaUrl: string;
-    mediaType: "image" | "gif" | "video";
+    mediaType: 'image' | 'gif' | 'video';
 }

@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface OpenFoodQuery {
     lat: string;
@@ -7,7 +7,4 @@ export interface OpenFoodQuery {
     cuisine?: string;
 }
 
-export const OpenFoodQueryPact = createPact<OpenFoodQuery>(
-    "OpenFoodQueryProvider",
-    { fromSourceType: "OpenFoodQuery" }
-);
+export const OpenFoodQueryPact = createPact<OpenFoodQuery>('OpenFoodQueryProvider', { fromSourceType: 'OpenFoodQuery' });

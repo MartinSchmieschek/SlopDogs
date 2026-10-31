@@ -45,11 +45,7 @@ return {
         name: 'Public Transport Nearby',
         description: 'OEPNV: Haltestellen und Abfahrten in der Naehe (Bus, Tram, U-Bahn, S-Bahn, Zug)',
         emoji: '\uD83D\uDE82',
-        dogIds: [
-            BASE_DOG_PREFIX + 'PublicTransportRetriever',
-            BASE_DOG_PREFIX + 'QueryRetriever',
-            mimicDogId,
-        ],
+        dogIds: [BASE_DOG_PREFIX + 'PublicTransportRetriever', BASE_DOG_PREFIX + 'QueryRetriever', mimicDogId],
         defaultQuery: { lat: '50.1109', lng: '8.6821' },
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -110,11 +106,7 @@ return {
         name: 'Transit Scout',
         description: 'Komplette Bus- und Bahn-Trips in der Naehe — Stationen, Linien, Fahrplaene via MOTIS',
         emoji: '\uD83D\uDE8C',
-        dogIds: [
-            BASE_DOG_PREFIX + 'TransitTripRetriever',
-            BASE_DOG_PREFIX + 'QueryRetriever',
-            mimicDogId,
-        ],
+        dogIds: [BASE_DOG_PREFIX + 'TransitTripRetriever', BASE_DOG_PREFIX + 'QueryRetriever', mimicDogId],
         defaultQuery: { lat: '50.1109', lng: '8.6821', distance: '3000', results: '50' },
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -133,13 +125,23 @@ return {
     const rendererVersionId = randomUUID();
     const rendererDogId = randomUUID();
     const rendererCfg = {
-        id: rendererVersionId, lineageId: rendererDogId, parentId: null,
+        id: rendererVersionId,
+        lineageId: rendererDogId,
+        parentId: null,
         displayName: 'TransitRenderer',
         parentsRequired: ['TransitTripRetriever', 'QueryRetriever'],
         parentsOptional: [],
         theRun: TRANSIT_RENDERER_CODE,
     };
-    await nodesStore.save({ id: rendererVersionId, type: SerializedDog.name, lineageId: rendererDogId, parentId: null, displayName: 'TransitRenderer', serializedDogConfig: JSON.stringify(rendererCfg), createdAt: new Date() });
+    await nodesStore.save({
+        id: rendererVersionId,
+        type: SerializedDog.name,
+        lineageId: rendererDogId,
+        parentId: null,
+        displayName: 'TransitRenderer',
+        serializedDogConfig: JSON.stringify(rendererCfg),
+        createdAt: new Date(),
+    });
 
     // Update kennelConfig to use renderer as lead
     kennelConfig.dogIds = [rendererDogId, ...kennelConfig.dogIds];
@@ -204,11 +206,7 @@ return {
         name: 'Transit Scout (JSON)',
         description: 'OEPNV-Trips (MOTIS) als JSON — gleiche Parameter wie transit-scout, ohne Karte',
         emoji: '\uD83D\uDCE6',
-        dogIds: [
-            BASE_DOG_PREFIX + 'TransitTripRetriever',
-            BASE_DOG_PREFIX + 'QueryRetriever',
-            mimicDogId,
-        ],
+        dogIds: [BASE_DOG_PREFIX + 'TransitTripRetriever', BASE_DOG_PREFIX + 'QueryRetriever', mimicDogId],
         defaultQuery: { lat: '50.1109', lng: '8.6821', distance: '3000', results: '50' },
         createdAt: new Date(),
         updatedAt: new Date(),

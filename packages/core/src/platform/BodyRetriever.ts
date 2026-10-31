@@ -52,12 +52,11 @@ export class BodyRetriever extends Dog<any> {
 
     /** The cargo-bearer's sigil -- fetched from the central icon registry */
     get icon(): string | undefined {
-        return "\uD83D\uDCE6";
+        return '\uD83D\uDCE6';
     }
 
     /** Yield the cargo -- whatever was stowed, returned from the hold unchanged */
-    protected yieldCollectorFactory: (season: IHuntingSeason) => Promise<any> =
-        async (season: IHuntingSeason) => {
-            return this.bodyData;
-        };
+    protected yieldCollectorFactory: (season: IHuntingSeason) => Promise<any> = async (season: IHuntingSeason) => {
+        return this.bodyData;
+    };
 }

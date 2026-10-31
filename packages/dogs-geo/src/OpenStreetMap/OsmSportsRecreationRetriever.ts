@@ -5,59 +5,49 @@
  * Tile-cached pro leisure-Value.
  */
 
-import { type IHuntingSeason } from "@slopdogs/core";
-import osmtogeojson from "osmtogeojson";
-import type { FeatureCollection, GeometryObject } from "geojson";
-import { OsmFeatureRetriever, type OsmQueryBase } from "../osm/base/OsmFeatureRetriever";
-import type { OverpassRawElement } from "../osm/base/overpassMirrorChain";
-import {
-    OsmSportsRecreationPact,
-    type OsmSportsRecreationQueryInput,
-} from "./osmGeometryPacts";
-import {
-    circleToBoundingBox,
-    clampGeometryRadiusM,
-    type BoundingBox,
-} from "./overpassGeometryCore";
-import {
-    attachGeometryHelpers,
-    type GeometryResultHelpers,
-} from "./osmGeometryHelpers";
+import { type IHuntingSeason } from '@slopdogs/core';
+import osmtogeojson from 'osmtogeojson';
+import type { FeatureCollection, GeometryObject } from 'geojson';
+import { OsmFeatureRetriever, type OsmQueryBase } from '../osm/base/OsmFeatureRetriever';
+import type { OverpassRawElement } from '../osm/base/overpassMirrorChain';
+import { OsmSportsRecreationPact, type OsmSportsRecreationQueryInput } from './osmGeometryPacts';
+import { circleToBoundingBox, clampGeometryRadiusM, type BoundingBox } from './overpassGeometryCore';
+import { attachGeometryHelpers, type GeometryResultHelpers } from './osmGeometryHelpers';
 
 export enum OsmLeisureValue {
-    SportsCentre = "sports_centre",
-    FitnessCentre = "fitness_centre",
-    FitnessStation = "fitness_station",
-    Pitch = "pitch",
-    Track = "track",
-    SwimmingPool = "swimming_pool",
-    GolfCourse = "golf_course",
-    MiniatureGolf = "miniature_golf",
-    Stadium = "stadium",
-    SportsHall = "sports_hall",
-    HorseRiding = "horse_riding",
-    IceRink = "ice_rink",
-    BowlingAlley = "bowling_alley",
-    Marina = "marina",
-    SaunaN = "sauna",
+    SportsCentre = 'sports_centre',
+    FitnessCentre = 'fitness_centre',
+    FitnessStation = 'fitness_station',
+    Pitch = 'pitch',
+    Track = 'track',
+    SwimmingPool = 'swimming_pool',
+    GolfCourse = 'golf_course',
+    MiniatureGolf = 'miniature_golf',
+    Stadium = 'stadium',
+    SportsHall = 'sports_hall',
+    HorseRiding = 'horse_riding',
+    IceRink = 'ice_rink',
+    BowlingAlley = 'bowling_alley',
+    Marina = 'marina',
+    SaunaN = 'sauna',
     // Recreation / leisure (non-sports) — common Taginfo values
-    Park = "park",
-    Garden = "garden",
-    Playground = "playground",
-    PicnicTable = "picnic_table",
-    PicnicSite = "picnic_site",
-    NatureReserve = "nature_reserve",
-    Bleachers = "bleachers",
-    Firepit = "firepit",
-    OutdoorSeating = "outdoor_seating",
-    Slipway = "slipway",
-    CommonE = "common",
-    Beach_Resort = "beach_resort",
-    DogPark = "dog_park",
-    WaterPark = "water_park",
-    AmusementArcade = "amusement_arcade",
-    EscapeGame = "escape_game",
-    Hackerspace = "hackerspace",
+    Park = 'park',
+    Garden = 'garden',
+    Playground = 'playground',
+    PicnicTable = 'picnic_table',
+    PicnicSite = 'picnic_site',
+    NatureReserve = 'nature_reserve',
+    Bleachers = 'bleachers',
+    Firepit = 'firepit',
+    OutdoorSeating = 'outdoor_seating',
+    Slipway = 'slipway',
+    CommonE = 'common',
+    Beach_Resort = 'beach_resort',
+    DogPark = 'dog_park',
+    WaterPark = 'water_park',
+    AmusementArcade = 'amusement_arcade',
+    EscapeGame = 'escape_game',
+    Hackerspace = 'hackerspace',
 }
 
 const LEISURE_SET = new Set<string>(Object.values(OsmLeisureValue));
@@ -75,7 +65,7 @@ function parseLeisureList(raw: unknown): OsmLeisureValue[] {
     if (raw == null) return [...DEFAULT_LEISURE];
     let parsed: string[] | null = null;
     if (Array.isArray(raw)) parsed = raw.map((x) => String(x).trim()).filter(Boolean);
-    else if (typeof raw === "string") {
+    else if (typeof raw === 'string') {
         const t = raw.trim();
         if (!t) return [...DEFAULT_LEISURE];
         try {
@@ -97,7 +87,7 @@ function parseSportList(raw: unknown): string[] | null {
     if (raw == null) return null;
     let parsed: string[] | null = null;
     if (Array.isArray(raw)) parsed = raw.map((x) => String(x).trim()).filter(Boolean);
-    else if (typeof raw === "string") {
+    else if (typeof raw === 'string') {
         const t = raw.trim();
         if (!t) return null;
         try {
@@ -123,11 +113,11 @@ export interface OsmSportsRecreationResult {
 export type OsmSportsRecreationResultWithHelpers = OsmSportsRecreationResult & GeometryResultHelpers<OsmSportsRecreationResult>;
 
 export class OsmSportsRecreationRetriever extends OsmFeatureRetriever<OsmSportsRecreationResult, typeof OsmSportsRecreationPact> {
-    protected readonly layer = "sportsRec";
+    protected readonly layer = 'sportsRec';
     protected readonly defaultRadiusM = 1000;
     protected readonly maxRadiusM = 10000;
     protected readonly queryPactClass = OsmSportsRecreationPact;
-    protected readonly outStatement = "out geom;";
+    protected readonly outStatement = 'out geom;';
 
     private sportFilter: string[] | null = null;
 
@@ -140,7 +130,7 @@ export class OsmSportsRecreationRetriever extends OsmFeatureRetriever<OsmSportsR
     }
 
     get icon(): string | undefined {
-        return "🏃";
+        return '🏃';
     }
 
     protected parseQuery(season: IHuntingSeason): OsmQueryBase {
@@ -148,26 +138,23 @@ export class OsmSportsRecreationRetriever extends OsmFeatureRetriever<OsmSportsR
         const query = (queryDog?.collected as OsmSportsRecreationQueryInput | undefined) ?? ({} as OsmSportsRecreationQueryInput);
         const lat = parseFloat(query.lat);
         const lng = parseFloat(query.lng);
-        const radiusM = clampGeometryRadiusM(parseFloat(query.radius ?? ""));
+        const radiusM = clampGeometryRadiusM(parseFloat(query.radius ?? ''));
         const leisure = parseLeisureList(query.leisure);
         this.sportFilter = parseSportList(query.sport);
         return { lat, lng, radiusM, facets: [...leisure] };
     }
 
-    protected buildOverpassBodyForTile(
-        bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number },
-        facets: string[],
-    ): string {
+    protected buildOverpassBodyForTile(bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number }, facets: string[]): string {
         const bboxClause = `(${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng})`;
         const lines: string[] = [];
         for (const v of facets) {
             lines.push(`  nwr["leisure"="${v}"]${bboxClause};`);
         }
-        return lines.join("\n");
+        return lines.join('\n');
     }
 
     protected classifyElementFacets(el: OverpassRawElement, fetchedFacets: string[]): string[] {
-        const v = el.tags?.["leisure"];
+        const v = el.tags?.['leisure'];
         if (!v) return [];
         return fetchedFacets.filter((f) => f === v);
     }
@@ -178,10 +165,10 @@ export class OsmSportsRecreationRetriever extends OsmFeatureRetriever<OsmSportsR
 
         const filtered = this.sportFilter
             ? elements.filter((el) => {
-                  const s = el.tags?.["sport"];
+                  const s = el.tags?.['sport'];
                   if (!s) return false;
                   // `sport` may be semicolon-separated list per OSM convention.
-                  const set = s.split(";").map((x) => x.trim());
+                  const set = s.split(';').map((x) => x.trim());
                   return set.some((x) => this.sportFilter!.includes(x));
               })
             : elements;

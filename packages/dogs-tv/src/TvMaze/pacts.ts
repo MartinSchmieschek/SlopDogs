@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface TvMazeQuery {
     /** Modus: search (Serien suchen), singleSearch (erster Treffer), show (nach ID),
@@ -12,7 +12,4 @@ export interface TvMazeQuery {
     embed?: string;
 }
 
-export const TvMazeQueryPact = createPact<TvMazeQuery>(
-    "TvMazeQueryProvider",
-    { fromSourceType: "TvMazeQuery" }
-);
+export const TvMazeQueryPact = createPact<TvMazeQuery>('TvMazeQueryProvider', { fromSourceType: 'TvMazeQuery' });

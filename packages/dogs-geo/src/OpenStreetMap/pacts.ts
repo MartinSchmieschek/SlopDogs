@@ -4,11 +4,11 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
-import type { LandmarksOverpassFacet } from "./overpassLandmarks";
-import type { TracksOverpassFacet } from "./overpassTracks";
-import type { VegetationOverpassFacet } from "./overpassVegetation";
-import type { FastRoadsOverpassFacet } from "./overpassFastRoads";
+import { createPact } from '@slopdogs/core';
+import type { LandmarksOverpassFacet } from './overpassLandmarks';
+import type { TracksOverpassFacet } from './overpassTracks';
+import type { VegetationOverpassFacet } from './overpassVegetation';
+import type { FastRoadsOverpassFacet } from './overpassFastRoads';
 
 export {
     DEFAULT_LANDMARKS_FACETS,
@@ -16,21 +16,13 @@ export {
     LandmarksOverpassFacet,
     LandmarksPreset,
     OsmLandmarkElementType,
-} from "./overpassLandmarks";
+} from './overpassLandmarks';
 
-export { TracksOverpassFacet, DEFAULT_TRACKS_FACETS, ALL_TRACKS_OVERPASS_FACETS } from "./overpassTracks";
+export { TracksOverpassFacet, DEFAULT_TRACKS_FACETS, ALL_TRACKS_OVERPASS_FACETS } from './overpassTracks';
 
-export {
-    VegetationOverpassFacet,
-    DEFAULT_VEGETATION_FACETS,
-    ALL_VEGETATION_OVERPASS_FACETS,
-} from "./overpassVegetation";
+export { VegetationOverpassFacet, DEFAULT_VEGETATION_FACETS, ALL_VEGETATION_OVERPASS_FACETS } from './overpassVegetation';
 
-export {
-    FastRoadsOverpassFacet,
-    DEFAULT_FAST_ROADS_FACETS,
-    ALL_FAST_ROADS_OVERPASS_FACETS,
-} from "./overpassFastRoads";
+export { FastRoadsOverpassFacet, DEFAULT_FAST_ROADS_FACETS, ALL_FAST_ROADS_OVERPASS_FACETS } from './overpassFastRoads';
 
 /**
  * Required query input for OsmLandmarksRetriever — the coordinates and
@@ -71,18 +63,18 @@ export interface OsmFastRoadsQueryInput {
 /** @deprecated use OsmLandmarksQueryInput */
 export type NearbyLandmarksQuery = OsmLandmarksQueryInput;
 
-export const NearbyLandmarksPact = createPact<OsmLandmarksQueryInput>("NearbyLandmarksQueryProvider", {
-    fromSourceType: "OsmLandmarksQueryInput",
+export const NearbyLandmarksPact = createPact<OsmLandmarksQueryInput>('NearbyLandmarksQueryProvider', {
+    fromSourceType: 'OsmLandmarksQueryInput',
 });
 
-export const NearbyTracksPact = createPact<OsmTracksQueryInput>("NearbyTracksQueryProvider", {
-    fromSourceType: "OsmTracksQueryInput",
+export const NearbyTracksPact = createPact<OsmTracksQueryInput>('NearbyTracksQueryProvider', {
+    fromSourceType: 'OsmTracksQueryInput',
 });
 
-export const NearbyVegetationPact = createPact<OsmVegetationQueryInput>("NearbyVegetationQueryProvider", {
-    fromSourceType: "OsmVegetationQueryInput",
+export const NearbyVegetationPact = createPact<OsmVegetationQueryInput>('NearbyVegetationQueryProvider', {
+    fromSourceType: 'OsmVegetationQueryInput',
 });
 
-export const NearbyFastRoadsPact = createPact<OsmFastRoadsQueryInput>("NearbyFastRoadsQueryProvider", {
-    fromSourceType: "OsmFastRoadsQueryInput",
+export const NearbyFastRoadsPact = createPact<OsmFastRoadsQueryInput>('NearbyFastRoadsQueryProvider', {
+    fromSourceType: 'OsmFastRoadsQueryInput',
 });

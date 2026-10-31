@@ -13,21 +13,19 @@ export class KennelFavoriteHandler {
     constructor(
         private readonly kennelsController: KennelController,
         private readonly favorites: KennelFavoriteService,
-    ) { }
+    ) {}
 
     registerRoutes(app: any): void {
         app.put(API_ROUTE.kennelFavorite, (req: Request, res: Response) =>
-            this.respond(req, res, (kennel) => this.favorites.set(kennel, req.ctx)));
+            this.respond(req, res, (kennel) => this.favorites.set(kennel, req.ctx)),
+        );
         app.delete(API_ROUTE.kennelFavorite, (req: Request, res: Response) =>
-            this.respond(req, res, (kennel) => this.favorites.clear(kennel, req.ctx)));
+            this.respond(req, res, (kennel) => this.favorites.clear(kennel, req.ctx)),
+        );
     }
 
     /** Kennel aufloesbar (sonst 404), dann die Aktion; FavoriteError wird zur Fehlerform des Bestands. */
-    private async respond(
-        req: Request,
-        res: Response,
-        action: (kennel: RatableKennel) => Promise<KennelFavoriteView>,
-    ): Promise<void> {
+    private async respond(req: Request, res: Response, action: (kennel: RatableKennel) => Promise<KennelFavoriteView>): Promise<void> {
         try {
             const found = await this.kennelsController.getById(paramString(req.params.id));
             if (!found.ok || !found.data) throw new FavoriteError(404, 'not_found', 'Kennel not found');

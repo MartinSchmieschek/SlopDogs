@@ -13,7 +13,7 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** GPS-Koordinaten fuer die Suche nach nahegelegenen Haltestellen */
 export interface PublicTransportQuery {
@@ -28,7 +28,6 @@ export interface PublicTransportQuery {
 }
 
 /** Arr, the GPS query pact — an anchor binding the hound to its earthly coordinates */
-export const PublicTransportQueryPact = createPact<PublicTransportQuery>(
-    "PublicTransportQueryProvider",
-    { fromSourceType: "PublicTransportQuery" }
-);
+export const PublicTransportQueryPact = createPact<PublicTransportQuery>('PublicTransportQueryProvider', {
+    fromSourceType: 'PublicTransportQuery',
+});

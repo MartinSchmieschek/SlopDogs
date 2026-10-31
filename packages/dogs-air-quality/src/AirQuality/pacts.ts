@@ -4,7 +4,7 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** GPS-Koordinaten fuer die Luftqualitaetsabfrage */
 export interface AirQualityQuery {
@@ -15,7 +15,4 @@ export interface AirQualityQuery {
 }
 
 /** Der Pact fuer AirQuality-Queries */
-export const AirQualityQueryPact = createPact<AirQualityQuery>(
-    "AirQualityQueryProvider",
-    { fromSourceType: "AirQualityQuery" }
-);
+export const AirQualityQueryPact = createPact<AirQualityQuery>('AirQualityQueryProvider', { fromSourceType: 'AirQualityQuery' });

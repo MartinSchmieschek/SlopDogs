@@ -1,7 +1,7 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from "@slopdogs/core";
-import { CurrencyQueryPact, type CurrencyQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { CurrencyQueryPact, type CurrencyQuery } from './pacts';
 
-const FRANKFURTER_BASE = "https://api.frankfurter.app";
+const FRANKFURTER_BASE = 'https://api.frankfurter.app';
 
 export interface CurrencyResult {
     base: string;
@@ -28,11 +28,11 @@ export class CurrencyRetriever extends Dog<CurrencyResult> implements ICacheable
     }
 
     get description(): string {
-        return "Fetches live exchange rates and currency conversions via the Frankfurter API.";
+        return 'Fetches live exchange rates and currency conversions via the Frankfurter API.';
     }
 
     get icon(): string | undefined {
-        return "\uD83D\uDCB1";
+        return '\uD83D\uDCB1';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -44,23 +44,23 @@ export class CurrencyRetriever extends Dog<CurrencyResult> implements ICacheable
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<CurrencyResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(CurrencyQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(CurrencyQueryPact, d));
         const query = (queryDog?.collected as CurrencyQuery | undefined) ?? ({} as CurrencyQuery);
 
-        const from = (query.from ?? "EUR").toUpperCase();
+        const from = (query.from ?? 'EUR').toUpperCase();
         const to = query.to?.toUpperCase();
-        const amountStr = query.amount ?? "1";
+        const amountStr = query.amount ?? '1';
         const amount = parseFloat(amountStr);
-        const dateSegment = query.date ?? "latest";
+        const dateSegment = query.date ?? 'latest';
 
         const params = new URLSearchParams();
-        params.set("from", from);
+        params.set('from', from);
         if (to) {
-            params.set("to", to);
+            params.set('to', to);
         }
 
         const url = `${FRANKFURTER_BASE}/${encodeURIComponent(dateSegment)}?${params.toString()}`;
-        const key = `currency:${from}:${to ?? "all"}:${dateSegment}`;
+        const key = `currency:${from}:${to ?? 'all'}:${dateSegment}`;
 
         const fetchRates = async (): Promise<CurrencyResult> => {
             const ctrl = new AbortController();
@@ -74,13 +74,11 @@ export class CurrencyRetriever extends Dog<CurrencyResult> implements ICacheable
             }
 
             if (!res.ok) {
-                const text = await res.text().catch(() => "");
-                throw new Error(
-                    `CurrencyRetriever: HTTP ${res.status} ${res.statusText}${text ? ` — ${text.slice(0, 200)}` : ""}`
-                );
+                const text = await res.text().catch(() => '');
+                throw new Error(`CurrencyRetriever: HTTP ${res.status} ${res.statusText}${text ? ` — ${text.slice(0, 200)}` : ''}`);
             }
 
-            const json = await res.json() as { base: string; date: string; rates: Record<string, number> };
+            const json = (await res.json()) as { base: string; date: string; rates: Record<string, number> };
 
             const result: CurrencyResult = {
                 base: json.base,

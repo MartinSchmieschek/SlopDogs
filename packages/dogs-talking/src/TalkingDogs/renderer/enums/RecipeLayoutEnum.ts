@@ -9,8 +9,8 @@
 
 /** Arr, the recipe's accursed slots — what ye see, what ye need, and the steps to conjure it. */
 export enum RecipeLayoutEnum {
-    Image = "Image",
-    Title = "Title",
-    Ingredients = "Ingredients",
-    Steps = "Steps",
-  }
+    Image = 'Image',
+    Title = 'Title',
+    Ingredients = 'Ingredients',
+    Steps = 'Steps',
+}

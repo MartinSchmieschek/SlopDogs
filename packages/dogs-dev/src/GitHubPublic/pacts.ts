@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface GitHubPublicQuery {
     /** Modus: user, repo, orgRepos, userRepos, search — default "repo" */
@@ -19,7 +19,4 @@ export interface GitHubPublicQuery {
     perPage?: number;
 }
 
-export const GitHubPublicQueryPact = createPact<GitHubPublicQuery>(
-    "GitHubPublicQueryProvider",
-    { fromSourceType: "GitHubPublicQuery" }
-);
+export const GitHubPublicQueryPact = createPact<GitHubPublicQuery>('GitHubPublicQueryProvider', { fromSourceType: 'GitHubPublicQuery' });

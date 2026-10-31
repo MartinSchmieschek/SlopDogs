@@ -13,36 +13,52 @@ export async function seedVoidStormsKennel(nodesStore: IStore, kennelsStore: ISt
     const dataVersionId = randomUUID();
     const dataDogId = randomUUID();
     const dataCfg = {
-        id: dataVersionId, lineageId: dataDogId, parentId: null,
+        id: dataVersionId,
+        lineageId: dataDogId,
+        parentId: null,
         displayName: 'Voidhuntdata',
         parentsRequired: ['WarframeAlertsRetriever'],
         parentsOptional: [],
         theRun: VoidHuntDataCode,
     };
-    await nodesStore.save({ id: dataVersionId, type: SerializedDog.name, lineageId: dataDogId, parentId: null, displayName: 'Voidhuntdata', serializedDogConfig: JSON.stringify(dataCfg), createdAt: new Date() });
+    await nodesStore.save({
+        id: dataVersionId,
+        type: SerializedDog.name,
+        lineageId: dataDogId,
+        parentId: null,
+        displayName: 'Voidhuntdata',
+        serializedDogConfig: JSON.stringify(dataCfg),
+        createdAt: new Date(),
+    });
 
     // Wave 3: VoidHuntGallery (lead — renders HTML)
     const galleryVersionId = randomUUID();
     const galleryDogId = randomUUID();
     const galleryCfg = {
-        id: galleryVersionId, lineageId: galleryDogId, parentId: null,
+        id: galleryVersionId,
+        lineageId: galleryDogId,
+        parentId: null,
         displayName: 'VoidHuntGallery',
         parentsRequired: [dataDogId],
         parentsOptional: [],
         theRun: VoidHuntGalleryCode,
     };
-    await nodesStore.save({ id: galleryVersionId, type: SerializedDog.name, lineageId: galleryDogId, parentId: null, displayName: 'VoidHuntGallery', serializedDogConfig: JSON.stringify(galleryCfg), createdAt: new Date() });
+    await nodesStore.save({
+        id: galleryVersionId,
+        type: SerializedDog.name,
+        lineageId: galleryDogId,
+        parentId: null,
+        displayName: 'VoidHuntGallery',
+        serializedDogConfig: JSON.stringify(galleryCfg),
+        createdAt: new Date(),
+    });
 
     const kennelConfig: IKennelConfig = {
         id: kennelId,
         name: 'Void Hunt',
         description: 'Warframe Void Fissures, Storms, Invasions — live Dashboard aus dem Void',
         emoji: '\uD83C\uDF00',
-        dogIds: [
-            galleryDogId,
-            dataDogId,
-            BASE_DOG_PREFIX + 'WarframeAlertsRetriever',
-        ],
+        dogIds: [galleryDogId, dataDogId, BASE_DOG_PREFIX + 'WarframeAlertsRetriever'],
         createdAt: new Date(),
         updatedAt: new Date(),
     };

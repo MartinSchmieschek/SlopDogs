@@ -11,9 +11,9 @@
  * =========================================================================
  */
 
-import type { GeoLocation, GeoAddress, GeocodingResult } from "./interfaces/geocodingTypes";
+import type { GeoLocation, GeoAddress, GeocodingResult } from './interfaces/geocodingTypes';
 
-const NOMINATIM_BASE = "https://nominatim.openstreetmap.org";
+const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org';
 
 function parseAddress(addr: any): GeoAddress {
     const road = addr?.road ?? addr?.pedestrian ?? addr?.footway ?? null;
@@ -35,7 +35,7 @@ function parseLocation(item: any): GeoLocation {
     return {
         lat: parseFloat(item.lat),
         lng: parseFloat(item.lon),
-        displayName: item.display_name ?? "",
+        displayName: item.display_name ?? '',
         address: parseAddress(item.address),
         osmType: item.osm_type ?? null,
         importance: item.importance ?? 0,
@@ -45,10 +45,7 @@ function parseLocation(item: any): GeoLocation {
 /**
  * Forward geocoding — Adresse/Ortsname zu GPS-Koordinaten.
  */
-export async function forwardGeocode(
-    query: string,
-    limit: number = 5
-): Promise<GeocodingResult> {
+export async function forwardGeocode(query: string, limit: number = 5): Promise<GeocodingResult> {
     const url = `${NOMINATIM_BASE}/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=${limit}`;
 
     const controller = new AbortController();
@@ -58,8 +55,8 @@ export async function forwardGeocode(
     try {
         res = await fetch(url, {
             headers: {
-                "Accept": "application/json",
-                "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)",
+                Accept: 'application/json',
+                'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)',
             },
             signal: controller.signal,
         });
@@ -71,11 +68,11 @@ export async function forwardGeocode(
         throw new Error(`Nominatim search failed: ${res.status} ${res.statusText}`);
     }
 
-    const data = await res.json() as any[];
+    const data = (await res.json()) as any[];
     const results = data.map(parseLocation);
 
     return {
-        mode: "forward",
+        mode: 'forward',
         query,
         results,
         resultCount: results.length,
@@ -85,10 +82,7 @@ export async function forwardGeocode(
 /**
  * Reverse geocoding — GPS-Koordinaten zu Adresse.
  */
-export async function reverseGeocode(
-    lat: number,
-    lng: number
-): Promise<GeocodingResult> {
+export async function reverseGeocode(lat: number, lng: number): Promise<GeocodingResult> {
     const url = `${NOMINATIM_BASE}/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
 
     const controller = new AbortController();
@@ -98,8 +92,8 @@ export async function reverseGeocode(
     try {
         res = await fetch(url, {
             headers: {
-                "Accept": "application/json",
-                "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)",
+                Accept: 'application/json',
+                'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)',
             },
             signal: controller.signal,
         });
@@ -111,12 +105,12 @@ export async function reverseGeocode(
         throw new Error(`Nominatim reverse failed: ${res.status} ${res.statusText}`);
     }
 
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
 
     // Reverse returns a single object, not an array
     if (data.error) {
         return {
-            mode: "reverse",
+            mode: 'reverse',
             query: `${lat},${lng}`,
             results: [],
             resultCount: 0,
@@ -126,7 +120,7 @@ export async function reverseGeocode(
     const result = parseLocation(data);
 
     return {
-        mode: "reverse",
+        mode: 'reverse',
         query: `${lat},${lng}`,
         results: [result],
         resultCount: 1,

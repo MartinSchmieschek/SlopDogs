@@ -1,5 +1,5 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from "@slopdogs/core";
-import { WikiSearchQueryPact, type WikiSearchQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { WikiSearchQueryPact, type WikiSearchQuery } from './pacts';
 
 export interface WikiSearchResult {
     title: string;
@@ -51,11 +51,11 @@ export class WikiSearchRetriever extends Dog<WikiSearchResult> implements ICache
     }
 
     get description(): string {
-        return "Searches Wikipedia articles by keyword and returns article summaries.";
+        return 'Searches Wikipedia articles by keyword and returns article summaries.';
     }
 
     get icon(): string | undefined {
-        return "\uD83D\uDD0E";
+        return '\uD83D\uDD0E';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -67,15 +67,15 @@ export class WikiSearchRetriever extends Dog<WikiSearchResult> implements ICache
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<WikiSearchResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(WikiSearchQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(WikiSearchQueryPact, d));
         const query = (queryDog?.collected as WikiSearchQuery | undefined) ?? ({} as WikiSearchQuery);
 
-        const searchTerm = query.q ?? "";
+        const searchTerm = query.q ?? '';
         if (!searchTerm.trim()) {
-            throw new Error("WikiSearchRetriever: Missing required query param (q)");
+            throw new Error('WikiSearchRetriever: Missing required query param (q)');
         }
 
-        const lang = (query.lang ?? "en").toLowerCase();
+        const lang = (query.lang ?? 'en').toLowerCase();
         const key = `wikisearch:${lang}:${searchTerm.toLowerCase().trim()}`;
 
         const fetchWiki = async (): Promise<WikiSearchResult> => {
@@ -89,7 +89,7 @@ export class WikiSearchRetriever extends Dog<WikiSearchResult> implements ICache
                 const summaryRes = await fetchWithTimeout(summaryUrl, ctrl.signal);
 
                 if (summaryRes.ok) {
-                    const data = await summaryRes.json() as WikiSummaryResponse;
+                    const data = (await summaryRes.json()) as WikiSummaryResponse;
                     return {
                         title: data.title,
                         extract: data.extract,
@@ -105,20 +105,20 @@ export class WikiSearchRetriever extends Dog<WikiSearchResult> implements ICache
                 const searchRes = await fetchWithTimeout(searchUrl, ctrl.signal);
 
                 if (!searchRes.ok) {
-                    const text = await searchRes.text().catch(() => "");
+                    const text = await searchRes.text().catch(() => '');
                     throw new Error(
-                        `WikiSearchRetriever: HTTP ${searchRes.status} ${searchRes.statusText}${text ? ` — ${text.slice(0, 200)}` : ""}`
+                        `WikiSearchRetriever: HTTP ${searchRes.status} ${searchRes.statusText}${text ? ` — ${text.slice(0, 200)}` : ''}`,
                     );
                 }
 
-                const searchData = await searchRes.json() as WikiSearchResponse;
+                const searchData = (await searchRes.json()) as WikiSearchResponse;
                 const results = searchData.query?.search ?? [];
 
                 if (results.length === 0) {
                     throw new Error(`WikiSearchRetriever: No results found for "${searchTerm}"`);
                 }
 
-                const searchResults = results.map(r => ({
+                const searchResults = results.map((r) => ({
                     title: r.title,
                     snippet: r.snippet,
                 }));
@@ -129,7 +129,7 @@ export class WikiSearchRetriever extends Dog<WikiSearchResult> implements ICache
                 const topRes = await fetchWithTimeout(topSummaryUrl, ctrl.signal);
 
                 if (topRes.ok) {
-                    const topData = await topRes.json() as WikiSummaryResponse;
+                    const topData = (await topRes.json()) as WikiSummaryResponse;
                     return {
                         title: topData.title,
                         extract: topData.extract,
@@ -144,7 +144,7 @@ export class WikiSearchRetriever extends Dog<WikiSearchResult> implements ICache
                 // If even the top result summary fails, return search results only
                 return {
                     title: results[0].title,
-                    extract: results[0].snippet.replace(/<[^>]*>/g, ""),
+                    extract: results[0].snippet.replace(/<[^>]*>/g, ''),
                     url: `https://${lang}.wikipedia.org/wiki/${topTitle}`,
                     lang,
                     searchResults,

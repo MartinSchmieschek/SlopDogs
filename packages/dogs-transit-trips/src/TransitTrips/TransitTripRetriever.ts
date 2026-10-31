@@ -14,10 +14,10 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from "@slopdogs/core";
-import { fetchLocalTransitNetwork } from "./transitTripApiClient";
-import type { TransitTripResult } from "./interfaces/transitTripTypes";
-import { TransitTripQueryPact, type TransitTripQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@slopdogs/core';
+import { fetchLocalTransitNetwork } from './transitTripApiClient';
+import type { TransitTripResult } from './interfaces/transitTripTypes';
+import { TransitTripQueryPact, type TransitTripQuery } from './pacts';
 
 /**
  * Arr, the TransitTripRetriever — a spectral hound that charts
@@ -41,7 +41,7 @@ export class TransitTripRetriever extends Dog<TransitTripResult> implements ICac
     }
 
     get icon(): string | undefined {
-        return "\uD83D\uDE82";
+        return '\uD83D\uDE82';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -53,7 +53,7 @@ export class TransitTripRetriever extends Dog<TransitTripResult> implements ICac
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<TransitTripResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(TransitTripQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(TransitTripQueryPact, d));
         const query = (queryDog?.collected as TransitTripQuery | undefined) ?? ({} as TransitTripQuery);
 
         const lat = parseFloat(query['lat']);
@@ -68,14 +68,12 @@ export class TransitTripRetriever extends Dog<TransitTripResult> implements ICac
         const line = query['line'] || undefined;
         const limit = parseInt(query['limit'] ?? '10', 10);
 
-        const key = geoBucketKey("trips", lat, lng, radius, {
+        const key = geoBucketKey('trips', lat, lng, radius, {
             extras: { stations, line: line ?? 'all', limit },
         });
 
         if (this.cacheHandler) {
-            return this.cacheHandler.getOrFetch(key, 5 * 60_000, () =>
-                fetchLocalTransitNetwork(lat, lng, radius, stations, line, limit)
-            );
+            return this.cacheHandler.getOrFetch(key, 5 * 60_000, () => fetchLocalTransitNetwork(lat, lng, radius, stations, line, limit));
         }
         return fetchLocalTransitNetwork(lat, lng, radius, stations, line, limit);
     };

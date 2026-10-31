@@ -9,24 +9,21 @@ import {
     MAX_OSM_RADIUS_M,
     overpassSettingsHeader,
     type OsmGeoElement,
-} from "./overpassOsmShared";
+} from './overpassOsmShared';
 
 export const DEFAULT_TRACKS_RADIUS_M = DEFAULT_OSM_RADIUS_M;
 export const MAX_TRACKS_RADIUS_M = MAX_OSM_RADIUS_M;
 
 export enum TracksOverpassFacet {
-    Path = "path",
-    Footway = "footway",
-    Cycleway = "cycleway",
-    Bridleway = "bridleway",
-    Track = "track",
-    Steps = "steps",
+    Path = 'path',
+    Footway = 'footway',
+    Cycleway = 'cycleway',
+    Bridleway = 'bridleway',
+    Track = 'track',
+    Steps = 'steps',
 }
 
-export const DEFAULT_TRACKS_FACETS: readonly TracksOverpassFacet[] = [
-    TracksOverpassFacet.Path,
-    TracksOverpassFacet.Footway,
-];
+export const DEFAULT_TRACKS_FACETS: readonly TracksOverpassFacet[] = [TracksOverpassFacet.Path, TracksOverpassFacet.Footway];
 
 export const ALL_TRACKS_OVERPASS_FACETS: readonly TracksOverpassFacet[] = [
     TracksOverpassFacet.Path,
@@ -45,12 +42,12 @@ export interface OsmTracksResult {
 }
 
 const HIGHWAY_BY_FACET: Record<TracksOverpassFacet, string> = {
-    [TracksOverpassFacet.Path]: "path",
-    [TracksOverpassFacet.Footway]: "footway",
-    [TracksOverpassFacet.Cycleway]: "cycleway",
-    [TracksOverpassFacet.Bridleway]: "bridleway",
-    [TracksOverpassFacet.Track]: "track",
-    [TracksOverpassFacet.Steps]: "steps",
+    [TracksOverpassFacet.Path]: 'path',
+    [TracksOverpassFacet.Footway]: 'footway',
+    [TracksOverpassFacet.Cycleway]: 'cycleway',
+    [TracksOverpassFacet.Bridleway]: 'bridleway',
+    [TracksOverpassFacet.Track]: 'track',
+    [TracksOverpassFacet.Steps]: 'steps',
 };
 
 function lineForFacet(f: TracksOverpassFacet, r: number, lat: number, lng: number): string {
@@ -70,7 +67,7 @@ function dedupeFacets(facets: TracksOverpassFacet[]): TracksOverpassFacet[] {
 }
 
 function coerceFacet(raw: unknown): TracksOverpassFacet | null {
-    if (typeof raw !== "string") {
+    if (typeof raw !== 'string') {
         const vals = Object.values(TracksOverpassFacet) as TracksOverpassFacet[];
         return vals.includes(raw as TracksOverpassFacet) ? (raw as TracksOverpassFacet) : null;
     }
@@ -92,10 +89,10 @@ export function parseTracksFacets(raw: unknown): TracksOverpassFacet[] {
         }
         return mapped.length ? dedupeFacets(mapped) : base;
     }
-    if (typeof raw === "string") {
+    if (typeof raw === 'string') {
         const v = raw.toLowerCase();
-        if (v === "" || v === "default") return base;
-        if (v === "full") {
+        if (v === '' || v === 'default') return base;
+        if (v === 'full') {
             return dedupeFacets([...ALL_TRACKS_OVERPASS_FACETS]);
         }
         const one = coerceFacet(raw);
@@ -105,18 +102,13 @@ export function parseTracksFacets(raw: unknown): TracksOverpassFacet[] {
     return single != null ? [single] : base;
 }
 
-export function buildTracksOverpassQuery(
-    lat: number,
-    lng: number,
-    radiusM: number,
-    facets: TracksOverpassFacet[]
-): string {
+export function buildTracksOverpassQuery(lat: number, lng: number, radiusM: number, facets: TracksOverpassFacet[]): string {
     const r = radiusM;
     const list = facets.length ? dedupeFacets(facets) : [...DEFAULT_TRACKS_FACETS];
     const lines = list.map((f) => lineForFacet(f, r, lat, lng));
     return `${overpassSettingsHeader()}
 (
-${lines.join("\n")}
+${lines.join('\n')}
 );
 out center;`;
 }
@@ -129,11 +121,11 @@ export async function fetchNearbyTracks(
     lat: number,
     lng: number,
     radiusM: number,
-    facets: TracksOverpassFacet[]
+    facets: TracksOverpassFacet[],
 ): Promise<OsmTracksResult> {
     const normalized = facets.length ? dedupeFacets(facets) : [...DEFAULT_TRACKS_FACETS];
     const query = buildTracksOverpassQuery(lat, lng, radiusM, normalized);
-    const elements = await fetchOverpassElements(query, "OsmTracksRetriever");
+    const elements = await fetchOverpassElements(query, 'OsmTracksRetriever');
     return {
         center: { lat, lng },
         radiusM,

@@ -1,12 +1,9 @@
-import { IHuntingSeason } from "@slopdogs/core";
-import { OsmFeatureRetriever, type OsmQueryBase } from "../base/OsmFeatureRetriever";
-import {
-    type OverpassRawElement,
-    overpassElementRepresentativePoint,
-} from "../base/overpassMirrorChain";
-import { DrinkingWaterQueryPact, type DrinkingWaterQuery } from "./pacts";
+import { IHuntingSeason } from '@slopdogs/core';
+import { OsmFeatureRetriever, type OsmQueryBase } from '../base/OsmFeatureRetriever';
+import { type OverpassRawElement, overpassElementRepresentativePoint } from '../base/overpassMirrorChain';
+import { DrinkingWaterQueryPact, type DrinkingWaterQuery } from './pacts';
 
-export type DrinkingWaterFacilityType = "drinking_water" | "toilet" | "water_point" | "water_tap";
+export type DrinkingWaterFacilityType = 'drinking_water' | 'toilet' | 'water_point' | 'water_tap';
 
 export interface DrinkingWaterFacility {
     lat: number;
@@ -34,25 +31,25 @@ export interface DrinkingWaterResult {
 
 /** Jede Facility-Art als eigene Facet — getrennt cachen, zusammen ausliefern. */
 const FACET_TAGS: Record<string, { key: string; value: string }> = {
-    drinking_water: { key: "amenity", value: "drinking_water" },
-    toilet: { key: "amenity", value: "toilets" },
-    water_point: { key: "amenity", value: "water_point" },
-    water_tap: { key: "man_made", value: "water_tap" },
+    drinking_water: { key: 'amenity', value: 'drinking_water' },
+    toilet: { key: 'amenity', value: 'toilets' },
+    water_point: { key: 'amenity', value: 'water_point' },
+    water_tap: { key: 'man_made', value: 'water_tap' },
 };
 
 const ALL_FACETS = Object.keys(FACET_TAGS);
 
 function classifyFacilityType(tags: Record<string, string>): DrinkingWaterFacilityType {
-    if (tags["man_made"] === "water_tap") return "water_tap";
-    const amenity = tags["amenity"] ?? "";
-    if (amenity === "drinking_water") return "drinking_water";
-    if (amenity === "toilets") return "toilet";
-    if (amenity === "water_point") return "water_point";
-    return "drinking_water";
+    if (tags['man_made'] === 'water_tap') return 'water_tap';
+    const amenity = tags['amenity'] ?? '';
+    if (amenity === 'drinking_water') return 'drinking_water';
+    if (amenity === 'toilets') return 'toilet';
+    if (amenity === 'water_point') return 'water_point';
+    return 'drinking_water';
 }
 
 export class DrinkingWaterRetriever extends OsmFeatureRetriever<DrinkingWaterResult, typeof DrinkingWaterQueryPact> {
-    protected readonly layer = "drinking-water";
+    protected readonly layer = 'drinking-water';
     protected readonly defaultRadiusM = 500;
     protected readonly maxRadiusM = 3000;
     protected readonly queryPactClass = DrinkingWaterQueryPact;
@@ -62,7 +59,7 @@ export class DrinkingWaterRetriever extends OsmFeatureRetriever<DrinkingWaterRes
     }
 
     get description(): string {
-        return "Finds nearby drinking water fountains, water points and public toilets via the Overpass/OpenStreetMap API.";
+        return 'Finds nearby drinking water fountains, water points and public toilets via the Overpass/OpenStreetMap API.';
     }
 
     protected parseQuery(season: IHuntingSeason): OsmQueryBase {
@@ -71,15 +68,12 @@ export class DrinkingWaterRetriever extends OsmFeatureRetriever<DrinkingWaterRes
         return {
             lat: parseFloat(query.lat),
             lng: parseFloat(query.lng),
-            radiusM: this.clampRadius(parseFloat(query.radius ?? "")),
+            radiusM: this.clampRadius(parseFloat(query.radius ?? '')),
             facets: ALL_FACETS,
         };
     }
 
-    protected buildOverpassBodyForTile(
-        bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number },
-        facets: string[],
-    ): string {
+    protected buildOverpassBodyForTile(bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number }, facets: string[]): string {
         const bboxClause = `(${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng})`;
         const lines: string[] = [];
         for (const f of facets) {
@@ -87,11 +81,11 @@ export class DrinkingWaterRetriever extends OsmFeatureRetriever<DrinkingWaterRes
             if (!c) continue;
             lines.push(`  node["${c.key}"="${c.value}"]${bboxClause};`);
             // Toilets/drinking_water koennen auch als Way getaggt sein.
-            if (f === "drinking_water" || f === "toilet") {
+            if (f === 'drinking_water' || f === 'toilet') {
                 lines.push(`  way["${c.key}"="${c.value}"]${bboxClause};`);
             }
         }
-        return lines.join("\n");
+        return lines.join('\n');
     }
 
     protected classifyElementFacets(el: OverpassRawElement, fetchedFacets: string[]): string[] {
@@ -122,19 +116,19 @@ export class DrinkingWaterRetriever extends OsmFeatureRetriever<DrinkingWaterRes
                 lat: point.lat,
                 lng: point.lng,
                 type: classifyFacilityType(el.tags),
-                name: el.tags["name"],
-                fee: el.tags["fee"],
-                wheelchair: el.tags["wheelchair"],
-                opening_hours: el.tags["opening_hours"],
+                name: el.tags['name'],
+                fee: el.tags['fee'],
+                wheelchair: el.tags['wheelchair'],
+                opening_hours: el.tags['opening_hours'],
                 tags: el.tags,
             });
         }
 
         const counts = {
-            drinkingWater: facilities.filter((f) => f.type === "drinking_water").length,
-            toilet: facilities.filter((f) => f.type === "toilet").length,
-            waterPoint: facilities.filter((f) => f.type === "water_point").length,
-            waterTap: facilities.filter((f) => f.type === "water_tap").length,
+            drinkingWater: facilities.filter((f) => f.type === 'drinking_water').length,
+            toilet: facilities.filter((f) => f.type === 'toilet').length,
+            waterPoint: facilities.filter((f) => f.type === 'water_point').length,
+            waterTap: facilities.filter((f) => f.type === 'water_tap').length,
             total: facilities.length,
         };
 

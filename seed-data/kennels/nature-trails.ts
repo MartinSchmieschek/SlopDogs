@@ -117,13 +117,23 @@ return result
     const rendererVersionId = randomUUID();
     const rendererDogId = randomUUID();
     const rendererCfg = {
-        id: rendererVersionId, lineageId: rendererDogId, parentId: null,
+        id: rendererVersionId,
+        lineageId: rendererDogId,
+        parentId: null,
         displayName: 'NaturRenderer',
         parentsRequired: [leadDogId, 'QueryRetriever'],
         parentsOptional: [],
         theRun: NATUR_RENDERER_CODE,
     };
-    await nodesStore.save({ id: rendererVersionId, type: SerializedDog.name, lineageId: rendererDogId, parentId: null, displayName: 'NaturRenderer', serializedDogConfig: JSON.stringify(rendererCfg), createdAt: new Date() });
+    await nodesStore.save({
+        id: rendererVersionId,
+        type: SerializedDog.name,
+        lineageId: rendererDogId,
+        parentId: null,
+        displayName: 'NaturRenderer',
+        serializedDogConfig: JSON.stringify(rendererCfg),
+        createdAt: new Date(),
+    });
 
     const kennelConfig: IKennelConfig = {
         id: kennelId,
@@ -287,11 +297,7 @@ export async function seedElevationKennel(nodesStore: IStore, kennelsStore: ISto
         name: 'Elevation',
         description: 'Elevation: meters above sea level from GPS (Open-Meteo)',
         emoji: '\u26F0\uFE0F',
-        dogIds: [
-            BASE_DOG_PREFIX + 'ElevationRetriever',
-            BASE_DOG_PREFIX + 'QueryRetriever',
-            mimicDogId,
-        ],
+        dogIds: [BASE_DOG_PREFIX + 'ElevationRetriever', BASE_DOG_PREFIX + 'QueryRetriever', mimicDogId],
         defaultQuery: { lat: '47.3769,47.3800,47.3850,47.3900', lng: '8.5417,8.5500,8.5600,8.5700' },
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -398,9 +404,13 @@ return {
 `,
     };
     await nodesStore.save({
-        id: dataVersionId, type: SerializedDog.name, lineageId: dataDogId,
-        parentId: null, displayName: 'TrailScoutData',
-        serializedDogConfig: JSON.stringify(dataCfg), createdAt: new Date(),
+        id: dataVersionId,
+        type: SerializedDog.name,
+        lineageId: dataDogId,
+        parentId: null,
+        displayName: 'TrailScoutData',
+        serializedDogConfig: JSON.stringify(dataCfg),
+        createdAt: new Date(),
     });
 
     // --- Wave 5: Renderer — reads TrailScoutData, builds HTML with Leaflet map ---
@@ -534,9 +544,13 @@ return html;
 `,
     };
     await nodesStore.save({
-        id: rendererVersionId, type: SerializedDog.name, lineageId: rendererDogId,
-        parentId: null, displayName: 'TrailScoutRenderer',
-        serializedDogConfig: JSON.stringify(rendererCfg), createdAt: new Date(),
+        id: rendererVersionId,
+        type: SerializedDog.name,
+        lineageId: rendererDogId,
+        parentId: null,
+        displayName: 'TrailScoutRenderer',
+        serializedDogConfig: JSON.stringify(rendererCfg),
+        createdAt: new Date(),
     });
 
     // Kennel: Renderer als Anfuehrer (erste dogId), dann Data, dann BaseDogs + Mimics

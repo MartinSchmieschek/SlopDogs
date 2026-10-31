@@ -1,6 +1,6 @@
 export interface TriviaQuestion {
     category: string;
-    type: "multiple" | "boolean";
+    type: 'multiple' | 'boolean';
     difficulty: string;
     question: string;
     correct_answer: string;

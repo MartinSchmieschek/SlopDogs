@@ -13,10 +13,10 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason } from "@slopdogs/core";
-import { fetchNearbyStations, fetchDepartures } from "./publicTransportApiClient";
-import type { PublicTransportNearbyResult, TransitStationDepartures } from "./interfaces/publicTransportTypes";
-import { PublicTransportQueryPact, type PublicTransportQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason } from '@slopdogs/core';
+import { fetchNearbyStations, fetchDepartures } from './publicTransportApiClient';
+import type { PublicTransportNearbyResult, TransitStationDepartures } from './interfaces/publicTransportTypes';
+import { PublicTransportQueryPact, type PublicTransportQuery } from './pacts';
 
 /**
  * Arr, the PublicTransportRetriever — a spectral hound that sniffs out
@@ -36,7 +36,7 @@ export class PublicTransportRetriever extends Dog<PublicTransportNearbyResult> {
 
     /** The mark of our vessel — the transit sigil */
     get icon(): string | undefined {
-        return "\uD83D\uDE8C";
+        return '\uD83D\uDE8C';
     }
 
     /** The unholy pacts this hound be shackled to — GPS coordinates from the mortal plane */
@@ -55,7 +55,7 @@ export class PublicTransportRetriever extends Dog<PublicTransportNearbyResult> {
      * from the MOTIS void — revealing destinations across the cursed network.
      */
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<PublicTransportNearbyResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(PublicTransportQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(PublicTransportQueryPact, d));
         const query = (queryDog?.collected as PublicTransportQuery | undefined) ?? ({} as PublicTransportQuery);
 
         const lat = parseFloat(query['lat']);
@@ -80,7 +80,7 @@ export class PublicTransportRetriever extends Dog<PublicTransportNearbyResult> {
                     console.warn(`[PublicTransportRetriever] Failed to fetch departures for ${station.name}: ${err}`);
                     return { station, departures: [] };
                 }
-            })
+            }),
         );
 
         return {

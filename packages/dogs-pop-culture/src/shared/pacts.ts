@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /**
  * Gemeinsamer Lookup-Pact fuer alle 4 Pop-Culture-Hunde.
@@ -20,7 +20,4 @@ export interface PopCultureQuery {
     page?: number;
 }
 
-export const PopCultureQueryPact = createPact<PopCultureQuery>(
-    "PopCultureQueryProvider",
-    { fromSourceType: "PopCultureQuery" }
-);
+export const PopCultureQueryPact = createPact<PopCultureQuery>('PopCultureQueryProvider', { fromSourceType: 'PopCultureQuery' });

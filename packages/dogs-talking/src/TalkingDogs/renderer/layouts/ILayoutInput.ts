@@ -6,7 +6,7 @@
  * bears no name — and each interface be a pact signed in eldritch ink,
  * binding the caller to provide what the void requires.
  */
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** Arr, the Tinder input — swipe through souls like a pirate sortin' plunder from the abyss. */
 export interface ITinderInput {

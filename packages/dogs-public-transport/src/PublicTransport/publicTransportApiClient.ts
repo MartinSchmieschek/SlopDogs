@@ -14,20 +14,19 @@
  * =========================================================================
  */
 
-import type { TransitStation, TransitDeparture } from "./interfaces/publicTransportTypes";
+import type { TransitStation, TransitDeparture } from './interfaces/publicTransportTypes';
 
-const MOTIS_BASE = "https://europe.motis-project.de/api/v1";
+const MOTIS_BASE = 'https://europe.motis-project.de/api/v1';
 
 /**
  * Haversine distance in meters between two GPS points.
  */
 function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
     const R = 6371000;
-    const toRad = (deg: number) => deg * Math.PI / 180;
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
     const dLat = toRad(lat2 - lat1);
     const dLng = toRad(lng2 - lng1);
-    const a = Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
@@ -37,7 +36,7 @@ function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number)
  */
 function metersToDeg(meters: number, lat: number): { dLat: number; dLng: number } {
     const dLat = meters / 111320;
-    const dLng = meters / (111320 * Math.cos(lat * Math.PI / 180));
+    const dLng = meters / (111320 * Math.cos((lat * Math.PI) / 180));
     return { dLat, dLng };
 }
 
@@ -50,7 +49,7 @@ export async function fetchNearbyStations(
     lat: number,
     lng: number,
     distance: number = 1000,
-    results: number = 8
+    results: number = 8,
 ): Promise<TransitStation[]> {
     const { dLat, dLng } = metersToDeg(distance, lat);
     const min = `${lat - dLat},${lng - dLng}`;
@@ -63,7 +62,7 @@ export async function fetchNearbyStations(
     let res: Response;
     try {
         res = await fetch(url, {
-            headers: { "Accept": "application/json", "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)" },
+            headers: { Accept: 'application/json', 'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)' },
             signal: controller.signal,
         });
     } finally {
@@ -71,11 +70,11 @@ export async function fetchNearbyStations(
     }
 
     if (!res.ok) {
-        const text = await res.text().catch(() => "");
+        const text = await res.text().catch(() => '');
         throw new Error(`MOTIS map/stops failed: ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
     }
 
-    const stops = await res.json() as any[];
+    const stops = (await res.json()) as any[];
 
     // Deduplicate by station name — keep the entry with a parentId (preferred for stoptimes)
     // and the closest distance. Multiple Steige of the same station share the same name.
@@ -86,11 +85,11 @@ export async function fetchNearbyStations(
         const stopLng = stop.lon;
         if (stopLat == null || stopLng == null) continue;
 
-        const name: string = stop.name ?? "unknown";
+        const name: string = stop.name ?? 'unknown';
 
         // Filter out RIDE_SHARING-only stops
         const modes: string[] = stop.modes ?? [];
-        const transitModes = modes.filter((m: string) => m !== "RIDE_SHARING");
+        const transitModes = modes.filter((m: string) => m !== 'RIDE_SHARING');
         if (transitModes.length === 0) continue;
 
         const dist = Math.round(haversineMeters(lat, lng, stopLat, stopLng));
@@ -126,10 +125,7 @@ export async function fetchNearbyStations(
  * Fetch departures for a given MOTIS stop ID via stoptimes endpoint.
  * Returns all transport modes: bus, tram, U-Bahn, S-Bahn, regional, ICE, etc.
  */
-export async function fetchDepartures(
-    stopId: string,
-    maxDepartures: number = 15
-): Promise<TransitDeparture[]> {
+export async function fetchDepartures(stopId: string, maxDepartures: number = 15): Promise<TransitDeparture[]> {
     const url = `${MOTIS_BASE}/stoptimes?stopId=${encodeURIComponent(stopId)}&n=${maxDepartures}&arriveBy=false`;
 
     const controller = new AbortController();
@@ -138,7 +134,7 @@ export async function fetchDepartures(
     let res: Response;
     try {
         res = await fetch(url, {
-            headers: { "Accept": "application/json", "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)" },
+            headers: { Accept: 'application/json', 'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)' },
             signal: controller.signal,
         });
     } finally {
@@ -149,7 +145,7 @@ export async function fetchDepartures(
         throw new Error(`MOTIS stoptimes failed for "${stopId}": ${res.status} ${res.statusText}`);
     }
 
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     const stopTimes: any[] = data.stopTimes ?? [];
 
     return stopTimes.map((st: any) => {
@@ -165,9 +161,9 @@ export async function fetchDepartures(
         }
 
         return {
-            line: st.routeShortName ?? st.displayName ?? "unknown",
-            mode: st.mode ?? "unknown",
-            direction: st.headsign ?? st.tripTo?.name ?? "unknown",
+            line: st.routeShortName ?? st.displayName ?? 'unknown',
+            mode: st.mode ?? 'unknown',
+            direction: st.headsign ?? st.tripTo?.name ?? 'unknown',
             plannedWhen: scheduledDep,
             when: actualDep,
             delay: delay !== 0 ? delay : null,

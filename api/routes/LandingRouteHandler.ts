@@ -112,7 +112,13 @@ export class LandingRouteHandler {
             res.setHeader('Cache-Control', `public, max-age=${Math.round(this.memoMs / 1000)}`);
             res.setHeader('ETag', etag);
             const ifNoneMatch = String(req.get?.('if-none-match') ?? req.headers?.['if-none-match'] ?? '');
-            if (ifNoneMatch && ifNoneMatch.split(',').map((t) => t.trim()).includes(etag)) {
+            if (
+                ifNoneMatch &&
+                ifNoneMatch
+                    .split(',')
+                    .map((t) => t.trim())
+                    .includes(etag)
+            ) {
                 res.status(304).end();
                 return;
             }
@@ -147,7 +153,9 @@ export class LandingRouteHandler {
         const byName = (a: LandingEntry, b: LandingEntry) => String(a.name ?? a.lineageId).localeCompare(String(b.name ?? b.lineageId));
         const topByCalls30d = entries
             .filter((e) => e.stats.calls.ranked30d > 0)
-            .sort((a, b) => b.stats.calls.ranked30d - a.stats.calls.ranked30d || b.stats.calls.ranked - a.stats.calls.ranked || byName(a, b))
+            .sort(
+                (a, b) => b.stats.calls.ranked30d - a.stats.calls.ranked30d || b.stats.calls.ranked - a.stats.calls.ranked || byName(a, b),
+            )
             .slice(0, LandingRouteHandler.MAX_LIMIT);
         const topByRating = entries
             .filter((e) => e.stats.rating.count > 0)
@@ -162,14 +170,21 @@ export class LandingRouteHandler {
     /** Bewaehrte Dogs (P4b): nur mit Abzeichen, nach proven.score, dann ranked30d, dann Name. */
     private async loadProvenDogs(): Promise<LandingDogEntry[]> {
         if (!this.dogs) return [];
-        const visible = filterRunnable((await this.dogs.listDogMeta()) as any[], ANON)
-            .map((d) => ({ id: d.id, lineageId: d.lineageId || d.id, ownerId: d.ownerId ?? null, displayName: d.displayName ?? null }));
+        const visible = filterRunnable((await this.dogs.listDogMeta()) as any[], ANON).map((d) => ({
+            id: d.id,
+            lineageId: d.lineageId || d.id,
+            ownerId: d.ownerId ?? null,
+            displayName: d.displayName ?? null,
+        }));
         const withStats = await this.dogs.dogStats.attach(visible);
         const shown = withStats
             .filter((d) => d.stats.proven.badge)
-            .sort((a, b) => b.stats.proven.score - a.stats.proven.score
-                || b.stats.calls.ranked30d - a.stats.calls.ranked30d
-                || String(a.displayName ?? a.lineageId).localeCompare(String(b.displayName ?? b.lineageId)))
+            .sort(
+                (a, b) =>
+                    b.stats.proven.score - a.stats.proven.score ||
+                    b.stats.calls.ranked30d - a.stats.calls.ranked30d ||
+                    String(a.displayName ?? a.lineageId).localeCompare(String(b.displayName ?? b.lineageId)),
+            )
             .slice(0, LandingRouteHandler.MAX_LIMIT);
         // description/icon stehen in der Konfig: nur fuer die gezeigten Dogs nachladen.
         const details = shown.length > 0 ? await this.dogs.listDogsOf(shown.map((d) => d.lineageId)) : [];

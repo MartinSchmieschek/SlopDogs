@@ -9,10 +9,18 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey, GEO_CACHE_TTL_AIR_QUALITY_MS } from "@slopdogs/core";
-import { getAirQuality } from "./airQualityApiClient";
-import type { AirQualityResult } from "./interfaces/airQualityTypes";
-import { AirQualityQueryPact, type AirQualityQuery } from "./pacts";
+import {
+    Dog,
+    IHuntingDog,
+    IHuntingSeason,
+    type ICacheHandler,
+    type ICacheable,
+    geoBucketKey,
+    GEO_CACHE_TTL_AIR_QUALITY_MS,
+} from '@slopdogs/core';
+import { getAirQuality } from './airQualityApiClient';
+import type { AirQualityResult } from './interfaces/airQualityTypes';
+import { AirQualityQueryPact, type AirQualityQuery } from './pacts';
 
 /**
  * Arr, the AirQualityRetriever — a spectral hound that sniffs out
@@ -26,14 +34,24 @@ export class AirQualityRetriever extends Dog<AirQualityResult> implements ICache
         this.cacheHandler = handler;
     }
 
-    get name(): string { return AirQualityRetriever.name; }
-    get description(): string { return 'Fetches current air quality index and pollutant levels from Open-Meteo.'; }
-    get icon(): string | undefined { return "\uD83C\uDF2B\uFE0F"; }
-    get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] { return [AirQualityQueryPact]; }
-    get optional(): (new (...args: any[]) => IHuntingDog<unknown>)[] { return []; }
+    get name(): string {
+        return AirQualityRetriever.name;
+    }
+    get description(): string {
+        return 'Fetches current air quality index and pollutant levels from Open-Meteo.';
+    }
+    get icon(): string | undefined {
+        return '\uD83C\uDF2B\uFE0F';
+    }
+    get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
+        return [AirQualityQueryPact];
+    }
+    get optional(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
+        return [];
+    }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<AirQualityResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(AirQualityQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(AirQualityQueryPact, d));
         const query = (queryDog?.collected as AirQualityQuery | undefined) ?? ({} as AirQualityQuery);
 
         const lat = parseFloat(query['lat']);
@@ -45,7 +63,7 @@ export class AirQualityRetriever extends Dog<AirQualityResult> implements ICache
 
         // Open-Meteo Air Quality aktualisiert stuendlich — 30 min TTL + 1-km-Grid
         // reichen; GPS-Jitter darf keine Misses ausloesen.
-        const key = geoBucketKey("air-quality", lat, lng, 1000);
+        const key = geoBucketKey('air-quality', lat, lng, 1000);
 
         if (this.cacheHandler) {
             return this.cacheHandler.getOrFetch(key, GEO_CACHE_TTL_AIR_QUALITY_MS, () => getAirQuality(lat, lng));

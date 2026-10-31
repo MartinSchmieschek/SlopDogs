@@ -4,7 +4,7 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** Query for space data — optional body name for solar system lookup */
 export interface SpaceQuery {
@@ -13,7 +13,4 @@ export interface SpaceQuery {
 }
 
 /** The Pact for Space queries */
-export const SpaceQueryPact = createPact<SpaceQuery>(
-    "SpaceQueryProvider",
-    { fromSourceType: "SpaceQuery" }
-);
+export const SpaceQueryPact = createPact<SpaceQuery>('SpaceQueryProvider', { fromSourceType: 'SpaceQuery' });

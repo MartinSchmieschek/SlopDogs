@@ -9,10 +9,10 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from "@slopdogs/core";
-import { getWaterConditions } from "./waterApiClient";
-import type { WaterResult } from "./interfaces/waterTypes";
-import { WaterQueryPact, type WaterQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@slopdogs/core';
+import { getWaterConditions } from './waterApiClient';
+import type { WaterResult } from './interfaces/waterTypes';
+import { WaterQueryPact, type WaterQuery } from './pacts';
 
 /**
  * Arr, the WaterRetriever — a spectral hound that sniffs out
@@ -35,7 +35,7 @@ export class WaterRetriever extends Dog<WaterResult> implements ICacheable {
     }
 
     get icon(): string | undefined {
-        return "\uD83C\uDF0A";
+        return '\uD83C\uDF0A';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -47,7 +47,7 @@ export class WaterRetriever extends Dog<WaterResult> implements ICacheable {
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<WaterResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(WaterQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(WaterQueryPact, d));
         const query = (queryDog?.collected as WaterQuery | undefined) ?? ({} as WaterQuery);
 
         const lat = parseFloat(query['lat']);
@@ -57,12 +57,10 @@ export class WaterRetriever extends Dog<WaterResult> implements ICacheable {
             throw new Error('WaterRetriever: Missing required query params (lat, lng)');
         }
 
-        const key = geoBucketKey("water", lat, lng, 1000);
+        const key = geoBucketKey('water', lat, lng, 1000);
 
         if (this.cacheHandler) {
-            return this.cacheHandler.getOrFetch(key, 15 * 60_000, () =>
-                getWaterConditions(lat, lng)
-            );
+            return this.cacheHandler.getOrFetch(key, 15 * 60_000, () => getWaterConditions(lat, lng));
         }
         return getWaterConditions(lat, lng);
     };

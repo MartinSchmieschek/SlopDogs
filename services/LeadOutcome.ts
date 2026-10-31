@@ -86,8 +86,11 @@ export class LeadOutcome {
         const searchId = leadRef.startsWith('base:') ? leadRef.substring(5) : leadRef;
         for (const wave of waves) {
             for (const node of wave) {
-                if (node.id === searchId || node.id === leadRef
-                    || (node.lineageId != null && (node.lineageId === searchId || node.lineageId === leadRef))) {
+                if (
+                    node.id === searchId ||
+                    node.id === leadRef ||
+                    (node.lineageId != null && (node.lineageId === searchId || node.lineageId === leadRef))
+                ) {
                     return node;
                 }
             }
@@ -98,8 +101,7 @@ export class LeadOutcome {
     private static matchesDog(dog: any, leadRef: string): boolean {
         const searchId = leadRef.startsWith('base:') ? leadRef.substring(5) : leadRef;
         if (dog instanceof SerializedDog) {
-            return dog.storageId === searchId || dog.storageId === leadRef
-                || dog.lineageId === searchId || dog.lineageId === leadRef;
+            return dog.storageId === searchId || dog.storageId === leadRef || dog.lineageId === searchId || dog.lineageId === leadRef;
         }
         return dog?.name === searchId || dog?.name === leadRef;
     }

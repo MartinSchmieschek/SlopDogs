@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface QuranQuery {
     /** Modus: ayah (einzelner Vers), surah (ganze Sure), random (zufaelliger Vers) — default "ayah" */
@@ -9,7 +9,4 @@ export interface QuranQuery {
     edition?: string;
 }
 
-export const QuranQueryPact = createPact<QuranQuery>(
-    "QuranQueryProvider",
-    { fromSourceType: "QuranQuery" }
-);
+export const QuranQueryPact = createPact<QuranQuery>('QuranQueryProvider', { fromSourceType: 'QuranQuery' });

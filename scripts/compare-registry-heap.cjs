@@ -9,11 +9,11 @@ const root = path.join(__dirname, '..');
 const childScript = path.join(__dirname, 'registry-heap-child.cjs');
 
 function runMode(mode) {
-    const r = spawnSync(
-        process.execPath,
-        ['-r', 'ts-node/register', '-r', 'tsconfig-paths/register', childScript, mode],
-        { cwd: root, encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 },
-    );
+    const r = spawnSync(process.execPath, ['-r', 'ts-node/register', '-r', 'tsconfig-paths/register', childScript, mode], {
+        cwd: root,
+        encoding: 'utf8',
+        maxBuffer: 10 * 1024 * 1024,
+    });
     if (r.status !== 0) {
         console.error(`[${mode}] stderr:\n`, r.stderr);
         throw new Error(`Child ${mode} exited ${r.status}`);

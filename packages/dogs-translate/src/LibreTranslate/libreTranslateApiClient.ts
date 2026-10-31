@@ -1,4 +1,4 @@
-import type { LibreTranslateApiResponse, LibreTranslateResult } from "./interfaces/libreTranslateTypes";
+import type { LibreTranslateApiResponse, LibreTranslateResult } from './interfaces/libreTranslateTypes';
 
 /**
  * LibreTranslate: Open-Source-Uebersetzer. libretranslate.com verlangt mittlerweile
@@ -6,11 +6,7 @@ import type { LibreTranslateApiResponse, LibreTranslateResult } from "./interfac
  * bzw. lassen ueber LIBRETRANSLATE_URL (ENV) eine andere Instanz setzen.
  * Fallback-Reihenfolge: ENV -> Fedilab -> Terraprint -> Argos.
  */
-const DEFAULT_INSTANCES = [
-    "https://translate.fedilab.app",
-    "https://translate.terraprint.co",
-    "https://translate.argosopentech.com",
-];
+const DEFAULT_INSTANCES = ['https://translate.fedilab.app', 'https://translate.terraprint.co', 'https://translate.argosopentech.com'];
 
 function instances(): string[] {
     const env = process.env.LIBRETRANSLATE_URL?.trim();
@@ -22,24 +18,24 @@ async function tryInstance(base: string, text: string, source: string, target: s
     const timer = setTimeout(() => controller.abort(), 20000);
     let res: Response;
     try {
-        res = await fetch(`${base.replace(/\/$/, "")}/translate`, {
-            method: "POST",
+        res = await fetch(`${base.replace(/\/$/, '')}/translate`, {
+            method: 'POST',
             headers: {
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-                "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)",
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)',
             },
-            body: JSON.stringify({ q: text, source, target, format: "text" }),
+            body: JSON.stringify({ q: text, source, target, format: 'text' }),
             signal: controller.signal,
         });
     } finally {
         clearTimeout(timer);
     }
     if (!res.ok) {
-        const t = await res.text().catch(() => "");
+        const t = await res.text().catch(() => '');
         throw new Error(`libretranslate ${base} failed: ${res.status} ${res.statusText} ${t.slice(0, 200)}`);
     }
-    const data = await res.json() as LibreTranslateApiResponse;
+    const data = (await res.json()) as LibreTranslateApiResponse;
     if (data.error) {
         throw new Error(`libretranslate ${base} error: ${data.error}`);
     }
@@ -47,14 +43,14 @@ async function tryInstance(base: string, text: string, source: string, target: s
         source,
         target,
         originalText: text,
-        translatedText: data.translatedText ?? "",
+        translatedText: data.translatedText ?? '',
         detectedLanguage: data.detectedLanguage?.language,
         detectedConfidence: data.detectedLanguage?.confidence,
         instance: base,
     };
 }
 
-export async function translateText(text: string, source: string = "auto", target: string = "en"): Promise<LibreTranslateResult> {
+export async function translateText(text: string, source: string = 'auto', target: string = 'en'): Promise<LibreTranslateResult> {
     if (!text || !text.trim()) {
         throw new Error("LibreTranslateRetriever: 'text' is required");
     }
@@ -66,5 +62,5 @@ export async function translateText(text: string, source: string = "auto", targe
             attempts.push(`${base}: ${e?.message ?? e}`);
         }
     }
-    throw new Error(`LibreTranslate: all community instances failed:\n  ${attempts.join("\n  ")}`);
+    throw new Error(`LibreTranslate: all community instances failed:\n  ${attempts.join('\n  ')}`);
 }

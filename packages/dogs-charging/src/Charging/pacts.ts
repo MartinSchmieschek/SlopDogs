@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface ChargingQuery {
     lat: string;
@@ -6,7 +6,4 @@ export interface ChargingQuery {
     radius?: string;
 }
 
-export const ChargingQueryPact = createPact<ChargingQuery>(
-    "ChargingQueryProvider",
-    { fromSourceType: "ChargingQuery" }
-);
+export const ChargingQueryPact = createPact<ChargingQuery>('ChargingQueryProvider', { fromSourceType: 'ChargingQuery' });

@@ -16,7 +16,7 @@
  * =========================================================================
  */
 
-import type { TransitTrip, TripStop, TransitTripResult } from "./interfaces/transitTripTypes";
+import type { TransitTrip, TripStop, TransitTripResult } from './interfaces/transitTripTypes';
 
 const MOTIS_BASE = process.env.MOTIS_API_URL ?? 'https://europe.motis-project.de';
 
@@ -29,7 +29,7 @@ async function motisFetch(path: string): Promise<any> {
     let res: Response;
     try {
         res = await fetch(url, {
-            headers: { "Accept": "application/json", "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)" },
+            headers: { Accept: 'application/json', 'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)' },
             signal: controller.signal,
         });
     } finally {
@@ -37,7 +37,7 @@ async function motisFetch(path: string): Promise<any> {
     }
 
     if (!res.ok) {
-        const text = await res.text().catch(() => "");
+        const text = await res.text().catch(() => '');
         throw new Error(`MOTIS ${path} failed: ${res.status} ${text.slice(0, 200)}`);
     }
     return res.json();
@@ -46,7 +46,7 @@ async function motisFetch(path: string): Promise<any> {
 /** Convert meters to rough lat/lng offset for bounding box */
 function metersToDeg(meters: number, lat: number): { dLat: number; dLng: number } {
     const dLat = meters / 111320;
-    const dLng = meters / (111320 * Math.cos(lat * Math.PI / 180));
+    const dLng = meters / (111320 * Math.cos((lat * Math.PI) / 180));
     return { dLat, dLng };
 }
 
@@ -88,7 +88,7 @@ async function findNearbyStations(
     lat: number,
     lng: number,
     distanceM: number,
-    maxStations: number
+    maxStations: number,
 ): Promise<{ stopId: string; name: string }[]> {
     const { dLat, dLng } = metersToDeg(distanceM, lat);
     const min = `${lat - dLat},${lng - dLng}`;
@@ -125,45 +125,50 @@ export async function fetchLocalTransitNetwork(
     distanceM: number = 1000,
     maxStations: number = 5,
     lineFilter: string | undefined,
-    limitPerStation: number = 10
+    limitPerStation: number = 10,
 ): Promise<TransitTripResult> {
     // Step 1: find nearby stations
     const stations = await findNearbyStations(lat, lng, distanceM, maxStations);
 
     if (stations.length === 0) {
         return {
-            trips: [], totalTrips: 0, totalStops: 0,
-            searchLocation: { lat, lng }, searchLine: lineFilter ?? null,
+            trips: [],
+            totalTrips: 0,
+            totalStops: 0,
+            searchLocation: { lat, lng },
+            searchLine: lineFilter ?? null,
         };
     }
 
     // Step 2: fetch departures from all stations in parallel
     const allDepartures: { tripId: string; lineName: string; headsign: string; mode: string; agencyName: string | null }[] = [];
 
-    await Promise.all(stations.map(async (station) => {
-        try {
-            const data = await motisFetch(
-                `/api/v1/stoptimes?stopId=${encodeURIComponent(station.stopId)}&n=${limitPerStation}&arriveBy=false`
-            );
-            for (const st of data.stopTimes ?? []) {
-                const lineName = st.routeShortName ?? st.displayName ?? '';
-                if (!lineName || !st.tripId) continue;
+    await Promise.all(
+        stations.map(async (station) => {
+            try {
+                const data = await motisFetch(
+                    `/api/v1/stoptimes?stopId=${encodeURIComponent(station.stopId)}&n=${limitPerStation}&arriveBy=false`,
+                );
+                for (const st of data.stopTimes ?? []) {
+                    const lineName = st.routeShortName ?? st.displayName ?? '';
+                    if (!lineName || !st.tripId) continue;
 
-                // Apply line filter
-                if (lineFilter && !lineName.toLowerCase().includes(lineFilter.toLowerCase())) continue;
+                    // Apply line filter
+                    if (lineFilter && !lineName.toLowerCase().includes(lineFilter.toLowerCase())) continue;
 
-                allDepartures.push({
-                    tripId: st.tripId,
-                    lineName,
-                    headsign: st.headsign ?? 'Unknown',
-                    mode: st.mode ?? 'RAIL',
-                    agencyName: st.agencyName ?? null,
-                });
+                    allDepartures.push({
+                        tripId: st.tripId,
+                        lineName,
+                        headsign: st.headsign ?? 'Unknown',
+                        mode: st.mode ?? 'RAIL',
+                        agencyName: st.agencyName ?? null,
+                    });
+                }
+            } catch (err) {
+                console.warn(`[TransitTripRetriever] Stoptimes for ${station.name} failed: ${err}`);
             }
-        } catch (err) {
-            console.warn(`[TransitTripRetriever] Stoptimes for ${station.name} failed: ${err}`);
-        }
-    }));
+        }),
+    );
 
     // Step 3: deduplicate by line + headsign (one trip per direction)
     const seen = new Set<string>();
@@ -181,21 +186,23 @@ export async function fetchLocalTransitNetwork(
     const batchSize = 5;
     for (let i = 0; i < uniqueDeps.length; i += batchSize) {
         const batch = uniqueDeps.slice(i, i + batchSize);
-        const results = await Promise.allSettled(batch.map(async (dep) => {
-            const stops = await fetchFullTrip(dep.tripId);
-            if (stops.length === 0) return null;
-            return {
-                tripId: dep.tripId,
-                lineName: dep.lineName,
-                headsign: dep.headsign,
-                mode: dep.mode,
-                agencyName: dep.agencyName,
-                stops,
-                origin: stops[0].name,
-                destination: stops[stops.length - 1].name,
-                stopCount: stops.length,
-            } as TransitTrip;
-        }));
+        const results = await Promise.allSettled(
+            batch.map(async (dep) => {
+                const stops = await fetchFullTrip(dep.tripId);
+                if (stops.length === 0) return null;
+                return {
+                    tripId: dep.tripId,
+                    lineName: dep.lineName,
+                    headsign: dep.headsign,
+                    mode: dep.mode,
+                    agencyName: dep.agencyName,
+                    stops,
+                    origin: stops[0].name,
+                    destination: stops[stops.length - 1].name,
+                    stopCount: stops.length,
+                } as TransitTrip;
+            }),
+        );
         for (const r of results) {
             if (r.status === 'fulfilled' && r.value) trips.push(r.value);
         }

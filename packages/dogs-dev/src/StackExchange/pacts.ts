@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface StackExchangeQuery {
     /** Stack-Exchange-Site (stackoverflow, superuser, serverfault, askubuntu, ...) — default "stackoverflow" */
@@ -17,7 +17,6 @@ export interface StackExchangeQuery {
     page?: number;
 }
 
-export const StackExchangeQueryPact = createPact<StackExchangeQuery>(
-    "StackExchangeQueryProvider",
-    { fromSourceType: "StackExchangeQuery" }
-);
+export const StackExchangeQueryPact = createPact<StackExchangeQuery>('StackExchangeQueryProvider', {
+    fromSourceType: 'StackExchangeQuery',
+});

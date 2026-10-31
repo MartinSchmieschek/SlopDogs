@@ -8,11 +8,25 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketCenter, GEO_CACHE_TTL_OSM_MS } from "@slopdogs/core";
-import type { GeoPoint } from "@slopdogs/geo-pact";
-import { calculateRoute, processRouteResponse } from "./routeCalculator";
-import type { BloodhoundRouteResult, RouteSegment } from "./interfaces/bloodhoundTypes";
-import { BloodhoundRouteQueryPact, BloodhoundProfile, DEFAULT_BLOODHOUND_PROFILE, type BloodhoundRouteQuery, type BloodhoundPoint } from "./pacts";
+import {
+    Dog,
+    IHuntingDog,
+    IHuntingSeason,
+    type ICacheHandler,
+    type ICacheable,
+    geoBucketCenter,
+    GEO_CACHE_TTL_OSM_MS,
+} from '@slopdogs/core';
+import type { GeoPoint } from '@slopdogs/geo-pact';
+import { calculateRoute, processRouteResponse } from './routeCalculator';
+import type { BloodhoundRouteResult, RouteSegment } from './interfaces/bloodhoundTypes';
+import {
+    BloodhoundRouteQueryPact,
+    BloodhoundProfile,
+    DEFAULT_BLOODHOUND_PROFILE,
+    type BloodhoundRouteQuery,
+    type BloodhoundPoint,
+} from './pacts';
 
 /**
  * Arr, the BloodhoundRouteRetriever — verlangt einen Routen-Pakt mit
@@ -42,7 +56,7 @@ export class BloodhoundRouteRetriever extends Dog<BloodhoundRouteResult> impleme
     }
 
     get icon(): string | undefined {
-        return "\uD83D\uDDFA\uFE0F";
+        return '\uD83D\uDDFA\uFE0F';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -61,8 +75,8 @@ export class BloodhoundRouteRetriever extends Dog<BloodhoundRouteResult> impleme
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<BloodhoundRouteResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(BloodhoundRouteQueryPact, d));
-        const query = (queryDog?.collected as BloodhoundRouteQuery | undefined);
+        const queryDog = season.exhausted.find((d) => this.matchesParent(BloodhoundRouteQueryPact, d));
+        const query = queryDog?.collected as BloodhoundRouteQuery | undefined;
 
         if (!query?.start || !query?.end) {
             throw new Error('BloodhoundRouteRetriever: Missing start or end in route pact');
@@ -78,7 +92,7 @@ export class BloodhoundRouteRetriever extends Dog<BloodhoundRouteResult> impleme
         const startBucket = geoBucketCenter(start.lat, start.lng, 100);
         const endBucket = geoBucketCenter(end.lat, end.lng, 100);
         const wpKey = waypoints
-            .map(wp => {
+            .map((wp) => {
                 const b = geoBucketCenter(wp.lat, wp.lng, 100);
                 return `${b.lat.toFixed(6)},${b.lng.toFixed(6)}`;
             })
@@ -89,18 +103,18 @@ export class BloodhoundRouteRetriever extends Dog<BloodhoundRouteResult> impleme
             const points: GeoPoint[] = [start, ...waypoints, end];
             const response = await calculateRoute(points, profile);
             const rawCoords = response.features[0].geometry.coordinates;
-            const coordinates: GeoPoint[] = rawCoords.map(c => ({ lat: c[1], lng: c[0] }));
+            const coordinates: GeoPoint[] = rawCoords.map((c) => ({ lat: c[1], lng: c[0] }));
             const travelSteps = processRouteResponse(response);
 
             let cumulativeKm = 0;
             let cumulativeMinutes = 0;
-            const segments: RouteSegment[] = travelSteps.map(step => {
+            const segments: RouteSegment[] = travelSteps.map((step) => {
                 cumulativeKm += step.lengthInKm;
                 cumulativeMinutes += step.travelDurationInMinutes;
                 return {
                     traveldKm: cumulativeKm,
                     time: cumulativeMinutes,
-                    points: [step.startPoint, step.endPoint]
+                    points: [step.startPoint, step.endPoint],
                 };
             });
 

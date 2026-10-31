@@ -49,7 +49,11 @@ type PendingWrite = { kind: DogReferenceFromKind; key: string; rows: DogReferenc
 
 function parseJson(raw: unknown): any {
     if (typeof raw !== 'string') return raw ?? null;
-    try { return JSON.parse(raw); } catch { return null; }
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
 }
 
 function stringList(raw: unknown): string[] {
@@ -74,7 +78,7 @@ export class DogReferenceIndex {
         private readonly nodesStore: IStore,
         private readonly baseDogsMap: Map<string, unknown>,
         private readonly counter?: KennelCallCounter,
-    ) { }
+    ) {}
 
     /** Abhaengige Memos (DogStatsService) haengen sich hier an: jede Aenderung invalidiert. */
     onChange(listener: () => void): void {
@@ -94,7 +98,15 @@ export class DogReferenceIndex {
         const ids = stringList(dogIds);
         for (const [position, raw] of ids.entries()) {
             const ref = await this.normalize(raw);
-            rows.push({ fromKind: 'kennel', fromKey: lineageId, toKey: ref.toKey, kind: 'crew', position, fromOwnerId: ownerId ?? null, resolved: ref.resolved });
+            rows.push({
+                fromKind: 'kennel',
+                fromKey: lineageId,
+                toKey: ref.toKey,
+                kind: 'crew',
+                position,
+                fromOwnerId: ownerId ?? null,
+                resolved: ref.resolved,
+            });
         }
         await this.replace('kennel', lineageId, rows);
     }
@@ -102,10 +114,21 @@ export class DogReferenceIndex {
     /** Dog gespeichert (create, neue Version): seine parents ersetzen die alten. */
     async replaceDogRefs(lineageId: string, ownerId: string | null | undefined, required: unknown, optional: unknown): Promise<void> {
         const rows: DogReferenceRow[] = [];
-        for (const [kind, list] of [['required', stringList(required)], ['optional', stringList(optional)]] as Array<[DogReferenceKind, string[]]>) {
+        for (const [kind, list] of [
+            ['required', stringList(required)],
+            ['optional', stringList(optional)],
+        ] as Array<[DogReferenceKind, string[]]>) {
             for (const [position, raw] of list.entries()) {
                 const ref = await this.normalize(raw);
-                rows.push({ fromKind: 'dog', fromKey: lineageId, toKey: ref.toKey, kind, position, fromOwnerId: ownerId ?? null, resolved: ref.resolved });
+                rows.push({
+                    fromKind: 'dog',
+                    fromKey: lineageId,
+                    toKey: ref.toKey,
+                    kind,
+                    position,
+                    fromOwnerId: ownerId ?? null,
+                    resolved: ref.resolved,
+                });
             }
         }
         await this.replace('dog', lineageId, rows);
@@ -169,7 +192,12 @@ export class DogReferenceIndex {
             if (typeof row.id === 'string') known.set(row.id, lineageId);
         }
 
-        type Source = { fromKind: DogReferenceFromKind; fromKey: string; ownerId: string | null; refs: Array<[DogReferenceKind, string[]]> };
+        type Source = {
+            fromKind: DogReferenceFromKind;
+            fromKey: string;
+            ownerId: string | null;
+            refs: Array<[DogReferenceKind, string[]]>;
+        };
         const sources: Source[] = [];
         for (const row of kennelRows) {
             const key = row.lineageId || row.id;
@@ -180,16 +208,23 @@ export class DogReferenceIndex {
             const key = DogReferenceIndex.dogLineageOf(row);
             if (!key) continue;
             sources.push({
-                fromKind: 'dog', fromKey: key, ownerId: row.ownerId ?? null,
-                refs: [['required', stringList(parseJson(row.parentsRequired))], ['optional', stringList(parseJson(row.parentsOptional))]],
+                fromKind: 'dog',
+                fromKey: key,
+                ownerId: row.ownerId ?? null,
+                refs: [
+                    ['required', stringList(parseJson(row.parentsRequired))],
+                    ['optional', stringList(parseJson(row.parentsOptional))],
+                ],
             });
         }
 
         // Gebuendelt: jede noch unbekannte GUID genau einmal nachschlagen — begrenzt parallel.
         const unknown = new Set<string>();
-        for (const s of sources) for (const [, list] of s.refs) for (const raw of list) {
-            if (!this.baseKeyOf(raw) && !known.has(raw)) unknown.add(raw);
-        }
+        for (const s of sources)
+            for (const [, list] of s.refs)
+                for (const raw of list) {
+                    if (!this.baseKeyOf(raw) && !known.has(raw)) unknown.add(raw);
+                }
         const looked = await mapBounded([...unknown], LOOKUP_CONCURRENCY, async (raw) => [raw, await this.lookup(raw)] as const);
         const resolvedLater = new Map<string, NormalizedRef>(looked);
 
@@ -201,12 +236,23 @@ export class DogReferenceIndex {
             for (const [kind, list] of s.refs) {
                 for (const [position, raw] of list.entries()) {
                     const base = this.baseKeyOf(raw);
-                    const ref: NormalizedRef = base
-                        ?? (known.has(raw) ? { toKey: known.get(raw)!, resolved: 1 } : resolvedLater.get(raw) ?? { toKey: raw, resolved: 0 });
+                    const ref: NormalizedRef =
+                        base ??
+                        (known.has(raw)
+                            ? { toKey: known.get(raw)!, resolved: 1 }
+                            : (resolvedLater.get(raw) ?? { toKey: raw, resolved: 0 }));
                     const pk = `${s.fromKind}\u0000${s.fromKey}\u0000${ref.toKey}\u0000${kind}\u0000${position}`;
-                    if (seen.has(pk)) continue;                       // doppelte Kopfzeile derselben Lineage (Altbestand)
+                    if (seen.has(pk)) continue; // doppelte Kopfzeile derselben Lineage (Altbestand)
                     seen.add(pk);
-                    rows.push({ fromKind: s.fromKind, fromKey: s.fromKey, toKey: ref.toKey, kind, position, fromOwnerId: s.ownerId, resolved: ref.resolved });
+                    rows.push({
+                        fromKind: s.fromKind,
+                        fromKey: s.fromKey,
+                        toKey: ref.toKey,
+                        kind,
+                        position,
+                        fromOwnerId: s.ownerId,
+                        resolved: ref.resolved,
+                    });
                     count += 1;
                 }
             }
@@ -223,14 +269,22 @@ export class DogReferenceIndex {
         try {
             return await this.nodesStore.findReferenceHeads(type);
         } catch (err) {
-            console.warn(`[DogReferenceIndex] schmale Kopfzeilen fuer ${type} gescheitert, voller Weg:`, err instanceof Error ? err.message : err);
+            console.warn(
+                `[DogReferenceIndex] schmale Kopfzeilen fuer ${type} gescheitert, voller Weg:`,
+                err instanceof Error ? err.message : err,
+            );
             return (await this.nodesStore.findLatestByType(type)).map((row) => DogReferenceIndex.headFromFullRow(type, row));
         }
     }
 
     /** Dieselbe Ableitung wie die SQL-Extraktion in PrismaStore.findReferenceHeads — aus einer vollen Zeile. */
     static headFromFullRow(type: string, row: any): ReferenceHeadRow {
-        const head: ReferenceHeadRow = { id: row.id, lineageId: row.lineageId ?? null, ownerId: row.ownerId ?? null, createdAt: row.createdAt ?? null };
+        const head: ReferenceHeadRow = {
+            id: row.id,
+            lineageId: row.lineageId ?? null,
+            ownerId: row.ownerId ?? null,
+            createdAt: row.createdAt ?? null,
+        };
         if (type === 'KennelConfig') return { ...head, dogIds: row.dogIds ?? null };
         const cfg = parseJson(row.serializedDogConfig);
         const asJson = (v: unknown) => (Array.isArray(v) || typeof v === 'string' ? JSON.stringify(v) : null);
@@ -321,7 +375,11 @@ export class DogReferenceIndex {
 
     private changed(): void {
         for (const listener of this.listeners) {
-            try { listener(); } catch { /* ein Zuhoerer darf den Index nicht brechen */ }
+            try {
+                listener();
+            } catch {
+                /* ein Zuhoerer darf den Index nicht brechen */
+            }
         }
     }
 

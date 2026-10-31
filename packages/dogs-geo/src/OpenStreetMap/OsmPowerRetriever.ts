@@ -3,34 +3,27 @@
  * Mixed geometry: line/cable as ways, towers/poles/generators as nodes, substations/plants as ways/relations.
  */
 
-import { type IHuntingSeason } from "@slopdogs/core";
-import osmtogeojson from "osmtogeojson";
-import type { FeatureCollection, GeometryObject } from "geojson";
-import { OsmFeatureRetriever, type OsmQueryBase } from "../osm/base/OsmFeatureRetriever";
-import type { OverpassRawElement } from "../osm/base/overpassMirrorChain";
-import { OsmPowerPact, type OsmPowerQueryInput } from "./osmGeometryPacts";
-import {
-    circleToBoundingBox,
-    clampGeometryRadiusM,
-    type BoundingBox,
-} from "./overpassGeometryCore";
-import {
-    attachGeometryHelpers,
-    type GeometryResultHelpers,
-} from "./osmGeometryHelpers";
+import { type IHuntingSeason } from '@slopdogs/core';
+import osmtogeojson from 'osmtogeojson';
+import type { FeatureCollection, GeometryObject } from 'geojson';
+import { OsmFeatureRetriever, type OsmQueryBase } from '../osm/base/OsmFeatureRetriever';
+import type { OverpassRawElement } from '../osm/base/overpassMirrorChain';
+import { OsmPowerPact, type OsmPowerQueryInput } from './osmGeometryPacts';
+import { circleToBoundingBox, clampGeometryRadiusM, type BoundingBox } from './overpassGeometryCore';
+import { attachGeometryHelpers, type GeometryResultHelpers } from './osmGeometryHelpers';
 
 export enum OsmPowerValue {
-    Line = "line",
-    MinorLine = "minor_line",
-    Cable = "cable",
-    Tower = "tower",
-    Pole = "pole",
-    Substation = "substation",
-    Transformer = "transformer",
-    Plant = "plant",
-    Generator = "generator",
-    Switch = "switch",
-    Portal = "portal",
+    Line = 'line',
+    MinorLine = 'minor_line',
+    Cable = 'cable',
+    Tower = 'tower',
+    Pole = 'pole',
+    Substation = 'substation',
+    Transformer = 'transformer',
+    Plant = 'plant',
+    Generator = 'generator',
+    Switch = 'switch',
+    Portal = 'portal',
 }
 
 const POWER_SET = new Set<string>(Object.values(OsmPowerValue));
@@ -47,7 +40,7 @@ function parsePowerList(raw: unknown): OsmPowerValue[] {
     if (raw == null) return [...DEFAULT_POWER];
     let parsed: string[] | null = null;
     if (Array.isArray(raw)) parsed = raw.map((x) => String(x).trim()).filter(Boolean);
-    else if (typeof raw === "string") {
+    else if (typeof raw === 'string') {
         const t = raw.trim();
         if (!t) return [...DEFAULT_POWER];
         try {
@@ -75,11 +68,11 @@ export interface OsmPowerResult {
 export type OsmPowerResultWithHelpers = OsmPowerResult & GeometryResultHelpers<OsmPowerResult>;
 
 export class OsmPowerRetriever extends OsmFeatureRetriever<OsmPowerResult, typeof OsmPowerPact> {
-    protected readonly layer = "power";
+    protected readonly layer = 'power';
     protected readonly defaultRadiusM = 2000;
     protected readonly maxRadiusM = 20000;
     protected readonly queryPactClass = OsmPowerPact;
-    protected readonly outStatement = "out geom;";
+    protected readonly outStatement = 'out geom;';
 
     get name(): string {
         return OsmPowerRetriever.name;
@@ -90,7 +83,7 @@ export class OsmPowerRetriever extends OsmFeatureRetriever<OsmPowerResult, typeo
     }
 
     get icon(): string | undefined {
-        return "⚡";
+        return '⚡';
     }
 
     protected parseQuery(season: IHuntingSeason): OsmQueryBase {
@@ -98,25 +91,22 @@ export class OsmPowerRetriever extends OsmFeatureRetriever<OsmPowerResult, typeo
         const query = (queryDog?.collected as OsmPowerQueryInput | undefined) ?? ({} as OsmPowerQueryInput);
         const lat = parseFloat(query.lat);
         const lng = parseFloat(query.lng);
-        const radiusM = clampGeometryRadiusM(parseFloat(query.radius ?? ""));
+        const radiusM = clampGeometryRadiusM(parseFloat(query.radius ?? ''));
         const power = parsePowerList(query.power);
         return { lat, lng, radiusM, facets: [...power] };
     }
 
-    protected buildOverpassBodyForTile(
-        bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number },
-        facets: string[],
-    ): string {
+    protected buildOverpassBodyForTile(bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number }, facets: string[]): string {
         const bboxClause = `(${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng})`;
         const lines: string[] = [];
         for (const v of facets) {
             lines.push(`  nwr["power"="${v}"]${bboxClause};`);
         }
-        return lines.join("\n");
+        return lines.join('\n');
     }
 
     protected classifyElementFacets(el: OverpassRawElement, fetchedFacets: string[]): string[] {
-        const v = el.tags?.["power"];
+        const v = el.tags?.['power'];
         if (!v) return [];
         return fetchedFacets.filter((f) => f === v);
     }

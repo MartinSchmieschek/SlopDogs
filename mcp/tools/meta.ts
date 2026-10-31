@@ -100,22 +100,22 @@ export function getMetaTools(): ToolDef[] {
                 'Returns the SlopDogs README — the living document of the API, architecture, and conventions. Read this once at session start; it is the truth that other tool descriptions assume.',
             inputSchema: { type: 'object', properties: {}, additionalProperties: false },
             handler: async (_args, _ctx, deps) => {
-                const candidates = [
-                    path.join(deps.projectRoot, 'README.md'),
-                    path.join(deps.projectRoot, '..', 'README.md'),
-                ];
+                const candidates = [path.join(deps.projectRoot, 'README.md'), path.join(deps.projectRoot, '..', 'README.md')];
                 for (const p of candidates) {
                     try {
                         const text = await fs.readFile(p, 'utf-8');
                         return ok(text);
-                    } catch { /* try next */ }
+                    } catch {
+                        /* try next */
+                    }
                 }
                 return fail('README.md not found');
             },
         },
         {
             name: 'health_check',
-            description: 'Cheap liveness probe. Returns the current server time, the authenticated user (if any) and the kennel call counter `stats` {pending, dropped, lastFlushError}: pending = unflushed (kennel, day, source) keys, flushed every KENNEL_CALL_FLUSH_MS; plus `dogStats` {pendingDogs, referenceRows}: unflushed per-dog run keys and the rows of the dog reference index (who uses which dog); plus `memory` (process RSS/heap/external/arrayBuffers in MB, V8 heap_size_limit, peak RSS since start (maxRssMb), uptimeSec, kennel runs since boot, node version and available parallelism, on Linux VmHWM/VmRSS/threads, smaps_rollup Rss/Anonymous/Private_Dirty, the container cgroup current/peak/limit/anon/file/events and current minus process RSS, the memory guard with soft and hard limit, waiting runs, rejections, runtime kills of running dogs and GC runs since boot, dog isolate slots: active/live/terminating, snapshot cache entries and approximate bytes), `admission` (the run queues: active/waiting per pot, tracked sources, 429/503 refusals since boot) and `eventLoop` (main-thread event loop lag since start in ms beyond the 20 ms sampling tick: p50/p99/max/mean; plus the watchpost thread that watches the main thread from outside: alive, restarts, stall threshold and poll interval, stalls since start, longest stall in ms, highest and current cgroup memory it saw in MB; `{enabled:false}` when SLOPDOGS_WATCHPOST is off). Numbers only — no client addresses or ids.',
+            description:
+                'Cheap liveness probe. Returns the current server time, the authenticated user (if any) and the kennel call counter `stats` {pending, dropped, lastFlushError}: pending = unflushed (kennel, day, source) keys, flushed every KENNEL_CALL_FLUSH_MS; plus `dogStats` {pendingDogs, referenceRows}: unflushed per-dog run keys and the rows of the dog reference index (who uses which dog); plus `memory` (process RSS/heap/external/arrayBuffers in MB, V8 heap_size_limit, peak RSS since start (maxRssMb), uptimeSec, kennel runs since boot, node version and available parallelism, on Linux VmHWM/VmRSS/threads, smaps_rollup Rss/Anonymous/Private_Dirty, the container cgroup current/peak/limit/anon/file/events and current minus process RSS, the memory guard with soft and hard limit, waiting runs, rejections, runtime kills of running dogs and GC runs since boot, dog isolate slots: active/live/terminating, snapshot cache entries and approximate bytes), `admission` (the run queues: active/waiting per pot, tracked sources, 429/503 refusals since boot) and `eventLoop` (main-thread event loop lag since start in ms beyond the 20 ms sampling tick: p50/p99/max/mean; plus the watchpost thread that watches the main thread from outside: alive, restarts, stall threshold and poll interval, stalls since start, longest stall in ms, highest and current cgroup memory it saw in MB; `{enabled:false}` when SLOPDOGS_WATCHPOST is off). Numbers only — no client addresses or ids.',
             inputSchema: { type: 'object', properties: {}, additionalProperties: false },
             handler: async (_args, ctx, deps) => {
                 return ok({

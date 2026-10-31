@@ -4,7 +4,7 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** Breitengrad und optionales Datum fuer die Jahreszeitenabfrage */
 export interface SeasonQuery {
@@ -15,7 +15,4 @@ export interface SeasonQuery {
 }
 
 /** Der Pact fuer Season-Queries */
-export const SeasonQueryPact = createPact<SeasonQuery>(
-    "SeasonQueryProvider",
-    { fromSourceType: "SeasonQuery" }
-);
+export const SeasonQueryPact = createPact<SeasonQuery>('SeasonQueryProvider', { fromSourceType: 'SeasonQuery' });

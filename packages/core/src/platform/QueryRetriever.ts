@@ -56,12 +56,11 @@ export class QueryRetriever extends Dog<Record<string, string>> {
 
     /** The map-reader's sigil -- fetched from the central icon registry */
     get icon(): string | undefined {
-        return "\uD83D\uDD0D";
+        return '\uD83D\uDD0D';
     }
 
     /** Yield the query data -- the map's coordinates, plundered and ready */
-    protected yieldCollectorFactory: (season: IHuntingSeason) => Promise<Record<string, string>> =
-        async (season: IHuntingSeason) => {
-            return this.queryData;
-        };
+    protected yieldCollectorFactory: (season: IHuntingSeason) => Promise<Record<string, string>> = async (season: IHuntingSeason) => {
+        return this.queryData;
+    };
 }

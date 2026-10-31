@@ -9,36 +9,26 @@
  * `kinds` selects which transit types to fetch; each kind expands to one or more facets.
  */
 
-import { type IHuntingSeason } from "@slopdogs/core";
-import osmtogeojson from "osmtogeojson";
-import type { FeatureCollection, GeometryObject } from "geojson";
-import { OsmFeatureRetriever, type OsmQueryBase } from "../osm/base/OsmFeatureRetriever";
-import type { OverpassRawElement } from "../osm/base/overpassMirrorChain";
-import {
-    OsmPublicTransitStopsPact,
-    type OsmPublicTransitStopsQueryInput,
-} from "./osmGeometryPacts";
-import {
-    circleToBoundingBox,
-    clampGeometryRadiusM,
-    type BoundingBox,
-} from "./overpassGeometryCore";
-import {
-    attachGeometryHelpers,
-    type GeometryResultHelpers,
-} from "./osmGeometryHelpers";
+import { type IHuntingSeason } from '@slopdogs/core';
+import osmtogeojson from 'osmtogeojson';
+import type { FeatureCollection, GeometryObject } from 'geojson';
+import { OsmFeatureRetriever, type OsmQueryBase } from '../osm/base/OsmFeatureRetriever';
+import type { OverpassRawElement } from '../osm/base/overpassMirrorChain';
+import { OsmPublicTransitStopsPact, type OsmPublicTransitStopsQueryInput } from './osmGeometryPacts';
+import { circleToBoundingBox, clampGeometryRadiusM, type BoundingBox } from './overpassGeometryCore';
+import { attachGeometryHelpers, type GeometryResultHelpers } from './osmGeometryHelpers';
 
 export enum OsmTransitKind {
-    Bus = "bus",
-    Tram = "tram",
-    Subway = "subway",
-    Train = "train",
-    LightRail = "light_rail",
-    Monorail = "monorail",
-    Ferry = "ferry",
-    BusStation = "bus_station",
-    Aerialway = "aerialway",
-    Taxi = "taxi",
+    Bus = 'bus',
+    Tram = 'tram',
+    Subway = 'subway',
+    Train = 'train',
+    LightRail = 'light_rail',
+    Monorail = 'monorail',
+    Ferry = 'ferry',
+    BusStation = 'bus_station',
+    Aerialway = 'aerialway',
+    Taxi = 'taxi',
 }
 
 const TRANSIT_KIND_SET = new Set<string>(Object.values(OsmTransitKind));
@@ -55,7 +45,7 @@ function parseKindsList(raw: unknown): OsmTransitKind[] {
     if (raw == null) return [...DEFAULT_KINDS];
     let parsed: string[] | null = null;
     if (Array.isArray(raw)) parsed = raw.map((x) => String(x).trim()).filter(Boolean);
-    else if (typeof raw === "string") {
+    else if (typeof raw === 'string') {
         const t = raw.trim();
         if (!t) return [...DEFAULT_KINDS];
         try {
@@ -75,21 +65,21 @@ function parseKindsList(raw: unknown): OsmTransitKind[] {
 /** Per kind, the Overpass tag filters that select stops for that kind. */
 const KIND_FILTERS: Record<OsmTransitKind, ReadonlyArray<{ key: string; value: string }>> = {
     [OsmTransitKind.Bus]: [
-        { key: "highway", value: "bus_stop" },
-        { key: "public_transport", value: "platform" },
+        { key: 'highway', value: 'bus_stop' },
+        { key: 'public_transport', value: 'platform' },
     ],
-    [OsmTransitKind.Tram]: [{ key: "railway", value: "tram_stop" }],
-    [OsmTransitKind.Subway]: [{ key: "station", value: "subway" }],
+    [OsmTransitKind.Tram]: [{ key: 'railway', value: 'tram_stop' }],
+    [OsmTransitKind.Subway]: [{ key: 'station', value: 'subway' }],
     [OsmTransitKind.Train]: [
-        { key: "railway", value: "station" },
-        { key: "railway", value: "halt" },
+        { key: 'railway', value: 'station' },
+        { key: 'railway', value: 'halt' },
     ],
-    [OsmTransitKind.LightRail]: [{ key: "station", value: "light_rail" }],
-    [OsmTransitKind.Monorail]: [{ key: "station", value: "monorail" }],
-    [OsmTransitKind.Ferry]: [{ key: "amenity", value: "ferry_terminal" }],
-    [OsmTransitKind.BusStation]: [{ key: "amenity", value: "bus_station" }],
-    [OsmTransitKind.Aerialway]: [{ key: "aerialway", value: "station" }],
-    [OsmTransitKind.Taxi]: [{ key: "amenity", value: "taxi" }],
+    [OsmTransitKind.LightRail]: [{ key: 'station', value: 'light_rail' }],
+    [OsmTransitKind.Monorail]: [{ key: 'station', value: 'monorail' }],
+    [OsmTransitKind.Ferry]: [{ key: 'amenity', value: 'ferry_terminal' }],
+    [OsmTransitKind.BusStation]: [{ key: 'amenity', value: 'bus_station' }],
+    [OsmTransitKind.Aerialway]: [{ key: 'aerialway', value: 'station' }],
+    [OsmTransitKind.Taxi]: [{ key: 'amenity', value: 'taxi' }],
 };
 
 export interface OsmPublicTransitStopsResult {
@@ -103,11 +93,11 @@ export interface OsmPublicTransitStopsResult {
 export type OsmPublicTransitStopsResultWithHelpers = OsmPublicTransitStopsResult & GeometryResultHelpers<OsmPublicTransitStopsResult>;
 
 export class OsmPublicTransitStopsRetriever extends OsmFeatureRetriever<OsmPublicTransitStopsResult, typeof OsmPublicTransitStopsPact> {
-    protected readonly layer = "transitStops";
+    protected readonly layer = 'transitStops';
     protected readonly defaultRadiusM = 500;
     protected readonly maxRadiusM = 5000;
     protected readonly queryPactClass = OsmPublicTransitStopsPact;
-    protected readonly outStatement = "out geom;";
+    protected readonly outStatement = 'out geom;';
 
     get name(): string {
         return OsmPublicTransitStopsRetriever.name;
@@ -118,7 +108,7 @@ export class OsmPublicTransitStopsRetriever extends OsmFeatureRetriever<OsmPubli
     }
 
     get icon(): string | undefined {
-        return "🚌";
+        return '🚌';
     }
 
     protected parseQuery(season: IHuntingSeason): OsmQueryBase {
@@ -126,15 +116,12 @@ export class OsmPublicTransitStopsRetriever extends OsmFeatureRetriever<OsmPubli
         const query = (queryDog?.collected as OsmPublicTransitStopsQueryInput | undefined) ?? ({} as OsmPublicTransitStopsQueryInput);
         const lat = parseFloat(query.lat);
         const lng = parseFloat(query.lng);
-        const radiusM = clampGeometryRadiusM(parseFloat(query.radius ?? ""));
+        const radiusM = clampGeometryRadiusM(parseFloat(query.radius ?? ''));
         const kinds = parseKindsList(query.kinds);
         return { lat, lng, radiusM, facets: [...kinds] };
     }
 
-    protected buildOverpassBodyForTile(
-        bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number },
-        facets: string[],
-    ): string {
+    protected buildOverpassBodyForTile(bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number }, facets: string[]): string {
         const bboxClause = `(${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng})`;
         const lines: string[] = [];
         for (const kind of facets) {
@@ -144,7 +131,7 @@ export class OsmPublicTransitStopsRetriever extends OsmFeatureRetriever<OsmPubli
                 lines.push(`  nwr["${f.key}"="${f.value}"]${bboxClause};`);
             }
         }
-        return lines.join("\n");
+        return lines.join('\n');
     }
 
     protected classifyElementFacets(el: OverpassRawElement, fetchedFacets: string[]): string[] {

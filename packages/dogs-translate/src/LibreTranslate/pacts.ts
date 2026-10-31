@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface LibreTranslateQuery {
     /** Zu uebersetzender Text */
@@ -9,7 +9,6 @@ export interface LibreTranslateQuery {
     target?: string;
 }
 
-export const LibreTranslateQueryPact = createPact<LibreTranslateQuery>(
-    "LibreTranslateQueryProvider",
-    { fromSourceType: "LibreTranslateQuery" }
-);
+export const LibreTranslateQueryPact = createPact<LibreTranslateQuery>('LibreTranslateQueryProvider', {
+    fromSourceType: 'LibreTranslateQuery',
+});

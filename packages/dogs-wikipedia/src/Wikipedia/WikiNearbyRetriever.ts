@@ -9,10 +9,10 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from "@slopdogs/core";
-import { getWikiNearby } from "./wikipediaApiClient";
-import type { WikiNearbyResult } from "./interfaces/wikipediaTypes";
-import { WikiNearbyQueryPact, type WikiNearbyQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@slopdogs/core';
+import { getWikiNearby } from './wikipediaApiClient';
+import type { WikiNearbyResult } from './interfaces/wikipediaTypes';
+import { WikiNearbyQueryPact, type WikiNearbyQuery } from './pacts';
 
 const WIKI_NEARBY_CACHE_TTL_MS = 24 * 60 * 60_000; // 24 h — Geo-Artikel sind stabil
 
@@ -28,14 +28,24 @@ export class WikiNearbyRetriever extends Dog<WikiNearbyResult> implements ICache
         this.cacheHandler = handler;
     }
 
-    get name(): string { return WikiNearbyRetriever.name; }
-    get description(): string { return 'Finds nearby Wikipedia articles for given GPS coordinates.'; }
-    get icon(): string | undefined { return "\uD83D\uDCDA"; }
-    get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] { return [WikiNearbyQueryPact]; }
-    get optional(): (new (...args: any[]) => IHuntingDog<unknown>)[] { return []; }
+    get name(): string {
+        return WikiNearbyRetriever.name;
+    }
+    get description(): string {
+        return 'Finds nearby Wikipedia articles for given GPS coordinates.';
+    }
+    get icon(): string | undefined {
+        return '\uD83D\uDCDA';
+    }
+    get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
+        return [WikiNearbyQueryPact];
+    }
+    get optional(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
+        return [];
+    }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<WikiNearbyResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(WikiNearbyQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(WikiNearbyQueryPact, d));
         const query = (queryDog?.collected as WikiNearbyQuery | undefined) ?? ({} as WikiNearbyQuery);
 
         const lat = parseFloat(query['lat']);
@@ -48,14 +58,12 @@ export class WikiNearbyRetriever extends Dog<WikiNearbyResult> implements ICache
             throw new Error('WikiNearbyRetriever: Missing required query params (lat, lng)');
         }
 
-        const key = geoBucketKey("wiki-nearby", lat, lng, radius, {
+        const key = geoBucketKey('wiki-nearby', lat, lng, radius, {
             extras: { lang, limit },
         });
 
         if (this.cacheHandler) {
-            return this.cacheHandler.getOrFetch(key, WIKI_NEARBY_CACHE_TTL_MS, () =>
-                getWikiNearby(lat, lng, radius, limit, lang)
-            );
+            return this.cacheHandler.getOrFetch(key, WIKI_NEARBY_CACHE_TTL_MS, () => getWikiNearby(lat, lng, radius, limit, lang));
         }
         return getWikiNearby(lat, lng, radius, limit, lang);
     };

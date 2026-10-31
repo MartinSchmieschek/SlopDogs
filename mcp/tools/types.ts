@@ -185,9 +185,10 @@ export function unknownArgsRefusal(tool: ToolDef, args: unknown): { message: str
     const parts = unknown.map((u) => `"${u.path}"${u.suggestion ? ` (did you mean "${u.suggestion}"?)` : ''}`);
     const first = unknown[0];
     const parent = first.path.slice(0, first.path.length - first.field.length).replace(/\.$/, '');
-    const message = `Unknown argument${unknown.length > 1 ? 's' : ''} for ${tool.name}: ${parts.join(', ')}. `
-        + `Allowed${parent ? ` in ${parent}` : ''}: ${first.allowed.join(', ')}. `
-        + 'Nothing was run — fix the call and send it again.';
+    const message =
+        `Unknown argument${unknown.length > 1 ? 's' : ''} for ${tool.name}: ${parts.join(', ')}. ` +
+        `Allowed${parent ? ` in ${parent}` : ''}: ${first.allowed.join(', ')}. ` +
+        'Nothing was run — fix the call and send it again.';
     return { message, unknown };
 }
 
@@ -307,10 +308,7 @@ function erkannteZustaendigkeiten(code: string): string[] {
     return bereiche.filter(([, n, min]) => n >= min).map(([name]) => name);
 }
 
-export function codeHinweise(
-    tsCode: unknown,
-    parents: { parentsRequired?: unknown; parentsOptional?: unknown },
-): string[] {
+export function codeHinweise(tsCode: unknown, parents: { parentsRequired?: unknown; parentsOptional?: unknown }): string[] {
     if (typeof tsCode !== 'string' || tsCode.length === 0) return [];
     const out: string[] = [];
 
@@ -320,12 +318,12 @@ export function codeHinweise(
     const bereiche = erkannteZustaendigkeiten(tsCode);
     if (bereiche.length >= 3 || (bereiche.length === 2 && tsCode.length >= 2500)) {
         out.push(
-            `Dieser Dog beantwortet mehrere Fragen: ${bereiche.join(', ')}. `
-            + 'Ein Dog ist wie eine Klasse -- zusammengehoerige Funktionen um EINEN Zweck. Mehrere '
-            + 'Funktionsgruppen ohne gemeinsamen Zweck sind mehrere Klassen in einer Datei, und '
-            + 'genau das sind hier mehrere Dogs. Trenn nach Zustaendigkeit, nicht nach Dateityp: '
-            + 'Markup hierhin und Script dorthin verschiebt nur Zeichen. '
-            + 'Die Probe: sag in EINEM Satz, was dieser Dog beantwortet. Gelingt es nicht, teile ihn.',
+            `Dieser Dog beantwortet mehrere Fragen: ${bereiche.join(', ')}. ` +
+                'Ein Dog ist wie eine Klasse -- zusammengehoerige Funktionen um EINEN Zweck. Mehrere ' +
+                'Funktionsgruppen ohne gemeinsamen Zweck sind mehrere Klassen in einer Datei, und ' +
+                'genau das sind hier mehrere Dogs. Trenn nach Zustaendigkeit, nicht nach Dateityp: ' +
+                'Markup hierhin und Script dorthin verschiebt nur Zeichen. ' +
+                'Die Probe: sag in EINEM Satz, was dieser Dog beantwortet. Gelingt es nicht, teile ihn.',
         );
     }
 
@@ -333,14 +331,14 @@ export function codeHinweise(
     if (tsCode.length >= DOG_GROSS) {
         const dringend = tsCode.length >= DOG_ZU_GROSS;
         out.push(
-            `Dieser Dog ist ${tsCode.length} Zeichen gross${dringend ? ' -- das ist zu viel' : ''}. `
-            + 'Ein Dog tut EINE benennbare Sache; ab dieser Groesse sind es fast immer mehrere. '
-            + 'Teile ihn auf: HTML-Fragmente (Kopf, Liste, Legende), der Script-Block, die '
-            + 'Datenaufbereitung und das Zusammensetzen sind je ein eigener Dog -- der Lead setzt sie '
-            + 'zusammen. Das ist keine Kosmetik: in einem grossen Dog toetet ein einziges falsches '
-            + 'Zeichen die ganze Ausgabe, du kannst die Beute der Teile nicht einzeln ansehen, und '
-            + 'jede Korrektur bedeutet, den kompletten Block neu zu erzeugen.'
-            + (dringend ? ' Bei dieser Groesse: aufteilen, bevor du weitermachst.' : ''),
+            `Dieser Dog ist ${tsCode.length} Zeichen gross${dringend ? ' -- das ist zu viel' : ''}. ` +
+                'Ein Dog tut EINE benennbare Sache; ab dieser Groesse sind es fast immer mehrere. ' +
+                'Teile ihn auf: HTML-Fragmente (Kopf, Liste, Legende), der Script-Block, die ' +
+                'Datenaufbereitung und das Zusammensetzen sind je ein eigener Dog -- der Lead setzt sie ' +
+                'zusammen. Das ist keine Kosmetik: in einem grossen Dog toetet ein einziges falsches ' +
+                'Zeichen die ganze Ausgabe, du kannst die Beute der Teile nicht einzeln ansehen, und ' +
+                'jede Korrektur bedeutet, den kompletten Block neu zu erzeugen.' +
+                (dringend ? ' Bei dieser Groesse: aufteilen, bevor du weitermachst.' : ''),
         );
     }
 
@@ -355,19 +353,19 @@ export function codeHinweise(
     const usesSocket = /new\s+WebSocket\s*\(/.test(tsCode) || /\bwss?:\/\//.test(tsCode);
     if (usesSocket && !hasLobby) {
         out.push(
-            'Dieser Dog benutzt einen WebSocket, hat aber keinen WebSocketChannelRetriever als Parent — '
-            + 'du baust dir gerade eine eigene Lobby. Nimm die vorhandene: '
-            + 'extraDogIds: ["base:WebSocketChannelRetriever", "base:QueryRetriever"] (MIT base:) und '
-            + 'parentsRequired: ["WebSocketChannelRetriever"] (OHNE base:). '
-            + 'Sie liefert channelId, wsUrl, heartbeatSec, peers, channelParam und channelQuery — erfinde keine eigene Adresse und keinen eigenen room-Parameter. '
-            + 'Den Teilen-Link baut die Seite selbst aus location.origin + location.pathname + channelQuery.',
+            'Dieser Dog benutzt einen WebSocket, hat aber keinen WebSocketChannelRetriever als Parent — ' +
+                'du baust dir gerade eine eigene Lobby. Nimm die vorhandene: ' +
+                'extraDogIds: ["base:WebSocketChannelRetriever", "base:QueryRetriever"] (MIT base:) und ' +
+                'parentsRequired: ["WebSocketChannelRetriever"] (OHNE base:). ' +
+                'Sie liefert channelId, wsUrl, heartbeatSec, peers, channelParam und channelQuery — erfinde keine eigene Adresse und keinen eigenen room-Parameter. ' +
+                'Den Teilen-Link baut die Seite selbst aus location.origin + location.pathname + channelQuery.',
         );
     }
 
     if (/require\s*\(\s*['"]fs['"]\s*\)/.test(tsCode) || /\bfs\.(writeFile|readFile|appendFile)/.test(tsCode)) {
         out.push(
-            'Dateisystem-Zugriff im Dog-Code — der VM-Sandkasten hat keins. '
-            + 'Fuer Zustand und Caches steht `jsonStore` global bereit (get/set/delete/has/list/snapshot, alle async).',
+            'Dateisystem-Zugriff im Dog-Code — der VM-Sandkasten hat keins. ' +
+                'Fuer Zustand und Caches steht `jsonStore` global bereit (get/set/delete/has/list/snapshot, alle async).',
         );
     }
 

@@ -9,17 +9,15 @@
  * =========================================================================
  */
 
-import type { IPGeoApiResponse, IPGeoResult } from "./interfaces/ipGeoTypes";
+import type { IPGeoApiResponse, IPGeoResult } from './interfaces/ipGeoTypes';
 
-const FIELDS = "status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,query";
+const FIELDS = 'status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,query';
 
 /**
  * Fetch geolocation data from ip-api.com.
  */
 export async function getIPGeoData(ip?: string): Promise<IPGeoResult> {
-    const base = ip
-        ? `http://ip-api.com/json/${encodeURIComponent(ip)}`
-        : `http://ip-api.com/json/`;
+    const base = ip ? `http://ip-api.com/json/${encodeURIComponent(ip)}` : `http://ip-api.com/json/`;
 
     const url = `${base}?fields=${FIELDS}`;
 
@@ -29,7 +27,7 @@ export async function getIPGeoData(ip?: string): Promise<IPGeoResult> {
     let res: Response;
     try {
         res = await fetch(url, {
-            headers: { "Accept": "application/json", "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)" },
+            headers: { Accept: 'application/json', 'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)' },
             signal: controller.signal,
         });
     } finally {
@@ -37,13 +35,13 @@ export async function getIPGeoData(ip?: string): Promise<IPGeoResult> {
     }
 
     if (!res.ok) {
-        const text = await res.text().catch(() => "");
+        const text = await res.text().catch(() => '');
         throw new Error(`ip-api.com failed: ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
     }
 
-    const data = await res.json() as IPGeoApiResponse;
+    const data = (await res.json()) as IPGeoApiResponse;
 
-    if (data.status === "fail") {
+    if (data.status === 'fail') {
         throw new Error(`ip-api.com error: ${data.message ?? 'unknown error'}`);
     }
 

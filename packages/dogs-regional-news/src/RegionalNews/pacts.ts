@@ -9,7 +9,7 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** Query parameters for the regional news hunt */
 export interface RegionalNewsQuery {
@@ -22,7 +22,4 @@ export interface RegionalNewsQuery {
 }
 
 /** Der Pact fuer RegionalNews-Queries */
-export const RegionalNewsQueryPact = createPact<RegionalNewsQuery>(
-    "RegionalNewsQueryProvider",
-    { fromSourceType: "RegionalNewsQuery" }
-);
+export const RegionalNewsQueryPact = createPact<RegionalNewsQuery>('RegionalNewsQueryProvider', { fromSourceType: 'RegionalNewsQuery' });

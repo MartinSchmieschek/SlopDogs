@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface F1Query {
     /** Saison: 4-stellig oder "current" — default "current" */
@@ -13,7 +13,4 @@ export interface F1Query {
     offset?: number;
 }
 
-export const F1QueryPact = createPact<F1Query>(
-    "F1QueryProvider",
-    { fromSourceType: "F1Query" }
-);
+export const F1QueryPact = createPact<F1Query>('F1QueryProvider', { fromSourceType: 'F1Query' });

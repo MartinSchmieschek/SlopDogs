@@ -9,7 +9,7 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** Query parameters for the biodiversity hunt */
 export interface BiodiversityQuery {
@@ -26,7 +26,4 @@ export interface BiodiversityQuery {
 }
 
 /** Der Pact fuer Biodiversity-Queries */
-export const BiodiversityQueryPact = createPact<BiodiversityQuery>(
-    "BiodiversityQueryProvider",
-    { fromSourceType: "BiodiversityQuery" }
-);
+export const BiodiversityQueryPact = createPact<BiodiversityQuery>('BiodiversityQueryProvider', { fromSourceType: 'BiodiversityQuery' });

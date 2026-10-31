@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface LyricsQuery {
     /** Kuenstler-Name */
@@ -7,7 +7,4 @@ export interface LyricsQuery {
     title: string;
 }
 
-export const LyricsQueryPact = createPact<LyricsQuery>(
-    "LyricsQueryProvider",
-    { fromSourceType: "LyricsQuery" }
-);
+export const LyricsQueryPact = createPact<LyricsQuery>('LyricsQueryProvider', { fromSourceType: 'LyricsQuery' });

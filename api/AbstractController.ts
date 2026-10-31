@@ -24,9 +24,9 @@ export interface ICreateInput {
  */
 export interface IUpdateInput {
     id?: string;
-    lineageId?: string;            // The lineage mark — binds all incarnations across branches
-    parentId?: string | null;  // The ancestor from which this incarnation was born
-    displayName?: string;      // The spirit's true name — changeable without breaking pacts
+    lineageId?: string; // The lineage mark — binds all incarnations across branches
+    parentId?: string | null; // The ancestor from which this incarnation was born
+    displayName?: string; // The spirit's true name — changeable without breaking pacts
     /** @deprecated Relic of the old linear rite */
     version?: number;
     [key: string]: any;
@@ -48,8 +48,7 @@ export interface IControllerResponse<T = any> {
  * diese Version. Fehler tragen einen Code, nie den rohen Store-Text (Prisma nennt Dateipfade und Tabellen).
  */
 export type IDeleteOutcome =
-    | { ok: true; scope: 'lineage' | 'version'; lineageId: string; deleted: number }
-    | { ok: false; code: 'not_found' | 'delete_failed' };
+    { ok: true; scope: 'lineage' | 'version'; lineageId: string; deleted: number } | { ok: false; code: 'not_found' | 'delete_failed' };
 
 /**
  * The AbstractController — a skeletal captain that all concrete controllers must flesh out.
@@ -121,7 +120,7 @@ export abstract class AbstractController<T extends IEntity = IEntity> {
             // Apply the filter if one was cast — only those who answer the challenge may board.
             if (filter) {
                 entities = entities.filter((entity: T) => {
-                    return Object.keys(filter).every(key => {
+                    return Object.keys(filter).every((key) => {
                         return entity[key] === filter[key];
                     });
                 });
@@ -209,7 +208,7 @@ export abstract class AbstractController<T extends IEntity = IEntity> {
 
         // Strip internal field
         const entities = Array.from(latest.values());
-        entities.forEach(e => delete (e as any)._createdAt);
+        entities.forEach((e) => delete (e as any)._createdAt);
 
         return entities;
     }
@@ -228,7 +227,8 @@ export abstract class AbstractController<T extends IEntity = IEntity> {
             const single = await this.store.load(lineageIdOrVersionId);
             if (single) {
                 const parsed = typeof single === 'string' ? JSON.parse(single) : single;
-                const resolvedDogId = parsed.lineageId || (parsed.serializedDogConfig ? JSON.parse(parsed.serializedDogConfig).lineageId : null);
+                const resolvedDogId =
+                    parsed.lineageId || (parsed.serializedDogConfig ? JSON.parse(parsed.serializedDogConfig).lineageId : null);
                 if (resolvedDogId) {
                     rows = await this.store.findAllVersions(this.entityType, resolvedDogId);
                 }
@@ -238,10 +238,10 @@ export abstract class AbstractController<T extends IEntity = IEntity> {
         for (const row of rows) {
             let config: any = {};
             try {
-                config = typeof row.serializedDogConfig === 'string'
-                    ? JSON.parse(row.serializedDogConfig)
-                    : row.serializedDogConfig;
-            } catch { continue; }
+                config = typeof row.serializedDogConfig === 'string' ? JSON.parse(row.serializedDogConfig) : row.serializedDogConfig;
+            } catch {
+                continue;
+            }
             // Eine Zeile ohne Konfig-Blob hat hier nichts umzubenennen (Kennels: eigenes rename).
             if (!config || typeof config !== 'object') continue;
 
@@ -301,7 +301,11 @@ export abstract class AbstractController<T extends IEntity = IEntity> {
         try {
             if (!id) return { ok: false, code: 'not_found' };
             const lineage = await this.store.findAllVersions(this.entityType, id);
-            if (lineage.length > 0) return await this.deleteLineageRows(id, lineage.map((v) => v.id));
+            if (lineage.length > 0)
+                return await this.deleteLineageRows(
+                    id,
+                    lineage.map((v) => v.id),
+                );
 
             const row = await this.store.load(id);
             if (!row) {
@@ -310,7 +314,10 @@ export abstract class AbstractController<T extends IEntity = IEntity> {
                 if (!resolved.ok || !lineageId || lineageId === id) return { ok: false, code: 'not_found' };
                 const versions = await this.store.findAllVersions(this.entityType, lineageId);
                 if (versions.length === 0) return { ok: false, code: 'not_found' };
-                return await this.deleteLineageRows(lineageId, versions.map((v) => v.id));
+                return await this.deleteLineageRows(
+                    lineageId,
+                    versions.map((v) => v.id),
+                );
             }
 
             const lineageId = AbstractController.lineageOfRow(row) || id;
@@ -368,7 +375,9 @@ export abstract class AbstractController<T extends IEntity = IEntity> {
      * Through endless faces, countless forms, a multitude unfolds.
      * @param lineageId - The lineage GUID that binds all incarnations across branches.
      */
-    async getVersions(lineageIdOrVersionId: string): Promise<Array<{ id: string; version: number; config: any; parentId?: string | null; createdAt?: Date }>> {
+    async getVersions(
+        lineageIdOrVersionId: string,
+    ): Promise<Array<{ id: string; version: number; config: any; parentId?: string | null; createdAt?: Date }>> {
         // First, try treating the input as a lineageId (lineage GUID).
         let versions = await this.store.findAllVersions(this.entityType, lineageIdOrVersionId);
 
@@ -378,20 +387,21 @@ export abstract class AbstractController<T extends IEntity = IEntity> {
             const single = await this.store.load(lineageIdOrVersionId);
             if (single) {
                 const parsed = typeof single === 'string' ? JSON.parse(single) : single;
-                const resolvedDogId = parsed.lineageId || (parsed.serializedDogConfig ? JSON.parse(parsed.serializedDogConfig).lineageId : null);
+                const resolvedDogId =
+                    parsed.lineageId || (parsed.serializedDogConfig ? JSON.parse(parsed.serializedDogConfig).lineageId : null);
                 if (resolvedDogId) {
                     versions = await this.store.findAllVersions(this.entityType, resolvedDogId);
                 }
             }
         }
 
-        return versions.map(v => {
+        return versions.map((v) => {
             let config: any = {};
             try {
-                config = typeof v.serializedDogConfig === 'string'
-                    ? JSON.parse(v.serializedDogConfig)
-                    : v.serializedDogConfig;
-            } catch { /* If the config has sunk, we return an empty chest. */ }
+                config = typeof v.serializedDogConfig === 'string' ? JSON.parse(v.serializedDogConfig) : v.serializedDogConfig;
+            } catch {
+                /* If the config has sunk, we return an empty chest. */
+            }
             return { id: v.id, version: v.version, config, parentId: v.parentId ?? null, createdAt: v.createdAt ?? undefined };
         });
     }
@@ -407,4 +417,3 @@ export abstract class AbstractController<T extends IEntity = IEntity> {
         return data as T;
     }
 }
-

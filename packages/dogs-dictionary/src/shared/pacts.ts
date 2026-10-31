@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /**
  * Gemeinsamer Wort-Query-Pact fuer alle Wort-basierten Hunde dieses Packages.
@@ -11,7 +11,4 @@ export interface WordQuery {
     lang?: string;
 }
 
-export const WordQueryPact = createPact<WordQuery>(
-    "WordQueryProvider",
-    { fromSourceType: "WordQuery" }
-);
+export const WordQueryPact = createPact<WordQuery>('WordQueryProvider', { fromSourceType: 'WordQuery' });

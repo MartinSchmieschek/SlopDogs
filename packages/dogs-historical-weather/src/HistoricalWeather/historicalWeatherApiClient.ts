@@ -10,15 +10,15 @@
  * =========================================================================
  */
 
-import type { HistoricalDayEntry, HistoricalSummary, HistoricalWeatherResult } from "./interfaces/historicalWeatherTypes";
+import type { HistoricalDayEntry, HistoricalSummary, HistoricalWeatherResult } from './interfaces/historicalWeatherTypes';
 
-const ARCHIVE_API_BASE = "https://archive-api.open-meteo.com/v1/archive";
+const ARCHIVE_API_BASE = 'https://archive-api.open-meteo.com/v1/archive';
 
 /**
  * Format a Date as YYYY-MM-DD.
  */
 function formatDate(d: Date): string {
-    return d.toISOString().split("T")[0];
+    return d.toISOString().split('T')[0];
 }
 
 /**
@@ -58,7 +58,7 @@ export async function getHistoricalWeather(
         `end_date=${resolvedEnd}`,
         `daily=temperature_2m_max,temperature_2m_min,temperature_2m_mean,precipitation_sum,rain_sum,snowfall_sum,windspeed_10m_max,windgusts_10m_max,sunshine_duration`,
         `timezone=auto`,
-    ].join("&");
+    ].join('&');
 
     const url = `${ARCHIVE_API_BASE}?${params}`;
 
@@ -68,7 +68,7 @@ export async function getHistoricalWeather(
     let res: Response;
     try {
         res = await fetch(url, {
-            headers: { "Accept": "application/json", "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)" },
+            headers: { Accept: 'application/json', 'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)' },
             signal: controller.signal,
         });
     } finally {
@@ -76,11 +76,11 @@ export async function getHistoricalWeather(
     }
 
     if (!res.ok) {
-        const text = await res.text().catch(() => "");
+        const text = await res.text().catch(() => '');
         throw new Error(`Open-Meteo Archive failed: ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
     }
 
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
 
     const d = data.daily;
     const times: string[] = d.time ?? [];

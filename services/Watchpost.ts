@@ -32,7 +32,10 @@ const MEMORY_HYSTERESIS = 0.05;
 const DELAY_RESOLUTION_MS = 20;
 const MAX_RESTARTS = 1;
 
-export interface StallEvent { kind: 'begin' | 'continue' | 'end'; ms: number; }
+export interface StallEvent {
+    kind: 'begin' | 'continue' | 'end';
+    ms: number;
+}
 
 /**
  * Erkennt eine Blockade am stehenden Puls. Reine Logik, die Zeit kommt von aussen — die Klasse laeuft im
@@ -44,7 +47,10 @@ export class StallDetector {
     private stalled = false;
     private lastReportAt = 0;
 
-    constructor(private readonly stallMs: number, private readonly repeatMs: number) {}
+    constructor(
+        private readonly stallMs: number,
+        private readonly repeatMs: number,
+    ) {}
 
     observe(pulse: number, now: number): StallEvent | null {
         if (pulse !== this.lastPulse) {
@@ -68,7 +74,10 @@ export class StallDetector {
     }
 }
 
-export interface LevelEvent { kind: 'up' | 'down'; threshold: number; }
+export interface LevelEvent {
+    kind: 'up' | 'down';
+    threshold: number;
+}
 
 /**
  * Speicher-Stufen mit Hysterese: meldet das Ueberschreiten einer Stufe sofort, das Absinken erst, wenn der Stand
@@ -77,7 +86,10 @@ export interface LevelEvent { kind: 'up' | 'down'; threshold: number; }
 export class MemoryLevels {
     private level = 0;
 
-    constructor(private readonly thresholds: number[], private readonly hysteresis: number) {}
+    constructor(
+        private readonly thresholds: number[],
+        private readonly hysteresis: number,
+    ) {}
 
     observe(fraction: number): LevelEvent | null {
         const before = this.level;
@@ -188,7 +200,8 @@ function watchpostThread(): void {
         if (runs.size === 0) {
             parts.push('keine Laeufe');
         } else {
-            const shown = Array.from(runs.values()).slice(0, 3)
+            const shown = Array.from(runs.values())
+                .slice(0, 3)
                 .map((run) => `${run.kennelId} (${run.source}) ${((now - run.at) / 1000).toFixed(1)} s`);
             parts.push(`Laeufe ${runs.size}: ${shown.join(', ')}${runs.size > shown.length ? ', …' : ''}`);
         }
@@ -203,9 +216,12 @@ function watchpostThread(): void {
         const ms = Math.round(event.ms);
         if (event.kind === 'begin') Atomics.add(shared, cfg.slot.stalls, 1);
         if (ms > Atomics.load(shared, cfg.slot.longestStallMs)) Atomics.store(shared, cfg.slot.longestStallMs, ms);
-        const head = event.kind === 'begin' ? `${C.red}${C.bold}⏸ Haupt-Thread blockiert${C.reset} seit ${ms} ms`
-            : event.kind === 'continue' ? `${C.red}⏸ Haupt-Thread weiter blockiert${C.reset}, ${ms} ms`
-                : `${C.green}▶ Haupt-Thread wieder frei${C.reset} nach ${ms} ms`;
+        const head =
+            event.kind === 'begin'
+                ? `${C.red}${C.bold}⏸ Haupt-Thread blockiert${C.reset} seit ${ms} ms`
+                : event.kind === 'continue'
+                  ? `${C.red}⏸ Haupt-Thread weiter blockiert${C.reset}, ${ms} ms`
+                  : `${C.green}▶ Haupt-Thread wieder frei${C.reset} nach ${ms} ms`;
         write(head + context(true));
     };
 
@@ -234,9 +250,9 @@ function watchpostThread(): void {
         const color = !up ? C.gray : event.threshold >= 0.9 ? C.red : C.yellow;
         const head = up ? `▲ Speicher ueber ${pct(event.threshold)} %` : `▼ Speicher zurueck unter ${pct(event.threshold)} %`;
         write(
-            `${color}${C.bold}${head}${C.reset}: cg ${mb(current)}/${mb(limitBytes)} MB (${pct(current / limitBytes)} %)`
-            + ` · peak ${peak !== null ? mb(peak) : '?'} MB · ${rate >= 0 ? '+' : ''}${rate.toFixed(0)} MB/s`
-            + context(false),
+            `${color}${C.bold}${head}${C.reset}: cg ${mb(current)}/${mb(limitBytes)} MB (${pct(current / limitBytes)} %)` +
+                ` · peak ${peak !== null ? mb(peak) : '?'} MB · ${rate >= 0 ? '+' : ''}${rate.toFixed(0)} MB/s` +
+                context(false),
         );
     };
 
@@ -254,8 +270,8 @@ function watchpostThread(): void {
     };
 
     const memoryNote = files
-        ? `Speicher-Stufen ${cfg.levels.map(pct).join('/')} % von ${mb(limitBytes)} MB`
-            + ` (${limitFromCgroup ? `cgroup v${files.version} memory.max` : 'MEMORY_LIMIT_MB'})`
+        ? `Speicher-Stufen ${cfg.levels.map(pct).join('/')} % von ${mb(limitBytes)} MB` +
+          ` (${limitFromCgroup ? `cgroup v${files.version} memory.max` : 'MEMORY_LIMIT_MB'})`
         : 'Speicher aus (keine cgroup lesbar)';
     write(`${cfg.restart ? 'wacht wieder (Neustart)' : 'wacht'} · Blockade ab ${cfg.stallMs} ms · Takt ${cfg.pollMs} ms · ${memoryNote}`);
     setInterval(poll, cfg.pollMs);
@@ -280,7 +296,6 @@ function positiveFromEnv(env: NodeJS.ProcessEnv, name: string, fallback: number)
     const n = Number(env[name]);
     return Number.isFinite(n) && n > 0 ? n : fallback;
 }
-
 
 /**
  * Der Haupt-Thread-Teil: haelt den Puls, die Event-Loop-Messung und den Wachposten-Thread. Nichts hiervon darf den

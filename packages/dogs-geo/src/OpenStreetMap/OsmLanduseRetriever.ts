@@ -3,13 +3,13 @@
  * Tile-cached pro landuse-Value.
  */
 
-import { type IHuntingSeason } from "@slopdogs/core";
-import osmtogeojson from "osmtogeojson";
-import type { FeatureCollection, GeometryObject } from "geojson";
-import { OsmFeatureRetriever, type OsmQueryBase } from "../osm/base/OsmFeatureRetriever";
-import type { OverpassRawElement } from "../osm/base/overpassMirrorChain";
-import { OsmLandusePact, type OsmLanduseQueryInput } from "./osmGeometryPacts";
-import { OsmLanduseValue } from "./osmGeometryEnums";
+import { type IHuntingSeason } from '@slopdogs/core';
+import osmtogeojson from 'osmtogeojson';
+import type { FeatureCollection, GeometryObject } from 'geojson';
+import { OsmFeatureRetriever, type OsmQueryBase } from '../osm/base/OsmFeatureRetriever';
+import type { OverpassRawElement } from '../osm/base/overpassMirrorChain';
+import { OsmLandusePact, type OsmLanduseQueryInput } from './osmGeometryPacts';
+import { OsmLanduseValue } from './osmGeometryEnums';
 
 const LANDUSE_SET = new Set<string>(Object.values(OsmLanduseValue));
 const DEFAULT_LANDUSE: readonly OsmLanduseValue[] = [
@@ -23,7 +23,7 @@ function parseLanduseList(raw: unknown): OsmLanduseValue[] {
     if (raw == null) return [...DEFAULT_LANDUSE];
     let parsed: string[] | null = null;
     if (Array.isArray(raw)) parsed = raw.map((x) => String(x).trim()).filter(Boolean);
-    else if (typeof raw === "string") {
+    else if (typeof raw === 'string') {
         const t = raw.trim();
         if (!t) return [...DEFAULT_LANDUSE];
         try {
@@ -40,15 +40,8 @@ function parseLanduseList(raw: unknown): OsmLanduseValue[] {
     for (const s of parsed) if (LANDUSE_SET.has(s) || /^[a-z0-9_:]+$/.test(s)) out.push(s);
     return (out.length ? out : [...DEFAULT_LANDUSE]) as OsmLanduseValue[];
 }
-import {
-    circleToBoundingBox,
-    clampGeometryRadiusM,
-    type BoundingBox,
-} from "./overpassGeometryCore";
-import {
-    attachGeometryHelpers,
-    type GeometryResultHelpers,
-} from "./osmGeometryHelpers";
+import { circleToBoundingBox, clampGeometryRadiusM, type BoundingBox } from './overpassGeometryCore';
+import { attachGeometryHelpers, type GeometryResultHelpers } from './osmGeometryHelpers';
 
 export interface OsmLanduseResult {
     center: { lat: number; lng: number };
@@ -61,11 +54,11 @@ export interface OsmLanduseResult {
 export type OsmLanduseResultWithHelpers = OsmLanduseResult & GeometryResultHelpers<OsmLanduseResult>;
 
 export class OsmLanduseRetriever extends OsmFeatureRetriever<OsmLanduseResult, typeof OsmLandusePact> {
-    protected readonly layer = "landuse";
+    protected readonly layer = 'landuse';
     protected readonly defaultRadiusM = 1000;
     protected readonly maxRadiusM = 10000;
     protected readonly queryPactClass = OsmLandusePact;
-    protected readonly outStatement = "out geom;";
+    protected readonly outStatement = 'out geom;';
 
     get name(): string {
         return OsmLanduseRetriever.name;
@@ -76,7 +69,7 @@ export class OsmLanduseRetriever extends OsmFeatureRetriever<OsmLanduseResult, t
     }
 
     get icon(): string | undefined {
-        return "🏘️";
+        return '🏘️';
     }
 
     protected parseQuery(season: IHuntingSeason): OsmQueryBase {
@@ -84,26 +77,23 @@ export class OsmLanduseRetriever extends OsmFeatureRetriever<OsmLanduseResult, t
         const query = (queryDog?.collected as OsmLanduseQueryInput | undefined) ?? ({} as OsmLanduseQueryInput);
         const lat = parseFloat(query.lat);
         const lng = parseFloat(query.lng);
-        const radiusM = clampGeometryRadiusM(parseFloat(query.radius ?? ""));
+        const radiusM = clampGeometryRadiusM(parseFloat(query.radius ?? ''));
         const landuse = parseLanduseList(query.landuse);
         return { lat, lng, radiusM, facets: [...landuse] };
     }
 
-    protected buildOverpassBodyForTile(
-        bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number },
-        facets: string[],
-    ): string {
+    protected buildOverpassBodyForTile(bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number }, facets: string[]): string {
         const bboxClause = `(${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng})`;
         const lines: string[] = [];
         for (const v of facets) {
             lines.push(`  way["landuse"="${v}"]${bboxClause};`);
             lines.push(`  relation["landuse"="${v}"]${bboxClause};`);
         }
-        return lines.join("\n");
+        return lines.join('\n');
     }
 
     protected classifyElementFacets(el: OverpassRawElement, fetchedFacets: string[]): string[] {
-        const v = el.tags?.["landuse"];
+        const v = el.tags?.['landuse'];
         if (!v) return [];
         return fetchedFacets.filter((f) => f === v);
     }

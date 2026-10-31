@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface PlaygroundQuery {
     lat: string;
@@ -6,7 +6,4 @@ export interface PlaygroundQuery {
     radius?: string;
 }
 
-export const PlaygroundQueryPact = createPact<PlaygroundQuery>(
-    "PlaygroundQueryProvider",
-    { fromSourceType: "PlaygroundQuery" }
-);
+export const PlaygroundQueryPact = createPact<PlaygroundQuery>('PlaygroundQueryProvider', { fromSourceType: 'PlaygroundQuery' });

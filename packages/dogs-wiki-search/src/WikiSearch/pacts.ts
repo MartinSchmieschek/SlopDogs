@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface WikiSearchQuery {
     /** Search term */
@@ -7,7 +7,4 @@ export interface WikiSearchQuery {
     lang?: string;
 }
 
-export const WikiSearchQueryPact = createPact<WikiSearchQuery>(
-    "WikiSearchQueryProvider",
-    { fromSourceType: "WikiSearchQuery" }
-);
+export const WikiSearchQueryPact = createPact<WikiSearchQuery>('WikiSearchQueryProvider', { fromSourceType: 'WikiSearchQuery' });

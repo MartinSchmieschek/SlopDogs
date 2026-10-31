@@ -13,17 +13,8 @@
  * GeoJSON, das selbst wieder die Helper traegt.
  */
 
-import type {
-    Feature,
-    FeatureCollection,
-    GeometryObject,
-    LineString,
-    MultiLineString,
-    Polygon,
-    MultiPolygon,
-    Position,
-} from "geojson";
-import polygonClipping, { type Geom as PCGeom, type MultiPolygon as PCMultiPolygon } from "polygon-clipping";
+import type { Feature, FeatureCollection, GeometryObject, LineString, MultiLineString, Polygon, MultiPolygon, Position } from 'geojson';
+import polygonClipping, { type Geom as PCGeom, type MultiPolygon as PCMultiPolygon } from 'polygon-clipping';
 
 const M_PER_DEG_LAT = 111320;
 
@@ -97,31 +88,29 @@ function simplifyRing(ring: Position[], toleranceDeg: number): Position[] {
 
 function simplifyGeometry(geom: GeometryObject, toleranceDeg: number): GeometryObject {
     switch (geom.type) {
-        case "LineString": {
+        case 'LineString': {
             const g = geom as LineString;
-            return { type: "LineString", coordinates: douglasPeucker(g.coordinates, toleranceDeg) };
+            return { type: 'LineString', coordinates: douglasPeucker(g.coordinates, toleranceDeg) };
         }
-        case "MultiLineString": {
+        case 'MultiLineString': {
             const g = geom as MultiLineString;
             return {
-                type: "MultiLineString",
+                type: 'MultiLineString',
                 coordinates: g.coordinates.map((line) => douglasPeucker(line, toleranceDeg)),
             };
         }
-        case "Polygon": {
+        case 'Polygon': {
             const g = geom as Polygon;
             return {
-                type: "Polygon",
+                type: 'Polygon',
                 coordinates: g.coordinates.map((ring) => simplifyRing(ring, toleranceDeg)),
             };
         }
-        case "MultiPolygon": {
+        case 'MultiPolygon': {
             const g = geom as MultiPolygon;
             return {
-                type: "MultiPolygon",
-                coordinates: g.coordinates.map((poly) =>
-                    poly.map((ring) => simplifyRing(ring, toleranceDeg)),
-                ),
+                type: 'MultiPolygon',
+                coordinates: g.coordinates.map((poly) => poly.map((ring) => simplifyRing(ring, toleranceDeg))),
             };
         }
         default:
@@ -140,21 +129,19 @@ export function simplifyFeatureCollection(
         ...f,
         geometry: simplifyGeometry(f.geometry, tolDeg),
     }));
-    return { type: "FeatureCollection", features };
+    return { type: 'FeatureCollection', features };
 }
 
 function isPolygonGeom(geom: GeometryObject): geom is Polygon | MultiPolygon {
-    return geom.type === "Polygon" || geom.type === "MultiPolygon";
+    return geom.type === 'Polygon' || geom.type === 'MultiPolygon';
 }
 
 function geomToPolygonClipping(geom: Polygon | MultiPolygon): PCGeom {
-    if (geom.type === "Polygon") return geom.coordinates as PCGeom;
+    if (geom.type === 'Polygon') return geom.coordinates as PCGeom;
     return geom.coordinates as PCGeom;
 }
 
-export function mergeFeatureCollection(
-    fc: FeatureCollection<GeometryObject>,
-): FeatureCollection<GeometryObject> {
+export function mergeFeatureCollection(fc: FeatureCollection<GeometryObject>): FeatureCollection<GeometryObject> {
     const polygons: Array<Polygon | MultiPolygon> = [];
     const passthrough: Feature<GeometryObject>[] = [];
     for (const f of fc.features) {
@@ -165,19 +152,19 @@ export function mergeFeatureCollection(
         }
     }
     if (polygons.length === 0) {
-        return { type: "FeatureCollection", features: passthrough };
+        return { type: 'FeatureCollection', features: passthrough };
     }
 
     const [first, ...rest] = polygons.map(geomToPolygonClipping);
     const unioned: PCMultiPolygon = polygonClipping.union(first, ...rest);
 
     const merged: Feature<MultiPolygon> = {
-        type: "Feature",
+        type: 'Feature',
         properties: { merged: true, sourceCount: polygons.length },
-        geometry: { type: "MultiPolygon", coordinates: unioned as Position[][][] },
+        geometry: { type: 'MultiPolygon', coordinates: unioned as Position[][][] },
     };
 
-    return { type: "FeatureCollection", features: [merged, ...passthrough] };
+    return { type: 'FeatureCollection', features: [merged, ...passthrough] };
 }
 
 /** Result-Shape, das einen `geojson`-FeatureCollection-Slot und ein `center` traegt. */
@@ -199,9 +186,7 @@ export interface GeometryResultHelpers<T extends GeometryResultBase> {
  * eine neue Result-Instanz, die wieder dieselben Helper traegt — Chaining
  * ist also moeglich: `result.simplify(2).merge()`.
  */
-export function attachGeometryHelpers<T extends GeometryResultBase>(
-    result: T,
-): T & GeometryResultHelpers<T> {
+export function attachGeometryHelpers<T extends GeometryResultBase>(result: T): T & GeometryResultHelpers<T> {
     const wrapped = result as T & GeometryResultHelpers<T>;
     wrapped.simplify = (toleranceM: number): T => {
         const next: T = {

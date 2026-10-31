@@ -1,7 +1,7 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from "@slopdogs/core";
-import { HolidayQueryPact, type HolidayQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { HolidayQueryPact, type HolidayQuery } from './pacts';
 
-const NAGER_BASE = "https://date.nager.at/api/v3/publicholidays";
+const NAGER_BASE = 'https://date.nager.at/api/v3/publicholidays';
 
 interface NagerHoliday {
     date: string;
@@ -47,11 +47,11 @@ export class HolidayRetriever extends Dog<HolidayResult> implements ICacheable {
     }
 
     get description(): string {
-        return "Fetches public holidays for a given country and year via the Nager.Date API.";
+        return 'Fetches public holidays for a given country and year via the Nager.Date API.';
     }
 
     get icon(): string | undefined {
-        return "\uD83C\uDF89";
+        return '\uD83C\uDF89';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -63,17 +63,17 @@ export class HolidayRetriever extends Dog<HolidayResult> implements ICacheable {
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<HolidayResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(HolidayQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(HolidayQueryPact, d));
         const query = (queryDog?.collected as HolidayQuery | undefined) ?? ({} as HolidayQuery);
 
-        const country = (query.country ?? "").toUpperCase();
+        const country = (query.country ?? '').toUpperCase();
         if (!country) {
-            throw new Error("HolidayRetriever: Missing required query param (country)");
+            throw new Error('HolidayRetriever: Missing required query param (country)');
         }
 
         const year = query.year ? parseInt(query.year, 10) : new Date().getFullYear();
         if (isNaN(year)) {
-            throw new Error("HolidayRetriever: Invalid year");
+            throw new Error('HolidayRetriever: Invalid year');
         }
 
         const url = `${NAGER_BASE}/${year}/${encodeURIComponent(country)}`;
@@ -91,15 +91,13 @@ export class HolidayRetriever extends Dog<HolidayResult> implements ICacheable {
             }
 
             if (!res.ok) {
-                const text = await res.text().catch(() => "");
-                throw new Error(
-                    `HolidayRetriever: HTTP ${res.status} ${res.statusText}${text ? ` — ${text.slice(0, 200)}` : ""}`
-                );
+                const text = await res.text().catch(() => '');
+                throw new Error(`HolidayRetriever: HTTP ${res.status} ${res.statusText}${text ? ` — ${text.slice(0, 200)}` : ''}`);
             }
 
-            const raw = await res.json() as NagerHoliday[];
+            const raw = (await res.json()) as NagerHoliday[];
 
-            const holidays: HolidayEntry[] = raw.map(h => ({
+            const holidays: HolidayEntry[] = raw.map((h) => ({
                 date: h.date,
                 localName: h.localName,
                 name: h.name,
@@ -112,10 +110,10 @@ export class HolidayRetriever extends Dog<HolidayResult> implements ICacheable {
             today.setHours(0, 0, 0, 0);
 
             const futureHolidays = holidays
-                .filter(h => new Date(h.date) >= today)
+                .filter((h) => new Date(h.date) >= today)
                 .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-            let nextHoliday: HolidayResult["nextHoliday"] = null;
+            let nextHoliday: HolidayResult['nextHoliday'] = null;
             if (futureHolidays.length > 0) {
                 const next = futureHolidays[0];
                 const nextDate = new Date(next.date);

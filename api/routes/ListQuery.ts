@@ -39,13 +39,13 @@ export const USAGE_FILTERS: readonly UsageFilter[] = ['top', 'never_used', 'neve
  * wenn sein Lead-Dog scheiterte (leadFailed), ein Dog-Lauf, wenn er mit error/timeout/oom endete (failures).
  */
 export const USAGE_FILTER_HELP =
-    'Usage filter, applied after the rights filter (only what you may run) and combinable with search, sort and the other filters: '
-    + '"top" = at least one call, ordered by calls (stats.calls.total desc, then last30d desc) unless you pass sort; '
-    + '"never_used" = 0 calls in total; '
-    + '"never_worked" = calls > 0 and every one failed (kennel: leadFailed == total; dog: failures == total, failures = error + timeout + oom); '
-    + '"failing" = at least one failed run in the last 30 days (kennel: leadFailed30d > 0; dog: failures30d > 0); '
-    + '"dormant" = calls > 0 in total, but 0 in the last 30 days. '
-    + 'Calls count every source (public page, execute, run, snapshot, build); the window is 30 UTC days including today.';
+    'Usage filter, applied after the rights filter (only what you may run) and combinable with search, sort and the other filters: ' +
+    '"top" = at least one call, ordered by calls (stats.calls.total desc, then last30d desc) unless you pass sort; ' +
+    '"never_used" = 0 calls in total; ' +
+    '"never_worked" = calls > 0 and every one failed (kennel: leadFailed == total; dog: failures == total, failures = error + timeout + oom); ' +
+    '"failing" = at least one failed run in the last 30 days (kennel: leadFailed30d > 0; dog: failures30d > 0); ' +
+    '"dormant" = calls > 0 in total, but 0 in the last 30 days. ' +
+    'Calls count every source (public page, execute, run, snapshot, build); the window is 30 UTC days including today.';
 
 export interface IListPage<T> {
     data: T[];
@@ -56,7 +56,17 @@ export class ListQuery {
     /** Hard ceiling — a caller may ask for more, but never receives more. */
     static readonly MAX_LIMIT = 200;
 
-    private static readonly SORT_FIELDS: readonly string[] = ['name', 'createdAt', 'updatedAt', 'calls', 'calls30d', 'rating', 'proven', 'reuse', 'failures30d'];
+    private static readonly SORT_FIELDS: readonly string[] = [
+        'name',
+        'createdAt',
+        'updatedAt',
+        'calls',
+        'calls30d',
+        'rating',
+        'proven',
+        'reuse',
+        'failures30d',
+    ];
     /** lineageId too: the kennel id is what people and agents know a kennel by. */
     private static readonly SEARCHABLE_FIELDS: readonly string[] = ['name', 'displayName', 'description', 'lineageId'];
 
@@ -81,7 +91,7 @@ export class ListQuery {
         readonly minReliability: number | null = null,
         /** Keep only the caller's favourites (`favorites=1`, Spur U) — needs `favorite` on the items. */
         readonly favoritesOnly: boolean = false,
-    ) { }
+    ) {}
 
     /**
      * Read the query string. Every parameter is optional, and a broken value never raises —
@@ -122,14 +132,19 @@ export class ListQuery {
 
     /** Apply mine -> favorites -> q -> minStars -> minCalls -> proven -> minReliability -> usage -> sort -> page. The caller has already applied the ACL filter. */
     apply<T>(items: T[], ctx: AuthCtx | undefined): IListPage<T> {
-        const owned = this.mineOnly ? items.filter(item => ListQuery.isOwnedBy(item, ctx)) : items;
-        const favorites = this.favoritesOnly ? owned.filter(item => ListQuery.isFavorite(item)) : owned;
-        const found = this.search ? favorites.filter(item => this.matches(item)) : favorites;
-        const starred = this.minStars === null ? found : found.filter(item => (ListQuery.statsOf(item)?.rating?.avg ?? -1) >= this.minStars!);
-        const called = this.minCalls === null ? starred : starred.filter(item => (ListQuery.statsOf(item)?.calls?.ranked ?? 0) >= this.minCalls!);
-        const proven = this.provenOnly ? called.filter(item => ListQuery.statsOf(item)?.proven?.badge === true) : called;
-        const reliable = this.minReliability === null ? proven : proven.filter(item => (ListQuery.statsOf(item)?.proven?.reliability ?? -1) >= this.minReliability!);
-        const used = this.usage === null ? reliable : reliable.filter(item => ListQuery.matchesUsage(item, this.usage!));
+        const owned = this.mineOnly ? items.filter((item) => ListQuery.isOwnedBy(item, ctx)) : items;
+        const favorites = this.favoritesOnly ? owned.filter((item) => ListQuery.isFavorite(item)) : owned;
+        const found = this.search ? favorites.filter((item) => this.matches(item)) : favorites;
+        const starred =
+            this.minStars === null ? found : found.filter((item) => (ListQuery.statsOf(item)?.rating?.avg ?? -1) >= this.minStars!);
+        const called =
+            this.minCalls === null ? starred : starred.filter((item) => (ListQuery.statsOf(item)?.calls?.ranked ?? 0) >= this.minCalls!);
+        const proven = this.provenOnly ? called.filter((item) => ListQuery.statsOf(item)?.proven?.badge === true) : called;
+        const reliable =
+            this.minReliability === null
+                ? proven
+                : proven.filter((item) => (ListQuery.statsOf(item)?.proven?.reliability ?? -1) >= this.minReliability!);
+        const used = this.usage === null ? reliable : reliable.filter((item) => ListQuery.matchesUsage(item, this.usage!));
         const ordered = this.usage === 'top' && !this.sortGiven ? ListQuery.byCalls(used) : this.ordered(used);
 
         if (this.limit === null) {
@@ -167,7 +182,7 @@ export class ListQuery {
 
     private matches(item: unknown): boolean {
         const record = item as Record<string, unknown>;
-        return ListQuery.SEARCHABLE_FIELDS.some(field => {
+        return ListQuery.SEARCHABLE_FIELDS.some((field) => {
             const value = record?.[field];
             return typeof value === 'string' && value.toLowerCase().includes(this.search);
         });
@@ -204,11 +219,16 @@ export class ListQuery {
     private static matchesUsage(item: unknown, usage: UsageFilter): boolean {
         const c = ListQuery.callsOf(item);
         switch (usage) {
-            case 'top': return c.total > 0;
-            case 'never_used': return c.total === 0;
-            case 'never_worked': return c.total > 0 && c.failures >= c.total;
-            case 'failing': return c.failures30d > 0;
-            case 'dormant': return c.total > 0 && c.last30d === 0;
+            case 'top':
+                return c.total > 0;
+            case 'never_used':
+                return c.total === 0;
+            case 'never_worked':
+                return c.total > 0 && c.failures >= c.total;
+            case 'failing':
+                return c.failures30d > 0;
+            case 'dormant':
+                return c.total > 0 && c.last30d === 0;
         }
     }
 
@@ -217,7 +237,7 @@ export class ListQuery {
         return [...items].sort((a, b) => {
             const ca = ListQuery.callsOf(a);
             const cb = ListQuery.callsOf(b);
-            return (cb.total - ca.total) || (cb.last30d - ca.last30d) || ListQuery.compare(ListQuery.idOf(a), ListQuery.idOf(b));
+            return cb.total - ca.total || cb.last30d - ca.last30d || ListQuery.compare(ListQuery.idOf(a), ListQuery.idOf(b));
         });
     }
 
@@ -231,15 +251,23 @@ export class ListQuery {
     }
 
     /** The `stats` a list item carries (P4 kennels, P4b dogs) — undefined for callers that did not attach. */
-    private static statsOf(item: unknown): {
-        calls?: {
-            total?: number; last30d?: number; ranked?: number; ranked30d?: number;
-            leadFailed?: number; leadFailed30d?: number; failures?: number; failures30d?: number;
-        };
-        rating?: { avg?: number | null; score?: number };
-        proven?: { score?: number; badge?: boolean; reliability?: number };
-        reuse?: { kennelsTransitive?: number };
-    } | undefined {
+    private static statsOf(item: unknown):
+        | {
+              calls?: {
+                  total?: number;
+                  last30d?: number;
+                  ranked?: number;
+                  ranked30d?: number;
+                  leadFailed?: number;
+                  leadFailed30d?: number;
+                  failures?: number;
+                  failures30d?: number;
+              };
+              rating?: { avg?: number | null; score?: number };
+              proven?: { score?: number; badge?: boolean; reliability?: number };
+              reuse?: { kennelsTransitive?: number };
+          }
+        | undefined {
         return (item as { stats?: any })?.stats;
     }
 
@@ -258,9 +286,10 @@ export class ListQuery {
         }
         // AbstractController.listLatest parks the row timestamp on `_createdAt`; KennelController
         // hands out real `createdAt` / `updatedAt`. Fall back rather than sort everything to 0.
-        const raw = field === 'updatedAt'
-            ? record?.updatedAt ?? record?.createdAt ?? record?._createdAt
-            : record?.createdAt ?? record?._createdAt;
+        const raw =
+            field === 'updatedAt'
+                ? (record?.updatedAt ?? record?.createdAt ?? record?._createdAt)
+                : (record?.createdAt ?? record?._createdAt);
         const time = raw ? new Date(raw as string).getTime() : 0;
         return Number.isFinite(time) ? time : 0;
     }

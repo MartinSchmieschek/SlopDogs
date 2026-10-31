@@ -9,7 +9,7 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** Query parameters for the transit trip hunt */
 export interface TransitTripQuery {
@@ -28,7 +28,4 @@ export interface TransitTripQuery {
 }
 
 /** Der Pact fuer TransitTrip-Queries */
-export const TransitTripQueryPact = createPact<TransitTripQuery>(
-    "TransitTripQueryProvider",
-    { fromSourceType: "TransitTripQuery" }
-);
+export const TransitTripQueryPact = createPact<TransitTripQuery>('TransitTripQueryProvider', { fromSourceType: 'TransitTripQuery' });

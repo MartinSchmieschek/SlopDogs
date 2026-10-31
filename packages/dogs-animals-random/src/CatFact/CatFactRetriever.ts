@@ -1,7 +1,7 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from "@slopdogs/core";
-import { getCatFact } from "./catFactApiClient";
-import type { CatFactResult } from "./interfaces/catFactTypes";
-import { CatFactQueryPact, type CatFactQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { getCatFact } from './catFactApiClient';
+import type { CatFactResult } from './interfaces/catFactTypes';
+import { CatFactQueryPact, type CatFactQuery } from './pacts';
 
 export class CatFactRetriever extends Dog<CatFactResult> implements ICacheable {
     private cacheHandler?: ICacheHandler;
@@ -15,11 +15,11 @@ export class CatFactRetriever extends Dog<CatFactResult> implements ICacheable {
     }
 
     get description(): string {
-        return "Holt einen zufaelligen Katzen-Fakt von catfact.ninja.";
+        return 'Holt einen zufaelligen Katzen-Fakt von catfact.ninja.';
     }
 
     get icon(): string | undefined {
-        return "\uD83D\uDC31";
+        return '\uD83D\uDC31';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -32,7 +32,7 @@ export class CatFactRetriever extends Dog<CatFactResult> implements ICacheable {
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<CatFactResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(CatFactQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(CatFactQueryPact, d));
         const query = (queryDog?.collected as CatFactQuery | undefined) ?? ({} as CatFactQuery);
         return getCatFact(query.maxLength);
     };

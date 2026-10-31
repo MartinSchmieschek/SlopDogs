@@ -1,11 +1,7 @@
 // HTML consent page for OAuth authorization. Plain inline page, no framework,
 // matches the SlopDogs visual style (dark + emoji vibes from the kennel UI).
 
-export function renderConsentPage(opts: {
-    clientName: string;
-    scope: string;
-    csrf: string;
-}): string {
+export function renderConsentPage(opts: { clientName: string; scope: string; csrf: string }): string {
     const { clientName, scope, csrf } = opts;
     const safeName = escapeHtml(clientName);
     const safeScope = escapeHtml(scope);
@@ -40,12 +36,18 @@ export function renderConsentPage(opts: {
         '.foot{margin-top:24px;font-size:11px;color:#8080a0;text-align:center;}',
         '</style></head><body>',
         '<form method="POST" action="/auth/authorize" class="card">',
-        '<input type="hidden" name="csrf" value="', safeCsrf, '" />',
+        '<input type="hidden" name="csrf" value="',
+        safeCsrf,
+        '" />',
         '<h1 class="title">Grant access?</h1>',
-        '<p class="subtitle"><span class="client">', safeName, '</span> ',
+        '<p class="subtitle"><span class="client">',
+        safeName,
+        '</span> ',
         'is requesting access to your SlopDogs account. ',
         'It will be able to read and modify Kennels you own.</p>',
-        '<div><span class="scope">', safeScope, '</span></div>',
+        '<div><span class="scope">',
+        safeScope,
+        '</span></div>',
         '<div class="actions">',
         '<button class="btn btn-deny" name="decision" value="deny" type="submit">Deny</button>',
         '<button class="btn btn-approve" name="decision" value="approve" type="submit">Approve</button>',
@@ -56,10 +58,5 @@ export function renderConsentPage(opts: {
 }
 
 function escapeHtml(s: string): string {
-    return s
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }

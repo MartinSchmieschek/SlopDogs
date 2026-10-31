@@ -9,10 +9,10 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from "@slopdogs/core";
-import { getTrending } from "./gitHubTrendingApiClient";
-import type { GitHubTrendingResult } from "./interfaces/gitHubTrendingTypes";
-import { GitHubTrendingQueryPact, type GitHubTrendingQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { getTrending } from './gitHubTrendingApiClient';
+import type { GitHubTrendingResult } from './interfaces/gitHubTrendingTypes';
+import { GitHubTrendingQueryPact, type GitHubTrendingQuery } from './pacts';
 
 /**
  * Arr, the GitHubTrendingRetriever — a spectral hound that sniffs out
@@ -34,7 +34,7 @@ export class GitHubTrendingRetriever extends Dog<GitHubTrendingResult> implement
     }
 
     get icon(): string | undefined {
-        return "\uD83D\uDC19";
+        return '\uD83D\uDC19';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -46,17 +46,15 @@ export class GitHubTrendingRetriever extends Dog<GitHubTrendingResult> implement
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<GitHubTrendingResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(GitHubTrendingQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(GitHubTrendingQueryPact, d));
         const query = (queryDog?.collected as GitHubTrendingQuery | undefined) ?? ({} as GitHubTrendingQuery);
 
         const language = query['language'];
-        const since = query['since'] ?? "daily";
+        const since = query['since'] ?? 'daily';
         const key = `github-trending:${language ?? 'all'}:${since}`;
 
         if (this.cacheHandler) {
-            return this.cacheHandler.getOrFetch(key, 15 * 60_000, () =>
-                getTrending(language, since)
-            );
+            return this.cacheHandler.getOrFetch(key, 15 * 60_000, () => getTrending(language, since));
         }
         return getTrending(language, since);
     };

@@ -13,10 +13,10 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from "@slopdogs/core";
-import { getRegionalNews } from "./newsApiClient";
-import type { RegionalNewsResult } from "./interfaces/newsTypes";
-import { RegionalNewsQueryPact, type RegionalNewsQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { getRegionalNews } from './newsApiClient';
+import type { RegionalNewsResult } from './interfaces/newsTypes';
+import { RegionalNewsQueryPact, type RegionalNewsQuery } from './pacts';
 
 /**
  * Arr, the RegionalNewsRetriever — a spectral hound that sniffs out
@@ -40,7 +40,7 @@ export class RegionalNewsRetriever extends Dog<RegionalNewsResult> implements IC
     }
 
     get icon(): string | undefined {
-        return "\uD83D\uDCF0";
+        return '\uD83D\uDCF0';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -52,7 +52,7 @@ export class RegionalNewsRetriever extends Dog<RegionalNewsResult> implements IC
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<RegionalNewsResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(RegionalNewsQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(RegionalNewsQueryPact, d));
         const query = (queryDog?.collected as RegionalNewsQuery | undefined) ?? ({} as RegionalNewsQuery);
 
         const searchQuery = query['query'];
@@ -66,9 +66,7 @@ export class RegionalNewsRetriever extends Dog<RegionalNewsResult> implements IC
         const key = `news:${searchQuery ?? 'custom'}:${feedUrls ?? 'google'}:${limit}`;
 
         if (this.cacheHandler) {
-            return this.cacheHandler.getOrFetch(key, 15 * 60_000, () =>
-                getRegionalNews(searchQuery ?? '', feedUrls, limit)
-            );
+            return this.cacheHandler.getOrFetch(key, 15 * 60_000, () => getRegionalNews(searchQuery ?? '', feedUrls, limit));
         }
         return getRegionalNews(searchQuery ?? '', feedUrls, limit);
     };

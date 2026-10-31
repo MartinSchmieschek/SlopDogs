@@ -13,18 +13,13 @@
 import { Router, type Request, type Response } from 'express';
 import type { PrismaClient } from '../../store/generated/prisma-auth-client';
 import { randomBytes, createHash } from 'crypto';
-import {
-    issueAccessToken,
-    newRefreshToken,
-    hashRefreshToken,
-    verifyAccessToken,
-} from './jwt';
+import { issueAccessToken, newRefreshToken, hashRefreshToken, verifyAccessToken } from './jwt';
 import { loadClient, isRedirectAllowed, registerClient } from './clients';
 import { renderConsentPage } from './consent-page';
 
-const ACCESS_TTL_SEC = 3600;            // 1 hour
+const ACCESS_TTL_SEC = 3600; // 1 hour
 const REFRESH_TTL_SEC = 60 * 60 * 24 * 30; // 30 days
-const CODE_TTL_SEC = 600;               // 10 minutes
+const CODE_TTL_SEC = 600; // 10 minutes
 
 declare module 'express-session' {
     interface SessionData {
@@ -67,32 +62,19 @@ export function createOAuthRouter(prisma: PrismaClient): Router {
 
     // === GET /auth/authorize — browser flow entry point ===
     router.get('/authorize', async (req: Request, res: Response) => {
-        const {
-            response_type,
-            client_id,
-            redirect_uri,
-            state,
-            scope,
-            code_challenge,
-            code_challenge_method,
-        } = req.query as Record<string, string>;
+        const { response_type, client_id, redirect_uri, state, scope, code_challenge, code_challenge_method } = req.query as Record<
+            string,
+            string
+        >;
 
         if (response_type !== 'code') {
             return badRequest(res, 'unsupported_response_type', 'only "code" is supported');
         }
         if (!client_id || !redirect_uri || !code_challenge) {
-            return badRequest(
-                res,
-                'invalid_request',
-                'client_id, redirect_uri and code_challenge are required',
-            );
+            return badRequest(res, 'invalid_request', 'client_id, redirect_uri and code_challenge are required');
         }
         if (code_challenge_method !== 'S256') {
-            return badRequest(
-                res,
-                'invalid_request',
-                'code_challenge_method must be S256 (PKCE)',
-            );
+            return badRequest(res, 'invalid_request', 'code_challenge_method must be S256 (PKCE)');
         }
 
         const client = await loadClient(prisma, client_id);
@@ -121,11 +103,13 @@ export function createOAuthRouter(prisma: PrismaClient): Router {
         };
 
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.send(renderConsentPage({
-            clientName: client.name,
-            scope: scope || 'default',
-            csrf,
-        }));
+        res.send(
+            renderConsentPage({
+                clientName: client.name,
+                scope: scope || 'default',
+                csrf,
+            }),
+        );
     });
 
     // === POST /auth/authorize — consent submit ===
@@ -203,30 +187,31 @@ export function createOAuthRouter(prisma: PrismaClient): Router {
         if (hint !== 'refresh_token') {
             const claims = await verifyAccessToken(token);
             if (claims) {
-                await prisma.accessToken.update({
-                    where: { jti: claims.jti },
-                    data: { revokedAt: new Date() },
-                }).catch(() => undefined);
+                await prisma.accessToken
+                    .update({
+                        where: { jti: claims.jti },
+                        data: { revokedAt: new Date() },
+                    })
+                    .catch(() => undefined);
                 res.status(200).end();
                 return;
             }
         }
         // Try as refresh token.
         const hashed = hashRefreshToken(token);
-        await prisma.refreshToken.update({
-            where: { token: hashed },
-            data: { revokedAt: new Date() },
-        }).catch(() => undefined);
+        await prisma.refreshToken
+            .update({
+                where: { token: hashed },
+                data: { revokedAt: new Date() },
+            })
+            .catch(() => undefined);
         res.status(200).end();
     });
 
     return router;
 }
 
-async function authenticateClient(
-    prisma: PrismaClient,
-    req: Request,
-): Promise<{ clientId: string; isPublic: boolean } | null> {
+async function authenticateClient(prisma: PrismaClient, req: Request): Promise<{ clientId: string; isPublic: boolean } | null> {
     const bodyId = req.body?.client_id as string | undefined;
     const bodySecret = req.body?.client_secret as string | undefined;
 

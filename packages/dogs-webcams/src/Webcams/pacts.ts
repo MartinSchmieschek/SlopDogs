@@ -9,7 +9,7 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** Query parameters for the webcam hunt */
 export interface WebcamQuery {
@@ -24,7 +24,4 @@ export interface WebcamQuery {
 }
 
 /** Der Pact fuer Webcam-Queries */
-export const WebcamQueryPact = createPact<WebcamQuery>(
-    "WebcamQueryProvider",
-    { fromSourceType: "WebcamQuery" }
-);
+export const WebcamQueryPact = createPact<WebcamQuery>('WebcamQueryProvider', { fromSourceType: 'WebcamQuery' });

@@ -3,21 +3,14 @@
  * Optional `shop: ['supermarket','bakery',…]` filters Overpass-side, narrows cache partition.
  */
 
-import { type IHuntingSeason } from "@slopdogs/core";
-import osmtogeojson from "osmtogeojson";
-import type { FeatureCollection, GeometryObject } from "geojson";
-import { OsmFeatureRetriever, type OsmQueryBase } from "../osm/base/OsmFeatureRetriever";
-import type { OverpassRawElement } from "../osm/base/overpassMirrorChain";
-import { OsmShopsPact, type OsmShopsQueryInput } from "./osmGeometryPacts";
-import {
-    circleToBoundingBox,
-    clampGeometryRadiusM,
-    type BoundingBox,
-} from "./overpassGeometryCore";
-import {
-    attachGeometryHelpers,
-    type GeometryResultHelpers,
-} from "./osmGeometryHelpers";
+import { type IHuntingSeason } from '@slopdogs/core';
+import osmtogeojson from 'osmtogeojson';
+import type { FeatureCollection, GeometryObject } from 'geojson';
+import { OsmFeatureRetriever, type OsmQueryBase } from '../osm/base/OsmFeatureRetriever';
+import type { OverpassRawElement } from '../osm/base/overpassMirrorChain';
+import { OsmShopsPact, type OsmShopsQueryInput } from './osmGeometryPacts';
+import { circleToBoundingBox, clampGeometryRadiusM, type BoundingBox } from './overpassGeometryCore';
+import { attachGeometryHelpers, type GeometryResultHelpers } from './osmGeometryHelpers';
 
 /**
  * Curated set of common `shop=*` values — sourced from Taginfo top-in-wiki frequencies.
@@ -25,56 +18,56 @@ import {
  * any other value matching `[a-z0-9_:]+` is accepted as a custom long-tail tag.
  */
 export enum OsmShopValue {
-    Convenience = "convenience",
-    Supermarket = "supermarket",
-    Clothes = "clothes",
-    Hairdresser = "hairdresser",
-    CarRepair = "car_repair",
-    Bakery = "bakery",
-    Beauty = "beauty",
-    Car = "car",
-    Hardware = "hardware",
-    Butcher = "butcher",
-    Kiosk = "kiosk",
-    MobilePhone = "mobile_phone",
-    Furniture = "furniture",
-    CarParts = "car_parts",
-    Alcohol = "alcohol",
-    VarietyStore = "variety_store",
-    Florist = "florist",
-    Electronics = "electronics",
-    Optician = "optician",
-    DoItYourself = "doityourself",
-    Jewelry = "jewelry",
-    Shoes = "shoes",
-    Books = "books",
-    Bicycle = "bicycle",
-    Pet = "pet",
-    Toys = "toys",
-    Sports = "sports",
-    Confectionery = "confectionery",
-    SecondHand = "second_hand",
-    Stationery = "stationery",
-    Tobacco = "tobacco",
-    Tattoo = "tattoo",
-    Gift = "gift",
-    Greengrocer = "greengrocer",
-    Travel_Agency = "travel_agency",
-    DryCleaning = "dry_cleaning",
-    Tailor = "tailor",
-    Laundry = "laundry",
-    Wine = "wine",
-    Beverages = "beverages",
+    Convenience = 'convenience',
+    Supermarket = 'supermarket',
+    Clothes = 'clothes',
+    Hairdresser = 'hairdresser',
+    CarRepair = 'car_repair',
+    Bakery = 'bakery',
+    Beauty = 'beauty',
+    Car = 'car',
+    Hardware = 'hardware',
+    Butcher = 'butcher',
+    Kiosk = 'kiosk',
+    MobilePhone = 'mobile_phone',
+    Furniture = 'furniture',
+    CarParts = 'car_parts',
+    Alcohol = 'alcohol',
+    VarietyStore = 'variety_store',
+    Florist = 'florist',
+    Electronics = 'electronics',
+    Optician = 'optician',
+    DoItYourself = 'doityourself',
+    Jewelry = 'jewelry',
+    Shoes = 'shoes',
+    Books = 'books',
+    Bicycle = 'bicycle',
+    Pet = 'pet',
+    Toys = 'toys',
+    Sports = 'sports',
+    Confectionery = 'confectionery',
+    SecondHand = 'second_hand',
+    Stationery = 'stationery',
+    Tobacco = 'tobacco',
+    Tattoo = 'tattoo',
+    Gift = 'gift',
+    Greengrocer = 'greengrocer',
+    Travel_Agency = 'travel_agency',
+    DryCleaning = 'dry_cleaning',
+    Tailor = 'tailor',
+    Laundry = 'laundry',
+    Wine = 'wine',
+    Beverages = 'beverages',
 }
 
 const SHOP_SET = new Set<string>(Object.values(OsmShopValue));
-const SHOP_ALL = "all";
+const SHOP_ALL = 'all';
 
 function parseShopList(raw: unknown): string[] {
     if (raw == null) return [SHOP_ALL];
     let parsed: string[] | null = null;
     if (Array.isArray(raw)) parsed = raw.map((x) => String(x).trim()).filter(Boolean);
-    else if (typeof raw === "string") {
+    else if (typeof raw === 'string') {
         const t = raw.trim();
         if (!t || t === SHOP_ALL) return [SHOP_ALL];
         try {
@@ -103,11 +96,11 @@ export interface OsmShopsResult {
 export type OsmShopsResultWithHelpers = OsmShopsResult & GeometryResultHelpers<OsmShopsResult>;
 
 export class OsmShopsRetriever extends OsmFeatureRetriever<OsmShopsResult, typeof OsmShopsPact> {
-    protected readonly layer = "shops";
+    protected readonly layer = 'shops';
     protected readonly defaultRadiusM = 500;
     protected readonly maxRadiusM = 5000;
     protected readonly queryPactClass = OsmShopsPact;
-    protected readonly outStatement = "out geom;";
+    protected readonly outStatement = 'out geom;';
 
     get name(): string {
         return OsmShopsRetriever.name;
@@ -118,7 +111,7 @@ export class OsmShopsRetriever extends OsmFeatureRetriever<OsmShopsResult, typeo
     }
 
     get icon(): string | undefined {
-        return "🛒";
+        return '🛒';
     }
 
     protected parseQuery(season: IHuntingSeason): OsmQueryBase {
@@ -126,15 +119,12 @@ export class OsmShopsRetriever extends OsmFeatureRetriever<OsmShopsResult, typeo
         const query = (queryDog?.collected as OsmShopsQueryInput | undefined) ?? ({} as OsmShopsQueryInput);
         const lat = parseFloat(query.lat);
         const lng = parseFloat(query.lng);
-        const radiusM = clampGeometryRadiusM(parseFloat(query.radius ?? ""));
+        const radiusM = clampGeometryRadiusM(parseFloat(query.radius ?? ''));
         const shop = parseShopList(query.shop);
         return { lat, lng, radiusM, facets: shop };
     }
 
-    protected buildOverpassBodyForTile(
-        bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number },
-        facets: string[],
-    ): string {
+    protected buildOverpassBodyForTile(bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number }, facets: string[]): string {
         const bboxClause = `(${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng})`;
         const lines: string[] = [];
         for (const f of facets) {
@@ -144,11 +134,11 @@ export class OsmShopsRetriever extends OsmFeatureRetriever<OsmShopsResult, typeo
                 lines.push(`  nwr["shop"="${f}"]${bboxClause};`);
             }
         }
-        return lines.join("\n");
+        return lines.join('\n');
     }
 
     protected classifyElementFacets(el: OverpassRawElement, fetchedFacets: string[]): string[] {
-        const v = el.tags?.["shop"];
+        const v = el.tags?.['shop'];
         if (!v) return [];
         const matches: string[] = [];
         for (const f of fetchedFacets) {

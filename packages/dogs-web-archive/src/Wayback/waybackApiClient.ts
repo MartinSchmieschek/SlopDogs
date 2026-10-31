@@ -1,13 +1,13 @@
-import type { WaybackApiResponse, WaybackResult } from "./interfaces/waybackTypes";
+import type { WaybackApiResponse, WaybackResult } from './interfaces/waybackTypes';
 
-const WAYBACK_BASE = "https://archive.org/wayback/available";
+const WAYBACK_BASE = 'https://archive.org/wayback/available';
 
 export async function getWaybackSnapshot(url: string, timestamp?: string): Promise<WaybackResult> {
     if (!url || !url.trim()) {
         throw new Error("WaybackRetriever: 'url' is required");
     }
     const params = new URLSearchParams({ url: url.trim() });
-    if (timestamp && timestamp.trim()) params.set("timestamp", timestamp.trim());
+    if (timestamp && timestamp.trim()) params.set('timestamp', timestamp.trim());
 
     const full = `${WAYBACK_BASE}?${params.toString()}`;
 
@@ -16,17 +16,17 @@ export async function getWaybackSnapshot(url: string, timestamp?: string): Promi
     let res: Response;
     try {
         res = await fetch(full, {
-            headers: { "Accept": "application/json", "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)" },
+            headers: { Accept: 'application/json', 'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)' },
             signal: controller.signal,
         });
     } finally {
         clearTimeout(timer);
     }
     if (!res.ok) {
-        const text = await res.text().catch(() => "");
+        const text = await res.text().catch(() => '');
         throw new Error(`wayback failed: ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
     }
-    const data = await res.json() as WaybackApiResponse;
+    const data = (await res.json()) as WaybackApiResponse;
     const closest = data.archived_snapshots?.closest;
     return {
         url: data.url ?? url,

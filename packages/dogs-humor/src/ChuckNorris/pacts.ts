@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** Abfrage fuer chucknorris.io */
 export interface ChuckNorrisQuery {
@@ -6,7 +6,4 @@ export interface ChuckNorrisQuery {
     category?: string;
 }
 
-export const ChuckNorrisQueryPact = createPact<ChuckNorrisQuery>(
-    "ChuckNorrisQueryProvider",
-    { fromSourceType: "ChuckNorrisQuery" }
-);
+export const ChuckNorrisQueryPact = createPact<ChuckNorrisQuery>('ChuckNorrisQueryProvider', { fromSourceType: 'ChuckNorrisQuery' });

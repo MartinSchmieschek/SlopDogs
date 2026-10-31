@@ -124,11 +124,7 @@ return {
         name: 'Compare Locations',
         description: 'Zwei Adressen vergleichen: Kennel ruft Kennel auf — Wetter, Luft, OEPNV, Kultur im Vergleich',
         emoji: '\u2696\uFE0F',
-        dogIds: [
-            comparatorDogId,
-            BASE_DOG_PREFIX + 'QueryRetriever',
-            fetcherDogId,
-        ],
+        dogIds: [comparatorDogId, BASE_DOG_PREFIX + 'QueryRetriever', fetcherDogId],
         defaultQuery: { from: 'Koelner Dom', to: 'Brandenburger Tor Berlin' },
         createdAt: new Date(),
         updatedAt: new Date(),

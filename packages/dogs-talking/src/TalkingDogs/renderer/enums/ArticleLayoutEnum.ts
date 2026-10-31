@@ -9,8 +9,8 @@
 
 /** Arr, the slots of an article — image, headline, body, and the dread "Read More" beckoning ye deeper. */
 export enum ArticleLayoutEnum {
-    HeaderImage = "HeaderImage",
-    Headline = "Headline",
-    Paragraph = "Paragraph",
-    ReadMore = "ReadMore",
-  }
+    HeaderImage = 'HeaderImage',
+    Headline = 'Headline',
+    Paragraph = 'Paragraph',
+    ReadMore = 'ReadMore',
+}

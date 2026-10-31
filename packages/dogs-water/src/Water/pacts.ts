@@ -4,7 +4,7 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** GPS coordinates for marine/water query */
 export interface WaterQuery {
@@ -15,7 +15,4 @@ export interface WaterQuery {
 }
 
 /** The Pact for Water queries */
-export const WaterQueryPact = createPact<WaterQuery>(
-    "WaterQueryProvider",
-    { fromSourceType: "WaterQuery" }
-);
+export const WaterQueryPact = createPact<WaterQuery>('WaterQueryProvider', { fromSourceType: 'WaterQuery' });

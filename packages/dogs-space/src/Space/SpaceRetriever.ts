@@ -9,10 +9,10 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from "@slopdogs/core";
-import { getSpace } from "./spaceApiClient";
-import type { SpaceResult } from "./interfaces/spaceTypes";
-import { SpaceQueryPact, type SpaceQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { getSpace } from './spaceApiClient';
+import type { SpaceResult } from './interfaces/spaceTypes';
+import { SpaceQueryPact, type SpaceQuery } from './pacts';
 
 /**
  * Arr, the SpaceRetriever — a spectral hound that tracks the ISS
@@ -34,7 +34,7 @@ export class SpaceRetriever extends Dog<SpaceResult> implements ICacheable {
     }
 
     get icon(): string | undefined {
-        return "\uD83D\uDE80";
+        return '\uD83D\uDE80';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -46,16 +46,14 @@ export class SpaceRetriever extends Dog<SpaceResult> implements ICacheable {
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<SpaceResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(SpaceQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(SpaceQueryPact, d));
         const query = (queryDog?.collected as SpaceQuery | undefined) ?? ({} as SpaceQuery);
 
         const bodyName = query['body'];
         const key = `space:${(bodyName ?? 'overview').toLowerCase().trim()}`;
 
         if (this.cacheHandler) {
-            return this.cacheHandler.getOrFetch(key, 60_000, () =>
-                getSpace(bodyName)
-            );
+            return this.cacheHandler.getOrFetch(key, 60_000, () => getSpace(bodyName));
         }
         return getSpace(bodyName);
     };

@@ -36,7 +36,7 @@ export interface ChannelState {
      */
     wsUrl: string;
     /** Name des Query-Parameters, der die Einladung in eine Lobby traegt. */
-    channelParam: "channelId";
+    channelParam: 'channelId';
     /**
      * Fertiger Einladungs-Query: `"?channelId=" + encodeURIComponent(channelId)`.
      * Immer gefuellt — auch wenn die Lobby mit diesem Aufruf frisch und zufaellig entstanden ist.

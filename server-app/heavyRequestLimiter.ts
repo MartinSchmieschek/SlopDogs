@@ -23,14 +23,7 @@
  */
 
 import type { Application, Request, RequestHandler, Response } from 'express';
-import {
-    AdmissionDenial,
-    RunAdmission,
-    RunGates,
-    RunSource,
-    SourceRunGate,
-    positiveIntFromEnv,
-} from './runAdmission';
+import { AdmissionDenial, RunAdmission, RunGates, RunSource, SourceRunGate, positiveIntFromEnv } from './runAdmission';
 
 /** Default-Wartebudget der Schlangen: lang — warten und seriell weiterlaufen statt abweisen. */
 const DEFAULT_QUEUE_TIMEOUT_MS = 120_000;
@@ -68,18 +61,13 @@ export class HeavyRequestLimiter {
     ];
 
     /** Darunter die Kennel-LAEUFE — nur sie zaehlen gegen die Sperre je Quelle, die UI-Listen nicht. */
-    private static readonly HEAVY_RUN_PATHS: readonly RegExp[] = [
-        /^\/api\/kennels\/[^/]+\/(run|execute)\/?$/,
-    ];
+    private static readonly HEAVY_RUN_PATHS: readonly RegExp[] = [/^\/api\/kennels\/[^/]+\/(run|execute)\/?$/];
 
     /**
      * Die oeffentlichen Laeufe: `/k/:id` und die Spec-Erzeugung `/k/:id/openapi.json`.
      * `/k/:id/docs` liefert nur statisches HTML und bleibt ungebremst. Disjunkt zu HEAVY_PATHS.
      */
-    private static readonly PUBLIC_PATHS: readonly RegExp[] = [
-        /^\/k\/[^/]+\/?$/,
-        /^\/k\/[^/]+\/openapi\.json\/?$/,
-    ];
+    private static readonly PUBLIC_PATHS: readonly RegExp[] = [/^\/k\/[^/]+\/?$/, /^\/k\/[^/]+\/openapi\.json\/?$/];
 
     /** UI-Listen und Runs der Werkstatt. Mit `gates` teilt die Schleuse Topf und Quellen-Sperre mit MCP. */
     public static heavy(gates?: RunGates): HeavyRequestLimiter {
@@ -122,12 +110,14 @@ export class HeavyRequestLimiter {
         this.methods = options.methods ? new Set(options.methods.map((m) => m.toUpperCase())) : null;
         this.sourcePaths = options.sourcePaths ?? [];
         this.sourceGate = options.sourceGate ?? null;
-        this.admission = options.admission ?? new RunAdmission({
-            name: options.name,
-            maxConcurrent: options.maxConcurrent,
-            queueTimeoutMs: options.queueTimeoutMs,
-            queueMax: options.queueMax ?? DEFAULT_QUEUE_MAX,
-        });
+        this.admission =
+            options.admission ??
+            new RunAdmission({
+                name: options.name,
+                maxConcurrent: options.maxConcurrent,
+                queueTimeoutMs: options.queueTimeoutMs,
+                queueMax: options.queueMax ?? DEFAULT_QUEUE_MAX,
+            });
     }
 
     /**

@@ -11,9 +11,9 @@
  * =========================================================================
  */
 
-import type { BirdObservation, BirdResult } from "./interfaces/birdTypes";
+import type { BirdObservation, BirdResult } from './interfaces/birdTypes';
 
-const EBIRD_BASE = "https://api.ebird.org/v2";
+const EBIRD_BASE = 'https://api.ebird.org/v2';
 
 function getApiKey(): string {
     return process.env.EBIRD_API_KEY ?? '';
@@ -30,9 +30,9 @@ async function fetchEbird(path: string): Promise<any[]> {
     try {
         res = await fetch(url, {
             headers: {
-                "Accept": "application/json",
-                "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)",
-                "X-eBirdApiToken": getApiKey(),
+                Accept: 'application/json',
+                'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)',
+                'X-eBirdApiToken': getApiKey(),
             },
             signal: controller.signal,
         });
@@ -41,11 +41,11 @@ async function fetchEbird(path: string): Promise<any[]> {
     }
 
     if (!res.ok) {
-        const text = await res.text().catch(() => "");
+        const text = await res.text().catch(() => '');
         throw new Error(`eBird failed: ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
     }
 
-    return await res.json() as any[];
+    return (await res.json()) as any[];
 }
 
 /** Parse an eBird observation record into our typed form */
@@ -64,24 +64,14 @@ function parseObservation(raw: any, notable: boolean): BirdObservation {
 }
 
 /** Fetch recent bird observations near GPS coordinates */
-export async function fetchRecentBirds(
-    lat: number,
-    lng: number,
-    radiusKm: number,
-    back: number
-): Promise<BirdObservation[]> {
+export async function fetchRecentBirds(lat: number, lng: number, radiusKm: number, back: number): Promise<BirdObservation[]> {
     const path = `/data/obs/geo/recent?lat=${lat}&lng=${lng}&dist=${radiusKm}&back=${back}`;
     const raw = await fetchEbird(path);
     return raw.map((r: any) => parseObservation(r, false));
 }
 
 /** Fetch notable (rare) bird observations near GPS coordinates */
-export async function fetchNotableBirds(
-    lat: number,
-    lng: number,
-    radiusKm: number,
-    back: number
-): Promise<BirdObservation[]> {
+export async function fetchNotableBirds(lat: number, lng: number, radiusKm: number, back: number): Promise<BirdObservation[]> {
     const path = `/data/obs/geo/recent/notable?lat=${lat}&lng=${lng}&dist=${radiusKm}&back=${back}`;
     const raw = await fetchEbird(path);
     return raw.map((r: any) => parseObservation(r, true));
@@ -91,18 +81,13 @@ export async function fetchNotableBirds(
  * Fetch both recent and notable birds, build a BirdResult.
  * The totalSpecies count is derived from unique speciesCodes in recent observations.
  */
-export async function getBirds(
-    lat: number,
-    lng: number,
-    radiusKm: number = 25,
-    back: number = 14
-): Promise<BirdResult> {
+export async function getBirds(lat: number, lng: number, radiusKm: number = 25, back: number = 14): Promise<BirdResult> {
     const [recent, notable] = await Promise.all([
         fetchRecentBirds(lat, lng, radiusKm, back),
         fetchNotableBirds(lat, lng, radiusKm, back).catch(() => [] as BirdObservation[]),
     ]);
 
-    const uniqueSpecies = new Set(recent.map(o => o.speciesCode));
+    const uniqueSpecies = new Set(recent.map((o) => o.speciesCode));
 
     return {
         recentObservations: recent,

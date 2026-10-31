@@ -11,9 +11,9 @@
  * waiting in the abyss fer a shapeshifter to give them substance.
  */
 
-import { Dog } from "../core/entities/abstractHuntingDog";
-import { IHuntingDog } from "../core/entities/IHuntingDog";
-import { IHuntingSeason } from "../core/entities/IHuntingSeason";
+import { Dog } from '../core/entities/abstractHuntingDog';
+import { IHuntingDog } from '../core/entities/IHuntingDog';
+import { IHuntingSeason } from '../core/entities/IHuntingSeason';
 
 /** Options fer Pacts whose return type is resolved at runtime from TypeScript sources */
 export interface CreatePactFromSourceOptions {
@@ -43,16 +43,22 @@ export function createPact<T>(name: string, typeDef: string): (new () => Dog<T>)
 export function createPact<T>(name: string, options: CreatePactFromSourceOptions): (new () => Dog<T>) & { __isPact: true };
 export function createPact<T>(
     name: string,
-    typeDefOrOptions?: string | CreatePactFromSourceOptions
+    typeDefOrOptions?: string | CreatePactFromSourceOptions,
 ): (new () => Dog<T>) & { __isPact: true } {
     // The PactDog -- a hollow vessel, a promise unfulfilled, an echo in the deep
     class PactDog extends Dog<T> {
-        get name() { return name; }
-        get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] { return []; }
-        get optional(): (new (...args: any[]) => IHuntingDog<unknown>)[] { return []; }
+        get name() {
+            return name;
+        }
+        get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
+            return [];
+        }
+        get optional(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
+            return [];
+        }
         protected yieldCollectorFactory = async (_season: IHuntingSeason): Promise<T> => {
             throw new Error(`Pact '${name}' requires a MimicDog to provide data`);
-        }
+        };
     }
     // Brand the pact with its true name
     Object.defineProperty(PactDog, 'name', { value: name });

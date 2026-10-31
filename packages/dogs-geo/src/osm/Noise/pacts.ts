@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface NoiseQuery {
     lat: string;
@@ -6,7 +6,4 @@ export interface NoiseQuery {
     radius?: string;
 }
 
-export const NoiseQueryPact = createPact<NoiseQuery>(
-    "NoiseQueryProvider",
-    { fromSourceType: "NoiseQuery" }
-);
+export const NoiseQueryPact = createPact<NoiseQuery>('NoiseQueryProvider', { fromSourceType: 'NoiseQuery' });

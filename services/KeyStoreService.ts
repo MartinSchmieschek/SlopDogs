@@ -27,7 +27,11 @@ const CIPHER = 'aes-256-gcm';
 
 /** Ein Fehler des Key-Stores — die Tuer (REST oder MCP) uebersetzt ihn in ihre Sprache. */
 export class KeyStoreError extends Error {
-    constructor(readonly status: number, readonly code: string, message: string) {
+    constructor(
+        readonly status: number,
+        readonly code: string,
+        message: string,
+    ) {
         super(message);
     }
 }
@@ -122,8 +126,8 @@ export class MasterKeyring {
         }
         if (hex.length !== 64) {
             throw new Error(
-                `${name} must be 64 hex chars (32 bytes for AES-256-GCM), got ${hex.length}. Generate one with:\n`
-                + '  node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"',
+                `${name} must be 64 hex chars (32 bytes for AES-256-GCM), got ${hex.length}. Generate one with:\n` +
+                    "  node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"",
             );
         }
         return Buffer.from(hex, 'hex');
@@ -187,8 +191,11 @@ export function normalizeAllowedDomains(input: unknown): string[] {
     const list = Array.isArray(input) ? input : [];
     const out = [...new Set(list.map(normalizeDomain))];
     if (out.length === 0 || out.length > MAX_DOMAINS || out.some((d) => d === null)) {
-        throw new KeyStoreError(400, 'invalid_domains',
-            `allowedDomains: 1-${MAX_DOMAINS} hostnames required (api.example.com or *.example.com; no IPs, no single labels).`);
+        throw new KeyStoreError(
+            400,
+            'invalid_domains',
+            `allowedDomains: 1-${MAX_DOMAINS} hostnames required (api.example.com or *.example.com; no IPs, no single labels).`,
+        );
     }
     return out as string[];
 }
@@ -200,7 +207,10 @@ export function hostAllowedBy(host: string, allowedDomains: string[]): boolean {
 }
 
 function parseCsv(csv: string | null | undefined): string[] {
-    return (csv || '').split(',').map((s) => s.trim()).filter(Boolean);
+    return (csv || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
 }
 
 /**
@@ -233,7 +243,8 @@ export class KeyStoreService {
         const rawOwner = (env.KEYSTORE_SUPERUSER_OWNER || '').trim();
         const superuserOwner = rawOwner && nodeEnv === 'development' ? rawOwner : null;
         if (rawOwner && !superuserOwner) console.warn(`[KeyStore] KEYSTORE_SUPERUSER_OWNER ignoriert (NODE_ENV=${nodeEnv}; nur lokal).`);
-        if (superuserOwner) console.log('[KeyStore] KEYSTORE_SUPERUSER_OWNER gesetzt — Super-User-Laeufe nutzen die Keys dieses Nutzers (nur lokal).');
+        if (superuserOwner)
+            console.log('[KeyStore] KEYSTORE_SUPERUSER_OWNER gesetzt — Super-User-Laeufe nutzen die Keys dieses Nutzers (nur lokal).');
         return new KeyStoreService(prisma, keyring, { superuserOwner });
     }
 
@@ -269,7 +280,11 @@ export class KeyStoreService {
         const quotaPerDay = KeyStoreService.validQuota(input.quotaPerDay);
         const kennelGrants = KeyStoreService.validGrants(input.kennelGrants);
         if (kennelGrants.length > 0 && quotaPerDay === null) {
-            throw new KeyStoreError(400, 'quota_required', 'kennelGrants need quotaPerDay — a granted key is used by other people, so it gets a daily cap.');
+            throw new KeyStoreError(
+                400,
+                'quota_required',
+                'kennelGrants need quotaPerDay — a granted key is used by other people, so it gets a daily cap.',
+            );
         }
         const sealed = keyring.seal(ownerId, alias, secret);
         const data = {
@@ -324,7 +339,9 @@ export class KeyStoreService {
         } catch (err) {
             if (!this.undecryptableLogged) {
                 this.undecryptableLogged = true;
-                console.error(`[KeyStore] Schluessel nicht entschluesselbar (keyVersion ${row.keyVersion}: ${(err as Error).message}) — falscher Master-Key oder Rotation unvollstaendig. Einmal je Prozess gemeldet.`);
+                console.error(
+                    `[KeyStore] Schluessel nicht entschluesselbar (keyVersion ${row.keyVersion}: ${(err as Error).message}) — falscher Master-Key oder Rotation unvollstaendig. Einmal je Prozess gemeldet.`,
+                );
             }
             throw new KeyStoreError(500, `key_undecryptable:${row.alias}`, `key_undecryptable:${row.alias}`);
         }
@@ -421,7 +438,11 @@ export class KeyStoreService {
 
     private static validAlias(raw: unknown): string {
         if (typeof raw !== 'string' || !KEY_ALIAS_RX.test(raw)) {
-            throw new KeyStoreError(400, 'invalid_alias', 'alias: 1-32 chars, lowercase a-z, 0-9, _ and -, starting with a letter or digit.');
+            throw new KeyStoreError(
+                400,
+                'invalid_alias',
+                'alias: 1-32 chars, lowercase a-z, 0-9, _ and -, starting with a letter or digit.',
+            );
         }
         return raw;
     }

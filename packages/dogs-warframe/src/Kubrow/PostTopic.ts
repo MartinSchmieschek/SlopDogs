@@ -11,7 +11,7 @@ export class PostTopic {
     constructor(
         readonly title: string,
         private readonly bodyMarkdown: string,
-        private readonly media: IPostMedia[]
+        private readonly media: IPostMedia[],
     ) {}
 
     /**

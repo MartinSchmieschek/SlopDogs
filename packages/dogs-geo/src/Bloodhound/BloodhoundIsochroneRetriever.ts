@@ -16,10 +16,10 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey, GEO_CACHE_TTL_OSM_MS } from "@slopdogs/core";
-import { BloodhoundIsochronePact, BloodhoundProfile, DEFAULT_BLOODHOUND_PROFILE, type BloodhoundIsochroneInput } from "./pacts";
-import { calculateIsochrone } from "./routeCalculator";
-import type { BloodhoundIsochroneResult, IsochroneFeatureResult } from "./interfaces/bloodhoundTypes";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey, GEO_CACHE_TTL_OSM_MS } from '@slopdogs/core';
+import { BloodhoundIsochronePact, BloodhoundProfile, DEFAULT_BLOODHOUND_PROFILE, type BloodhoundIsochroneInput } from './pacts';
+import { calculateIsochrone } from './routeCalculator';
+import type { BloodhoundIsochroneResult, IsochroneFeatureResult } from './interfaces/bloodhoundTypes';
 
 /**
  * Arr, the BloodhoundIsochroneRetriever — a cursed hound that charts the reach
@@ -34,7 +34,9 @@ export class BloodhoundIsochroneRetriever extends Dog<BloodhoundIsochroneResult>
     constructor() {
         super();
         if (!process.env.ORS_API_KEYS?.trim()) {
-            throw new Error('BloodhoundIsochroneRetriever: ORS_API_KEYS not set. Get a free key at https://openrouteservice.org/dev/#/signup');
+            throw new Error(
+                'BloodhoundIsochroneRetriever: ORS_API_KEYS not set. Get a free key at https://openrouteservice.org/dev/#/signup',
+            );
         }
     }
 
@@ -53,7 +55,7 @@ export class BloodhoundIsochroneRetriever extends Dog<BloodhoundIsochroneResult>
 
     /** The sigil of our vessel, glimpsed in luminous space of blackened stars */
     get icon(): string | undefined {
-        return "\u23F1\uFE0F";
+        return '\u23F1\uFE0F';
     }
 
     /** The pacts we be bound to — eldritch accords no crew member can escape */
@@ -81,8 +83,12 @@ export class BloodhoundIsochroneRetriever extends Dog<BloodhoundIsochroneResult>
      * but we mortal crew prefer [lat, lng].
      */
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<BloodhoundIsochroneResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(BloodhoundIsochronePact, d));
-        const input: BloodhoundIsochroneInput = (queryDog?.collected as BloodhoundIsochroneInput | undefined) ?? { lat: '', lng: '', range: '' };
+        const queryDog = season.exhausted.find((d) => this.matchesParent(BloodhoundIsochronePact, d));
+        const input: BloodhoundIsochroneInput = (queryDog?.collected as BloodhoundIsochroneInput | undefined) ?? {
+            lat: '',
+            lng: '',
+            range: '',
+        };
 
         const lat = parseFloat(input.lat);
         const lng = parseFloat(input.lng);
@@ -96,19 +102,17 @@ export class BloodhoundIsochroneRetriever extends Dog<BloodhoundIsochroneResult>
 
         // Der Isochrone-Radius haengt von range ab; wir bucketen den Startpunkt
         // auf einem 100 m-Grid, sodass GPS-Jitter das Cache-Hit nicht zerschlaegt.
-        const key = geoBucketKey("isochrone", lat, lng, 100, {
+        const key = geoBucketKey('isochrone', lat, lng, 100, {
             extras: { profile, range: String(range) },
         });
 
         const fetchIsochrone = async (): Promise<BloodhoundIsochroneResult> => {
             const response = await calculateIsochrone(lat, lng, profile, range);
 
-            const features: IsochroneFeatureResult[] = response.features.map(feature => ({
-                coordinates: feature.geometry.coordinates[0].map(
-                    coord => ({ lat: coord[1], lng: coord[0] })
-                ),
+            const features: IsochroneFeatureResult[] = response.features.map((feature) => ({
+                coordinates: feature.geometry.coordinates[0].map((coord) => ({ lat: coord[1], lng: coord[0] })),
                 value: feature.properties.value,
-                center: { lat: feature.properties.center[1], lng: feature.properties.center[0] }
+                center: { lat: feature.properties.center[1], lng: feature.properties.center[0] },
             }));
 
             return { features, raw: response };

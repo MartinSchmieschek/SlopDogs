@@ -75,9 +75,7 @@ export class AclError extends Error {
  * Frozen-Sperre, Nutzer-Aufloesung, Speichern als neue Version. MCP-Werkzeuge und REST teilen sie.
  */
 export class AclManager {
-    constructor(
-        private readonly deps: Pick<ToolDeps, 'kennelsController' | 'nodesController' | 'prisma'>,
-    ) {}
+    constructor(private readonly deps: Pick<ToolDeps, 'kennelsController' | 'nodesController' | 'prisma'>) {}
 
     async resolveUser(ref: string): Promise<ResolvedUser | null> {
         if (!ref || typeof ref !== 'string') return null;
@@ -159,8 +157,10 @@ export class AclManager {
         const viewers = parseList(entity.viewers);
         const runners = parseList(entity.runners);
         // Die hoechste Stufe gewinnt (3.5.7): ein Editor wird nicht zusaetzlich reader oder runner.
-        if (listRole !== 'editor' && editors.includes(user.id)) return { entity_type: entityType, id, action: `redundant_editor_is_${listRole}`, user };
-        if (listRole === 'runner' && viewers.includes(user.id)) return { entity_type: entityType, id, action: 'redundant_viewer_is_runner', user };
+        if (listRole !== 'editor' && editors.includes(user.id))
+            return { entity_type: entityType, id, action: `redundant_editor_is_${listRole}`, user };
+        if (listRole === 'runner' && viewers.includes(user.id))
+            return { entity_type: entityType, id, action: 'redundant_viewer_is_runner', user };
         const current = parseList(entity[LIST_COLUMN[listRole]]);
         if (current.includes(user.id)) return { entity_type: entityType, id, action: `already_${listRole}`, user };
         await this.save(entityType, id, { [LIST_COLUMN[listRole]]: serializeList([...current, user.id]) });
@@ -268,12 +268,7 @@ export class AclManager {
         const editors = parseList(entity.editors);
         const viewers = parseList(entity.viewers);
         const runners = parseList(entity.runners);
-        const allIds = [
-            ...(entity.ownerId ? [entity.ownerId as string] : []),
-            ...editors,
-            ...viewers,
-            ...runners,
-        ];
+        const allIds = [...(entity.ownerId ? [entity.ownerId as string] : []), ...editors, ...viewers, ...runners];
         return {
             ok: true,
             visibility: entity.visibility ?? 'public',
@@ -319,9 +314,16 @@ export function getAclTools(): ToolDef[] {
                     role: { type: 'string', enum: ['editor', 'reader', 'viewer', 'runner', 'owner'] },
                 },
             },
-            handler: async (args, ctx, deps) => asTool(() =>
-                new AclManager(deps).grant(args.entity_type as EntityType, String(args.id), String(args.user), args.role as AclRole, ctx),
-            ),
+            handler: async (args, ctx, deps) =>
+                asTool(() =>
+                    new AclManager(deps).grant(
+                        args.entity_type as EntityType,
+                        String(args.id),
+                        String(args.user),
+                        args.role as AclRole,
+                        ctx,
+                    ),
+                ),
         },
         {
             name: 'revoke_access',
@@ -337,23 +339,29 @@ export function getAclTools(): ToolDef[] {
                     role: { type: 'string', enum: ['editor', 'reader', 'viewer', 'runner'] },
                 },
             },
-            handler: async (args, ctx, deps) => asTool(() =>
-                new AclManager(deps).revoke(args.entity_type as EntityType, String(args.id), String(args.user), args.role as AclRole, ctx),
-            ),
+            handler: async (args, ctx, deps) =>
+                asTool(() =>
+                    new AclManager(deps).revoke(
+                        args.entity_type as EntityType,
+                        String(args.id),
+                        String(args.user),
+                        args.role as AclRole,
+                        ctx,
+                    ),
+                ),
         },
         {
             name: 'release_ownership',
             description:
-                'Releases ownership of a kennel or node — sets ownerId back to null, returning the entity to community mode (any logged-in user reads + edits; only the super-user manages its access or freezes it). Only the current owner (or super-user) can release; not while frozen. The entity\'s editors[], viewers[] and runners[] are kept intact.',
+                "Releases ownership of a kennel or node — sets ownerId back to null, returning the entity to community mode (any logged-in user reads + edits; only the super-user manages its access or freezes it). Only the current owner (or super-user) can release; not while frozen. The entity's editors[], viewers[] and runners[] are kept intact.",
             inputSchema: {
                 type: 'object',
                 required: ['entity_type', 'id'],
                 additionalProperties: false,
                 properties: { ...ENTITY_ARGS },
             },
-            handler: async (args, ctx, deps) => asTool(() =>
-                new AclManager(deps).release(args.entity_type as EntityType, String(args.id), ctx),
-            ),
+            handler: async (args, ctx, deps) =>
+                asTool(() => new AclManager(deps).release(args.entity_type as EntityType, String(args.id), ctx)),
         },
         {
             name: 'freeze_entity',
@@ -365,9 +373,8 @@ export function getAclTools(): ToolDef[] {
                 additionalProperties: false,
                 properties: { ...ENTITY_ARGS },
             },
-            handler: async (args, ctx, deps) => asTool(() =>
-                new AclManager(deps).setFrozen(args.entity_type as EntityType, String(args.id), true, ctx),
-            ),
+            handler: async (args, ctx, deps) =>
+                asTool(() => new AclManager(deps).setFrozen(args.entity_type as EntityType, String(args.id), true, ctx)),
         },
         {
             name: 'unfreeze_entity',
@@ -379,9 +386,8 @@ export function getAclTools(): ToolDef[] {
                 additionalProperties: false,
                 properties: { ...ENTITY_ARGS },
             },
-            handler: async (args, ctx, deps) => asTool(() =>
-                new AclManager(deps).setFrozen(args.entity_type as EntityType, String(args.id), false, ctx),
-            ),
+            handler: async (args, ctx, deps) =>
+                asTool(() => new AclManager(deps).setFrozen(args.entity_type as EntityType, String(args.id), false, ctx)),
         },
         {
             name: 'list_collaborators',
@@ -430,12 +436,13 @@ export function getAclTools(): ToolDef[] {
                     });
                 }
 
-                const users = allIds.length === 0
-                    ? []
-                    : await deps.prisma.user.findMany({
-                        where: { id: { in: Array.from(new Set(allIds)) } },
-                        select: { id: true, email: true, name: true },
-                    });
+                const users =
+                    allIds.length === 0
+                        ? []
+                        : await deps.prisma.user.findMany({
+                              where: { id: { in: Array.from(new Set(allIds)) } },
+                              select: { id: true, email: true, name: true },
+                          });
                 const byId = new Map(users.map((u) => [u.id, u]));
                 const lookup = (uid: string) => byId.get(uid) ?? { id: uid, email: '<unknown>', name: null };
 

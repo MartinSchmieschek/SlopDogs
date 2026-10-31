@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface NpmQuery {
     /** Paketname (e.g. "react", "@angular/core") */
@@ -9,7 +9,4 @@ export interface NpmQuery {
     period?: string;
 }
 
-export const NpmQueryPact = createPact<NpmQuery>(
-    "NpmQueryProvider",
-    { fromSourceType: "NpmQuery" }
-);
+export const NpmQueryPact = createPact<NpmQuery>('NpmQueryProvider', { fromSourceType: 'NpmQuery' });

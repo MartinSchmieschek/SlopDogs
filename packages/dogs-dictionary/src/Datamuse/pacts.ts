@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /**
  * Datamuse hat mehr Parameter als der simple WordQueryPact —
@@ -16,7 +16,4 @@ export interface DatamuseQuery {
     max?: number;
 }
 
-export const DatamuseQueryPact = createPact<DatamuseQuery>(
-    "DatamuseQueryProvider",
-    { fromSourceType: "DatamuseQuery" }
-);
+export const DatamuseQueryPact = createPact<DatamuseQuery>('DatamuseQueryProvider', { fromSourceType: 'DatamuseQuery' });

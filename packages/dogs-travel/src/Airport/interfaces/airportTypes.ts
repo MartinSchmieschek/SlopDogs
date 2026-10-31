@@ -12,7 +12,7 @@ export interface AirportRecord {
 }
 
 export interface AirportResult {
-    queryType: "iata" | "icao";
+    queryType: 'iata' | 'icao';
     query: string;
     airport: AirportRecord;
 }

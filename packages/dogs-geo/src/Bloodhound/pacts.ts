@@ -9,18 +9,18 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** Movement profiles supported by OpenRouteService */
 export enum BloodhoundProfile {
-    FootWalking = "foot-walking",
-    Hiking = "foot-hiking",
-    DrivingCar = "driving-car",
-    CyclingRegular = "cycling-regular",
-    CyclingRoad = "cycling-road",
-    CyclingMountain = "cycling-mountain",
-    CyclingElectric = "cycling-electric",
-    Wheelchair = "wheelchair",
+    FootWalking = 'foot-walking',
+    Hiking = 'foot-hiking',
+    DrivingCar = 'driving-car',
+    CyclingRegular = 'cycling-regular',
+    CyclingRoad = 'cycling-road',
+    CyclingMountain = 'cycling-mountain',
+    CyclingElectric = 'cycling-electric',
+    Wheelchair = 'wheelchair',
 }
 
 /** The default profile when none is specified */
@@ -59,13 +59,11 @@ export interface BloodhoundIsochroneInput {
 }
 
 /** Arr, the route query pact — an anchor binding retriever to its dark source */
-export const BloodhoundRouteQueryPact = createPact<BloodhoundRouteQuery>(
-    "BloodhoundQueryProvider",
-    { fromSourceType: "BloodhoundRouteQuery" }
-);
+export const BloodhoundRouteQueryPact = createPact<BloodhoundRouteQuery>('BloodhoundQueryProvider', {
+    fromSourceType: 'BloodhoundRouteQuery',
+});
 
 /** The isochrone pact — from brooding gulfs are we beheld, by that which bears no name */
-export const BloodhoundIsochronePact = createPact<BloodhoundIsochroneInput>(
-    "BloodhoundIsochroneProvider",
-    { fromSourceType: "BloodhoundIsochroneInput" }
-);
+export const BloodhoundIsochronePact = createPact<BloodhoundIsochroneInput>('BloodhoundIsochroneProvider', {
+    fromSourceType: 'BloodhoundIsochroneInput',
+});

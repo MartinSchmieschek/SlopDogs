@@ -5,12 +5,7 @@
  * @see server-registries/fullRegistry.ts für die volle Liste.
  */
 import { QueryRetriever, BodyRetriever, WebSocketChannelRetriever, ChannelLiveSnippetRetriever } from '@slopdogs/core';
-import {
-    RandomRecipesRetriever,
-    RandomEveryThingRetriever,
-    CountryFlagBlackLab,
-    DishFlagBlackLab,
-} from '@slopdogs/dogs-demo';
+import { RandomRecipesRetriever, RandomEveryThingRetriever, CountryFlagBlackLab, DishFlagBlackLab } from '@slopdogs/dogs-demo';
 import { TalkingDog, LayoutInputPact } from '@slopdogs/dogs-talking';
 import { WarframeAlertsRetriever } from '@slopdogs/dogs-warframe';
 import {

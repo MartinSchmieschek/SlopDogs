@@ -6,7 +6,7 @@
  * the renderer presses on, stitching styles and scripts into a page
  * no mortal eye was meant to witness.
  */
-import { LayoutBase } from "./layouts/LayoutBase";
+import { LayoutBase } from './layouts/LayoutBase';
 
 /** Arr, base styles that anchor the page — no horizontal scrollin' through the abyss, matey. */
 const LAYOUT_BASE_CSS = `
@@ -42,18 +42,18 @@ const LAYOUT_BASE_CSS = `
 
 /** Arr, the LayoutRenderer — helmsman that weaves fragments from brooding gulfs into a full HTML page, corporeal laws unwritten as the void's will takes form. */
 export class LayoutRenderer {
-  /**
-   * Arr, render the given layout into a complete HTML document, matey.
-   * The abyss provides styles, scripts, and markup — through endless faces countless forms, the page emerges whole.
-   * @param layout - The accursed layout vessel whose fragments shall be rendered into the deep HTML
-   * @returns The full HTML string, a cursed scroll conjured from the void
-   */
-  render(layout: LayoutBase<any>): string {
-    const html = layout.renderHtml();
-    const styles = layout.collectStyles();
-    const scripts = layout.collectScripts();
+    /**
+     * Arr, render the given layout into a complete HTML document, matey.
+     * The abyss provides styles, scripts, and markup — through endless faces countless forms, the page emerges whole.
+     * @param layout - The accursed layout vessel whose fragments shall be rendered into the deep HTML
+     * @returns The full HTML string, a cursed scroll conjured from the void
+     */
+    render(layout: LayoutBase<any>): string {
+        const html = layout.renderHtml();
+        const styles = layout.collectStyles();
+        const scripts = layout.collectScripts();
 
-    return `
+        return `
       <html>
         <head>
           <meta charset="utf-8" />
@@ -77,5 +77,5 @@ export class LayoutRenderer {
         </body>
       </html>
     `;
-  }
+    }
 }

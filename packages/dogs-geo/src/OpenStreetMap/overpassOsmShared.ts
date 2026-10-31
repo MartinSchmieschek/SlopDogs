@@ -2,9 +2,9 @@
  * Shared Overpass fetch + element mapping for OSM geo retrievers (landmarks, tracks, vegetation).
  */
 
-import { readOverpassBodyText } from "../osm/base/overpassResponseLimit";
+import { readOverpassBodyText } from '../osm/base/overpassResponseLimit';
 
-export const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+export const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 
 export const DEFAULT_OSM_RADIUS_M = 500;
 export const MAX_OSM_RADIUS_M = 5000;
@@ -17,7 +17,7 @@ export const DEFAULT_OVERPASS_FETCH_TIMEOUT_MS = 30_000;
 
 function parseEnvPositiveInt(name: string, fallback: number): number {
     const v = process.env[name];
-    if (v == null || v === "") return fallback;
+    if (v == null || v === '') return fallback;
     const n = parseInt(v, 10);
     return Number.isFinite(n) && n > 0 ? n : fallback;
 }
@@ -26,7 +26,7 @@ function parseEnvPositiveInt(name: string, fallback: number): number {
  * Overpass `[timeout:N]` (server max runtime). Env: `OVERPASS_QUERY_TIMEOUT_SEC` (default 25).
  */
 export function getOverpassQueryTimeoutSec(): number {
-    return parseEnvPositiveInt("OVERPASS_QUERY_TIMEOUT_SEC", DEFAULT_OVERPASS_QUERY_TIMEOUT_SEC);
+    return parseEnvPositiveInt('OVERPASS_QUERY_TIMEOUT_SEC', DEFAULT_OVERPASS_QUERY_TIMEOUT_SEC);
 }
 
 /**
@@ -34,7 +34,7 @@ export function getOverpassQueryTimeoutSec(): number {
  */
 export function getOverpassFetchTimeoutMs(): number {
     const fromEnv = process.env.OVERPASS_FETCH_TIMEOUT_MS;
-    if (fromEnv != null && fromEnv !== "") {
+    if (fromEnv != null && fromEnv !== '') {
         const n = parseInt(fromEnv, 10);
         if (Number.isFinite(n) && n >= 5_000) return n;
     }
@@ -47,9 +47,9 @@ export function overpassSettingsHeader(): string {
 }
 
 export enum OsmGeoElementType {
-    Node = "node",
-    Way = "way",
-    Relation = "relation",
+    Node = 'node',
+    Way = 'way',
+    Relation = 'relation',
 }
 
 /** A node, way, or relation with a representative point and tags */
@@ -72,11 +72,7 @@ interface OverpassElement {
 }
 
 export function mapOverpassElement(el: OverpassElement): OsmGeoElement | null {
-    if (
-        el.type !== OsmGeoElementType.Node &&
-        el.type !== OsmGeoElementType.Way &&
-        el.type !== OsmGeoElementType.Relation
-    ) {
+    if (el.type !== OsmGeoElementType.Node && el.type !== OsmGeoElementType.Way && el.type !== OsmGeoElementType.Relation) {
         return null;
     }
     let lat: number | undefined;
@@ -92,7 +88,7 @@ export function mapOverpassElement(el: OverpassElement): OsmGeoElement | null {
         return null;
     }
     const tags = el.tags ?? {};
-    const name = tags["name"];
+    const name = tags['name'];
     return {
         type: el.type as OsmGeoElementType,
         id: el.id,
@@ -114,8 +110,7 @@ export function clampOsmRadiusM(parsed: number, defaultM = DEFAULT_OSM_RADIUS_M,
  * POST Overpass interpreter; returns deduped elements. `userAgentLabel` appears in default User-Agent.
  */
 export async function fetchOverpassElements(query: string, userAgentLabel: string): Promise<OsmGeoElement[]> {
-    const userAgent =
-        process.env.OVERPASS_USER_AGENT ?? `jsonAggregator/${userAgentLabel} (contact: set OVERPASS_USER_AGENT)`;
+    const userAgent = process.env.OVERPASS_USER_AGENT ?? `jsonAggregator/${userAgentLabel} (contact: set OVERPASS_USER_AGENT)`;
 
     const controller = new AbortController();
     const timeoutMs = getOverpassFetchTimeoutMs();
@@ -124,19 +119,17 @@ export async function fetchOverpassElements(query: string, userAgentLabel: strin
     let res: Awaited<ReturnType<typeof fetch>>;
     try {
         res = await fetch(OVERPASS_URL, {
-            method: "POST",
+            method: 'POST',
             headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-                "User-Agent": userAgent,
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'User-Agent': userAgent,
             },
             body: `data=${encodeURIComponent(query)}`,
             signal: controller.signal,
         });
     } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") {
-            throw new Error(
-                `${userAgentLabel}: Overpass request aborted after ${timeoutMs}ms (client timeout)`,
-            );
+        if (err instanceof Error && err.name === 'AbortError') {
+            throw new Error(`${userAgentLabel}: Overpass request aborted after ${timeoutMs}ms (client timeout)`);
         }
         throw err;
     } finally {
@@ -144,10 +137,8 @@ export async function fetchOverpassElements(query: string, userAgentLabel: strin
     }
 
     if (!res.ok) {
-        const text = await readOverpassBodyText(res, userAgentLabel).catch(() => "");
-        throw new Error(
-            `${userAgentLabel}: Overpass HTTP ${res.status} ${res.statusText}${text ? ` — ${text.slice(0, 200)}` : ""}`
-        );
+        const text = await readOverpassBodyText(res, userAgentLabel).catch(() => '');
+        throw new Error(`${userAgentLabel}: Overpass HTTP ${res.status} ${res.statusText}${text ? ` — ${text.slice(0, 200)}` : ''}`);
     }
 
     // Deckel statt `res.json()`: die Antwortgroesse bestimmt die BBox, nicht wir.

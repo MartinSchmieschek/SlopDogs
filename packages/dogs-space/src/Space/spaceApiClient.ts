@@ -15,11 +15,11 @@
  * =========================================================================
  */
 
-import type { IssData, PlanetSummary, BodyData, SpaceResult } from "./interfaces/spaceTypes";
+import type { IssData, PlanetSummary, BodyData, SpaceResult } from './interfaces/spaceTypes';
 
-const ISS_POSITION_URL = "http://api.open-notify.org/iss-now.json";
-const ISS_PEOPLE_URL = "http://api.open-notify.org/astros.json";
-const SOLAR_BODY_URL = "https://api.le-systeme-solaire.net/rest/bodies";
+const ISS_POSITION_URL = 'http://api.open-notify.org/iss-now.json';
+const ISS_PEOPLE_URL = 'http://api.open-notify.org/astros.json';
+const SOLAR_BODY_URL = 'https://api.le-systeme-solaire.net/rest/bodies';
 
 interface IssPositionResponse {
     iss_position: { latitude: string; longitude: string };
@@ -63,11 +63,11 @@ async function fetchIss(): Promise<IssData | null> {
     try {
         const [posRes, crewRes] = await Promise.all([
             fetch(ISS_POSITION_URL, {
-                headers: { "Accept": "application/json", "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)" },
+                headers: { Accept: 'application/json', 'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)' },
                 signal: controller.signal,
             }),
             fetch(ISS_PEOPLE_URL, {
-                headers: { "Accept": "application/json", "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)" },
+                headers: { Accept: 'application/json', 'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)' },
                 signal: controller.signal,
             }),
         ]);
@@ -76,12 +76,12 @@ async function fetchIss(): Promise<IssData | null> {
             throw new Error(`ISS position API failed: ${posRes.status}`);
         }
 
-        const posData = await posRes.json() as IssPositionResponse;
+        const posData = (await posRes.json()) as IssPositionResponse;
         let crew: Array<{ name: string; craft: string }> = [];
         let crewCount = 0;
 
         if (crewRes.ok) {
-            const crewData = await crewRes.json() as AstrosResponse;
+            const crewData = (await crewRes.json()) as AstrosResponse;
             crew = crewData.people;
             crewCount = crewData.number;
         }
@@ -110,16 +110,16 @@ async function fetchBody(bodyName: string): Promise<BodyData> {
     try {
         const url = `${SOLAR_BODY_URL}/${encodeURIComponent(bodyName.toLowerCase())}`;
         const res = await fetch(url, {
-            headers: { "Accept": "application/json", "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)" },
+            headers: { Accept: 'application/json', 'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)' },
             signal: controller.signal,
         });
 
         if (!res.ok) {
-            const text = await res.text().catch(() => "");
+            const text = await res.text().catch(() => '');
             throw new Error(`Solar system body API failed: ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
         }
 
-        const data = await res.json() as SolarBodyResponse;
+        const data = (await res.json()) as SolarBodyResponse;
 
         return {
             name: data.englishName,
@@ -127,7 +127,7 @@ async function fetchBody(bodyName: string): Promise<BodyData> {
             gravity: data.gravity,
             radiusKm: data.meanRadius,
             orbitDays: data.sideralOrbit,
-            discoveredBy: data.discoveredBy || "Unknown",
+            discoveredBy: data.discoveredBy || 'Unknown',
             moons: data.moons ? data.moons.length : 0,
             avgTemp: data.avgTemp,
         };
@@ -146,18 +146,18 @@ async function fetchPlanetsOverview(): Promise<{ planets: PlanetSummary[] }> {
     try {
         const url = `${SOLAR_BODY_URL}?filter[]=isPlanet,eq,true&data=englishName,gravity,meanRadius,sideralOrbit,discoveredBy`;
         const res = await fetch(url, {
-            headers: { "Accept": "application/json", "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)" },
+            headers: { Accept: 'application/json', 'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)' },
             signal: controller.signal,
         });
 
         if (!res.ok) {
-            const text = await res.text().catch(() => "");
+            const text = await res.text().catch(() => '');
             throw new Error(`Solar system bodies API failed: ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
         }
 
-        const data = await res.json() as SolarBodiesResponse;
+        const data = (await res.json()) as SolarBodiesResponse;
 
-        const planets: PlanetSummary[] = data.bodies.map(b => ({
+        const planets: PlanetSummary[] = data.bodies.map((b) => ({
             name: b.englishName,
             gravity: b.gravity,
             radiusKm: b.meanRadius,

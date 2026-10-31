@@ -1,15 +1,7 @@
 // The WavesConverter — the chronicler of the hunt, who turns the raw season into Waves of plunder.
 // After the dogs have hunted, their season must be charted in a form the crew can read.
 // Carrion hordes trill their profane accord with eldritch plans: each wave is a tide of results.
-import {
-    IHuntingSeason,
-    IWaveEntry,
-    IReadTrackingEntry,
-    IHuntingDog,
-    SerializedDog,
-    MimicDog,
-    IKennelConfig,
-} from '@slopdogs/core';
+import { IHuntingSeason, IWaveEntry, IReadTrackingEntry, IHuntingDog, SerializedDog, MimicDog, IKennelConfig } from '@slopdogs/core';
 import { TypeDefBuilder } from './TypeDefBuilder';
 
 /**
@@ -74,10 +66,10 @@ export type NodeEntry = {
     /**
      * Liegt dieser Knoten auf einem transitiven Pfad, der das Lead-Ergebnis speist —
      * Lead selbst, statische parentsRequired/parentsOptional-Kette, und per readFrom
- * weiterverfolgte Datenquellen, globales readTracking, und Initiatoren der ersten Welle,
- * die den Lead noch per Kanten-Graph erreichen. Nur gesetzt, wenn eine Kennel-Config
- * übergeben wurde; sonst undefined (unbekannt).
- */
+     * weiterverfolgte Datenquellen, globales readTracking, und Initiatoren der ersten Welle,
+     * die den Lead noch per Kanten-Graph erreichen. Nur gesetzt, wenn eine Kennel-Config
+     * übergeben wurde; sonst undefined (unbekannt).
+     */
     onLeadDependencyPath?: boolean;
 };
 
@@ -93,9 +85,7 @@ export type Waves = NodeEntry[][];
  * From brooding gulfs are we beheld: every dog must be named before it can be tracked.
  */
 function resolveInstanceId(instance: any): string {
-    return (instance instanceof SerializedDog)
-        ? (instance as SerializedDog<unknown>).storageId
-        : instance.name;
+    return instance instanceof SerializedDog ? (instance as SerializedDog<unknown>).storageId : instance.name;
 }
 
 /**
@@ -114,8 +104,7 @@ export function findLeadNodeEntry(waves: Waves, kennelConfig: IKennelConfig): No
                 node.id === searchId ||
                 node.id === leadId ||
                 node.id.replace(/-v\d+$/, '') === searchId.replace(/-v\d+$/, '') ||
-                (node.lineageId != null &&
-                    (node.lineageId === leadId || node.lineageId === searchId))
+                (node.lineageId != null && (node.lineageId === leadId || node.lineageId === searchId))
             ) {
                 return node;
             }
@@ -129,11 +118,7 @@ export function findLeadNodeEntry(waves: Waves, kennelConfig: IKennelConfig): No
  * parallel zu SerializedDog.findParentDog.
  */
 function resolveParentRefToNode(ref: string, nodes: NodeEntry[]): NodeEntry | undefined {
-    return nodes.find(n =>
-        n.id === ref ||
-        (n.lineageId != null && n.lineageId === ref) ||
-        n.name === ref
-    );
+    return nodes.find((n) => n.id === ref || (n.lineageId != null && n.lineageId === ref) || n.name === ref);
 }
 
 /**
@@ -148,13 +133,10 @@ function computeLeadDependencyClosure(lead: NodeEntry, allNodes: NodeEntry[]): S
         const id = queue.shift()!;
         if (closure.has(id)) continue;
         closure.add(id);
-        const node = allNodes.find(n => n.id === id);
+        const node = allNodes.find((n) => n.id === id);
         if (!node) continue;
 
-        const refs = [
-            ...(node.parentsRequired || []),
-            ...(node.parentsOptional || []),
-        ];
+        const refs = [...(node.parentsRequired || []), ...(node.parentsOptional || [])];
         for (const ref of refs) {
             const parent = resolveParentRefToNode(ref, allNodes);
             if (parent) {
@@ -167,13 +149,10 @@ function computeLeadDependencyClosure(lead: NodeEntry, allNodes: NodeEntry[]): S
     while (changed) {
         changed = false;
         for (const id of closure) {
-            const node = allNodes.find(n => n.id === id);
+            const node = allNodes.find((n) => n.id === id);
             if (!node?.readFrom?.length) continue;
             for (const rt of node.readFrom) {
-                const source = allNodes.find(n =>
-                    n.name === rt.sourceInstanceName ||
-                    n.id === rt.sourceInstanceName
-                );
+                const source = allNodes.find((n) => n.name === rt.sourceInstanceName || n.id === rt.sourceInstanceName);
                 if (source && !closure.has(source.id)) {
                     closure.add(source.id);
                     changed = true;
@@ -210,11 +189,7 @@ function buildParentToChildrenMapFromWaves(waves: Waves): Map<string, Set<string
 }
 
 /** Forward-Erreichbarkeit entlang Parent→Kind (Datenfluss zum Lead). */
-function canReachForward(
-    children: Map<string, Set<string>>,
-    start: string,
-    target: string
-): boolean {
+function canReachForward(children: Map<string, Set<string>>, start: string, target: string): boolean {
     const q: string[] = [start];
     const seen = new Set<string>();
     while (q.length > 0) {
@@ -233,11 +208,7 @@ function canReachForward(
  * Initiatoren in Welle 0, die den Lead noch über den Kanten-Graph „vorwärts“ erreichen,
  * in die Hülle aufnehmen (löst Lücken, wenn Eltern-Ketten nicht alle Reads abbilden).
  */
-function extendClosureWithWaveZeroReachableToLead(
-    waves: Waves,
-    leadId: string,
-    closure: Set<string>
-): boolean {
+function extendClosureWithWaveZeroReachableToLead(waves: Waves, leadId: string, closure: Set<string>): boolean {
     if (!waves.length || !waves[0].length) return false;
     const children = buildParentToChildrenMapFromWaves(waves);
     let changed = false;
@@ -255,23 +226,13 @@ function extendClosureWithWaveZeroReachableToLead(
  * Vollständiges readTracking: jede Kante Reader→Quelle zieht die Quelle in die Hülle,
  * wenn der Reader schon drin ist (Fixpunkt bis stabil).
  */
-function closureContainsReader(
-    closure: Set<string>,
-    allNodes: NodeEntry[],
-    readerInstance: IHuntingDog<unknown>
-): boolean {
+function closureContainsReader(closure: Set<string>, allNodes: NodeEntry[], readerInstance: IHuntingDog<unknown>): boolean {
     const rid = resolveInstanceId(readerInstance);
     if (closure.has(rid)) return true;
-    return allNodes.some(
-        n => closure.has(n.id) && n.name === readerInstance.name
-    );
+    return allNodes.some((n) => closure.has(n.id) && n.name === readerInstance.name);
 }
 
-function expandClosureWithGlobalReadTracking(
-    closure: Set<string>,
-    allNodes: NodeEntry[],
-    readTracking: IReadTrackingEntry[]
-): void {
+function expandClosureWithGlobalReadTracking(closure: Set<string>, allNodes: NodeEntry[], readTracking: IReadTrackingEntry[]): void {
     let pass = true;
     while (pass) {
         pass = false;
@@ -279,9 +240,7 @@ function expandClosureWithGlobalReadTracking(
             const sourceId = resolveInstanceId(rt.sourceInstance);
             if (!closureContainsReader(closure, allNodes, rt.readerInstance)) continue;
             if (closure.has(sourceId)) continue;
-            const sourceNode = allNodes.find(
-                n => n.id === sourceId || n.name === rt.sourceInstance.name
-            );
+            const sourceNode = allNodes.find((n) => n.id === sourceId || n.name === rt.sourceInstance.name);
             if (sourceNode) {
                 closure.add(sourceNode.id);
                 pass = true;
@@ -290,11 +249,7 @@ function expandClosureWithGlobalReadTracking(
     }
 }
 
-function applyLeadPathAnnotation(
-    waves: Waves,
-    kennelConfig: IKennelConfig,
-    readTracking: IReadTrackingEntry[]
-): void {
+function applyLeadPathAnnotation(waves: Waves, kennelConfig: IKennelConfig, readTracking: IReadTrackingEntry[]): void {
     const flat = waves.flat();
     const lead = findLeadNodeEntry(waves, kennelConfig);
     if (!lead) {
@@ -338,116 +293,115 @@ export function convertSeasonToWaves(theHunt: IHuntingSeason, kennelConfig?: IKe
     const waves: Waves = [];
 
     theHunt.wave.forEach((wave: IWaveEntry[]) => {
-        waves.push(wave.map((entry: IWaveEntry) => {
-            const instance = entry.instance;
-            const instanceId = resolveInstanceId(instance);
-            const instanceName = instance.name;
+        waves.push(
+            wave.map((entry: IWaveEntry) => {
+                const instance = entry.instance;
+                const instanceId = resolveInstanceId(instance);
+                const instanceName = instance.name;
 
-            const readFrom: any[] = [];
-            const readBy: any[] = [];
+                const readFrom: any[] = [];
+                const readBy: any[] = [];
 
-            // Walk the read-tracking log to discover this dog's place in the data lineage.
-            // In luminous space, blackened stars: each tracking entry illuminates a connection.
-            theHunt.readTracking.forEach((trackingEntry: any) => {
-                const readerName = trackingEntry.readerInstance.name;
-                const sourceName = trackingEntry.sourceInstance.name;
-                const readerId = resolveInstanceId(trackingEntry.readerInstance);
-                const sourceId = resolveInstanceId(trackingEntry.sourceInstance);
+                // Walk the read-tracking log to discover this dog's place in the data lineage.
+                // In luminous space, blackened stars: each tracking entry illuminates a connection.
+                theHunt.readTracking.forEach((trackingEntry: any) => {
+                    const readerName = trackingEntry.readerInstance.name;
+                    const sourceName = trackingEntry.sourceInstance.name;
+                    const readerId = resolveInstanceId(trackingEntry.readerInstance);
+                    const sourceId = resolveInstanceId(trackingEntry.sourceInstance);
 
-                // This dog was a reader — it drank from another dog's plunder.
-                if (readerId === instanceId || readerName === instanceName) {
-                    readFrom.push({
-                        waveIndex: trackingEntry.waveIndex,
-                        readerInstanceName: readerName,
-                        sourceInstanceName: sourceName,
-                        propertyPath: trackingEntry.propertyPath
-                    });
+                    // This dog was a reader — it drank from another dog's plunder.
+                    if (readerId === instanceId || readerName === instanceName) {
+                        readFrom.push({
+                            waveIndex: trackingEntry.waveIndex,
+                            readerInstanceName: readerName,
+                            sourceInstanceName: sourceName,
+                            propertyPath: trackingEntry.propertyPath,
+                        });
+                    }
+
+                    // This dog was a source — others drank from its plunder.
+                    if (sourceId === instanceId || sourceName === instanceName) {
+                        readBy.push({
+                            waveIndex: trackingEntry.waveIndex,
+                            readerInstanceName: readerName,
+                            sourceInstanceName: sourceName,
+                            propertyPath: trackingEntry.propertyPath,
+                        });
+                    }
+                });
+
+                const isMimic = instance instanceof MimicDog;
+                const isSerialized = instance instanceof SerializedDog;
+
+                const nodeEntry = {
+                    id: instanceId,
+                    lineageId: isSerialized ? (instance as SerializedDog<unknown>).lineageId : undefined,
+                    displayName: isSerialized ? (instance as SerializedDog<unknown>).instanceConfig?.displayName : undefined,
+                    name: instanceName,
+                    // The binding name, straight from the live instance's IHuntingDog.name getter —
+                    // the very value mergeParentDogsIntoContext writes into the context. Set here in
+                    // the shared literal, so SerializedDogs and base dogs carry it alike.
+                    contextName: instanceName,
+                    description: (instance as IHuntingDog<unknown>).description ?? undefined,
+                    icon: (isSerialized ? (instance as SerializedDog<unknown>).icon : (instance as IHuntingDog<unknown>).icon) ?? undefined,
+                    result: scrub ? scrub.scrubValue(instance.collected) : instance.collected,
+                    error:
+                        ((instance as any).__error && scrub ? scrub.scrubText((instance as any).__error) : (instance as any).__error) ||
+                        undefined,
+                    // Mimics are pact-bound shapeshifters — they cannot be deleted from the kennel.
+                    // BaseDogs are born of code, not the store — they too resist deletion.
+                    deletable: !isMimic,
+                    editable: isSerialized,
+                    mimic: isMimic,
+                    parentsOptional: [],
+                    parentsRequired: [],
+                    readFrom: readFrom.length > 0 ? readFrom : undefined,
+                    readBy: readBy.length > 0 ? readBy : undefined,
+                } as NodeEntry;
+
+                if (entry.instance instanceof SerializedDog) {
+                    // SerializedDogs carry their own code and VM context — expose it all for the crew.
+                    // Through endless faces, countless forms: each SerializedDog may have unique typings.
+                    const seDog = entry.instance as SerializedDog<unknown>;
+                    nodeEntry.codeTs = seDog.instanceConfig.theRun;
+                    const vmCtx = scrub ? scrub.scrubValue(seDog.simpleVmContext || {}) : seDog.simpleVmContext || {};
+                    nodeEntry.vmContext = vmCtx;
+                    nodeEntry.vmExpectedReturnTypeName = TypeDefBuilder.expectedReturnAliasTypeName(instanceId);
+                    nodeEntry.vmContextTypeDef = TypeDefBuilder.buildContextLib(seDog.name, vmCtx, entry.instance, instanceId);
+                    nodeEntry.serializedDogConfig = {
+                        theRun: seDog.instanceConfig.theRun,
+                        lineageId: seDog.instanceConfig.lineageId,
+                        parentId: seDog.instanceConfig.parentId,
+                        displayName: seDog.instanceConfig.displayName,
+                        version: seDog.instanceConfig.version,
+                        parentsRequired: seDog.instanceConfig.parentsRequired || [],
+                        parentsOptional: seDog.instanceConfig.parentsOptional || [],
+                        ...(typeof seDog.instanceConfig.icon === 'string' ? { icon: seDog.instanceConfig.icon } : {}),
+                    };
+                    nodeEntry.parentsRequired = seDog.instanceConfig.parentsRequired || [];
+                    nodeEntry.parentsOptional = seDog.instanceConfig.parentsOptional || [];
+                } else {
+                    // BaseDogs derive their parents from the hunt's dependency graph — not from a stored config.
+                    nodeEntry.parentsOptional = [
+                        ...(entry.optionalRequiresFrom
+                            ? entry.optionalRequiresFrom.map((r: any) => {
+                                  return resolveInstanceId(r.instance);
+                              })
+                            : []),
+                    ];
+                    nodeEntry.parentsRequired = [
+                        ...(entry.requiresFrom
+                            ? entry.requiresFrom.map((r: any) => {
+                                  return resolveInstanceId(r.instance);
+                              })
+                            : []),
+                    ];
                 }
 
-                // This dog was a source — others drank from its plunder.
-                if (sourceId === instanceId || sourceName === instanceName) {
-                    readBy.push({
-                        waveIndex: trackingEntry.waveIndex,
-                        readerInstanceName: readerName,
-                        sourceInstanceName: sourceName,
-                        propertyPath: trackingEntry.propertyPath
-                    });
-                }
-            });
-
-            const isMimic = instance instanceof MimicDog;
-            const isSerialized = instance instanceof SerializedDog;
-
-            const nodeEntry = {
-                id: instanceId,
-                lineageId: isSerialized
-                    ? (instance as SerializedDog<unknown>).lineageId
-                    : undefined,
-                displayName: isSerialized
-                    ? (instance as SerializedDog<unknown>).instanceConfig?.displayName
-                    : undefined,
-                name: instanceName,
-                // The binding name, straight from the live instance's IHuntingDog.name getter —
-                // the very value mergeParentDogsIntoContext writes into the context. Set here in
-                // the shared literal, so SerializedDogs and base dogs carry it alike.
-                contextName: instanceName,
-                description: (instance as IHuntingDog<unknown>).description ?? undefined,
-                icon: (isSerialized
-                    ? (instance as SerializedDog<unknown>).icon
-                    : (instance as IHuntingDog<unknown>).icon) ?? undefined,
-                result: scrub ? scrub.scrubValue(instance.collected) : instance.collected,
-                error: ((instance as any).__error && scrub ? scrub.scrubText((instance as any).__error) : (instance as any).__error) || undefined,
-                // Mimics are pact-bound shapeshifters — they cannot be deleted from the kennel.
-                // BaseDogs are born of code, not the store — they too resist deletion.
-                deletable: !isMimic,
-                editable: isSerialized,
-                mimic: isMimic,
-                parentsOptional: [],
-                parentsRequired: [],
-                readFrom: readFrom.length > 0 ? readFrom : undefined,
-                readBy: readBy.length > 0 ? readBy : undefined,
-            } as NodeEntry;
-
-            if (entry.instance instanceof SerializedDog) {
-                // SerializedDogs carry their own code and VM context — expose it all for the crew.
-                // Through endless faces, countless forms: each SerializedDog may have unique typings.
-                const seDog = entry.instance as SerializedDog<unknown>;
-                nodeEntry.codeTs = seDog.instanceConfig.theRun;
-                const vmCtx = scrub ? scrub.scrubValue(seDog.simpleVmContext || {}) : (seDog.simpleVmContext || {});
-                nodeEntry.vmContext = vmCtx;
-                nodeEntry.vmExpectedReturnTypeName = TypeDefBuilder.expectedReturnAliasTypeName(instanceId);
-                nodeEntry.vmContextTypeDef = TypeDefBuilder.buildContextLib(
-                    seDog.name,
-                    vmCtx,
-                    entry.instance,
-                    instanceId
-                );
-                nodeEntry.serializedDogConfig = {
-                    theRun: seDog.instanceConfig.theRun,
-                    lineageId: seDog.instanceConfig.lineageId,
-                    parentId: seDog.instanceConfig.parentId,
-                    displayName: seDog.instanceConfig.displayName,
-                    version: seDog.instanceConfig.version,
-                    parentsRequired: seDog.instanceConfig.parentsRequired || [],
-                    parentsOptional: seDog.instanceConfig.parentsOptional || [],
-                    ...(typeof seDog.instanceConfig.icon === 'string'
-                        ? { icon: seDog.instanceConfig.icon }
-                        : {}),
-                };
-                nodeEntry.parentsRequired = seDog.instanceConfig.parentsRequired || [];
-                nodeEntry.parentsOptional = seDog.instanceConfig.parentsOptional || [];
-            } else {
-                // BaseDogs derive their parents from the hunt's dependency graph — not from a stored config.
-                nodeEntry.parentsOptional = [...entry.optionalRequiresFrom ? entry.optionalRequiresFrom.map((r: any) => {
-                    return resolveInstanceId(r.instance);
-                }) : []];
-                nodeEntry.parentsRequired = [...entry.requiresFrom ? entry.requiresFrom.map((r: any) => {
-                    return resolveInstanceId(r.instance);
-                }) : []];
-            }
-
-            return nodeEntry;
-        }));
+                return nodeEntry;
+            }),
+        );
     });
 
     if (kennelConfig) {

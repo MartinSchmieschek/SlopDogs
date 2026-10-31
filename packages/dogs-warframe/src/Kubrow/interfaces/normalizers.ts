@@ -7,36 +7,61 @@
  * by imposing order upon the madness. To cosmic madness laws submit, though stalwart minds entreat.
  */
 import type {
-    RawSortieFromApi, ISortieData,
-    RawLiteSortieFromApi, IArchonHuntData,
-    RawInvasionFromApi, IInvasionData,
-    RawFissureFromApi, IFissureData,
-    RawVoidStormFromApi, IVoidStormData,
-    RawVoidTraderFromApi, IVoidTraderData,
-    RawSyndicateMissionFromApi, ISyndicateMissionData,
-    RawDailyDealFromApi, IDailyDealData,
-    RawFlashSaleFromApi, IFlashSaleData,
-    RawSeasonInfoFromApi, INightwaveData, INightwaveChallenge,
-    RawGoalFromApi, IGoalData,
-    RawNodeOverrideFromApi, INodeOverrideData,
-    RawPVPChallengeFromApi, IPVPChallengeData,
-    RawCalendarSeasonFromApi, ICalendarSeasonData,
-    RawConquestFromApi, IConquestData,
-    RawDescentFromApi, IDescentData,
-    RawEndlessXpChoice, IEndlessXpChoiceData,
-    RawFeaturedGuildFromApi, IFeaturedGuildData,
-    RawPersistentEnemyFromApi, IPersistentEnemyData,
-    RawGlobalUpgradeFromApi, IGlobalUpgradeData,
+    RawSortieFromApi,
+    ISortieData,
+    RawLiteSortieFromApi,
+    IArchonHuntData,
+    RawInvasionFromApi,
+    IInvasionData,
+    RawFissureFromApi,
+    IFissureData,
+    RawVoidStormFromApi,
+    IVoidStormData,
+    RawVoidTraderFromApi,
+    IVoidTraderData,
+    RawSyndicateMissionFromApi,
+    ISyndicateMissionData,
+    RawDailyDealFromApi,
+    IDailyDealData,
+    RawFlashSaleFromApi,
+    IFlashSaleData,
+    RawSeasonInfoFromApi,
+    INightwaveData,
+    INightwaveChallenge,
+    RawGoalFromApi,
+    IGoalData,
+    RawNodeOverrideFromApi,
+    INodeOverrideData,
+    RawPVPChallengeFromApi,
+    IPVPChallengeData,
+    RawCalendarSeasonFromApi,
+    ICalendarSeasonData,
+    RawConquestFromApi,
+    IConquestData,
+    RawDescentFromApi,
+    IDescentData,
+    RawEndlessXpChoice,
+    IEndlessXpChoiceData,
+    RawFeaturedGuildFromApi,
+    IFeaturedGuildData,
+    RawPersistentEnemyFromApi,
+    IPersistentEnemyData,
+    RawGlobalUpgradeFromApi,
+    IGlobalUpgradeData,
     IAlertMissionReward,
 } from './warframeWorldState';
 
 /** Arr, normalize a reward -- count the plunder so the crew knows what they've hauled from the deep. */
-function normalizeReward(raw?: { credits?: number; items?: string[]; countedItems?: Array<{ ItemType: string; ItemCount: number }> }): IAlertMissionReward | undefined {
+function normalizeReward(raw?: {
+    credits?: number;
+    items?: string[];
+    countedItems?: Array<{ ItemType: string; ItemCount: number }>;
+}): IAlertMissionReward | undefined {
     if (!raw) return undefined;
     return {
         credits: raw.credits,
         items: raw.items,
-        countedItems: raw.countedItems?.map(c => ({ count: c.ItemCount, type: c.ItemType })),
+        countedItems: raw.countedItems?.map((c) => ({ count: c.ItemCount, type: c.ItemType })),
     };
 }
 
@@ -51,7 +76,7 @@ export function normalizeSortie(raw: RawSortieFromApi): ISortieData {
         activation: raw.Activation,
         expiry: raw.Expiry,
         boss: raw.Boss,
-        variants: raw.Variants.map(v => ({
+        variants: raw.Variants.map((v) => ({
             missionType: v.missionType,
             modifier: v.modifierType,
             node: v.node,
@@ -72,7 +97,7 @@ export function normalizeArchonHunt(raw: RawLiteSortieFromApi): IArchonHuntData 
         activation: raw.Activation,
         expiry: raw.Expiry,
         boss: raw.Boss,
-        missions: raw.Missions.map(m => ({
+        missions: raw.Missions.map((m) => ({
             missionType: m.missionType,
             node: m.node,
         })),
@@ -94,11 +119,11 @@ export function normalizeInvasion(raw: RawInvasionFromApi): IInvasionData {
         defenderFaction: raw.DefenderFaction,
         attackerReward: {
             credits: raw.AttackerReward?.credits,
-            countedItems: raw.AttackerReward?.countedItems?.map(c => ({ count: c.ItemCount, type: c.ItemType })),
+            countedItems: raw.AttackerReward?.countedItems?.map((c) => ({ count: c.ItemCount, type: c.ItemType })),
         },
         defenderReward: {
             credits: raw.DefenderReward?.credits,
-            countedItems: raw.DefenderReward?.countedItems?.map(c => ({ count: c.ItemCount, type: c.ItemType })),
+            countedItems: raw.DefenderReward?.countedItems?.map((c) => ({ count: c.ItemCount, type: c.ItemType })),
         },
         progress,
         completed: raw.Completed,
@@ -154,7 +179,7 @@ export function normalizeVoidTrader(raw: RawVoidTraderFromApi): IVoidTraderData 
         character: raw.Character,
         node: raw.Node,
         active: !raw.Expiry?.isExpired(),
-        inventory: (raw.Manifest ?? []).map(m => ({
+        inventory: (raw.Manifest ?? []).map((m) => ({
             item: m.ItemType,
             ducats: m.PrimePrice,
             credits: m.RegularPrice,
@@ -226,13 +251,20 @@ export function normalizeNightwave(raw: RawSeasonInfoFromApi): INightwaveData {
         season: raw.Season,
         phase: raw.Phase,
         tag: raw.AffiliationTag,
-        activeChallenges: (raw.ActiveChallenges ?? []).map(c => normalizeNightwaveChallenge(c)),
+        activeChallenges: (raw.ActiveChallenges ?? []).map((c) => normalizeNightwaveChallenge(c)),
         active: !raw.Expiry?.isExpired(),
     };
 }
 
 /** Normalize a Nightwave challenge -- each one a task from the abyss, demanding the crew's compliance. */
-function normalizeNightwaveChallenge(raw: { _id: { $oid: string }; Activation: any; Expiry: any; Challenge: string; Daily?: boolean; isHard?: boolean }): INightwaveChallenge {
+function normalizeNightwaveChallenge(raw: {
+    _id: { $oid: string };
+    Activation: any;
+    Expiry: any;
+    Challenge: string;
+    Daily?: boolean;
+    isHard?: boolean;
+}): INightwaveChallenge {
     return {
         id: raw._id?.$oid ?? '',
         activation: raw.Activation,
@@ -308,9 +340,9 @@ export function normalizeCalendarSeason(raw: RawCalendarSeasonFromApi): ICalenda
     return {
         activation: raw.Activation,
         expiry: raw.Expiry,
-        days: raw.Days.map(d => ({
+        days: raw.Days.map((d) => ({
             day: d.day,
-            events: d.events.map(e => ({
+            events: d.events.map((e) => ({
                 type: e.type,
                 challenge: e.challenge,
                 reward: e.reward,
@@ -330,10 +362,10 @@ export function normalizeConquest(raw: RawConquestFromApi): IConquestData {
         activation: raw.Activation,
         expiry: raw.Expiry,
         type: raw.Type,
-        missions: raw.Missions.map(m => ({
+        missions: raw.Missions.map((m) => ({
             faction: m.faction,
             missionType: m.missionType,
-            difficulties: m.difficulties.map(d => ({
+            difficulties: m.difficulties.map((d) => ({
                 type: d.type,
                 deviation: d.deviation,
                 risks: d.risks,
@@ -353,7 +385,7 @@ export function normalizeDescent(raw: RawDescentFromApi): IDescentData {
         activation: raw.Activation,
         expiry: raw.Expiry,
         seed: raw.RandSeed,
-        challenges: raw.Challenges.map(c => ({
+        challenges: raw.Challenges.map((c) => ({
             index: c.Index,
             type: c.Type,
             challenge: c.Challenge,

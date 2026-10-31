@@ -1,7 +1,7 @@
-import { type IHuntingSeason } from "@slopdogs/core";
-import { OsmFeatureRetriever, type OsmQueryBase } from "../osm/base/OsmFeatureRetriever";
-import type { OverpassRawElement } from "../osm/base/overpassMirrorChain";
-import { NearbyFastRoadsPact, type OsmFastRoadsQueryInput } from "./pacts";
+import { type IHuntingSeason } from '@slopdogs/core';
+import { OsmFeatureRetriever, type OsmQueryBase } from '../osm/base/OsmFeatureRetriever';
+import type { OverpassRawElement } from '../osm/base/overpassMirrorChain';
+import { NearbyFastRoadsPact, type OsmFastRoadsQueryInput } from './pacts';
 import {
     clampFastRoadsRadiusM,
     parseFastRoadsFacets,
@@ -10,24 +10,24 @@ import {
     DEFAULT_FAST_ROADS_RADIUS_M,
     MAX_FAST_ROADS_RADIUS_M,
     type OsmFastRoadsResult,
-} from "./overpassFastRoads";
-import { mapOverpassElement, type OsmGeoElement } from "./overpassOsmShared";
+} from './overpassFastRoads';
+import { mapOverpassElement, type OsmGeoElement } from './overpassOsmShared';
 
 const HIGHWAY_BY_FACET: Record<string, string> = {
-    [FastRoadsOverpassFacet.Motorway]: "motorway",
-    [FastRoadsOverpassFacet.MotorwayLink]: "motorway_link",
-    [FastRoadsOverpassFacet.Trunk]: "trunk",
-    [FastRoadsOverpassFacet.TrunkLink]: "trunk_link",
-    [FastRoadsOverpassFacet.Primary]: "primary",
-    [FastRoadsOverpassFacet.Secondary]: "secondary",
+    [FastRoadsOverpassFacet.Motorway]: 'motorway',
+    [FastRoadsOverpassFacet.MotorwayLink]: 'motorway_link',
+    [FastRoadsOverpassFacet.Trunk]: 'trunk',
+    [FastRoadsOverpassFacet.TrunkLink]: 'trunk_link',
+    [FastRoadsOverpassFacet.Primary]: 'primary',
+    [FastRoadsOverpassFacet.Secondary]: 'secondary',
 };
 
 export class OsmFastRoadsRetriever extends OsmFeatureRetriever<OsmFastRoadsResult, typeof NearbyFastRoadsPact> {
-    protected readonly layer = "fastRoads";
+    protected readonly layer = 'fastRoads';
     protected readonly defaultRadiusM = DEFAULT_FAST_ROADS_RADIUS_M;
     protected readonly maxRadiusM = MAX_FAST_ROADS_RADIUS_M;
     protected readonly queryPactClass = NearbyFastRoadsPact;
-    protected readonly outStatement = "out center;";
+    protected readonly outStatement = 'out center;';
 
     get name(): string {
         return OsmFastRoadsRetriever.name;
@@ -38,7 +38,7 @@ export class OsmFastRoadsRetriever extends OsmFeatureRetriever<OsmFastRoadsResul
     }
 
     get icon(): string | undefined {
-        return "\uD83D\uDEE3\uFE0F";
+        return '\uD83D\uDEE3\uFE0F';
     }
 
     getVmContextContributions(): Record<string, any> {
@@ -55,15 +55,12 @@ export class OsmFastRoadsRetriever extends OsmFeatureRetriever<OsmFastRoadsResul
         const query = (queryDog?.collected as OsmFastRoadsQueryInput | undefined) ?? ({} as OsmFastRoadsQueryInput);
         const lat = parseFloat(query.lat);
         const lng = parseFloat(query.lng);
-        const radiusM = clampFastRoadsRadiusM(parseFloat(query.radius ?? ""));
+        const radiusM = clampFastRoadsRadiusM(parseFloat(query.radius ?? ''));
         const facets = parseFastRoadsFacets(query.preset);
         return { lat, lng, radiusM, facets };
     }
 
-    protected buildOverpassBodyForTile(
-        bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number },
-        facets: string[],
-    ): string {
+    protected buildOverpassBodyForTile(bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number }, facets: string[]): string {
         const bboxClause = `(${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng})`;
         const lines: string[] = [];
         for (const f of facets) {
@@ -71,11 +68,11 @@ export class OsmFastRoadsRetriever extends OsmFeatureRetriever<OsmFastRoadsResul
             if (!hw) continue;
             lines.push(`  way["highway"="${hw}"]${bboxClause};`);
         }
-        return lines.join("\n");
+        return lines.join('\n');
     }
 
     protected classifyElementFacets(el: OverpassRawElement, fetchedFacets: string[]): string[] {
-        const hw = el.tags?.["highway"];
+        const hw = el.tags?.['highway'];
         if (!hw) return [];
         const match: string[] = [];
         for (const f of fetchedFacets) {

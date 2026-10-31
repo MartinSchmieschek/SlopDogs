@@ -131,8 +131,8 @@ export class LocalMode {
         if (!LocalMode.isEnabled(env) || !LocalMode.containerAllowed(env)) return null;
         const evidence = probe(env);
         return evidence
-            ? `[boot] WARNING local mode in a container (${evidence}), allowed by SLOPDOGS_LOCAL_ALLOW_CONTAINER=1 — `
-                + 'a port mapping can make internet clients look like LAN clients; publish the port only on a LAN address'
+            ? `[boot] WARNING local mode in a container (${evidence}), allowed by SLOPDOGS_LOCAL_ALLOW_CONTAINER=1 — ` +
+                  'a port mapping can make internet clients look like LAN clients; publish the port only on a LAN address'
             : null;
     }
 
@@ -156,8 +156,10 @@ export class LocalMode {
         if (!LocalMode.containerAllowed(env)) {
             const evidence = probe(env);
             if (evidence) {
-                return `${prefix} refused — running in a container (${evidence}); a port mapping replaces the client address `
-                    + 'with the gateway and lets internet clients pass as LAN clients. Set SLOPDOGS_LOCAL_ALLOW_CONTAINER=1 to accept that';
+                return (
+                    `${prefix} refused — running in a container (${evidence}); a port mapping replaces the client address ` +
+                    'with the gateway and lets internet clients pass as LAN clients. Set SLOPDOGS_LOCAL_ALLOW_CONTAINER=1 to accept that'
+                );
             }
         }
 
@@ -179,10 +181,15 @@ export class LocalMode {
             }
             if (!isNonPublicHost(hostname)) return `${prefix} refused — ${name} host "${hostname}" is public ${LOCAL_HOSTS_HINT}`;
         }
-        for (const entry of (env.LOCAL_ALLOWED_HOSTS || '').split(',').map((s) => s.trim()).filter(Boolean)) {
+        for (const entry of (env.LOCAL_ALLOWED_HOSTS || '')
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)) {
             const parsed = parseHostEntry(entry);
-            if (!parsed) return `${prefix} refused — LOCAL_ALLOWED_HOSTS entry "${entry}" is not host or host:port (IPv6 in [], no zone id)`;
-            if (!isNonPublicHost(parsed.hostname)) return `${prefix} refused — LOCAL_ALLOWED_HOSTS entry "${entry}" is public ${LOCAL_HOSTS_HINT}`;
+            if (!parsed)
+                return `${prefix} refused — LOCAL_ALLOWED_HOSTS entry "${entry}" is not host or host:port (IPv6 in [], no zone id)`;
+            if (!isNonPublicHost(parsed.hostname))
+                return `${prefix} refused — LOCAL_ALLOWED_HOSTS entry "${entry}" is public ${LOCAL_HOSTS_HINT}`;
         }
         return null;
     }

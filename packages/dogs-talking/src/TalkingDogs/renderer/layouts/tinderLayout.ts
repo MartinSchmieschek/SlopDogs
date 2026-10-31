@@ -11,26 +11,22 @@
 // Die Next-Aktion unten laeuft im Browser: FragmentBase.getScript schreibt sie per toString() in die Seite.
 // Nur deshalb braucht diese Datei die DOM-Typen (`window`) — das Paket selbst baut ohne lib dom.
 /// <reference lib="dom" />
-import { ButtonFragment } from "../fragments/ButtonFragment";
-import { ImageFragment } from "../fragments/ImageFragment";
-import { TextFragment } from "../fragments/TextFragment";
-import { LayoutBase } from "./LayoutBase";
-import type { ILayoutInput, ITinderInput } from "./ILayoutInput";
+import { ButtonFragment } from '../fragments/ButtonFragment';
+import { ImageFragment } from '../fragments/ImageFragment';
+import { TextFragment } from '../fragments/TextFragment';
+import { LayoutBase } from './LayoutBase';
+import type { ILayoutInput, ITinderInput } from './ILayoutInput';
 
 /** Arr, the named slots of the Tinder layout — each a face in the void's swipe-deck of damned souls. */
 export enum TinderLayoutEnum {
-  PresentationImage = "PresentationImage",
-  Title = "Title",
-  Description = "Description",
-  Next = "Next",
+    PresentationImage = 'PresentationImage',
+    Title = 'Title',
+    Description = 'Description',
+    Next = 'Next',
 }
 
 function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 /**
@@ -270,65 +266,58 @@ const TINDER_LAYOUT_CSS = `
 
 /** Arr, the TinderLayout — a swipe-deck vessel from the abyss where the crew judges souls with a flick, through endless faces countless forms. */
 export class TinderLayout extends LayoutBase<TinderLayoutEnum> {
-  /** Arr, the gradient header strip text — a banner from the void, displayed above the glass card of cursed choices. */
-  private _inputsHeader = "";
-  /** Arr, the question posed above the selection pills — the abyss demands ye choose, matey. */
-  private _inputQuestion = "";
-  /** Arr, the selection pill options — cursed doubloons laid before the crew, each a path deeper into the eldritch deep. */
-  private _inputOptions: string[] = [];
+    /** Arr, the gradient header strip text — a banner from the void, displayed above the glass card of cursed choices. */
+    private _inputsHeader = '';
+    /** Arr, the question posed above the selection pills — the abyss demands ye choose, matey. */
+    private _inputQuestion = '';
+    /** Arr, the selection pill options — cursed doubloons laid before the crew, each a path deeper into the eldritch deep. */
+    private _inputOptions: string[] = [];
 
-  /**
-   * Arr, assemble the Tinder layout's fragments — image, title, description, and the dread "Next" button
-   * that pulls ye ever deeper into the void's swipe-deck of damned souls.
-   */
-  constructor() {
-    super();
+    /**
+     * Arr, assemble the Tinder layout's fragments — image, title, description, and the dread "Next" button
+     * that pulls ye ever deeper into the void's swipe-deck of damned souls.
+     */
+    constructor() {
+        super();
 
-    this.fragments.set(TinderLayoutEnum.PresentationImage, new ImageFragment());
-    this.fragments.set(TinderLayoutEnum.Title, new TextFragment("Dog Name"));
-    this.fragments.set(TinderLayoutEnum.Description, new TextFragment("Recipe description here..."));
-    this.fragments.set(TinderLayoutEnum.Next, new ButtonFragment("Next"));
-  }
+        this.fragments.set(TinderLayoutEnum.PresentationImage, new ImageFragment());
+        this.fragments.set(TinderLayoutEnum.Title, new TextFragment('Dog Name'));
+        this.fragments.set(TinderLayoutEnum.Description, new TextFragment('Recipe description here...'));
+        this.fragments.set(TinderLayoutEnum.Next, new ButtonFragment('Next'));
+    }
 
-  /**
-   * Arr, render the full Tinder card HTML — image, name, bio, "Next" button, and optional pill inputs
-   * rise from brooding gulfs into a card layout. The void's own UI, matey.
-   * @returns The HTML string of the accursed Tinder card, complete with optional glass-card inputs
-   */
-  renderHtml(): string {
-    const image = this.get(TinderLayoutEnum.PresentationImage) as ImageFragment | undefined;
-    const title = this.get(TinderLayoutEnum.Title) as TextFragment | undefined;
-    const desc = this.get(TinderLayoutEnum.Description) as TextFragment | undefined;
-    const next = this.get(TinderLayoutEnum.Next) as ButtonFragment | undefined;
+    /**
+     * Arr, render the full Tinder card HTML — image, name, bio, "Next" button, and optional pill inputs
+     * rise from brooding gulfs into a card layout. The void's own UI, matey.
+     * @returns The HTML string of the accursed Tinder card, complete with optional glass-card inputs
+     */
+    renderHtml(): string {
+        const image = this.get(TinderLayoutEnum.PresentationImage) as ImageFragment | undefined;
+        const title = this.get(TinderLayoutEnum.Title) as TextFragment | undefined;
+        const desc = this.get(TinderLayoutEnum.Description) as TextFragment | undefined;
+        const next = this.get(TinderLayoutEnum.Next) as ButtonFragment | undefined;
 
-    const mediaHtml = image ? image.render() : "";
-    const titleHtml = escapeHtml(title?.text ?? "");
-    const bioHtml = escapeHtml(desc?.text ?? "");
-    const nextHtml = next ? `<div class="tinder-next">${next.render()}</div>` : "";
+        const mediaHtml = image ? image.render() : '';
+        const titleHtml = escapeHtml(title?.text ?? '');
+        const bioHtml = escapeHtml(desc?.text ?? '');
+        const nextHtml = next ? `<div class="tinder-next">${next.render()}</div>` : '';
 
-    const hasHeader = !!this._inputsHeader.trim();
-    const hasQuestion = !!this._inputQuestion.trim();
-    const hasPills = this._inputOptions.length > 0;
-    const showInputsBlock = hasHeader || hasQuestion || hasPills;
+        const hasHeader = !!this._inputsHeader.trim();
+        const hasQuestion = !!this._inputQuestion.trim();
+        const hasPills = this._inputOptions.length > 0;
+        const showInputsBlock = hasHeader || hasQuestion || hasPills;
 
-    let inputsHtml = "";
-    if (showInputsBlock) {
-      const strip = hasHeader
-        ? `<div class="tinder-inputs__header-strip">${escapeHtml(this._inputsHeader)}</div>`
-        : "";
-      const glassClass =
-        hasHeader
-          ? "tinder-inputs__glass tinder-inputs__glass--with-strip"
-          : "tinder-inputs__glass";
-      const q = hasQuestion
-        ? `<p class="tinder-inputs__question">${escapeHtml(this._inputQuestion)}</p>`
-        : "";
-      const pills = hasPills
-        ? `<div class="tinder-inputs__pills">${this._inputOptions
-            .map((o) => `<button type="button" class="tinder-pill">${escapeHtml(o)}</button>`)
-            .join("")}</div>`
-        : "";
-      inputsHtml = `
+        let inputsHtml = '';
+        if (showInputsBlock) {
+            const strip = hasHeader ? `<div class="tinder-inputs__header-strip">${escapeHtml(this._inputsHeader)}</div>` : '';
+            const glassClass = hasHeader ? 'tinder-inputs__glass tinder-inputs__glass--with-strip' : 'tinder-inputs__glass';
+            const q = hasQuestion ? `<p class="tinder-inputs__question">${escapeHtml(this._inputQuestion)}</p>` : '';
+            const pills = hasPills
+                ? `<div class="tinder-inputs__pills">${this._inputOptions
+                      .map((o) => `<button type="button" class="tinder-pill">${escapeHtml(o)}</button>`)
+                      .join('')}</div>`
+                : '';
+            inputsHtml = `
   <section class="tinder-inputs" aria-label="Selection">
     ${strip}
     <div class="${glassClass}">
@@ -336,16 +325,16 @@ export class TinderLayout extends LayoutBase<TinderLayoutEnum> {
       ${pills}
     </div>
   </section>`;
-    }
+        }
 
-    return `
+        return `
 <div class="tinder-stack">
   <div class="tinder-card">
     <div class="tinder-card__media">${mediaHtml}</div>
     <div class="tinder-card__gradient" aria-hidden="true"></div>
     <div class="tinder-card__info">
       <h1 class="tinder-card__name">${titleHtml}</h1>
-      ${bioHtml ? `<p class="tinder-card__bio">${bioHtml}</p>` : ""}
+      ${bioHtml ? `<p class="tinder-card__bio">${bioHtml}</p>` : ''}
     </div>
     <div class="tinder-card__chrome">
       ${nextHtml}
@@ -354,40 +343,40 @@ export class TinderLayout extends LayoutBase<TinderLayoutEnum> {
 ${inputsHtml}
 </div>
 `.trim();
-  }
-
-  /**
-   * Arr, collect all styles and append the Tinder-specific CSS — the void layers its horrors in order, matey.
-   * @returns The combined CSS string, eldritch stylesheets merged from fragment and layout alike
-   */
-  collectStyles(): string {
-    return super.collectStyles() + TINDER_LAYOUT_CSS;
-  }
-
-  /**
-   * Arr, populate this Tinder vessel with data plundered from the input, matey.
-   * Image, title, description, and optional pill choices — the abyss fills every slot.
-   * @param input - The layout input pact, cast as ITinderInput by the void's own hand
-   */
-  populate(input: ILayoutInput): void {
-    const data = input as ITinderInput;
-
-    this._inputsHeader = data.inputsHeader?.trim() ?? "";
-    this._inputQuestion = data.inputQuestion?.trim() ?? "";
-    this._inputOptions = Array.isArray(data.inputOptions) ? [...data.inputOptions] : [];
-
-    const image = this.get(TinderLayoutEnum.PresentationImage);
-    if (image && "imageUrl" in image) (image as ImageFragment).imageUrl = data.imageUrl;
-
-    const title = this.get(TinderLayoutEnum.Title);
-    if (title && "text" in title) (title as TextFragment).text = data.title;
-
-    if (data.description) {
-      const desc = this.get(TinderLayoutEnum.Description);
-      if (desc && "text" in desc) (desc as TextFragment).text = data.description;
     }
 
-    const next = this.get(TinderLayoutEnum.Next);
-    if (next) (next as ButtonFragment).action = () => window.location.reload();
-  }
+    /**
+     * Arr, collect all styles and append the Tinder-specific CSS — the void layers its horrors in order, matey.
+     * @returns The combined CSS string, eldritch stylesheets merged from fragment and layout alike
+     */
+    collectStyles(): string {
+        return super.collectStyles() + TINDER_LAYOUT_CSS;
+    }
+
+    /**
+     * Arr, populate this Tinder vessel with data plundered from the input, matey.
+     * Image, title, description, and optional pill choices — the abyss fills every slot.
+     * @param input - The layout input pact, cast as ITinderInput by the void's own hand
+     */
+    populate(input: ILayoutInput): void {
+        const data = input as ITinderInput;
+
+        this._inputsHeader = data.inputsHeader?.trim() ?? '';
+        this._inputQuestion = data.inputQuestion?.trim() ?? '';
+        this._inputOptions = Array.isArray(data.inputOptions) ? [...data.inputOptions] : [];
+
+        const image = this.get(TinderLayoutEnum.PresentationImage);
+        if (image && 'imageUrl' in image) (image as ImageFragment).imageUrl = data.imageUrl;
+
+        const title = this.get(TinderLayoutEnum.Title);
+        if (title && 'text' in title) (title as TextFragment).text = data.title;
+
+        if (data.description) {
+            const desc = this.get(TinderLayoutEnum.Description);
+            if (desc && 'text' in desc) (desc as TextFragment).text = data.description;
+        }
+
+        const next = this.get(TinderLayoutEnum.Next);
+        if (next) (next as ButtonFragment).action = () => window.location.reload();
+    }
 }

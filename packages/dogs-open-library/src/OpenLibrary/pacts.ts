@@ -4,7 +4,7 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** Query for Open Library book search */
 export interface OpenLibraryQuery {
@@ -15,7 +15,4 @@ export interface OpenLibraryQuery {
 }
 
 /** The Pact for Open Library queries */
-export const OpenLibraryQueryPact = createPact<OpenLibraryQuery>(
-    "OpenLibraryQueryProvider",
-    { fromSourceType: "OpenLibraryQuery" }
-);
+export const OpenLibraryQueryPact = createPact<OpenLibraryQuery>('OpenLibraryQueryProvider', { fromSourceType: 'OpenLibraryQuery' });

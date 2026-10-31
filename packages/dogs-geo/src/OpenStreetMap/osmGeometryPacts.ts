@@ -2,7 +2,7 @@
  * Pacts for OSM circle-based geometry queries — lat, lng, radius (meters) only.
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** Query input for forest / area polygon geometry */
 export interface OsmForestGeometryQueryInput {
@@ -15,10 +15,9 @@ export interface OsmForestGeometryQueryInput {
     natural?: string[] | string;
 }
 
-export const OsmForestGeometryPact = createPact<OsmForestGeometryQueryInput>(
-    "OsmForestGeometryQueryProvider",
-    { fromSourceType: "OsmForestGeometryQueryInput" }
-);
+export const OsmForestGeometryPact = createPact<OsmForestGeometryQueryInput>('OsmForestGeometryQueryProvider', {
+    fromSourceType: 'OsmForestGeometryQueryInput',
+});
 
 /** Query input for street line geometry */
 export interface OsmStreetsGeometryQueryInput {
@@ -31,10 +30,9 @@ export interface OsmStreetsGeometryQueryInput {
     preset?: string;
 }
 
-export const OsmStreetsGeometryPact = createPact<OsmStreetsGeometryQueryInput>(
-    "OsmStreetsGeometryQueryProvider",
-    { fromSourceType: "OsmStreetsGeometryQueryInput" }
-);
+export const OsmStreetsGeometryPact = createPact<OsmStreetsGeometryQueryInput>('OsmStreetsGeometryQueryProvider', {
+    fromSourceType: 'OsmStreetsGeometryQueryInput',
+});
 
 /** Query input for building polygons */
 export interface OsmBuildingsGeometryQueryInput {
@@ -48,10 +46,9 @@ export interface OsmBuildingsGeometryQueryInput {
     building?: string[] | string;
 }
 
-export const OsmBuildingsGeometryPact = createPact<OsmBuildingsGeometryQueryInput>(
-    "OsmBuildingsGeometryQueryProvider",
-    { fromSourceType: "OsmBuildingsGeometryQueryInput" }
-);
+export const OsmBuildingsGeometryPact = createPact<OsmBuildingsGeometryQueryInput>('OsmBuildingsGeometryQueryProvider', {
+    fromSourceType: 'OsmBuildingsGeometryQueryInput',
+});
 
 /** Query input for railway line geometry */
 export interface OsmRailsGeometryQueryInput {
@@ -62,10 +59,9 @@ export interface OsmRailsGeometryQueryInput {
     railway?: string[] | string;
 }
 
-export const OsmRailsGeometryPact = createPact<OsmRailsGeometryQueryInput>(
-    "OsmRailsGeometryQueryProvider",
-    { fromSourceType: "OsmRailsGeometryQueryInput" }
-);
+export const OsmRailsGeometryPact = createPact<OsmRailsGeometryQueryInput>('OsmRailsGeometryQueryProvider', {
+    fromSourceType: 'OsmRailsGeometryQueryInput',
+});
 
 /**
  * Query input for landscape features — point trees, tree rows, walls/fences,
@@ -84,10 +80,9 @@ export interface OsmLandscapeFeaturesQueryInput {
     manMade?: string[] | string;
 }
 
-export const OsmLandscapeFeaturesPact = createPact<OsmLandscapeFeaturesQueryInput>(
-    "OsmLandscapeFeaturesQueryProvider",
-    { fromSourceType: "OsmLandscapeFeaturesQueryInput" }
-);
+export const OsmLandscapeFeaturesPact = createPact<OsmLandscapeFeaturesQueryInput>('OsmLandscapeFeaturesQueryProvider', {
+    fromSourceType: 'OsmLandscapeFeaturesQueryInput',
+});
 
 /** Query input for water (polygons + waterways) */
 export interface OsmWaterQueryInput {
@@ -100,10 +95,7 @@ export interface OsmWaterQueryInput {
     waterway?: string[] | string;
 }
 
-export const OsmWaterPact = createPact<OsmWaterQueryInput>(
-    "OsmWaterQueryProvider",
-    { fromSourceType: "OsmWaterQueryInput" }
-);
+export const OsmWaterPact = createPact<OsmWaterQueryInput>('OsmWaterQueryProvider', { fromSourceType: 'OsmWaterQueryInput' });
 
 /** Query input for landuse polygons */
 export interface OsmLanduseQueryInput {
@@ -114,10 +106,7 @@ export interface OsmLanduseQueryInput {
     landuse?: string[] | string;
 }
 
-export const OsmLandusePact = createPact<OsmLanduseQueryInput>(
-    "OsmLanduseQueryProvider",
-    { fromSourceType: "OsmLanduseQueryInput" }
-);
+export const OsmLandusePact = createPact<OsmLanduseQueryInput>('OsmLanduseQueryProvider', { fromSourceType: 'OsmLanduseQueryInput' });
 
 /** Query input for broad amenity POIs */
 export interface OsmAmenitiesQueryInput {
@@ -132,10 +121,9 @@ export interface OsmAmenitiesQueryInput {
     amenity?: string[] | string;
 }
 
-export const OsmAmenitiesPact = createPact<OsmAmenitiesQueryInput>(
-    "OsmAmenitiesQueryProvider",
-    { fromSourceType: "OsmAmenitiesQueryInput" }
-);
+export const OsmAmenitiesPact = createPact<OsmAmenitiesQueryInput>('OsmAmenitiesQueryProvider', {
+    fromSourceType: 'OsmAmenitiesQueryInput',
+});
 
 /** Query input for administrative + protected-area boundaries */
 export interface OsmBoundariesQueryInput {
@@ -148,10 +136,9 @@ export interface OsmBoundariesQueryInput {
     adminLevel?: string[] | string;
 }
 
-export const OsmBoundariesPact = createPact<OsmBoundariesQueryInput>(
-    "OsmBoundariesQueryProvider",
-    { fromSourceType: "OsmBoundariesQueryInput" }
-);
+export const OsmBoundariesPact = createPact<OsmBoundariesQueryInput>('OsmBoundariesQueryProvider', {
+    fromSourceType: 'OsmBoundariesQueryInput',
+});
 
 /** Query input for power-grid infrastructure */
 export interface OsmPowerQueryInput {
@@ -162,10 +149,7 @@ export interface OsmPowerQueryInput {
     power?: string[] | string;
 }
 
-export const OsmPowerPact = createPact<OsmPowerQueryInput>(
-    "OsmPowerQueryProvider",
-    { fromSourceType: "OsmPowerQueryInput" }
-);
+export const OsmPowerPact = createPact<OsmPowerQueryInput>('OsmPowerQueryProvider', { fromSourceType: 'OsmPowerQueryInput' });
 
 /** Query input for public-transit stop points / platforms */
 export interface OsmPublicTransitStopsQueryInput {
@@ -180,10 +164,9 @@ export interface OsmPublicTransitStopsQueryInput {
     kinds?: string[] | string;
 }
 
-export const OsmPublicTransitStopsPact = createPact<OsmPublicTransitStopsQueryInput>(
-    "OsmPublicTransitStopsQueryProvider",
-    { fromSourceType: "OsmPublicTransitStopsQueryInput" }
-);
+export const OsmPublicTransitStopsPact = createPact<OsmPublicTransitStopsQueryInput>('OsmPublicTransitStopsQueryProvider', {
+    fromSourceType: 'OsmPublicTransitStopsQueryInput',
+});
 
 /** Query input for shops */
 export interface OsmShopsQueryInput {
@@ -197,10 +180,7 @@ export interface OsmShopsQueryInput {
     shop?: string[] | string;
 }
 
-export const OsmShopsPact = createPact<OsmShopsQueryInput>(
-    "OsmShopsQueryProvider",
-    { fromSourceType: "OsmShopsQueryInput" }
-);
+export const OsmShopsPact = createPact<OsmShopsQueryInput>('OsmShopsQueryProvider', { fromSourceType: 'OsmShopsQueryInput' });
 
 /** Query input for sports & recreation features */
 export interface OsmSportsRecreationQueryInput {
@@ -213,7 +193,6 @@ export interface OsmSportsRecreationQueryInput {
     sport?: string[] | string;
 }
 
-export const OsmSportsRecreationPact = createPact<OsmSportsRecreationQueryInput>(
-    "OsmSportsRecreationQueryProvider",
-    { fromSourceType: "OsmSportsRecreationQueryInput" }
-);
+export const OsmSportsRecreationPact = createPact<OsmSportsRecreationQueryInput>('OsmSportsRecreationQueryProvider', {
+    fromSourceType: 'OsmSportsRecreationQueryInput',
+});

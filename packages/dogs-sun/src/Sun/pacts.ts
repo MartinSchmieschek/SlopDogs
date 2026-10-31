@@ -4,7 +4,7 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** GPS-Koordinaten fuer die Sonnenabfrage */
 export interface SunQuery {
@@ -17,7 +17,4 @@ export interface SunQuery {
 }
 
 /** Der Pact fuer Sun-Queries */
-export const SunQueryPact = createPact<SunQuery>(
-    "SunQueryProvider",
-    { fromSourceType: "SunQuery" }
-);
+export const SunQueryPact = createPact<SunQuery>('SunQueryProvider', { fromSourceType: 'SunQuery' });

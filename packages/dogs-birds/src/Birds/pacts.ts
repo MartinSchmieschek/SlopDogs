@@ -9,7 +9,7 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** Query parameters for the bird observation hunt */
 export interface BirdQuery {
@@ -24,7 +24,4 @@ export interface BirdQuery {
 }
 
 /** Der Pact fuer Bird-Queries */
-export const BirdQueryPact = createPact<BirdQuery>(
-    "BirdQueryProvider",
-    { fromSourceType: "BirdQuery" }
-);
+export const BirdQueryPact = createPact<BirdQuery>('BirdQueryProvider', { fromSourceType: 'BirdQuery' });

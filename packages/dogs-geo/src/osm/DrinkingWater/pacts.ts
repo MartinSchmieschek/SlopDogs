@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface DrinkingWaterQuery {
     lat: string;
@@ -6,7 +6,6 @@ export interface DrinkingWaterQuery {
     radius?: string;
 }
 
-export const DrinkingWaterQueryPact = createPact<DrinkingWaterQuery>(
-    "DrinkingWaterQueryProvider",
-    { fromSourceType: "DrinkingWaterQuery" }
-);
+export const DrinkingWaterQueryPact = createPact<DrinkingWaterQuery>('DrinkingWaterQueryProvider', {
+    fromSourceType: 'DrinkingWaterQuery',
+});

@@ -212,12 +212,7 @@ return {
         lineageId: leadDogId,
         parentId: null,
         displayName: 'Smart Guide',
-        parentsRequired: [
-            'GeocodingRetriever',
-            recommenderDogId,
-            highlightDogId,
-            'PublicTransportRetriever',
-        ],
+        parentsRequired: ['GeocodingRetriever', recommenderDogId, highlightDogId, 'PublicTransportRetriever'],
         parentsOptional: [],
         theRun: `
 const geo = GeocodingRetriever.results[0];

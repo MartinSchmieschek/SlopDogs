@@ -8,25 +8,53 @@
  * Through endless faces, countless forms, a multitude unfolds.
  */
 import type {
-    IAlertData, IWarframeWorldState, RawEventFromApi,
-    ISortieData, IArchonHuntData, IInvasionData,
-    IFissureData, IVoidStormData, IVoidTraderData,
-    ISyndicateMissionData, IDailyDealData, IFlashSaleData,
-    INightwaveData, IGoalData, INodeOverrideData,
-    IPVPChallengeData, ICalendarSeasonData, IConquestData,
-    IDescentData, IEndlessXpChoiceData, IFeaturedGuildData,
-    IPersistentEnemyData, IGlobalUpgradeData,
+    IAlertData,
+    IWarframeWorldState,
+    RawEventFromApi,
+    ISortieData,
+    IArchonHuntData,
+    IInvasionData,
+    IFissureData,
+    IVoidStormData,
+    IVoidTraderData,
+    ISyndicateMissionData,
+    IDailyDealData,
+    IFlashSaleData,
+    INightwaveData,
+    IGoalData,
+    INodeOverrideData,
+    IPVPChallengeData,
+    ICalendarSeasonData,
+    IConquestData,
+    IDescentData,
+    IEndlessXpChoiceData,
+    IFeaturedGuildData,
+    IPersistentEnemyData,
+    IGlobalUpgradeData,
     IAlertMission,
 } from './interfaces/warframeWorldState';
 import { normalizeAlert } from './interfaces/normalizeAlerts';
 import {
-    normalizeSortie, normalizeArchonHunt, normalizeInvasion,
-    normalizeFissure, normalizeVoidStorm, normalizeVoidTrader,
-    normalizeSyndicateMission, normalizeDailyDeal, normalizeFlashSale,
-    normalizeNightwave, normalizeGoal, normalizeNodeOverride,
-    normalizePVPChallenge, normalizeCalendarSeason, normalizeConquest,
-    normalizeDescent, normalizeEndlessXpChoice, normalizeFeaturedGuild,
-    normalizePersistentEnemy, normalizeGlobalUpgrade,
+    normalizeSortie,
+    normalizeArchonHunt,
+    normalizeInvasion,
+    normalizeFissure,
+    normalizeVoidStorm,
+    normalizeVoidTrader,
+    normalizeSyndicateMission,
+    normalizeDailyDeal,
+    normalizeFlashSale,
+    normalizeNightwave,
+    normalizeGoal,
+    normalizeNodeOverride,
+    normalizePVPChallenge,
+    normalizeCalendarSeason,
+    normalizeConquest,
+    normalizeDescent,
+    normalizeEndlessXpChoice,
+    normalizeFeaturedGuild,
+    normalizePersistentEnemy,
+    normalizeGlobalUpgrade,
 } from './interfaces/normalizers';
 import { ForumFirstPost } from './ForumFirstPost';
 import { PostTopic } from './PostTopic';
@@ -89,7 +117,7 @@ export class Kubrow {
      * @returns Active alerts that still cry out from the deep, matey
      */
     getActiveAlerts(): IAlertData[] {
-        return this.alerts.filter(a => a.active);
+        return this.alerts.filter((a) => a.active);
     }
 
     /**
@@ -99,7 +127,7 @@ export class Kubrow {
      */
     getAlertsByNode(node: string): IAlertData[] {
         const lower = node.toLowerCase();
-        return this.alerts.filter(a => a.mission.node.toLowerCase().includes(lower));
+        return this.alerts.filter((a) => a.mission.node.toLowerCase().includes(lower));
     }
 
     /**
@@ -109,7 +137,7 @@ export class Kubrow {
      */
     getAlertsByType(type: string): IAlertData[] {
         const lower = type.toLowerCase();
-        return this.alerts.filter(a => a.mission.type.toLowerCase().includes(lower));
+        return this.alerts.filter((a) => a.mission.type.toLowerCase().includes(lower));
     }
 
     /**
@@ -119,7 +147,7 @@ export class Kubrow {
      */
     getAlertsByFaction(faction: string): IAlertData[] {
         const lower = faction.toLowerCase();
-        return this.alerts.filter(a => a.mission.faction.toLowerCase().includes(lower));
+        return this.alerts.filter((a) => a.mission.faction.toLowerCase().includes(lower));
     }
 
     /**
@@ -129,10 +157,10 @@ export class Kubrow {
      */
     getAlertsByRewardItem(itemNameSubstring: string): IAlertData[] {
         const lower = itemNameSubstring.toLowerCase();
-        return this.alerts.filter(a => {
+        return this.alerts.filter((a) => {
             const items = a.mission.reward?.items ?? [];
-            const counted = a.mission.reward?.countedItems?.map(c => c.type) ?? [];
-            return [...items, ...counted].some(name => name.toLowerCase().includes(lower));
+            const counted = a.mission.reward?.countedItems?.map((c) => c.type) ?? [];
+            return [...items, ...counted].some((name) => name.toLowerCase().includes(lower));
         });
     }
 
@@ -142,7 +170,7 @@ export class Kubrow {
      * @returns The alert if found, or undefined if it has sunk into the abyss
      */
     getAlertById(id: string): IAlertData | undefined {
-        return this.alerts.find(a => a.id === id);
+        return this.alerts.find((a) => a.id === id);
     }
 
     /** Total number of alerts -- how many horrors cry out from the deep. */
@@ -159,9 +187,7 @@ export class Kubrow {
 
     /** Arr, get forum events -- threads linked from the void's own bulletin board. */
     private get forumEvents(): RawEventFromApi[] {
-        return (this.raw?.Events ?? []).filter(
-            e => e.Prop?.includes(FORUM_TOPIC_PREFIX),
-        );
+        return (this.raw?.Events ?? []).filter((e) => e.Prop?.includes(FORUM_TOPIC_PREFIX));
     }
 
     /**
@@ -187,9 +213,7 @@ export class Kubrow {
      * @returns All sorties, enriched with static world data from the deep
      */
     getSorties(): ISortieData[] {
-        return (this.raw?.Sorties ?? []).map((raw) =>
-            this.enrichSortie(normalizeSortie(raw)),
-        );
+        return (this.raw?.Sorties ?? []).map((raw) => this.enrichSortie(normalizeSortie(raw)));
     }
 
     /**
@@ -197,7 +221,7 @@ export class Kubrow {
      * @returns The active sortie, or undefined if none lurks in the void, matey
      */
     getActiveSortie(): ISortieData | undefined {
-        return this.getSorties().find(s => s.active);
+        return this.getSorties().find((s) => s.active);
     }
 
     // ── Archon Hunts (LiteSorties) ── Hunting the named horrors ──
@@ -207,9 +231,7 @@ export class Kubrow {
      * @returns All Archon Hunts, enriched with static world data
      */
     getArchonHunts(): IArchonHuntData[] {
-        return (this.raw?.LiteSorties ?? []).map((raw) =>
-            this.enrichArchonHunt(normalizeArchonHunt(raw)),
-        );
+        return (this.raw?.LiteSorties ?? []).map((raw) => this.enrichArchonHunt(normalizeArchonHunt(raw)));
     }
 
     /**
@@ -217,7 +239,7 @@ export class Kubrow {
      * @returns The active Archon Hunt, or undefined if the quarry has escaped, arr
      */
     getActiveArchonHunt(): IArchonHuntData | undefined {
-        return this.getArchonHunts().find(a => a.active);
+        return this.getArchonHunts().find((a) => a.active);
     }
 
     // ── Invasions ── Faction wars beneath blackened stars ──
@@ -227,9 +249,7 @@ export class Kubrow {
      * @returns All invasions with mission context if known, matey
      */
     getInvasions(): IInvasionData[] {
-        return (this.raw?.Invasions ?? []).map((raw) =>
-            this.attachMissionIfKnown(normalizeInvasion(raw)),
-        );
+        return (this.raw?.Invasions ?? []).map((raw) => this.attachMissionIfKnown(normalizeInvasion(raw)));
     }
 
     /**
@@ -237,7 +257,7 @@ export class Kubrow {
      * @returns Active invasions from the deep, arr
      */
     getActiveInvasions(): IInvasionData[] {
-        return this.getInvasions().filter(i => i.active);
+        return this.getInvasions().filter((i) => i.active);
     }
 
     /**
@@ -247,9 +267,8 @@ export class Kubrow {
      */
     getInvasionsByFaction(faction: string): IInvasionData[] {
         const lower = faction.toLowerCase();
-        return this.getInvasions().filter(i =>
-            i.attackerFaction.toLowerCase().includes(lower) ||
-            i.defenderFaction.toLowerCase().includes(lower)
+        return this.getInvasions().filter(
+            (i) => i.attackerFaction.toLowerCase().includes(lower) || i.defenderFaction.toLowerCase().includes(lower),
         );
     }
 
@@ -260,9 +279,7 @@ export class Kubrow {
      * @returns All fissures with mission context from the deep
      */
     getFissures(): IFissureData[] {
-        return (this.raw?.ActiveMissions ?? []).map((raw) =>
-            this.attachMissionIfKnown(normalizeFissure(raw)),
-        );
+        return (this.raw?.ActiveMissions ?? []).map((raw) => this.attachMissionIfKnown(normalizeFissure(raw)));
     }
 
     /**
@@ -270,7 +287,7 @@ export class Kubrow {
      * @returns Active fissures that still bleed from the abyss, arr
      */
     getActiveFissures(): IFissureData[] {
-        return this.getFissures().filter(f => f.active);
+        return this.getFissures().filter((f) => f.active);
     }
 
     /**
@@ -280,7 +297,7 @@ export class Kubrow {
      */
     getFissuresByTier(tier: string): IFissureData[] {
         const lower = tier.toLowerCase();
-        return this.getActiveFissures().filter(f => f.tier.toLowerCase().includes(lower));
+        return this.getActiveFissures().filter((f) => f.tier.toLowerCase().includes(lower));
     }
 
     // ── Void Storms (Railjack) ── Tempests from the deep ──
@@ -290,9 +307,7 @@ export class Kubrow {
      * @returns All void storms with mission context from the deep
      */
     getVoidStorms(): IVoidStormData[] {
-        return (this.raw?.VoidStorms ?? []).map((raw) =>
-            this.attachMissionIfKnown(normalizeVoidStorm(raw)),
-        );
+        return (this.raw?.VoidStorms ?? []).map((raw) => this.attachMissionIfKnown(normalizeVoidStorm(raw)));
     }
 
     /**
@@ -300,7 +315,7 @@ export class Kubrow {
      * @returns Active void storms, arr
      */
     getActiveVoidStorms(): IVoidStormData[] {
-        return this.getVoidStorms().filter(s => s.active);
+        return this.getVoidStorms().filter((s) => s.active);
     }
 
     // ── Void Trader (Baro Ki'Teer) ── The merchant from beyond the veil ──
@@ -310,9 +325,7 @@ export class Kubrow {
      * @returns All void traders with mission context, matey
      */
     getVoidTraders(): IVoidTraderData[] {
-        return (this.raw?.VoidTraders ?? []).map((raw) =>
-            this.attachMissionIfKnown(normalizeVoidTrader(raw)),
-        );
+        return (this.raw?.VoidTraders ?? []).map((raw) => this.attachMissionIfKnown(normalizeVoidTrader(raw)));
     }
 
     /**
@@ -320,7 +333,7 @@ export class Kubrow {
      * @returns The active void trader, or undefined if the merchant has retreated into the deep, arr
      */
     getActiveVoidTrader(): IVoidTraderData | undefined {
-        return this.getVoidTraders().find(t => t.active);
+        return this.getVoidTraders().find((t) => t.active);
     }
 
     // ── Syndicate Missions ── Secret orders with eldritch agendas ──
@@ -330,9 +343,7 @@ export class Kubrow {
      * @returns All syndicate missions, enriched with node lookups from the deep
      */
     getSyndicateMissions(): ISyndicateMissionData[] {
-        return (this.raw?.SyndicateMissions ?? []).map((raw) =>
-            this.enrichSyndicateMission(normalizeSyndicateMission(raw)),
-        );
+        return (this.raw?.SyndicateMissions ?? []).map((raw) => this.enrichSyndicateMission(normalizeSyndicateMission(raw)));
     }
 
     /**
@@ -342,7 +353,7 @@ export class Kubrow {
      */
     getSyndicateMissionsBySyndicate(tag: string): ISyndicateMissionData[] {
         const lower = tag.toLowerCase();
-        return this.getSyndicateMissions().filter(s => s.syndicate.toLowerCase().includes(lower));
+        return this.getSyndicateMissions().filter((s) => s.syndicate.toLowerCase().includes(lower));
     }
 
     // ── Daily Deals (Darvo) ── Bargains at the edge of the abyss ──
@@ -360,7 +371,7 @@ export class Kubrow {
      * @returns The active deal, or undefined if Darvo has sunk into the abyss, matey
      */
     getActiveDailyDeal(): IDailyDealData | undefined {
-        return this.getDailyDeals().find(d => d.active);
+        return this.getDailyDeals().find((d) => d.active);
     }
 
     // ── Flash Sales ── Fleeting as stars before the void ──
@@ -378,7 +389,7 @@ export class Kubrow {
      * @returns Active flash sales still glimmering in the cosmic dark, arr
      */
     getActiveFlashSales(): IFlashSaleData[] {
-        return this.getFlashSales().filter(s => s.active);
+        return this.getFlashSales().filter((s) => s.active);
     }
 
     // ── Nightwave (SeasonInfo) ── The pirate radio of the void ──
@@ -399,9 +410,7 @@ export class Kubrow {
      * @returns All goals, enriched with mission context from the deep
      */
     getGoals(): IGoalData[] {
-        return (this.raw?.Goals ?? []).map((raw) =>
-            this.enrichGoal(normalizeGoal(raw)),
-        );
+        return (this.raw?.Goals ?? []).map((raw) => this.enrichGoal(normalizeGoal(raw)));
     }
 
     /**
@@ -409,7 +418,7 @@ export class Kubrow {
      * @returns Active goals from the abyss, arr
      */
     getActiveGoals(): IGoalData[] {
-        return this.getGoals().filter(g => g.active);
+        return this.getGoals().filter((g) => g.active);
     }
 
     // ── Node Overrides ── When the void rewrites reality ──
@@ -419,9 +428,7 @@ export class Kubrow {
      * @returns All node overrides with mission context, matey
      */
     getNodeOverrides(): INodeOverrideData[] {
-        return (this.raw?.NodeOverrides ?? []).map((raw) =>
-            this.attachMissionIfKnown(normalizeNodeOverride(raw)),
-        );
+        return (this.raw?.NodeOverrides ?? []).map((raw) => this.attachMissionIfKnown(normalizeNodeOverride(raw)));
     }
 
     // ── PVP Challenges ── Tenno against Tenno in the madness ──
@@ -449,7 +456,7 @@ export class Kubrow {
      * @returns The active calendar season, or undefined if time itself has collapsed, matey
      */
     getActiveCalendarSeason(): ICalendarSeasonData | undefined {
-        return this.getCalendarSeasons().find(c => c.active);
+        return this.getCalendarSeasons().find((c) => c.active);
     }
 
     // ── Conquests ── Territorial warfare in the cosmic dark ──
@@ -467,7 +474,7 @@ export class Kubrow {
      * @returns Active conquests, arr
      */
     getActiveConquests(): IConquestData[] {
-        return this.getConquests().filter(c => c.active);
+        return this.getConquests().filter((c) => c.active);
     }
 
     // ── Descents (Circuit) ── A spiraling plunge into the abyss ──
@@ -485,7 +492,7 @@ export class Kubrow {
      * @returns Active descents from the deep, arr
      */
     getActiveDescents(): IDescentData[] {
-        return this.getDescents().filter(d => d.active);
+        return this.getDescents().filter((d) => d.active);
     }
 
     // ── Endless XP Choices ── All paths lead to the abyss ──
@@ -515,9 +522,7 @@ export class Kubrow {
      * @returns All persistent enemies, enriched with location details from the deep, matey
      */
     getPersistentEnemies(): IPersistentEnemyData[] {
-        return (this.raw?.PersistentEnemies ?? []).map((raw) =>
-            this.enrichPersistentEnemy(normalizePersistentEnemy(raw)),
-        );
+        return (this.raw?.PersistentEnemies ?? []).map((raw) => this.enrichPersistentEnemy(normalizePersistentEnemy(raw)));
     }
 
     // ── Global Upgrades ── Blessings from the void ──
@@ -535,7 +540,7 @@ export class Kubrow {
      * @returns Active global upgrades, arr
      */
     getActiveGlobalUpgrades(): IGlobalUpgradeData[] {
-        return this.getGlobalUpgrades().filter(u => u.active);
+        return this.getGlobalUpgrades().filter((u) => u.active);
     }
 
     // ── Metadata ── The fundamental truths of the World State ──
@@ -582,7 +587,7 @@ export class Kubrow {
      */
     getMissionByName(name: string): IMissionDetails | undefined {
         const lower = name.toLowerCase();
-        return this.getMissionDetails().find(m => m.Name.toLowerCase() === lower);
+        return this.getMissionDetails().find((m) => m.Name.toLowerCase() === lower);
     }
 
     /**
@@ -592,7 +597,7 @@ export class Kubrow {
      */
     getMissionsByPlanet(planet: string): IMissionDetails[] {
         const lower = planet.toLowerCase();
-        return this.getMissionDetails().filter(m => m.Planet.toLowerCase() === lower);
+        return this.getMissionDetails().filter((m) => m.Planet.toLowerCase() === lower);
     }
 
     /**
@@ -602,7 +607,7 @@ export class Kubrow {
      */
     getMissionsByType(type: string): IMissionDetails[] {
         const lower = type.toLowerCase();
-        return this.getMissionDetails().filter(m => m.Type.toLowerCase() === lower);
+        return this.getMissionDetails().filter((m) => m.Type.toLowerCase() === lower);
     }
 
     /**
@@ -612,9 +617,9 @@ export class Kubrow {
      */
     getMissionsByEnemy(enemy: string): IMissionDetails[] {
         const lower = enemy.toLowerCase();
-        return this.getMissionDetails().filter(m => {
+        return this.getMissionDetails().filter((m) => {
             const e = m.Enemy;
-            if (Array.isArray(e)) return e.some(f => f.toLowerCase().includes(lower));
+            if (Array.isArray(e)) return e.some((f) => f.toLowerCase().includes(lower));
             return e.toLowerCase().includes(lower);
         });
     }
@@ -651,9 +656,7 @@ export class Kubrow {
     }
 
     /** Arr, attach mission context if the node be known -- like pinning a chart to the helm. */
-    private attachMissionIfKnown<T extends { node: string }>(
-        item: T,
-    ): T & { mission?: IAlertMission } {
+    private attachMissionIfKnown<T extends { node: string }>(item: T): T & { mission?: IAlertMission } {
         const mission = this.missionFromNode(item.node);
         return mission.details ? { ...item, mission } : item;
     }
@@ -681,9 +684,7 @@ export class Kubrow {
     }
 
     /** Enrich Syndicate Missions -- look up each node in the chart of the damned. */
-    private enrichSyndicateMission(
-        syndicate: ISyndicateMissionData,
-    ): ISyndicateMissionData {
+    private enrichSyndicateMission(syndicate: ISyndicateMissionData): ISyndicateMissionData {
         return {
             ...syndicate,
             missions: syndicate.nodes.map((node) => this.missionFromNode(node)),
@@ -698,9 +699,7 @@ export class Kubrow {
     }
 
     /** Enrich a Persistent Enemy with location details -- tracking the stalker through the abyss. */
-    private enrichPersistentEnemy(
-        enemy: IPersistentEnemyData,
-    ): IPersistentEnemyData {
+    private enrichPersistentEnemy(enemy: IPersistentEnemyData): IPersistentEnemyData {
         if (!enemy.lastLocation) return enemy;
         const details = STATIC_MISSION_BY_INTERNAL_NAME.get(enemy.lastLocation);
         return details ? { ...enemy, locationDetails: details } : enemy;

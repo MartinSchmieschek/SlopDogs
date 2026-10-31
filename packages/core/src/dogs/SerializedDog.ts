@@ -11,15 +11,15 @@
  * only the void-context we grant it, and the code that drives it.
  */
 
-import { Dog } from "../core/entities/abstractHuntingDog";
-import { DogClass, IHuntingDog } from "../core/entities/IHuntingDog";
-import { IHuntingSeason } from "../core/entities/IHuntingSeason";
-import { DOG_OOM_MARKER, DOG_TIMEOUT_MARKER } from "../core/entities/IDogRunObserver";
-import { DogWorkerGate, type DogIsolateHandle } from "./DogWorkerGate";
-import { Worker } from "worker_threads";
-import { transform as sucraseTransform } from "sucrase";
-import { envFirst, isRuntimeLogVerbose } from "../runtimeLog";
-import { ILineDoc } from "./lineDocs";
+import { Dog } from '../core/entities/abstractHuntingDog';
+import { DogClass, IHuntingDog } from '../core/entities/IHuntingDog';
+import { IHuntingSeason } from '../core/entities/IHuntingSeason';
+import { DOG_OOM_MARKER, DOG_TIMEOUT_MARKER } from '../core/entities/IDogRunObserver';
+import { DogWorkerGate, type DogIsolateHandle } from './DogWorkerGate';
+import { Worker } from 'worker_threads';
+import { transform as sucraseTransform } from 'sucrase';
+import { envFirst, isRuntimeLogVerbose } from '../runtimeLog';
+import { ILineDoc } from './lineDocs';
 
 /**
  * ============================================================
@@ -74,9 +74,7 @@ export type VmGlobalCapabilityContext = {
  * Eine Factory, die fuer einen gegebenen Laufzeit-Kontext ein frisches
  * Bundle von VM-Methoden liefert (z.B. tenant-scoped `jsonStore`).
  */
-export type VmGlobalCapabilityFactory = (
-    ctx: VmGlobalCapabilityContext,
-) => Record<string, any>;
+export type VmGlobalCapabilityFactory = (ctx: VmGlobalCapabilityContext) => Record<string, any>;
 
 const vmGlobalCapabilities: Map<string, VmGlobalCapabilityFactory> = new Map();
 /**
@@ -96,11 +94,7 @@ const vmGlobalCapabilityDocs: Map<string, string> = new Map();
  * mit Zero-arg-Factories sind weiterhin gueltig (TypeScript laesst optionale
  * Parameter zu); das ctx wird einfach ignoriert.
  */
-export function registerVmGlobalCapability(
-    name: string,
-    factory: VmGlobalCapabilityFactory,
-    doc?: string,
-): void {
+export function registerVmGlobalCapability(name: string, factory: VmGlobalCapabilityFactory, doc?: string): void {
     vmGlobalCapabilities.set(name, factory);
     if (typeof doc === 'string' && doc.trim().length > 0) {
         vmGlobalCapabilityDocs.set(name, doc.trim());
@@ -152,7 +146,9 @@ export function setVmConsoleSink(sink: VmConsoleSink | null): void {
  * Adressen. Die Funktion reist als Quelltext in den Worker: keine Abhaengigkeiten, kein Template-String.
  */
 export function isPrivateNetworkAddress(address: string): boolean {
-    let a = String(address || '').trim().toLowerCase();
+    let a = String(address || '')
+        .trim()
+        .toLowerCase();
     if (a.charAt(0) === '[' && a.charAt(a.length - 1) === ']') a = a.slice(1, -1);
     const zone = a.indexOf('%');
     if (zone >= 0) a = a.slice(0, zone);
@@ -161,10 +157,14 @@ export function isPrivateNetworkAddress(address: string): boolean {
         if (!m) return null;
         const o1 = Number(m[1]);
         const o2 = Number(m[2]);
-        return o1 === 127 || o1 === 10 || o1 === 0
-            || (o1 === 172 && o2 >= 16 && o2 <= 31)
-            || (o1 === 192 && o2 === 168)
-            || (o1 === 169 && o2 === 254);
+        return (
+            o1 === 127 ||
+            o1 === 10 ||
+            o1 === 0 ||
+            (o1 === 172 && o2 >= 16 && o2 <= 31) ||
+            (o1 === 192 && o2 === 168) ||
+            (o1 === 169 && o2 === 254)
+        );
     };
     const direct = privateV4(a);
     if (direct !== null) return direct;
@@ -187,9 +187,7 @@ export function isPrivateNetworkAddress(address: string): boolean {
     if (zeroUpTo(8)) return true;
     if (zeroUpTo(7) && groups[7] === 1) return true;
     if (zeroUpTo(5) && (groups[5] === 0xffff || groups[5] === 0)) {
-        const v4 = tail !== null
-            ? tail
-            : [groups[6] >> 8, groups[6] & 255, groups[7] >> 8, groups[7] & 255].join('.');
+        const v4 = tail !== null ? tail : [groups[6] >> 8, groups[6] & 255, groups[7] >> 8, groups[7] & 255].join('.');
         return privateV4(v4) === true;
     }
     if ((groups[0] & 0xfe00) === 0xfc00) return true;
@@ -202,9 +200,7 @@ export function isPrivateNetworkAddress(address: string): boolean {
  * verschmelzen. Factories, die werfen, werden uebersprungen.
  * Welle 8: nimmt optional einen ctx, den jede Factory bekommt.
  */
-export function buildVmGlobalCapabilities(
-    ctx: VmGlobalCapabilityContext = {},
-): Record<string, any> {
+export function buildVmGlobalCapabilities(ctx: VmGlobalCapabilityContext = {}): Record<string, any> {
     const out: Record<string, any> = {};
     for (const [name, factory] of vmGlobalCapabilities) {
         try {
@@ -228,7 +224,8 @@ export function describeTranspileError(source: string, err: any): string {
     const roh = err?.message ?? String(err);
     const m = /\((\d+):(\d+)\)/.exec(roh);
     if (!m) return roh;
-    const zeile = Number(m[1]), spalte = Number(m[2]);
+    const zeile = Number(m[1]),
+        spalte = Number(m[2]);
     const zeilen = (source || '').split('\n');
     let offset = 0;
     for (let i = 0; i < zeile - 1 && i < zeilen.length; i++) offset += zeilen[i].length + 1;
@@ -274,26 +271,31 @@ export function resolveDogFetchMaxBodyBytes(): number {
  * Die Funktion reist als Quelltext in den Worker: keine Abhaengigkeiten, nur Web-Globals.
  */
 export function limitFetchBody(res: Response, maxBytes: number): Response {
-    const tooLarge = (what: string): Error => new Error(
-        'fetch_body_too_large: ' + what + ' exceeds the limit of ' + maxBytes + ' bytes (DOG_FETCH_MAX_BODY_MB)'
-    );
+    const tooLarge = (what: string): Error =>
+        new Error('fetch_body_too_large: ' + what + ' exceeds the limit of ' + maxBytes + ' bytes (DOG_FETCH_MAX_BODY_MB)');
     const declared = Number(res.headers.get('content-length'));
     if (Number.isFinite(declared) && declared > maxBytes) {
-        try { if (res.body) res.body.cancel(); } catch (e) { /* schon zu */ }
+        try {
+            if (res.body) res.body.cancel();
+        } catch (e) {
+            /* schon zu */
+        }
         throw tooLarge('Content-Length ' + declared);
     }
     if (!res.body || [101, 204, 205, 304].indexOf(res.status) >= 0) return res;
     let seen = 0;
-    const counted = res.body.pipeThrough(new TransformStream({
-        transform(chunk: Uint8Array, controller: TransformStreamDefaultController<Uint8Array>) {
-            seen += chunk.byteLength;
-            if (seen > maxBytes) {
-                controller.error(tooLarge('response body'));
-                return;
-            }
-            controller.enqueue(chunk);
-        },
-    }));
+    const counted = res.body.pipeThrough(
+        new TransformStream({
+            transform(chunk: Uint8Array, controller: TransformStreamDefaultController<Uint8Array>) {
+                seen += chunk.byteLength;
+                if (seen > maxBytes) {
+                    controller.error(tooLarge('response body'));
+                    return;
+                }
+                controller.enqueue(chunk);
+            },
+        }),
+    );
     const limited = new Response(counted, { status: res.status, statusText: res.statusText, headers: res.headers });
     Object.defineProperty(limited, 'url', { value: res.url });
     Object.defineProperty(limited, 'redirected', { value: res.redirected });
@@ -316,7 +318,9 @@ function releaseProcessWideHeapFlagForWorkers(): void {
     try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         require('v8').setFlagsFromString('--max-old-space-size=0');
-    } catch { /* ohne v8-Modul bleibt es beim Flag des Prozesses */ }
+    } catch {
+        /* ohne v8-Modul bleibt es beim Flag des Prozesses */
+    }
 }
 
 /** Old-Space-Deckel je Sandbox-Isolate in MB, wenn DOG_WORKER_MAX_HEAP_MB schweigt. */
@@ -334,9 +338,7 @@ const DEFAULT_DOG_WORKER_MAX_HEAP_MB = 64;
  */
 function resolveDogWorkerMaxHeapMb(): number {
     const configured = Number(process.env.DOG_WORKER_MAX_HEAP_MB);
-    return Number.isInteger(configured) && configured > 0
-        ? configured
-        : DEFAULT_DOG_WORKER_MAX_HEAP_MB;
+    return Number.isInteger(configured) && configured > 0 ? configured : DEFAULT_DOG_WORKER_MAX_HEAP_MB;
 }
 
 /**
@@ -363,7 +365,7 @@ const DEFAULT_VM_TIMEOUT_MS = 10_000;
 const DEFAULT_VM_TIMEOUT_MAX_MS = 60_000;
 
 function positiveFiniteNumber(value: unknown): number | undefined {
-    const n = typeof value === "number" ? value : Number(value);
+    const n = typeof value === 'number' ? value : Number(value);
     return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
@@ -377,9 +379,10 @@ export function resolveVmTimeoutMaxMs(): number {
  * ueber SLOPDOGS_VM_TIMEOUT_MAX_MS. Eine Stelle fuer alle Wege (HTTP, MCP, Snapshot, Build).
  */
 export function resolveVmTimeoutMs(override?: number): number {
-    const requested = positiveFiniteNumber(override)
-        ?? positiveFiniteNumber(envFirst("SLOPDOGS_VM_TIMEOUT_MS", "DATADOGS_VM_TIMEOUT_MS"))
-        ?? DEFAULT_VM_TIMEOUT_MS;
+    const requested =
+        positiveFiniteNumber(override) ??
+        positiveFiniteNumber(envFirst('SLOPDOGS_VM_TIMEOUT_MS', 'DATADOGS_VM_TIMEOUT_MS')) ??
+        DEFAULT_VM_TIMEOUT_MS;
     return Math.min(requested, resolveVmTimeoutMaxMs());
 }
 
@@ -642,7 +645,7 @@ export type SerializedDogVmGlobalsSupplier = (
     ctx: Record<string, any>,
     dog: SerializedDog<unknown>,
     /** The kennel (simpleVmContext) or season.exhausted (runExternalCode) -- source hounds fer context */
-    sourceDogs: IHuntingDog<unknown>[] | null
+    sourceDogs: IHuntingDog<unknown>[] | null,
 ) => void;
 
 /**
@@ -653,12 +656,11 @@ export type SerializedDogVmGlobalsSupplier = (
  * @template T The type of eldritch yield this spirit produces from its sandboxed void
  */
 export class SerializedDog<T> extends Dog<T> {
-
-    private _storageId
+    private _storageId;
 
     /** The spirit's storage identity -- its name in the deep where it sleeps between hunts */
-    public get storageId(): string{
-        return this._storageId
+    public get storageId(): string {
+        return this._storageId;
     }
 
     /**
@@ -712,10 +714,7 @@ export class SerializedDog<T> extends Dog<T> {
     }
 
     /** Apply all VM globals suppliers to the context -- let each supplier inscribe its runes */
-    private applyVmGlobalsSuppliers(
-        ctx: Record<string, any>,
-        sourceDogs: IHuntingDog<unknown>[] | null
-    ): void {
+    private applyVmGlobalsSuppliers(ctx: Record<string, any>, sourceDogs: IHuntingDog<unknown>[] | null): void {
         for (const supplier of this.vmGlobalsSuppliers) {
             supplier(ctx, this as SerializedDog<unknown>, sourceDogs);
         }
@@ -747,9 +746,7 @@ export class SerializedDog<T> extends Dog<T> {
                 transforms: ['typescript'],
             }).code;
         } catch (err: any) {
-            throw new Error(
-                `SerializedDog ${this.storageId}: TypeScript transpile failed: ${describeTranspileError(source, err)}`
-            );
+            throw new Error(`SerializedDog ${this.storageId}: TypeScript transpile failed: ${describeTranspileError(source, err)}`);
         }
         return this._strippedCode;
     }
@@ -780,7 +777,7 @@ export class SerializedDog<T> extends Dog<T> {
      * The void cares not which mark ye bear, so long as it be the right one.
      */
     private findParentDog(parentId: string, source: Array<IHuntingDog<unknown>>): IHuntingDog<unknown> | undefined {
-        return source.find(dog => {
+        return source.find((dog) => {
             if (dog instanceof SerializedDog) {
                 const sDog = dog as SerializedDog<unknown>;
                 return sDog.storageId === parentId || sDog.lineageId === parentId;
@@ -798,7 +795,7 @@ export class SerializedDog<T> extends Dog<T> {
     private mergeParentDogsIntoContext(
         contextObj: Record<string, any>,
         parentSource: Array<IHuntingDog<unknown>> | null,
-        useExhausted: boolean = false
+        useExhausted: boolean = false,
     ): void {
         if (!parentSource) {
             return;
@@ -850,7 +847,7 @@ export class SerializedDog<T> extends Dog<T> {
      * Merges base context, cached parent yields, and kennel-ref parents.
      * The void provides only what is needed, nothing more.
      */
-    public get simpleVmContext(): Record<string, any> | undefined{
+    public get simpleVmContext(): Record<string, any> | undefined {
         // Start with the base tools -- fetch and console, the spirit's lifeline
         const justContext = this.buildBaseContext();
 
@@ -951,10 +948,8 @@ export class SerializedDog<T> extends Dog<T> {
         // Split on separators; per token preserve PascalCase shape, otherwise capitalize-lowercase.
         return input
             .split(/[-_\s]+/)
-            .filter(word => word.length > 0)
-            .map(word => /^[A-Z][a-zA-Z0-9]*$/.test(word)
-                ? word
-                : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .filter((word) => word.length > 0)
+            .map((word) => (/^[A-Z][a-zA-Z0-9]*$/.test(word) ? word : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()))
             .join('');
     }
 
@@ -963,11 +958,52 @@ export class SerializedDog<T> extends Dog<T> {
 
     /** Reserved words can never serve as a binding — `declare const default` is a syntax error. */
     private static readonly RESERVED_WORDS = new Set([
-        'await', 'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default',
-        'delete', 'do', 'else', 'enum', 'export', 'extends', 'false', 'finally', 'for', 'function',
-        'if', 'implements', 'import', 'in', 'instanceof', 'interface', 'let', 'new', 'null',
-        'package', 'private', 'protected', 'public', 'return', 'static', 'super', 'switch', 'this',
-        'throw', 'true', 'try', 'typeof', 'var', 'void', 'while', 'with', 'yield',
+        'await',
+        'break',
+        'case',
+        'catch',
+        'class',
+        'const',
+        'continue',
+        'debugger',
+        'default',
+        'delete',
+        'do',
+        'else',
+        'enum',
+        'export',
+        'extends',
+        'false',
+        'finally',
+        'for',
+        'function',
+        'if',
+        'implements',
+        'import',
+        'in',
+        'instanceof',
+        'interface',
+        'let',
+        'new',
+        'null',
+        'package',
+        'private',
+        'protected',
+        'public',
+        'return',
+        'static',
+        'super',
+        'switch',
+        'this',
+        'throw',
+        'true',
+        'try',
+        'typeof',
+        'var',
+        'void',
+        'while',
+        'with',
+        'yield',
     ]);
 
     /**
@@ -992,12 +1028,10 @@ export class SerializedDog<T> extends Dog<T> {
     private applyContextAliases(
         contextObj: Record<string, any>,
         boundParents: Array<{ dog: IHuntingDog<unknown>; value: any }>,
-        yieldCache?: Map<string, any>
+        yieldCache?: Map<string, any>,
     ): void {
         for (const { dog, value } of boundParents) {
-            const displayName = dog instanceof SerializedDog
-                ? (dog.instanceConfig as ISerializedDogConfig)?.displayName
-                : undefined;
+            const displayName = dog instanceof SerializedDog ? (dog.instanceConfig as ISerializedDogConfig)?.displayName : undefined;
             const source = typeof displayName === 'string' && displayName.length > 0 ? displayName : dog.name;
             const aliases = [source.charAt(0).toUpperCase() + source.slice(1), source];
 
@@ -1021,8 +1055,8 @@ export class SerializedDog<T> extends Dog<T> {
     }
 
     /** The raw config of this spirit -- its full blueprint, laid bare */
-    public get instanceConfig():any{
-        return this.config
+    public get instanceConfig(): any {
+        return this.config;
     }
 
     /**
@@ -1048,7 +1082,7 @@ export class SerializedDog<T> extends Dog<T> {
         if (parentsRequired.length === 0) return true;
 
         return parentsRequired.every((parentId: string) => {
-            return season.exhausted.some(dog => {
+            return season.exhausted.some((dog) => {
                 if (dog instanceof SerializedDog) {
                     const sDog = dog as SerializedDog<unknown>;
                     return sDog.storageId === parentId || sDog.lineageId === parentId;
@@ -1065,7 +1099,7 @@ export class SerializedDog<T> extends Dog<T> {
      * The parentClass is checked first, then we verify the instance
      * is one of our declared parents. Arr, specificity matters in the deep.
      */
-    protected matchesParent(parentClass: (new (...args: any[]) => IHuntingDog<unknown>), instance: IHuntingDog<unknown>): boolean {
+    protected matchesParent(parentClass: new (...args: any[]) => IHuntingDog<unknown>, instance: IHuntingDog<unknown>): boolean {
         // First, the standard class check -- is it of the right lineage?
         if (!(instance instanceof parentClass)) {
             return false;
@@ -1092,19 +1126,22 @@ export class SerializedDog<T> extends Dog<T> {
     }
 
     /** The yield collector -- delegates to runExternalCode, where the spirit's incantation is executed */
-    protected yieldCollectorFactory: (season: IHuntingSeason) => Promise<T> = (season:IHuntingSeason) => {
-            return this.runExternalCode(season)
-        }
+    protected yieldCollectorFactory: (season: IHuntingSeason) => Promise<T> = (season: IHuntingSeason) => {
+        return this.runExternalCode(season);
+    };
 
     /**
      * Summon the spirit into existence -- bind its config and storage identity.
      * If theRun be empty, the spirit throws an error upon execution -- a hollow vessel with no purpose.
      */
-    constructor(private config:ISerializedDogConfig, private storageIdentifier:string) {
+    constructor(
+        private config: ISerializedDogConfig,
+        private storageIdentifier: string,
+    ) {
         super();
-        this._storageId = storageIdentifier
-        if (!this.config.theRun){
-            this.config.theRun = `throw new Error("Empty yieldCollector!")`
+        this._storageId = storageIdentifier;
+        if (!this.config.theRun) {
+            this.config.theRun = `throw new Error("Empty yieldCollector!")`;
         }
         this.invalidateStrippedCode();
     }
@@ -1120,15 +1157,14 @@ export class SerializedDog<T> extends Dog<T> {
      */
     private describeWorkerError(err: Error, maxHeapMb: number): Error {
         const isOutOfMemory =
-            (err as NodeJS.ErrnoException)?.code === 'ERR_WORKER_OUT_OF_MEMORY'
-            || /reaching memory limit/i.test(err?.message ?? '');
+            (err as NodeJS.ErrnoException)?.code === 'ERR_WORKER_OUT_OF_MEMORY' || /reaching memory limit/i.test(err?.message ?? '');
 
         if (!isOutOfMemory) return err;
 
         return new Error(
-            `SerializedDog ${this.storageId} ("${this.name}"): ${DOG_OOM_MARKER} `
-            + `of ${maxHeapMb} MB and was terminated. Raise DOG_WORKER_MAX_HEAP_MB (default `
-            + `${DEFAULT_DOG_WORKER_MAX_HEAP_MB}) or let this dog hold less data in memory.`
+            `SerializedDog ${this.storageId} ("${this.name}"): ${DOG_OOM_MARKER} ` +
+                `of ${maxHeapMb} MB and was terminated. Raise DOG_WORKER_MAX_HEAP_MB (default ` +
+                `${DEFAULT_DOG_WORKER_MAX_HEAP_MB}) or let this dog hold less data in memory.`,
         );
     }
 
@@ -1148,10 +1184,7 @@ export class SerializedDog<T> extends Dog<T> {
      *    to the worker, and each call round-trips via rpc:call / rpc:result. Calls
      *    are async -- user code must `await` the bridge method.
      */
-    public async runExternalCode(
-    season: IHuntingSeason
-  ): Promise<T>  {
-
+    public async runExternalCode(season: IHuntingSeason): Promise<T> {
         // Transpile (cached) and wrap the user's incantation in an async function.
         // The line break before the closing brace is load-bearing: code that ends in a
         // `// comment` would otherwise swallow `} catch …` and die with "Unexpected end of input".
@@ -1196,7 +1229,9 @@ export class SerializedDog<T> extends Dog<T> {
                 boundParents.push({ dog: parentDog, value: untracked });
                 // Debug: log fer SerializedDog parents
                 if (parentDog instanceof SerializedDog && isRuntimeLogVerbose()) {
-                    console.log(`[SerializedDog ${this.storageId}] Füge ${dogName} (storageId: ${(parentDog as SerializedDog<unknown>).storageId}) zum Context hinzu`);
+                    console.log(
+                        `[SerializedDog ${this.storageId}] Füge ${dogName} (storageId: ${(parentDog as SerializedDog<unknown>).storageId}) zum Context hinzu`,
+                    );
                 }
                 // If the parent carries extra tools for the VM, inscribe them too
                 if (typeof parentDog.getVmContextContributions === 'function') {
@@ -1284,7 +1319,10 @@ export class SerializedDog<T> extends Dog<T> {
                 console.log(`[SerializedDog ${this.storageId}] Context keys (raw):`, Object.keys(contextObj));
                 console.log(`[SerializedDog ${this.storageId}] Context keys (worker-safe):`, Object.keys(safeContext));
                 if (bridgeNamespaces.length > 0) {
-                    console.log(`[SerializedDog ${this.storageId}] Bridge namespaces:`, bridgeNamespaces.map(b => `${b.namespace}.{${b.methods.join(',')}}`));
+                    console.log(
+                        `[SerializedDog ${this.storageId}] Bridge namespaces:`,
+                        bridgeNamespaces.map((b) => `${b.namespace}.{${b.methods.join(',')}}`),
+                    );
                 }
             }
 
@@ -1308,8 +1346,10 @@ export class SerializedDog<T> extends Dog<T> {
                     const v = (safeContext as any)[k];
                     let t: string;
                     try {
-                        t = typeof v + '/' + (Array.isArray(v) ? 'array' : (v === null ? 'null' : Object.prototype.toString.call(v)));
-                    } catch { t = '<unreadable>'; }
+                        t = typeof v + '/' + (Array.isArray(v) ? 'array' : v === null ? 'null' : Object.prototype.toString.call(v));
+                    } catch {
+                        t = '<unreadable>';
+                    }
                     console.error(`  [${k}]: ${t}`);
                 }
                 // Throw -- the harvester's letOut() will catch, brand the dog with __error,
@@ -1361,10 +1401,8 @@ export class SerializedDog<T> extends Dog<T> {
                     isolateSpawned = true;
                     // Der Laufzeit-Waechter darf dieses Isolat unter Speicherdruck beenden: settle() markiert es
                     // als terminating, beendet den Worker und laesst den Lauf mit DOG_MEMPRESSURE_MARKER scheitern.
-                    const isolate = gate.isolateSpawned(
-                        lease,
-                        { storageId: this.storageId, name: this.name },
-                        (memoryError) => settle(() => reject(memoryError)),
+                    const isolate = gate.isolateSpawned(lease, { storageId: this.storageId, name: this.name }, (memoryError) =>
+                        settle(() => reject(memoryError)),
                     );
 
                     let settled = false;
@@ -1379,9 +1417,7 @@ export class SerializedDog<T> extends Dog<T> {
                     };
 
                     const timer = setTimeout(() => {
-                        settle(() => reject(new Error(
-                            `SerializedDog ${this.storageId}: ${DOG_TIMEOUT_MARKER} ${timeoutMs}ms`
-                        )));
+                        settle(() => reject(new Error(`SerializedDog ${this.storageId}: ${DOG_TIMEOUT_MARKER} ${timeoutMs}ms`)));
                     }, timeoutMs);
 
                     // Persistent listener -- rpc:call messages can arrive any number of times
@@ -1441,21 +1477,31 @@ export class SerializedDog<T> extends Dog<T> {
                         isolate.exited();
                         // Ein Ergebnis kommt immer VOR 'exit' an (Node leert den Port vorher). Wer hier
                         // noch nicht entschieden ist, kommt nie mehr: frueher hielt Code 0 den Lauf bis zum Timer.
-                        settle(() => reject(new Error(code !== 0
-                            ? `SerializedDog ${this.storageId}: sandbox worker exited with code ${code}`
-                            : `SerializedDog ${this.storageId}: sandbox worker exited before returning a result`
-                        )));
+                        settle(() =>
+                            reject(
+                                new Error(
+                                    code !== 0
+                                        ? `SerializedDog ${this.storageId}: sandbox worker exited with code ${code}`
+                                        : `SerializedDog ${this.storageId}: sandbox worker exited before returning a result`,
+                                ),
+                            ),
+                        );
                     });
 
                     // Send the payload AFTER Worker is up. Any clone failure here surfaces via the
                     // 'error' listener with full diagnostic, not as a synchronous throw that we'd
                     // misattribute to the user's code.
                     try {
-                        worker.postMessage({ wrappedCode, contextObj: safeContext, bridgeNamespaces, fetchMaxBodyBytes: resolveDogFetchMaxBodyBytes() });
+                        worker.postMessage({
+                            wrappedCode,
+                            contextObj: safeContext,
+                            bridgeNamespaces,
+                            fetchMaxBodyBytes: resolveDogFetchMaxBodyBytes(),
+                        });
                     } catch (postErr: any) {
-                        settle(() => reject(new Error(
-                            `SerializedDog ${this.storageId}: postMessage failed: ${postErr?.message ?? postErr}`
-                        )));
+                        settle(() =>
+                            reject(new Error(`SerializedDog ${this.storageId}: postMessage failed: ${postErr?.message ?? postErr}`)),
+                        );
                     }
                 });
             } catch (err: any) {
@@ -1466,15 +1512,11 @@ export class SerializedDog<T> extends Dog<T> {
                 const scriptError = `[SerializedDog ${this.storageId}] Script Error: ${err?.message ?? err}`;
                 if (vmConsoleSink) vmConsoleSink('error', scriptError, this.capabilityCtx);
                 else console.error(scriptError);
-                throw err instanceof Error
-                    ? err
-                    : new Error(typeof err === 'string' ? err : String(err));
+                throw err instanceof Error ? err : new Error(typeof err === 'string' ? err : String(err));
             }
         } finally {
             // Kein Isolat entstanden -> der Slot geht hier zurueck. Sonst gibt ihn erst das 'exit' frei.
             if (!isolateSpawned) lease.release();
         }
     }
-
-
 }

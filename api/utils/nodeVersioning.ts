@@ -20,7 +20,7 @@ export async function createNodeConfigFromSaveInput(
         parentsOptional?: string[];
         serializedDogConfig?: ISerializedDogConfig;
     },
-    store: IStore
+    store: IStore,
 ): Promise<{ config: ISerializedDogConfig; nextVersionId: string }> {
     const id = input.id;
     const tsCode = input.tsCode || input.code || '';
@@ -37,9 +37,8 @@ export async function createNodeConfigFromSaveInput(
     if (existingData) {
         existing = typeof existingData === 'string' ? JSON.parse(existingData) : existingData;
         if (existing.serializedDogConfig) {
-            existing = typeof existing.serializedDogConfig === 'string'
-                ? JSON.parse(existing.serializedDogConfig)
-                : existing.serializedDogConfig;
+            existing =
+                typeof existing.serializedDogConfig === 'string' ? JSON.parse(existing.serializedDogConfig) : existing.serializedDogConfig;
         }
     }
 

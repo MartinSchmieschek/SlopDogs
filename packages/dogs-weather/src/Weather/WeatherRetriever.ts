@@ -12,10 +12,18 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey, GEO_CACHE_TTL_WEATHER_MS } from "@slopdogs/core";
-import { getWeather } from "./weatherApiClient";
-import type { WeatherResult } from "./interfaces/weatherTypes";
-import { WeatherQueryPact, type WeatherQuery } from "./pacts";
+import {
+    Dog,
+    IHuntingDog,
+    IHuntingSeason,
+    type ICacheHandler,
+    type ICacheable,
+    geoBucketKey,
+    GEO_CACHE_TTL_WEATHER_MS,
+} from '@slopdogs/core';
+import { getWeather } from './weatherApiClient';
+import type { WeatherResult } from './interfaces/weatherTypes';
+import { WeatherQueryPact, type WeatherQuery } from './pacts';
 
 /**
  * Arr, the WeatherRetriever — a spectral hound that sniffs out
@@ -39,7 +47,7 @@ export class WeatherRetriever extends Dog<WeatherResult> implements ICacheable {
     }
 
     get icon(): string | undefined {
-        return "\u26C5";
+        return '\u26C5';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -51,7 +59,7 @@ export class WeatherRetriever extends Dog<WeatherResult> implements ICacheable {
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<WeatherResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(WeatherQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(WeatherQueryPact, d));
         const query = (queryDog?.collected as WeatherQuery | undefined) ?? ({} as WeatherQuery);
 
         const lat = parseFloat(query['lat']);
@@ -64,7 +72,7 @@ export class WeatherRetriever extends Dog<WeatherResult> implements ICacheable {
         // Wetter ist auf 1-km-Kacheln gebucketet — Open-Meteo liefert ohnehin
         // nur auf diesem Grid aufgeloeste Vorhersagen, GPS-Jitter soll keine
         // Cache-Misses ausloesen.
-        const key = geoBucketKey("weather", lat, lng, 1000, {
+        const key = geoBucketKey('weather', lat, lng, 1000, {
             extras: {
                 date: query['date'] ?? 'today',
                 time: query['time'] ?? 'now',
@@ -72,9 +80,7 @@ export class WeatherRetriever extends Dog<WeatherResult> implements ICacheable {
         });
 
         if (this.cacheHandler) {
-            return this.cacheHandler.getOrFetch(key, GEO_CACHE_TTL_WEATHER_MS, () =>
-                getWeather(lat, lng, query['time'], query['date'])
-            );
+            return this.cacheHandler.getOrFetch(key, GEO_CACHE_TTL_WEATHER_MS, () => getWeather(lat, lng, query['time'], query['date']));
         }
         return getWeather(lat, lng, query['time'], query['date']);
     };

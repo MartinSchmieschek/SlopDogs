@@ -18,7 +18,7 @@
  * mehr in jeden einzelnen Retriever.
  */
 
-import { readOverpassBodyText } from "./overpassResponseLimit";
+import { readOverpassBodyText } from './overpassResponseLimit';
 
 /** Overpass `[timeout:N]` — Server bricht die Query ab (leicht unter Client-Cap). */
 const DEFAULT_OVERPASS_QUERY_TIMEOUT_SEC = 25;
@@ -88,10 +88,7 @@ function releaseSlot(url: string, outcome: 'ok' | 'transient' | 'permanent'): vo
         s.backoffUntil = 0;
     } else if (outcome === 'transient') {
         s.consecutiveFailures++;
-        const backoff = Math.min(
-            OVERPASS_BACKOFF_INITIAL_MS * 2 ** (s.consecutiveFailures - 1),
-            OVERPASS_BACKOFF_MAX_MS,
-        );
+        const backoff = Math.min(OVERPASS_BACKOFF_INITIAL_MS * 2 ** (s.consecutiveFailures - 1), OVERPASS_BACKOFF_MAX_MS);
         s.backoffUntil = Date.now() + backoff;
     }
     // permanent: keinen Backoff setzen — der Fehler ist client-side.
@@ -104,27 +101,27 @@ function releaseSlot(url: string, outcome: 'ok' | 'transient' | 'permanent'): vo
 // Fehler-Signal. Das bricht Caching-Entscheidungen, da ein "negatives" Resultat
 // persistiert wird. Besser komplett weglassen.
 const FALLBACK_OVERPASS_URLS = [
-    "https://overpass-api.de/api/interpreter",
-    "https://lz4.overpass-api.de/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter",
+    'https://overpass-api.de/api/interpreter',
+    'https://lz4.overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
 ];
 
 function parseEnvPositiveInt(name: string, fallback: number): number {
     const v = process.env[name];
-    if (v == null || v === "") return fallback;
+    if (v == null || v === '') return fallback;
     const n = parseInt(v, 10);
     return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
 /** Overpass-Server-Timeout (`[timeout:N]`). Env: OVERPASS_QUERY_TIMEOUT_SEC. */
 export function getOverpassQueryTimeoutSec(): number {
-    return parseEnvPositiveInt("OVERPASS_QUERY_TIMEOUT_SEC", DEFAULT_OVERPASS_QUERY_TIMEOUT_SEC);
+    return parseEnvPositiveInt('OVERPASS_QUERY_TIMEOUT_SEC', DEFAULT_OVERPASS_QUERY_TIMEOUT_SEC);
 }
 
 /** HTTP-Client-Abort-Budget pro Overpass-Request (nicht Tile-Cache). Env: OVERPASS_FETCH_TIMEOUT_MS. */
 export function getOverpassFetchTimeoutMs(): number {
     const fromEnv = process.env.OVERPASS_FETCH_TIMEOUT_MS;
-    if (fromEnv != null && fromEnv !== "") {
+    if (fromEnv != null && fromEnv !== '') {
         const n = parseInt(fromEnv, 10);
         if (Number.isFinite(n) && n >= MIN_OVERPASS_FETCH_TIMEOUT_MS) return n;
     }
@@ -136,7 +133,11 @@ export function getOverpassUrlChain(): string[] {
     const chain: string[] = [];
     const multi = process.env.OVERPASS_URLS;
     if (multi) {
-        for (const u of multi.split(",").map((s) => s.trim()).filter(Boolean)) chain.push(u);
+        for (const u of multi
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean))
+            chain.push(u);
     } else {
         const single = process.env.OVERPASS_URL;
         if (single) chain.push(single);
@@ -166,18 +167,21 @@ export interface OverpassRawElement {
 function extractOverpassError(body: string): string {
     const match = body.match(/<p[^>]*>\s*(?:<strong[^>]*>[^<]*<\/strong>\s*:?\s*)?([^<]{5,300})<\/p>/i);
     if (match && match[1]) return match[1].trim();
-    const stripped = body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    const stripped = body
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
     return stripped.slice(0, 200);
 }
 
 function isRetryableOverpassError(err: unknown): boolean {
     if (!err) return false;
     const e = err as { name?: string; message?: string; code?: string };
-    if (e.name === "AbortError") return true;
-    const msg = (e.message ?? "").toLowerCase();
+    if (e.name === 'AbortError') return true;
+    const msg = (e.message ?? '').toLowerCase();
     if (!msg) return false;
-    if (msg.includes("fetch failed") || msg.includes("network") || msg.includes("econn") || msg.includes("etimedout")) return true;
-    if (msg.includes("returned non-json")) return true;
+    if (msg.includes('fetch failed') || msg.includes('network') || msg.includes('econn') || msg.includes('etimedout')) return true;
+    if (msg.includes('returned non-json')) return true;
     if (/http\s+(5\d\d|429|408)/.test(msg)) return true;
     return false;
 }
@@ -188,9 +192,7 @@ async function fetchOverpassOnce(
     fetchTimeoutMs: number,
     userAgentLabel: string,
 ): Promise<OverpassRawElement[]> {
-    const userAgent =
-        process.env.OVERPASS_USER_AGENT ??
-        `SlopDogs/${userAgentLabel} (contact: set OVERPASS_USER_AGENT)`;
+    const userAgent = process.env.OVERPASS_USER_AGENT ?? `SlopDogs/${userAgentLabel} (contact: set OVERPASS_USER_AGENT)`;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), fetchTimeoutMs);
@@ -198,19 +200,17 @@ async function fetchOverpassOnce(
     let res: Response;
     try {
         res = await fetch(url, {
-            method: "POST",
+            method: 'POST',
             headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-                "User-Agent": userAgent,
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'User-Agent': userAgent,
             },
             body: `data=${encodeURIComponent(overpassQuery)}`,
             signal: controller.signal,
         });
     } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") {
-            throw new Error(
-                `${userAgentLabel}: Overpass request aborted after ${fetchTimeoutMs}ms (client timeout)`,
-            );
+        if (err instanceof Error && err.name === 'AbortError') {
+            throw new Error(`${userAgentLabel}: Overpass request aborted after ${fetchTimeoutMs}ms (client timeout)`);
         }
         throw err;
     } finally {
@@ -223,24 +223,18 @@ async function fetchOverpassOnce(
         rawBody = await readOverpassBodyText(res, userAgentLabel);
     } catch (err) {
         if (!res.ok) {
-            throw new Error(
-                `${userAgentLabel}: Overpass HTTP ${res.status} ${res.statusText} — ${(err as Error)?.message ?? err}`
-            );
+            throw new Error(`${userAgentLabel}: Overpass HTTP ${res.status} ${res.statusText} — ${(err as Error)?.message ?? err}`);
         }
         throw err;
     }
     if (!res.ok) {
-        throw new Error(
-            `${userAgentLabel}: Overpass HTTP ${res.status} ${res.statusText}${rawBody ? ` — ${rawBody.slice(0, 200)}` : ""}`
-        );
+        throw new Error(`${userAgentLabel}: Overpass HTTP ${res.status} ${res.statusText}${rawBody ? ` — ${rawBody.slice(0, 200)}` : ''}`);
     }
-    const contentType = res.headers.get("content-type") ?? "";
-    const looksLikeHtml = rawBody.trimStart().startsWith("<");
-    if (!contentType.includes("json") || looksLikeHtml) {
+    const contentType = res.headers.get('content-type') ?? '';
+    const looksLikeHtml = rawBody.trimStart().startsWith('<');
+    if (!contentType.includes('json') || looksLikeHtml) {
         const hint = extractOverpassError(rawBody);
-        throw new Error(
-            `${userAgentLabel}: Overpass returned non-JSON (${contentType || "no content-type"})${hint ? ` — ${hint}` : ""}`
-        );
+        throw new Error(`${userAgentLabel}: Overpass returned non-JSON (${contentType || 'no content-type'})${hint ? ` — ${hint}` : ''}`);
     }
 
     let json: { elements?: OverpassRawElement[] };
@@ -257,10 +251,7 @@ async function fetchOverpassOnce(
  * bis einer sauber antwortet. Transient-Fehler springen zum naechsten Mirror,
  * permanente Fehler (Bad-Query, Parse) bubbeln sofort durch.
  */
-export async function fetchOverpassElementsWithFallback(
-    overpassQuery: string,
-    userAgentLabel: string,
-): Promise<OverpassRawElement[]> {
+export async function fetchOverpassElementsWithFallback(overpassQuery: string, userAgentLabel: string): Promise<OverpassRawElement[]> {
     const urls = getOverpassUrlChain();
     const fetchTimeoutMs = getOverpassFetchTimeoutMs();
     const errors: string[] = [];
@@ -279,9 +270,7 @@ export async function fetchOverpassElementsWithFallback(
             errors.push(label);
             if (!transient || i === urls.length - 1) {
                 if (errors.length === 1) throw err;
-                throw new Error(
-                    `${userAgentLabel}: all Overpass mirrors failed — ${errors.join(" | ")}`
-                );
+                throw new Error(`${userAgentLabel}: all Overpass mirrors failed — ${errors.join(' | ')}`);
             }
         }
     }
@@ -295,9 +284,7 @@ export function overpassSettingsHeader(): string {
 }
 
 /** Representativer Punkt aus einem Overpass-Element, zieht `lat/lon` oder `center`. */
-export function overpassElementRepresentativePoint(
-    el: OverpassRawElement,
-): { lat: number; lng: number } | null {
+export function overpassElementRepresentativePoint(el: OverpassRawElement): { lat: number; lng: number } | null {
     if (el.lat != null && el.lon != null) return { lat: el.lat, lng: el.lon };
     if (el.center) return { lat: el.center.lat, lng: el.center.lon };
     return null;

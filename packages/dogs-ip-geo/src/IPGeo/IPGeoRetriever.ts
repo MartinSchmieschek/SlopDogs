@@ -9,10 +9,10 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from "@slopdogs/core";
-import { getIPGeoData } from "./ipGeoApiClient";
-import type { IPGeoResult } from "./interfaces/ipGeoTypes";
-import { IPGeoQueryPact, type IPGeoQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { getIPGeoData } from './ipGeoApiClient';
+import type { IPGeoResult } from './interfaces/ipGeoTypes';
+import { IPGeoQueryPact, type IPGeoQuery } from './pacts';
 
 /**
  * Arr, the IPGeoRetriever — a spectral hound that sniffs out
@@ -35,7 +35,7 @@ export class IPGeoRetriever extends Dog<IPGeoResult> implements ICacheable {
     }
 
     get icon(): string | undefined {
-        return "\uD83C\uDF10";
+        return '\uD83C\uDF10';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -47,7 +47,7 @@ export class IPGeoRetriever extends Dog<IPGeoResult> implements ICacheable {
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<IPGeoResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(IPGeoQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(IPGeoQueryPact, d));
         const query = (queryDog?.collected as IPGeoQuery | undefined) ?? ({} as IPGeoQuery);
 
         const ip = query['ip'] ?? '';
@@ -55,9 +55,7 @@ export class IPGeoRetriever extends Dog<IPGeoResult> implements ICacheable {
         const key = `ipgeo:${ip || 'auto'}`;
 
         if (this.cacheHandler) {
-            return this.cacheHandler.getOrFetch(key, 5 * 60_000, () =>
-                getIPGeoData(ip || undefined)
-            );
+            return this.cacheHandler.getOrFetch(key, 5 * 60_000, () => getIPGeoData(ip || undefined));
         }
         return getIPGeoData(ip || undefined);
     };

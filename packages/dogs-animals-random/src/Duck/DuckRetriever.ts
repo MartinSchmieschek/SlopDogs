@@ -1,7 +1,7 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from "@slopdogs/core";
-import { getRandomDuck } from "./duckApiClient";
-import type { DuckResult } from "./interfaces/duckTypes";
-import { DuckQueryPact } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { getRandomDuck } from './duckApiClient';
+import type { DuckResult } from './interfaces/duckTypes';
+import { DuckQueryPact } from './pacts';
 
 export class DuckRetriever extends Dog<DuckResult> implements ICacheable {
     private cacheHandler?: ICacheHandler;
@@ -15,11 +15,11 @@ export class DuckRetriever extends Dog<DuckResult> implements ICacheable {
     }
 
     get description(): string {
-        return "Holt ein zufaelliges Enten-Bild/GIF von random-d.uk.";
+        return 'Holt ein zufaelliges Enten-Bild/GIF von random-d.uk.';
     }
 
     get icon(): string | undefined {
-        return "\uD83E\uDD86";
+        return '\uD83E\uDD86';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {

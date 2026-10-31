@@ -11,9 +11,9 @@
  * =========================================================================
  */
 
-import type { WaterCurrent, WaterHourlyEntry, WaterResult } from "./interfaces/waterTypes";
+import type { WaterCurrent, WaterHourlyEntry, WaterResult } from './interfaces/waterTypes';
 
-const MARINE_API_BASE = "https://marine-api.open-meteo.com/v1/marine";
+const MARINE_API_BASE = 'https://marine-api.open-meteo.com/v1/marine';
 
 /**
  * Fetch marine/water conditions from Open-Meteo Marine API.
@@ -27,7 +27,7 @@ export async function getWaterConditions(lat: number, lng: number): Promise<Wate
         `hourly=wave_height,wave_direction,wave_period,ocean_current_velocity,ocean_current_direction,sea_water_temperature`,
         `timezone=auto`,
         `forecast_days=2`,
-    ].join("&");
+    ].join('&');
 
     const url = `${MARINE_API_BASE}?${params}`;
 
@@ -37,7 +37,7 @@ export async function getWaterConditions(lat: number, lng: number): Promise<Wate
     let res: Response;
     try {
         res = await fetch(url, {
-            headers: { "Accept": "application/json", "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)" },
+            headers: { Accept: 'application/json', 'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)' },
             signal: controller.signal,
         });
     } finally {
@@ -45,11 +45,11 @@ export async function getWaterConditions(lat: number, lng: number): Promise<Wate
     }
 
     if (!res.ok) {
-        const text = await res.text().catch(() => "");
+        const text = await res.text().catch(() => '');
         // Open-Meteo returns errors for inland locations
-        if (res.status === 400 || text.toLowerCase().includes("no data")) {
+        if (res.status === 400 || text.toLowerCase().includes('no data')) {
             return {
-                error: "No marine data for this location",
+                error: 'No marine data for this location',
                 current: null,
                 hourly: [],
             };
@@ -62,7 +62,7 @@ export async function getWaterConditions(lat: number, lng: number): Promise<Wate
         data = await res.json();
     } catch {
         return {
-            error: "No marine data for this location",
+            error: 'No marine data for this location',
             current: null,
             hourly: [],
         };
@@ -71,7 +71,7 @@ export async function getWaterConditions(lat: number, lng: number): Promise<Wate
     // Some inland coordinates return 200 but with null/empty data
     if (!data.current && !data.hourly) {
         return {
-            error: "No marine data for this location",
+            error: 'No marine data for this location',
             current: null,
             hourly: [],
         };

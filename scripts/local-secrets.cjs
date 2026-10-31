@@ -122,7 +122,11 @@ if ((process.env.SLOPDOGS_MODE || '').trim() === 'local') {
         } catch {
             return null;
         } finally {
-            try { db?.close(); } catch { /* ignore */ }
+            try {
+                db?.close();
+            } catch {
+                /* ignore */
+            }
         }
     };
 
@@ -140,7 +144,9 @@ if ((process.env.SLOPDOGS_MODE || '').trim() === 'local') {
             (process.env.LOCAL_SECRETS_FILE || '').trim() || path.join(os.homedir(), '.slopdogs', 'local-secrets.env'),
         );
         if (isInside(realish(file), realish(process.cwd()))) {
-            fail(`LOCAL_SECRETS_FILE ${file} liegt im Repo (${process.cwd()}) — die Schluessel duerfen nie ins Repo. Pfad ausserhalb waehlen.`);
+            fail(
+                `LOCAL_SECRETS_FILE ${file} liegt im Repo (${process.cwd()}) — die Schluessel duerfen nie ins Repo. Pfad ausserhalb waehlen.`,
+            );
         }
         fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
 
@@ -169,11 +175,15 @@ if ((process.env.SLOPDOGS_MODE || '').trim() === 'local') {
                     const authDb = authDatabaseFile();
                     const keys = authDb ? storedKeyCount(authDb) : 0;
                     if (keys === null) {
-                        console.warn(`[local-secrets] WARNUNG: neuer KEYSTORE_MASTER_KEY_V1, Auth-DB ${authDb} nicht pruefbar — `
-                            + 'liegen dort schon Schluessel, sind sie danach unlesbar.');
+                        console.warn(
+                            `[local-secrets] WARNUNG: neuer KEYSTORE_MASTER_KEY_V1, Auth-DB ${authDb} nicht pruefbar — ` +
+                                'liegen dort schon Schluessel, sind sie danach unlesbar.',
+                        );
                     } else if (keys > 0) {
-                        fail(`neuer KEYSTORE_MASTER_KEY_V1 waere noetig, aber die Auth-DB ${authDb} haelt ${keys} gespeicherte Schluessel — `
-                            + 'sie waeren danach unlesbar. Stimmt LOCAL_SECRETS_FILE bzw. das HOME des Dienstes? Die alte Datei wiederherstellen.');
+                        fail(
+                            `neuer KEYSTORE_MASTER_KEY_V1 waere noetig, aber die Auth-DB ${authDb} haelt ${keys} gespeicherte Schluessel — ` +
+                                'sie waeren danach unlesbar. Stimmt LOCAL_SECRETS_FILE bzw. das HOME des Dienstes? Die alte Datei wiederherstellen.',
+                        );
                     }
                 }
                 const fresh = crypto.randomBytes(32).toString('hex');

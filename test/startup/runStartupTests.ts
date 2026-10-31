@@ -27,7 +27,9 @@ class StartupTestRun {
     private report(results: TestResult[]): number {
         const failed = results.filter((r) => !r.passed);
         const seconds = ((Date.now() - this.startedAt) / 1000).toFixed(1);
-        console.log(`[test:startup] ${results.length} Tests gelaufen, ${results.length - failed.length} bestanden, ${failed.length} fehlgeschlagen (${seconds} s)`);
+        console.log(
+            `[test:startup] ${results.length} Tests gelaufen, ${results.length - failed.length} bestanden, ${failed.length} fehlgeschlagen (${seconds} s)`,
+        );
         for (const r of failed) console.log(`[test:startup] FAIL ${r.name}: ${r.error ?? 'ohne Fehlertext'}`);
         if (results.length === 0) {
             console.log('[test:startup] FAIL: kein einziger Test ist gelaufen');
@@ -39,11 +41,7 @@ class StartupTestRun {
     /** Gibt Pools, Zaehler und den Wachposten frei; ein Fehler hier aendert das Testergebnis nicht. */
     private static async release(booted: BootedApplication): Promise<void> {
         await booted.callCounter.stop();
-        await Promise.allSettled([
-            booted.store.disconnect(),
-            booted.jsonStorageService.disconnect(),
-            booted.disconnectHttpApplication(),
-        ]);
+        await Promise.allSettled([booted.store.disconnect(), booted.jsonStorageService.disconnect(), booted.disconnectHttpApplication()]);
         await Watchpost.stopShared();
     }
 }

@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface BoredQuery {
     /** Typ: education, recreational, social, diy, charity, cooking, relaxation, music, busywork */
@@ -11,7 +11,4 @@ export interface BoredQuery {
     maxAccessibility?: number;
 }
 
-export const BoredQueryPact = createPact<BoredQuery>(
-    "BoredQueryProvider",
-    { fromSourceType: "BoredQuery" }
-);
+export const BoredQueryPact = createPact<BoredQuery>('BoredQueryProvider', { fromSourceType: 'BoredQuery' });

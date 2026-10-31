@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface QuoteQuery {
     /** Autor-Filter (Slug, e.g. "albert-einstein") — optional */
@@ -11,7 +11,4 @@ export interface QuoteQuery {
     maxLength?: number;
 }
 
-export const QuoteQueryPact = createPact<QuoteQuery>(
-    "QuoteQueryProvider",
-    { fromSourceType: "QuoteQuery" }
-);
+export const QuoteQueryPact = createPact<QuoteQuery>('QuoteQueryProvider', { fromSourceType: 'QuoteQuery' });

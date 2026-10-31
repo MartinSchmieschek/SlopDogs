@@ -17,14 +17,18 @@ export interface KennelFavoriteView {
 
 /** Ein abgelehnter Favoriten-Zugriff — Status und Code wie in der REST-Antwort. */
 export class FavoriteError extends Error {
-    constructor(readonly status: 401 | 403 | 404, readonly code: string, description?: string) {
+    constructor(
+        readonly status: 401 | 403 | 404,
+        readonly code: string,
+        description?: string,
+    ) {
         super(description ?? code);
         this.name = 'FavoriteError';
     }
 }
 
 export class KennelFavoriteService {
-    constructor(private readonly store: FavoriteStore) { }
+    constructor(private readonly store: FavoriteStore) {}
 
     /**
      * Haengt `favorite` in place an (additiv wie `stats`). Eine Abfrage je Aufruf ueber den userId-Index;
@@ -35,9 +39,7 @@ export class KennelFavoriteService {
         ctx: AuthCtx | undefined,
     ): Promise<Array<T & { favorite: boolean }>> {
         const userId = ctx?.user?.id;
-        const favorites = userId && kennels.length > 0
-            ? new Set(await this.store.readKennelFavoriteIds(userId))
-            : new Set<string>();
+        const favorites = userId && kennels.length > 0 ? new Set(await this.store.readKennelFavoriteIds(userId)) : new Set<string>();
         for (const k of kennels) (k as T & { favorite: boolean }).favorite = favorites.has(statsKeyOf(k));
         return kennels as Array<T & { favorite: boolean }>;
     }

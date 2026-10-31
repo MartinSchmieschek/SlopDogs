@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface WikidataQuery {
     /** Roh-SPARQL (wenn gesetzt, werden search/entity ignoriert) */
@@ -13,7 +13,4 @@ export interface WikidataQuery {
     limit?: number;
 }
 
-export const WikidataQueryPact = createPact<WikidataQuery>(
-    "WikidataQueryProvider",
-    { fromSourceType: "WikidataQuery" }
-);
+export const WikidataQueryPact = createPact<WikidataQuery>('WikidataQueryProvider', { fromSourceType: 'WikidataQuery' });

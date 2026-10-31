@@ -9,7 +9,6 @@ import { MimicDog } from '@slopdogs/core';
  * values to types and conjures global declarations from the abyss.
  */
 export class TypeDefBuilder {
-
     /** A cursed ledger mapping pact names to their return type definitions, plundered from the deep. */
     private static pactReturnTypes: Map<string, string> = new Map();
 
@@ -53,9 +52,7 @@ export class TypeDefBuilder {
         for (const { pactName, sourceTypeName } of fromSource) {
             const resolved = defs.get(sourceTypeName);
             if (!resolved) {
-                throw new Error(
-                    `[TypeDefBuilder] Kein Typ-String für Pact "${pactName}" (Quelle: ${sourceTypeName}).`
-                );
+                throw new Error(`[TypeDefBuilder] Kein Typ-String für Pact "${pactName}" (Quelle: ${sourceTypeName}).`);
             }
             this.pactReturnTypes.set(pactName, resolved);
         }
@@ -78,7 +75,7 @@ export class TypeDefBuilder {
             uniqueInstanceKey != null && uniqueInstanceKey !== ''
                 ? this.expectedReturnAliasTypeName(uniqueInstanceKey)
                 : '__ExpectedReturn';
-        let interfaceDefs = "";
+        let interfaceDefs = '';
 
         for (const value of Object.values(ctx)) {
             if (value && typeof value === 'object' && !Array.isArray(value)) {
@@ -88,7 +85,7 @@ export class TypeDefBuilder {
                     if (className && className !== 'Object') {
                         const classType = CompilerCache.getClassType(className);
                         if (classType?.referencedInterfaces) {
-                            interfaceDefs += classType.referencedInterfaces + "\n";
+                            interfaceDefs += classType.referencedInterfaces + '\n';
                         }
                     }
                 }
@@ -97,11 +94,11 @@ export class TypeDefBuilder {
 
         const typeBody = this.valueToType(ctx, 1);
 
-        let globalVars = "";
-        Object.keys(ctx).forEach(key => {
+        let globalVars = '';
+        Object.keys(ctx).forEach((key) => {
             globalVars += `
             declare global {
-            type ${key} = ${this.valueToType(ctx[key], 2) };
+            type ${key} = ${this.valueToType(ctx[key], 2)};
 
             const ${key}: ${key};
           }
@@ -144,12 +141,7 @@ ${this.buildGlobals(typeName, ctx)}
      * @returns A safe TypeScript type name prefixed with "Node_".
      */
     private static safeTypeName(name: string): string {
-        return (
-            "Node_" +
-            name
-                .replace(/[^a-zA-Z0-9_]/g, "_")
-                .replace(/^[^a-zA-Z_]/, "_")
-        );
+        return 'Node_' + name.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^[^a-zA-Z_]/, '_');
     }
 
     /**
@@ -162,11 +154,8 @@ ${this.buildGlobals(typeName, ctx)}
      */
     private static buildGlobals(typeName: string, ctx: any): string {
         return Object.keys(ctx)
-            .map(
-                key =>
-                    `declare global {\n  const ${key}: ${typeName}["${key}"];\n}`
-            )
-            .join("\n");
+            .map((key) => `declare global {\n  const ${key}: ${typeName}["${key}"];\n}`)
+            .join('\n');
     }
 
     /**
@@ -179,31 +168,31 @@ ${this.buildGlobals(typeName, ctx)}
      * @returns A TypeScript type string representing the value's eldritch shape.
      */
     private static valueToType(value: any, indent: number): string {
-        const pad = (n: number) => "  ".repeat(n);
+        const pad = (n: number) => '  '.repeat(n);
 
-        if (value === null) return "null";
+        if (value === null) return 'null';
 
         if (Array.isArray(value)) {
-            if (value.length === 0) return "any[]";
+            if (value.length === 0) return 'any[]';
             return `${this.valueToType(value[0], indent)}[]`;
         }
 
         switch (typeof value) {
-            case "string": return "string";
-            case "number": return "number";
-            case "boolean": return "boolean";
+            case 'string':
+                return 'string';
+            case 'number':
+                return 'number';
+            case 'boolean':
+                return 'boolean';
 
-            case "function": {
-                const args = Array.from(
-                    { length: value.length },
-                    (_, i) => `arg${i}: any`
-                ).join(", ");
+            case 'function': {
+                const args = Array.from({ length: value.length }, (_, i) => `arg${i}: any`).join(', ');
                 const isAsync = value.constructor?.name === 'AsyncFunction';
                 const returnType = isAsync ? 'Promise<any>' : 'any';
                 return `(${args}) => ${returnType}`;
             }
 
-            case "object": {
+            case 'object': {
                 const proto = Object.getPrototypeOf(value);
 
                 if (proto && proto !== Object.prototype) {
@@ -211,11 +200,9 @@ ${this.buildGlobals(typeName, ctx)}
                     if (className && className !== 'Object') {
                         const classType = CompilerCache.getClassType(className);
                         if (classType) {
-                            const lines = Object.entries(classType.members).map(
-                                ([k, v]) => `${pad(indent)}${k}: ${v};`
-                            );
-                            if (!lines.length) return "{}";
-                            return `{\n${lines.join("\n")}\n${pad(indent - 1)}}`;
+                            const lines = Object.entries(classType.members).map(([k, v]) => `${pad(indent)}${k}: ${v};`);
+                            if (!lines.length) return '{}';
+                            return `{\n${lines.join('\n')}\n${pad(indent - 1)}}`;
                         }
                     }
 
@@ -236,26 +223,21 @@ ${this.buildGlobals(typeName, ctx)}
                         }
                     }
 
-                    if (!entries.length) return "{}";
-                    const lines = entries.map(
-                        ([k, v]) => `${pad(indent)}${k}: ${this.valueToType(v, indent + 1)};`
-                    );
-                    return `{\n${lines.join("\n")}\n${pad(indent - 1)}}`;
+                    if (!entries.length) return '{}';
+                    const lines = entries.map(([k, v]) => `${pad(indent)}${k}: ${this.valueToType(v, indent + 1)};`);
+                    return `{\n${lines.join('\n')}\n${pad(indent - 1)}}`;
                 }
 
                 const entries: [string, any][] = Object.entries(value);
-                if (!entries.length) return "{}";
+                if (!entries.length) return '{}';
 
-                const lines = entries.map(
-                    ([k, v]) =>
-                        `${pad(indent)}${k}: ${this.valueToType(v, indent + 1)};`
-                );
+                const lines = entries.map(([k, v]) => `${pad(indent)}${k}: ${this.valueToType(v, indent + 1)};`);
 
-                return `{\n${lines.join("\n")}\n${pad(indent - 1)}}`;
+                return `{\n${lines.join('\n')}\n${pad(indent - 1)}}`;
             }
 
             default:
-                return "any";
+                return 'any';
         }
     }
 }

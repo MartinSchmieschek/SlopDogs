@@ -44,7 +44,7 @@ export abstract class FetchBaseDog<T> extends Dog<T> {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            return await response.json() as T;
+            return (await response.json()) as T;
         } catch (error) {
             throw new Error(`Failed to fetch from ${this.apiUrl}: ${error instanceof Error ? error.message : String(error)}`);
         }

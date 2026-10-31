@@ -11,11 +11,7 @@
  */
 
 import { IHuntingDog as IDog } from './core/entities/IHuntingDog';
-import {
-    SerializedDog,
-    type SerializedDogVmGlobalsSupplier,
-    type VmGlobalCapabilityContext,
-} from './dogs/SerializedDog';
+import { SerializedDog, type SerializedDogVmGlobalsSupplier, type VmGlobalCapabilityContext } from './dogs/SerializedDog';
 import { MimicDog, IMimicDogConfig } from './dogs/MimicDog';
 import { SeasonRunner } from './harverster';
 import { IHuntingSeason } from './core/entities/IHuntingSeason';
@@ -97,10 +93,7 @@ export interface IKennelEdgeAnnotation {
  * `preferredLineageIds` (e.g. from a prior kennel version), fall back to the newest match in the deep.
  * Returning `null` means "no adoption — let autoMimic forge a fresh placeholder".
  */
-export type MimicAdopter = (
-    pactName: string,
-    preferredLineageIds: ReadonlySet<string>,
-) => Promise<MimicDog<unknown> | null>;
+export type MimicAdopter = (pactName: string, preferredLineageIds: ReadonlySet<string>) => Promise<MimicDog<unknown> | null>;
 
 export class KennelRun {
     private config?: IKennelConfig;
@@ -169,7 +162,7 @@ export class KennelRun {
         bodyData?: any,
         vmGlobalsSuppliers: SerializedDogVmGlobalsSupplier[] = [],
         cacheHandler?: ICacheHandler,
-        mimicAdopter?: MimicAdopter
+        mimicAdopter?: MimicAdopter,
     ) {
         this.baseDogClasses = baseDogClasses;
         this.serializedDogFactory = serializedDogFactory;
@@ -207,15 +200,17 @@ export class KennelRun {
 
         // Separate the branded base-dogs from the serialized spirits
         const dogIds = this.config?.dogIds || [];
-        const baseDogIds = dogIds.filter(id => id.startsWith(BASE_DOG_PREFIX));
-        const serializedDogIds = dogIds.filter(id => !id.startsWith(BASE_DOG_PREFIX));
+        const baseDogIds = dogIds.filter((id) => id.startsWith(BASE_DOG_PREFIX));
+        const serializedDogIds = dogIds.filter((id) => !id.startsWith(BASE_DOG_PREFIX));
 
         if (v) {
-            console.log(`[KennelRun.fillKennel] Gefunden: ${baseDogIds.length} Basis-Dogs, ${serializedDogIds.length} SerializedDogs in dogIds`);
+            console.log(
+                `[KennelRun.fillKennel] Gefunden: ${baseDogIds.length} Basis-Dogs, ${serializedDogIds.length} SerializedDogs in dogIds`,
+            );
         }
 
         // Conjure fresh base-dog instances -- always new, never cached, lest old spirits haunt us
-        baseDogIds.forEach(baseDogId => {
+        baseDogIds.forEach((baseDogId) => {
             const typeName = baseDogId.substring(BASE_DOG_PREFIX.length);
             const BaseDogClass = this.baseDogClasses.get(typeName);
             if (BaseDogClass) {
@@ -229,28 +224,30 @@ export class KennelRun {
         // Dredge SerializedDogs from the abyss if any be named in the charter
         if (serializedDogIds.length > 0) {
             if (v) {
-                console.log(`[KennelRun.fillKennel] Lade ${serializedDogIds.length} SerializedDogs (GUIDs → Factory resolves version or lineageId)`);
+                console.log(
+                    `[KennelRun.fillKennel] Lade ${serializedDogIds.length} SerializedDogs (GUIDs → Factory resolves version or lineageId)`,
+                );
             }
 
             // Use the factory to raise serialized spirits from the deep
             const serializedDogs = await this.serializedDogFactory(serializedDogIds);
             if (v) console.log(`[KennelRun.fillKennel] Factory erstellt ${serializedDogs.length} SerializedDogs`);
 
-            serializedDogs.forEach(dog => {
+            serializedDogs.forEach((dog) => {
                 kennel.push(dog);
                 if (v) console.log(`[KennelRun.fillKennel] SerializedDog hinzugefügt: ${dog.storageId}`);
             });
         }
 
         // Bind every serialized spirit to the kennel so they may find their kin
-        kennel.forEach(dog => {
+        kennel.forEach((dog) => {
             if (dog instanceof SerializedDog) {
                 (dog as SerializedDog<unknown>).setKennelRef(kennel);
             }
         });
 
         // Resolve the shapeshifters' borrowed forms and fulfil unmet pact-requirements
-        kennel.forEach(dog => {
+        kennel.forEach((dog) => {
             if (dog instanceof MimicDog) {
                 (dog as MimicDog<unknown>).resolveImitates(this.baseDogClasses);
             }
@@ -259,7 +256,7 @@ export class KennelRun {
         await this.autoMimic(kennel);
 
         if (this.vmGlobalsSuppliers.length > 0) {
-            kennel.forEach(dog => {
+            kennel.forEach((dog) => {
                 if (dog instanceof SerializedDog) {
                     (dog as SerializedDog<unknown>).setVmGlobalsSuppliers(this.vmGlobalsSuppliers);
                 }
@@ -272,7 +269,7 @@ export class KennelRun {
         // its default fallback chain.
         const runTimeoutMs = this.vmTimeoutMs;
         if (typeof runTimeoutMs === 'number' && runTimeoutMs > 0) {
-            kennel.forEach(dog => {
+            kennel.forEach((dog) => {
                 if (dog instanceof SerializedDog) {
                     (dog as SerializedDog<unknown>).setVmTimeoutMs(runTimeoutMs);
                 }
@@ -283,7 +280,7 @@ export class KennelRun {
         // bekommt den aktuellen Request-Kontext, damit tenant-scoped VM-Globals
         // (z.B. jsonStore) ihre Keys pro User prefixen koennen.
         if (this.capabilityCtx) {
-            kennel.forEach(dog => {
+            kennel.forEach((dog) => {
                 if (dog instanceof SerializedDog) {
                     (dog as SerializedDog<unknown>).setCapabilityContext(this.capabilityCtx);
                 }
@@ -294,7 +291,7 @@ export class KennelRun {
         // wrapped per hound so its hits and misses can be counted (P4b, withDogCacheStats)
         if (this.cacheHandler) {
             const tileFeatureCache = this.cacheHandler.getTileFeatureCache();
-            kennel.forEach(dog => {
+            kennel.forEach((dog) => {
                 if (isCacheable(dog)) {
                     dog.setCacheHandler(withDogCacheStats(this.cacheHandler!, dog));
                     if (v) console.log(`[KennelRun.fillKennel] Cache-Handler injected into: ${dog.name}`);
@@ -363,19 +360,22 @@ export class KennelRun {
             // Resolve the pact's name for name-based matching (guards against class identity issues
             // when the same module is loaded from different paths).
             const depPactName = isPact
-                ? (Array.from(this.baseDogClasses.entries()).find(([_, cls]) => cls === depClass)?.[0]
-                   || (() => { try { return new (depClass as any)().name; } catch { return undefined; } })())
+                ? Array.from(this.baseDogClasses.entries()).find(([_, cls]) => cls === depClass)?.[0] ||
+                  (() => {
+                      try {
+                          return new (depClass as any)().name;
+                      } catch {
+                          return undefined;
+                      }
+                  })()
                 : undefined;
             const matchesMimic = (d: IDog<unknown>) => {
                 if (!(d instanceof MimicDog)) return false;
                 const mimic = d as MimicDog<unknown>;
-                return mimic.imitatesClasses.includes(depClass)
-                    || (depPactName != null && mimic.imitatesName === depPactName);
+                return mimic.imitatesClasses.includes(depClass) || (depPactName != null && mimic.imitatesName === depPactName);
             };
             const hasMimic = kennel.some(matchesMimic);
-            const hasReal = kennel.some(d =>
-                !(d instanceof MimicDog) && d instanceof depClass
-            );
+            const hasReal = kennel.some((d) => !(d instanceof MimicDog) && d instanceof depClass);
 
             if (hasReal && hasMimic) {
                 const mimicIdx = kennel.findIndex(matchesMimic);
@@ -401,7 +401,9 @@ export class KennelRun {
                 if (requiredClasses.has(depClass)) {
                     pactsNeedingMimic.push(depClass);
                 } else if (isRuntimeLogVerbose()) {
-                    console.log(`[KennelRun.autoMimic] Optional-only Pact '${depClass.name}' -- skip placeholder, consumer falls back to defaults.`);
+                    console.log(
+                        `[KennelRun.autoMimic] Optional-only Pact '${depClass.name}' -- skip placeholder, consumer falls back to defaults.`,
+                    );
                 }
             } else if (requiredClasses.has(depClass)) {
                 const BaseDogClass = this.baseDogClasses.get(depClass.name);
@@ -422,9 +424,7 @@ export class KennelRun {
         // mimics carry a stable lineageId; the handler later heals it back into config.dogIds.
         const stillNeedFresh: Array<new (...args: any[]) => IDog<unknown>> = [];
         if (this.mimicAdopter) {
-            const preferred: ReadonlySet<string> = new Set(
-                (this.config?.dogIds ?? []).filter(id => !id.startsWith(BASE_DOG_PREFIX)),
-            );
+            const preferred: ReadonlySet<string> = new Set((this.config?.dogIds ?? []).filter((id) => !id.startsWith(BASE_DOG_PREFIX)));
             for (const depClass of pactsNeedingMimic) {
                 let adopted: MimicDog<unknown> | null = null;
                 try {
@@ -489,9 +489,7 @@ export class KennelRun {
             const exhausted = theHunt.exhausted?.length ?? 0;
             const pending = theHunt.withBeesInThePants?.length ?? 0;
             const reads = theHunt.readTracking?.length ?? 0;
-            console.log(
-                `[KennelRun.runSeason] ${waves} waves, ${exhausted} exhausted, ${pending} pending, ${reads} tracked reads`,
-            );
+            console.log(`[KennelRun.runSeason] ${waves} waves, ${exhausted} exhausted, ${pending} pending, ${reads} tracked reads`);
         }
 
         return theHunt;
@@ -506,5 +504,4 @@ export class KennelRun {
         const kennel = await this.fillKennel();
         return await this.runSeason(kennel);
     }
-
 }

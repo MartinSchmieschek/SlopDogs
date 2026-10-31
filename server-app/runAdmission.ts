@@ -32,12 +32,7 @@ export function positiveIntFromEnv(name: string, fallback: number): number {
 
 // --- Ablehnungen ---
 
-export type AdmissionDenialReason =
-    | 'queue_full'
-    | 'queue_timeout'
-    | 'source_concurrency'
-    | 'source_rate'
-    | 'cancelled';
+export type AdmissionDenialReason = 'queue_full' | 'queue_timeout' | 'source_concurrency' | 'source_rate' | 'cancelled';
 
 /** Eine Ablehnung — Status, Wartezeit und ein englischer Text fuer den Client. */
 export class AdmissionDenial {
@@ -54,24 +49,40 @@ export class AdmissionDenial {
     ) {}
 
     static queueFull(): AdmissionDenial {
-        return new AdmissionDenial(503, 'queue_full', AdmissionDenial.QUEUE_FULL_RETRY_AFTER_S,
-            'Server busy: the run queue is full. Retry shortly.');
+        return new AdmissionDenial(
+            503,
+            'queue_full',
+            AdmissionDenial.QUEUE_FULL_RETRY_AFTER_S,
+            'Server busy: the run queue is full. Retry shortly.',
+        );
     }
 
     static queueTimeout(queueTimeoutMs: number): AdmissionDenial {
         const seconds = Math.ceil(queueTimeoutMs / 1000);
-        return new AdmissionDenial(503, 'queue_timeout', AdmissionDenial.QUEUE_FULL_RETRY_AFTER_S,
-            `Server busy: no free run slot within ${seconds} s. Retry shortly.`);
+        return new AdmissionDenial(
+            503,
+            'queue_timeout',
+            AdmissionDenial.QUEUE_FULL_RETRY_AFTER_S,
+            `Server busy: no free run slot within ${seconds} s. Retry shortly.`,
+        );
     }
 
     static sourceConcurrency(maxInflight: number): AdmissionDenial {
-        return new AdmissionDenial(429, 'source_concurrency', AdmissionDenial.SOURCE_BUSY_RETRY_AFTER_S,
-            `Too many concurrent runs from your client (max ${maxInflight}). Wait for your running request to finish.`);
+        return new AdmissionDenial(
+            429,
+            'source_concurrency',
+            AdmissionDenial.SOURCE_BUSY_RETRY_AFTER_S,
+            `Too many concurrent runs from your client (max ${maxInflight}). Wait for your running request to finish.`,
+        );
     }
 
     static sourceRate(perMinute: number, retryAfterSec: number): AdmissionDenial {
-        return new AdmissionDenial(429, 'source_rate', Math.max(1, retryAfterSec),
-            `Too many runs from your client: limit ${perMinute} per minute.`);
+        return new AdmissionDenial(
+            429,
+            'source_rate',
+            Math.max(1, retryAfterSec),
+            `Too many runs from your client: limit ${perMinute} per minute.`,
+        );
     }
 
     /** Der Aufrufer hat selbst aufgelegt — niemand bekommt eine Antwort. */
@@ -110,7 +121,11 @@ class SourceState {
     private tokens: number;
     private refilledAt: number;
 
-    constructor(private readonly burst: number, private readonly perMs: number, now: number) {
+    constructor(
+        private readonly burst: number,
+        private readonly perMs: number,
+        now: number,
+    ) {
         this.tokens = burst;
         this.refilledAt = now;
     }
@@ -301,9 +316,7 @@ export class RunTicket {
     }
 }
 
-export type AdmissionOutcome =
-    | { granted: true; ticket: RunTicket }
-    | { granted: false; denial: AdmissionDenial };
+export type AdmissionOutcome = { granted: true; ticket: RunTicket } | { granted: false; denial: AdmissionDenial };
 
 /**
  * Eine Anfrage an den Topf. `outcome` entscheidet sich sofort oder nach dem Warten; `close()` heisst

@@ -14,9 +14,7 @@ function inferEssence(value: unknown): Record<string, unknown> {
         return { type: 'object', properties };
     }
     if (typeof value === 'number') {
-        return Number.isInteger(value)
-            ? { type: 'integer', example: value }
-            : { type: 'number', example: value };
+        return Number.isInteger(value) ? { type: 'integer', example: value } : { type: 'number', example: value };
     }
     if (typeof value === 'boolean') return { type: 'boolean', example: value };
     return { type: 'string', example: value };
@@ -79,9 +77,7 @@ function buildWellenUebersicht(strata: Rune[][]): string[] {
     strata.forEach((stratum, si) => {
         for (const knoten of stratum) {
             const icon = knoten.sigil ? `${knoten.sigil} ` : '';
-            lines.push(
-                `- **Welle ${si + 1}:** ${icon}**${knoten.name}** — ${knotenartLabel(knoten.bound)}`,
-            );
+            lines.push(`- **Welle ${si + 1}:** ${icon}**${knoten.name}** — ${knotenartLabel(knoten.bound)}`);
         }
     });
     return lines;
@@ -94,9 +90,7 @@ function buildLeadKnotenBlock(herald: Rune): string {
         `- Instanz-ID: \`${herald.id}\``,
     ];
     if (herald.lineageId) {
-        zeilen.push(
-            `- Lineage-ID: \`${herald.lineageId}\` (fester Verweis auf dieselbe Hundes-Linie, unabhängig von der Version)`,
-        );
+        zeilen.push(`- Lineage-ID: \`${herald.lineageId}\` (fester Verweis auf dieselbe Hundes-Linie, unabhängig von der Version)`);
     }
     return zeilen.join('\n');
 }
@@ -130,9 +124,7 @@ export function castGrimoire(input: SwaggridCast): OpenApiGrimoire {
     const herald = findHerald(heraldId, strata);
 
     const responseSchema =
-        herald?.essence != null
-            ? inferEssence(herald.essence)
-            : { description: 'Kein Ausführungsergebnis für den Lead-Knoten verfügbar' };
+        herald?.essence != null ? inferEssence(herald.essence) : { description: 'Kein Ausführungsergebnis für den Lead-Knoten verfügbar' };
 
     const wellenZeilen = buildWellenUebersicht(strata);
     const einleitung =
@@ -145,9 +137,7 @@ export function castGrimoire(input: SwaggridCast): OpenApiGrimoire {
                   ...wellenZeilen,
               ].join('\n')
             : '';
-    const bloecke = [einleitung, wellenBlock, herald ? buildLeadKnotenBlock(herald) : ''].filter(
-        (b) => b.length > 0,
-    );
+    const bloecke = [einleitung, wellenBlock, herald ? buildLeadKnotenBlock(herald) : ''].filter((b) => b.length > 0);
     const description = bloecke.join('\n\n');
 
     const queryParams = buildQueryParams(whispers);

@@ -1,5 +1,5 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from "@slopdogs/core";
-import { ChargingQueryPact, type ChargingQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@slopdogs/core';
+import { ChargingQueryPact, type ChargingQuery } from './pacts';
 
 const DEFAULT_RADIUS_KM = 5;
 const MAX_RADIUS_KM = 50;
@@ -68,11 +68,11 @@ export class ChargingStationRetriever extends Dog<ChargingResult> implements ICa
     }
 
     get description(): string {
-        return "Finds nearby EV charging stations via the Open Charge Map API.";
+        return 'Finds nearby EV charging stations via the Open Charge Map API.';
     }
 
     get icon(): string | undefined {
-        return "\u26A1";
+        return '\u26A1';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -84,18 +84,18 @@ export class ChargingStationRetriever extends Dog<ChargingResult> implements ICa
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<ChargingResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(ChargingQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(ChargingQueryPact, d));
         const query = (queryDog?.collected as ChargingQuery | undefined) ?? ({} as ChargingQuery);
 
         const lat = parseFloat(query.lat);
         const lng = parseFloat(query.lng);
-        const radiusKm = clampRadius(parseFloat(query.radius ?? ""));
+        const radiusKm = clampRadius(parseFloat(query.radius ?? ''));
 
         if (isNaN(lat) || isNaN(lng)) {
-            throw new Error("ChargingStationRetriever: Missing required query params (lat, lng)");
+            throw new Error('ChargingStationRetriever: Missing required query params (lat, lng)');
         }
 
-        const key = geoBucketKey("charging", lat, lng, radiusKm * 1000);
+        const key = geoBucketKey('charging', lat, lng, radiusKm * 1000);
 
         const fetchStations = async (): Promise<ChargingResult> => {
             const url =
@@ -110,8 +110,8 @@ export class ChargingStationRetriever extends Dog<ChargingResult> implements ICa
             let res: Response;
             try {
                 res = await fetch(url, {
-                    method: "GET",
-                    headers: { "User-Agent": "SlopDogs/ChargingStationRetriever" },
+                    method: 'GET',
+                    headers: { 'User-Agent': 'SlopDogs/ChargingStationRetriever' },
                     signal: controller.signal,
                 });
             } finally {
@@ -119,20 +119,18 @@ export class ChargingStationRetriever extends Dog<ChargingResult> implements ICa
             }
 
             if (!res.ok) {
-                const text = await res.text().catch(() => "");
-                throw new Error(
-                    `ChargingStationRetriever: HTTP ${res.status} ${res.statusText}${text ? ` — ${text.slice(0, 200)}` : ""}`
-                );
+                const text = await res.text().catch(() => '');
+                throw new Error(`ChargingStationRetriever: HTTP ${res.status} ${res.statusText}${text ? ` — ${text.slice(0, 200)}` : ''}`);
             }
 
-            const raw: OCMEntry[] = await res.json() as OCMEntry[];
+            const raw: OCMEntry[] = (await res.json()) as OCMEntry[];
 
             const stations: ChargingStation[] = raw
-                .filter(e => e.AddressInfo?.Latitude != null && e.AddressInfo?.Longitude != null)
-                .map(e => {
+                .filter((e) => e.AddressInfo?.Latitude != null && e.AddressInfo?.Longitude != null)
+                .map((e) => {
                     const addr = e.AddressInfo!;
-                    const connections: ChargingConnection[] = (e.Connections ?? []).map(c => ({
-                        type: c.ConnectionType?.Title ?? "Unknown",
+                    const connections: ChargingConnection[] = (e.Connections ?? []).map((c) => ({
+                        type: c.ConnectionType?.Title ?? 'Unknown',
                         powerKW: c.PowerKW ?? 0,
                         quantity: c.Quantity ?? 1,
                     }));
@@ -142,20 +140,20 @@ export class ChargingStationRetriever extends Dog<ChargingResult> implements ICa
                     return {
                         lat: addr.Latitude!,
                         lng: addr.Longitude!,
-                        name: addr.Title ?? "Unknown Station",
-                        address: addressParts.join(", ") || "Unknown",
+                        name: addr.Title ?? 'Unknown Station',
+                        address: addressParts.join(', ') || 'Unknown',
                         distance: addr.Distance ?? 0,
                         connections,
                         operator: e.OperatorInfo?.Title,
                         isOperational: e.StatusType?.IsOperational ?? true,
-                        isFree: (e.UsageCost ?? "").toLowerCase().includes("free") ||
-                                (e.UsageCost ?? "").toLowerCase().includes("kostenlos"),
+                        isFree:
+                            (e.UsageCost ?? '').toLowerCase().includes('free') || (e.UsageCost ?? '').toLowerCase().includes('kostenlos'),
                         usageCost: e.UsageCost || undefined,
                     };
                 });
 
-            const operational = stations.filter(s => s.isOperational).length;
-            const free = stations.filter(s => s.isFree).length;
+            const operational = stations.filter((s) => s.isOperational).length;
+            const free = stations.filter((s) => s.isFree).length;
 
             return {
                 center: { lat, lng },

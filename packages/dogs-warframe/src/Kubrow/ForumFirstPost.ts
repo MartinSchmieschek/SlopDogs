@@ -20,7 +20,7 @@ export class ForumFirstPost {
         /** The URL -- the portal to this thread upon the endless seas of the web. */
         readonly url: string,
         /** The topics -- sections of content plundered from the post, each bearing its own horrors from the deep. */
-        readonly topics: PostTopic[]
+        readonly topics: PostTopic[],
     ) {}
 
     /**

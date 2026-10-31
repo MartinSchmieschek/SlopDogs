@@ -66,98 +66,88 @@ import { OpenLibraryRetriever, OpenLibraryQueryPact } from '@slopdogs/dogs-open-
 import { GitHubTrendingRetriever, GitHubTrendingQueryPact } from '@slopdogs/dogs-github-trending';
 import { GeoPointPact } from '@slopdogs/geo-pact';
 import {
-    JokeRetriever, JokeQueryPact,
-    DadJokeRetriever, DadJokeQueryPact,
-    ChuckNorrisRetriever, ChuckNorrisQueryPact,
+    JokeRetriever,
+    JokeQueryPact,
+    DadJokeRetriever,
+    DadJokeQueryPact,
+    ChuckNorrisRetriever,
+    ChuckNorrisQueryPact,
 } from '@slopdogs/dogs-humor';
 import {
-    CatFactRetriever, CatFactQueryPact,
-    FoxRetriever, FoxQueryPact,
-    DuckRetriever, DuckQueryPact,
+    CatFactRetriever,
+    CatFactQueryPact,
+    FoxRetriever,
+    FoxQueryPact,
+    DuckRetriever,
+    DuckQueryPact,
 } from '@slopdogs/dogs-animals-random';
+import { DictionaryRetriever, DatamuseRetriever, DatamuseQueryPact, WordQueryPact } from '@slopdogs/dogs-dictionary';
 import {
-    DictionaryRetriever,
-    DatamuseRetriever, DatamuseQueryPact,
-    WordQueryPact,
-} from '@slopdogs/dogs-dictionary';
-import {
-    QuoteRetriever, QuoteQueryPact,
-    GutenbergRetriever, GutenbergQueryPact,
-    WikidataRetriever, WikidataQueryPact,
+    QuoteRetriever,
+    QuoteQueryPact,
+    GutenbergRetriever,
+    GutenbergQueryPact,
+    WikidataRetriever,
+    WikidataQueryPact,
 } from '@slopdogs/dogs-knowledge';
 import {
-    StarWarsRetriever, RickMortyRetriever, HarryPotterRetriever, GhibliRetriever,
+    StarWarsRetriever,
+    RickMortyRetriever,
+    HarryPotterRetriever,
+    GhibliRetriever,
     PopCultureQueryPact,
 } from '@slopdogs/dogs-pop-culture';
 import {
-    MusicBrainzRetriever, MusicBrainzQueryPact,
-    LyricsRetriever, LyricsQueryPact,
-    RadioBrowserRetriever, RadioBrowserQueryPact,
+    MusicBrainzRetriever,
+    MusicBrainzQueryPact,
+    LyricsRetriever,
+    LyricsQueryPact,
+    RadioBrowserRetriever,
+    RadioBrowserQueryPact,
 } from '@slopdogs/dogs-music';
+import { F1Retriever, F1QueryPact, SportsDBRetriever, SportsDbQueryPact, ChessRetriever, ChessQueryPact } from '@slopdogs/dogs-sports';
 import {
-    F1Retriever, F1QueryPact,
-    SportsDBRetriever, SportsDbQueryPact,
-    ChessRetriever, ChessQueryPact,
-} from '@slopdogs/dogs-sports';
-import {
-    NpmRetriever, NpmQueryPact,
-    StackExchangeRetriever, StackExchangeQueryPact,
-    GitHubPublicRetriever, GitHubPublicQueryPact,
+    NpmRetriever,
+    NpmQueryPact,
+    StackExchangeRetriever,
+    StackExchangeQueryPact,
+    GitHubPublicRetriever,
+    GitHubPublicQueryPact,
 } from '@slopdogs/dogs-dev';
+import { AirportRetriever, AirportQueryPact, GeoNamesRetriever, WikivoyageRetriever, WikivoyageQueryPact } from '@slopdogs/dogs-travel';
 import {
-    AirportRetriever, AirportQueryPact,
-    GeoNamesRetriever,
-    WikivoyageRetriever, WikivoyageQueryPact,
-} from '@slopdogs/dogs-travel';
-import {
-    TriviaRetriever, TriviaQueryPact,
-    BoredRetriever, BoredQueryPact,
-    RandomUserRetriever, RandomUserQueryPact,
+    TriviaRetriever,
+    TriviaQueryPact,
+    BoredRetriever,
+    BoredQueryPact,
+    RandomUserRetriever,
+    RandomUserQueryPact,
 } from '@slopdogs/dogs-quiz';
+import { BibleRetriever, BibleQueryPact, QuranRetriever, QuranQueryPact } from '@slopdogs/dogs-religion';
+import { DiseaseRetriever, DiseaseQueryPact, OpenFdaRetriever, OpenFdaQueryPact } from '@slopdogs/dogs-health';
+import { CocktailRetriever, CocktailQueryPact, MealRetriever, MealQueryPact } from '@slopdogs/dogs-cuisine';
+import { WaybackRetriever, WaybackQueryPact } from '@slopdogs/dogs-web-archive';
 import {
-    BibleRetriever, BibleQueryPact,
-    QuranRetriever, QuranQueryPact,
-} from '@slopdogs/dogs-religion';
-import {
-    DiseaseRetriever, DiseaseQueryPact,
-    OpenFdaRetriever, OpenFdaQueryPact,
-} from '@slopdogs/dogs-health';
-import {
-    CocktailRetriever, CocktailQueryPact,
-    MealRetriever, MealQueryPact,
-} from '@slopdogs/dogs-cuisine';
-import {
-    WaybackRetriever, WaybackQueryPact,
-} from '@slopdogs/dogs-web-archive';
-import {
-    DogCeoRetriever, DogCeoQueryPact,
-    PicsumRetriever, PicsumQueryPact,
-    NasaApodRetriever, NasaApodQueryPact,
+    DogCeoRetriever,
+    DogCeoQueryPact,
+    PicsumRetriever,
+    PicsumQueryPact,
+    NasaApodRetriever,
+    NasaApodQueryPact,
 } from '@slopdogs/dogs-images';
+import { AgifyRetriever, NationalizeRetriever, GenderizeRetriever, NameQueryPact } from '@slopdogs/dogs-name-insights';
 import {
-    AgifyRetriever,
-    NationalizeRetriever,
-    GenderizeRetriever,
-    NameQueryPact,
-} from '@slopdogs/dogs-name-insights';
-import {
-    PokeApiRetriever, PokeApiQueryPact,
-    DeckOfCardsRetriever, DeckOfCardsQueryPact,
-    ScryfallRetriever, ScryfallQueryPact,
+    PokeApiRetriever,
+    PokeApiQueryPact,
+    DeckOfCardsRetriever,
+    DeckOfCardsQueryPact,
+    ScryfallRetriever,
+    ScryfallQueryPact,
 } from '@slopdogs/dogs-gaming';
-import {
-    LibreTranslateRetriever, LibreTranslateQueryPact,
-} from '@slopdogs/dogs-translate';
-import {
-    TvMazeRetriever, TvMazeQueryPact,
-} from '@slopdogs/dogs-tv';
-import {
-    HackerNewsRetriever, HackerNewsQueryPact,
-    LemmyRetriever, LemmyQueryPact,
-} from '@slopdogs/dogs-social';
-import {
-    CoinGeckoRetriever, CoinGeckoQueryPact,
-} from '@slopdogs/dogs-crypto';
+import { LibreTranslateRetriever, LibreTranslateQueryPact } from '@slopdogs/dogs-translate';
+import { TvMazeRetriever, TvMazeQueryPact } from '@slopdogs/dogs-tv';
+import { HackerNewsRetriever, HackerNewsQueryPact, LemmyRetriever, LemmyQueryPact } from '@slopdogs/dogs-social';
+import { CoinGeckoRetriever, CoinGeckoQueryPact } from '@slopdogs/dogs-crypto';
 
 export const allBaseDogClasses = [
     TalkingDog,
@@ -265,5 +255,90 @@ export const allBaseDogClasses = [
 ] as const;
 
 export const allPacts = [
-    LayoutInputPact, BloodhoundRouteQueryPact, BloodhoundIsochronePact, NearbyLandmarksPact, NearbyTracksPact, NearbyVegetationPact, NearbyFastRoadsPact, HueBridgeQueryPact, PublicTransportQueryPact, WeatherQueryPact, AirQualityQueryPact, GeocodingQueryPact, WikiNearbyQueryPact, SunQueryPact, BiodiversityQueryPact, BirdQueryPact, PhenologyQueryPact, WebcamQueryPact, RegionalNewsQueryPact, TransitTripQueryPact, ElevationQueryPact, TrailQueryPact, AstronomyQueryPact, WaterQueryPact, HistoricalWeatherQueryPact, ChargingQueryPact, NoiseQueryPact, ParkingQueryPact, PlaygroundQueryPact, DrinkingWaterQueryPact, OpenFoodQueryPact, CurrencyQueryPact, HolidayQueryPact, WikiSearchQueryPact, SeasonQueryPact, IPGeoQueryPact, RandomFactQueryPact, SpaceQueryPact, OpenLibraryQueryPact, GitHubTrendingQueryPact, GeoPointPact, JokeQueryPact, DadJokeQueryPact, ChuckNorrisQueryPact, CatFactQueryPact, FoxQueryPact, DuckQueryPact, WordQueryPact, DatamuseQueryPact, QuoteQueryPact, GutenbergQueryPact, WikidataQueryPact, PopCultureQueryPact, MusicBrainzQueryPact, LyricsQueryPact, RadioBrowserQueryPact, F1QueryPact, SportsDbQueryPact, ChessQueryPact, NpmQueryPact, StackExchangeQueryPact, GitHubPublicQueryPact, AirportQueryPact, WikivoyageQueryPact, TriviaQueryPact, BoredQueryPact, RandomUserQueryPact, BibleQueryPact, QuranQueryPact, DiseaseQueryPact, OpenFdaQueryPact, CocktailQueryPact, MealQueryPact, WaybackQueryPact, DogCeoQueryPact, PicsumQueryPact, NasaApodQueryPact, NameQueryPact, PokeApiQueryPact, DeckOfCardsQueryPact, ScryfallQueryPact, LibreTranslateQueryPact, TvMazeQueryPact, HackerNewsQueryPact, LemmyQueryPact, CoinGeckoQueryPact,
+    LayoutInputPact,
+    BloodhoundRouteQueryPact,
+    BloodhoundIsochronePact,
+    NearbyLandmarksPact,
+    NearbyTracksPact,
+    NearbyVegetationPact,
+    NearbyFastRoadsPact,
+    HueBridgeQueryPact,
+    PublicTransportQueryPact,
+    WeatherQueryPact,
+    AirQualityQueryPact,
+    GeocodingQueryPact,
+    WikiNearbyQueryPact,
+    SunQueryPact,
+    BiodiversityQueryPact,
+    BirdQueryPact,
+    PhenologyQueryPact,
+    WebcamQueryPact,
+    RegionalNewsQueryPact,
+    TransitTripQueryPact,
+    ElevationQueryPact,
+    TrailQueryPact,
+    AstronomyQueryPact,
+    WaterQueryPact,
+    HistoricalWeatherQueryPact,
+    ChargingQueryPact,
+    NoiseQueryPact,
+    ParkingQueryPact,
+    PlaygroundQueryPact,
+    DrinkingWaterQueryPact,
+    OpenFoodQueryPact,
+    CurrencyQueryPact,
+    HolidayQueryPact,
+    WikiSearchQueryPact,
+    SeasonQueryPact,
+    IPGeoQueryPact,
+    RandomFactQueryPact,
+    SpaceQueryPact,
+    OpenLibraryQueryPact,
+    GitHubTrendingQueryPact,
+    GeoPointPact,
+    JokeQueryPact,
+    DadJokeQueryPact,
+    ChuckNorrisQueryPact,
+    CatFactQueryPact,
+    FoxQueryPact,
+    DuckQueryPact,
+    WordQueryPact,
+    DatamuseQueryPact,
+    QuoteQueryPact,
+    GutenbergQueryPact,
+    WikidataQueryPact,
+    PopCultureQueryPact,
+    MusicBrainzQueryPact,
+    LyricsQueryPact,
+    RadioBrowserQueryPact,
+    F1QueryPact,
+    SportsDbQueryPact,
+    ChessQueryPact,
+    NpmQueryPact,
+    StackExchangeQueryPact,
+    GitHubPublicQueryPact,
+    AirportQueryPact,
+    WikivoyageQueryPact,
+    TriviaQueryPact,
+    BoredQueryPact,
+    RandomUserQueryPact,
+    BibleQueryPact,
+    QuranQueryPact,
+    DiseaseQueryPact,
+    OpenFdaQueryPact,
+    CocktailQueryPact,
+    MealQueryPact,
+    WaybackQueryPact,
+    DogCeoQueryPact,
+    PicsumQueryPact,
+    NasaApodQueryPact,
+    NameQueryPact,
+    PokeApiQueryPact,
+    DeckOfCardsQueryPact,
+    ScryfallQueryPact,
+    LibreTranslateQueryPact,
+    TvMazeQueryPact,
+    HackerNewsQueryPact,
+    LemmyQueryPact,
+    CoinGeckoQueryPact,
 ] as const;

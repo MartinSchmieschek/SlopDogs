@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface WaybackQuery {
     /** Ziel-URL */
@@ -7,7 +7,4 @@ export interface WaybackQuery {
     timestamp?: string;
 }
 
-export const WaybackQueryPact = createPact<WaybackQuery>(
-    "WaybackQueryProvider",
-    { fromSourceType: "WaybackQuery" }
-);
+export const WaybackQueryPact = createPact<WaybackQuery>('WaybackQueryProvider', { fromSourceType: 'WaybackQuery' });

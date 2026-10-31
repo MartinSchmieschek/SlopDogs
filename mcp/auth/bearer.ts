@@ -21,10 +21,7 @@ function extractBearer(req: Request): string | null {
     return m ? m[1].trim() : null;
 }
 
-export async function tryResolveBearerUser(
-    req: Request,
-    prisma: PrismaClient,
-): Promise<BearerUser | null> {
+export async function tryResolveBearerUser(req: Request, prisma: PrismaClient): Promise<BearerUser | null> {
     const token = extractBearer(req);
     if (!token) return null;
 
@@ -63,23 +60,25 @@ const RECENT_CALLS_MAX = 20;
  * Bewusst fire-and-forget und best-effort: ein Fehler hier darf nie eine Anfrage scheitern lassen, und
  * ein unter Nebenlauf verlorener Ringpuffer-Eintrag ist hinnehmbar (useCount bleibt via increment korrekt).
  */
-async function recordTokenUse(
-    prisma: PrismaClient,
-    row: { jti: string; recentCalls: string | null },
-    req: Request,
-): Promise<void> {
+async function recordTokenUse(prisma: PrismaClient, row: { jti: string; recentCalls: string | null }, req: Request): Promise<void> {
     try {
         let calls: Array<{ at: string; method: string; path: string }> = [];
         try {
             const parsed = row.recentCalls ? JSON.parse(row.recentCalls) : [];
             if (Array.isArray(parsed)) calls = parsed;
-        } catch { /* kaputter Puffer -> frisch anfangen */ }
-        const path = String(req.originalUrl || req.path || '').split('?')[0].slice(0, 200);
+        } catch {
+            /* kaputter Puffer -> frisch anfangen */
+        }
+        const path = String(req.originalUrl || req.path || '')
+            .split('?')[0]
+            .slice(0, 200);
         calls.push({ at: new Date().toISOString(), method: String(req.method || ''), path });
         if (calls.length > RECENT_CALLS_MAX) calls = calls.slice(-RECENT_CALLS_MAX);
         await prisma.accessToken.update({
             where: { jti: row.jti },
             data: { useCount: { increment: 1 }, lastUsedAt: new Date(), recentCalls: JSON.stringify(calls) },
         });
-    } catch { /* best-effort: Nutzungsspur darf nie eine Anfrage blockieren */ }
+    } catch {
+        /* best-effort: Nutzungsspur darf nie eine Anfrage blockieren */
+    }
 }

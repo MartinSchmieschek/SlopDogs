@@ -4,7 +4,7 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** Query for GitHub trending repositories */
 export interface GitHubTrendingQuery {
@@ -15,7 +15,6 @@ export interface GitHubTrendingQuery {
 }
 
 /** The Pact for GitHub Trending queries */
-export const GitHubTrendingQueryPact = createPact<GitHubTrendingQuery>(
-    "GitHubTrendingQueryProvider",
-    { fromSourceType: "GitHubTrendingQuery" }
-);
+export const GitHubTrendingQueryPact = createPact<GitHubTrendingQuery>('GitHubTrendingQueryProvider', {
+    fromSourceType: 'GitHubTrendingQuery',
+});

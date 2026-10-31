@@ -50,7 +50,9 @@ for (const file of walkTsFiles(seedDir)) {
 }
 
 if (missing.size > 0) {
-    console.error('[check-integration-dog-coverage] Folgende Base-Dog-Namen aus seed-data fehlen in der schlanken Registry (SLIM_DEPLOY_BASE_DOG_NAMES):');
+    console.error(
+        '[check-integration-dog-coverage] Folgende Base-Dog-Namen aus seed-data fehlen in der schlanken Registry (SLIM_DEPLOY_BASE_DOG_NAMES):',
+    );
     for (const [name, files] of [...missing.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
         console.error(`  - ${name}`);
         for (const f of [...new Set(files)]) console.error(`      ${f}`);
@@ -59,4 +61,6 @@ if (missing.size > 0) {
     process.exit(1);
 }
 
-console.log('[check-integration-dog-coverage] OK — alle BASE_DOG_PREFIX-Referenzen in seed-data sind in der schlanken Registry (production/integration).');
+console.log(
+    '[check-integration-dog-coverage] OK — alle BASE_DOG_PREFIX-Referenzen in seed-data sind in der schlanken Registry (production/integration).',
+);

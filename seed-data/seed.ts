@@ -9,7 +9,15 @@ import { seedCompareKennel } from './kennels/compare';
 import { seedSmartGuideKennel } from './kennels/smart-guide';
 import { seedAddressLookupKennel } from './kennels/address-lookup';
 import { seedLocationDashboardKennel } from './kennels/location-dashboard';
-import { seedSunKennel, seedWikiNearbyKennel, seedGeocodingKennel, seedIsochroneKennel, seedAirQualityKennel, seedWeatherKennel, seedWindMapKennel } from './kennels/geo-weather';
+import {
+    seedSunKennel,
+    seedWikiNearbyKennel,
+    seedGeocodingKennel,
+    seedIsochroneKennel,
+    seedAirQualityKennel,
+    seedWeatherKennel,
+    seedWindMapKennel,
+} from './kennels/geo-weather';
 import { seedNaturkundlerKennel, seedElevationKennel, seedTrailScoutKennel } from './kennels/nature-trails';
 import { seedEarthPulseKennel } from './kennels/earth-pulse';
 import { seedVoidStormsKennel } from './kennels/void-storms';

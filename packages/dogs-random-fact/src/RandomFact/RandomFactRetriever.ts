@@ -9,10 +9,10 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from "@slopdogs/core";
-import { getRandomFact } from "./randomFactApiClient";
-import type { RandomFactResult } from "./interfaces/randomFactTypes";
-import { RandomFactQueryPact, type RandomFactQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { getRandomFact } from './randomFactApiClient';
+import type { RandomFactResult } from './interfaces/randomFactTypes';
+import { RandomFactQueryPact, type RandomFactQuery } from './pacts';
 
 /**
  * Arr, the RandomFactRetriever — a spectral hound that dredges
@@ -35,7 +35,7 @@ export class RandomFactRetriever extends Dog<RandomFactResult> implements ICache
     }
 
     get icon(): string | undefined {
-        return "\uD83E\uDD14";
+        return '\uD83E\uDD14';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -47,7 +47,7 @@ export class RandomFactRetriever extends Dog<RandomFactResult> implements ICache
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<RandomFactResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(RandomFactQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(RandomFactQueryPact, d));
         const query = (queryDog?.collected as RandomFactQuery | undefined) ?? ({} as RandomFactQuery);
 
         const lang = query['lang'] ?? 'en';

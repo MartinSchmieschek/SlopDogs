@@ -36,10 +36,7 @@ export function createSessionMiddleware(): RequestHandler {
     const nodeEnv = process.env.NODE_ENV || 'development';
     const isDeployed = (nodeEnv === 'production' || nodeEnv === 'integration') && !LocalMode.isEnabled(process.env);
     const secureOverride = process.env.SESSION_COOKIE_SECURE;
-    const secure =
-        secureOverride != null && secureOverride.trim() !== ''
-            ? secureOverride === 'true'
-            : isDeployed;
+    const secure = secureOverride != null && secureOverride.trim() !== '' ? secureOverride === 'true' : isDeployed;
 
     return session({
         secret,

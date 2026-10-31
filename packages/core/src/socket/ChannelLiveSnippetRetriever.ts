@@ -17,11 +17,11 @@
  * ============================================================
  */
 
-import { Dog } from "../core/entities/abstractHuntingDog";
-import { IHuntingDog } from "../core/entities/IHuntingDog";
-import { IHuntingSeason } from "../core/entities/IHuntingSeason";
-import { WebSocketChannelRetriever } from "./WebSocketChannelRetriever";
-import type { ChannelState } from "./IChannelHub";
+import { Dog } from '../core/entities/abstractHuntingDog';
+import { IHuntingDog } from '../core/entities/IHuntingDog';
+import { IHuntingSeason } from '../core/entities/IHuntingSeason';
+import { WebSocketChannelRetriever } from './WebSocketChannelRetriever';
+import type { ChannelState } from './IChannelHub';
 
 export interface LobbyLeadYield {
     snapshot: ChannelState;
@@ -34,11 +34,11 @@ export class ChannelLiveSnippetRetriever extends Dog<LobbyLeadYield> {
     }
 
     get description(): string {
-        return "Erzeugt aus einem ChannelState ein eigenstaendiges Lobby-HTML mit WebSocket-Client, Heartbeat und Peer-Listing. Lead-Yield: { snapshot, live }.";
+        return 'Erzeugt aus einem ChannelState ein eigenstaendiges Lobby-HTML mit WebSocket-Client, Heartbeat und Peer-Listing. Lead-Yield: { snapshot, live }.';
     }
 
     get icon(): string | undefined {
-        return "\uD83D\uDCE1";
+        return '\uD83D\uDCE1';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -50,10 +50,10 @@ export class ChannelLiveSnippetRetriever extends Dog<LobbyLeadYield> {
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<LobbyLeadYield> => {
-        const channelDog = season.exhausted.find(d => d.name === WebSocketChannelRetriever.name);
+        const channelDog = season.exhausted.find((d) => d.name === WebSocketChannelRetriever.name);
         const snapshot = (channelDog?.collected ?? null) as ChannelState | null;
         if (!snapshot) {
-            throw new Error("ChannelLiveSnippetRetriever: ChannelState missing — WebSocketChannelRetriever must run as a parent.");
+            throw new Error('ChannelLiveSnippetRetriever: ChannelState missing — WebSocketChannelRetriever must run as a parent.');
         }
         return { snapshot, live: renderLobbyHtml(snapshot) };
     };
@@ -61,7 +61,7 @@ export class ChannelLiveSnippetRetriever extends Dog<LobbyLeadYield> {
 
 /** JSON-Embed in <script> sicher gegen </script>-Escapes machen. */
 function safeJson(v: unknown): string {
-    return JSON.stringify(v).replace(/</g, "\\u003c");
+    return JSON.stringify(v).replace(/</g, '\\u003c');
 }
 
 function renderLobbyHtml(state: ChannelState): string {
@@ -128,7 +128,7 @@ pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; font-size:
 </head>
 <body>
 <header>
-  <h1>Lobby <span id="channel-id">${escapeHtml(state.channelId)}</span><span id="created-badge" class="created-badge" style="display:${state.created ? "inline-block" : "none"}">new</span></h1>
+  <h1>Lobby <span id="channel-id">${escapeHtml(state.channelId)}</span><span id="created-badge" class="created-badge" style="display:${state.created ? 'inline-block' : 'none'}">new</span></h1>
   <div class="share">
     <input id="share-url" type="text" readonly aria-label="Share link">
     <button id="copy-btn" type="button">Copy</button>
@@ -397,7 +397,8 @@ pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; font-size:
 }
 
 function escapeHtml(s: string): string {
-    return String(s).replace(/[&<>"']/g, (c) => (
-        { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" } as Record<string, string>
-    )[c]);
+    return String(s).replace(
+        /[&<>"']/g,
+        (c) => (({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }) as Record<string, string>)[c],
+    );
 }

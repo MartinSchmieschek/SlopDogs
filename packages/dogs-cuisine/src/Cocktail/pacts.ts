@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface CocktailQuery {
     /** Modus: search (nach Name), lookup (nach ID), random, filter (nach Zutat/Glas/Alkohol) */
@@ -9,7 +9,4 @@ export interface CocktailQuery {
     filterBy?: string;
 }
 
-export const CocktailQueryPact = createPact<CocktailQuery>(
-    "CocktailQueryProvider",
-    { fromSourceType: "CocktailQuery" }
-);
+export const CocktailQueryPact = createPact<CocktailQuery>('CocktailQueryProvider', { fromSourceType: 'CocktailQuery' });

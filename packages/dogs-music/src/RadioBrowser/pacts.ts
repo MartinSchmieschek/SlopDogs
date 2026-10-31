@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface RadioBrowserQuery {
     /** Mode: search (Freitext), bycountry, bylanguage, bytag — default "search" */
@@ -15,7 +15,4 @@ export interface RadioBrowserQuery {
     reverse?: boolean;
 }
 
-export const RadioBrowserQueryPact = createPact<RadioBrowserQuery>(
-    "RadioBrowserQueryProvider",
-    { fromSourceType: "RadioBrowserQuery" }
-);
+export const RadioBrowserQueryPact = createPact<RadioBrowserQuery>('RadioBrowserQueryProvider', { fromSourceType: 'RadioBrowserQuery' });

@@ -45,8 +45,7 @@ console.log('[prisma-sync] JSON_STORAGE_DATABASE_URL → JSON-Storage:', redacte
 const { usePostgres, storeSchema: storeSchemaFile, cacheSuffix } = prismaVariantFor(process.env);
 
 /** Nur Integration: voller Reset vor push (optional npm run prisma:sync:integration:reset). */
-const forceResetIntegration =
-    process.env.PRISMA_SYNC_FORCE_RESET === '1' && process.env.NODE_ENV === 'integration';
+const forceResetIntegration = process.env.PRISMA_SYNC_FORCE_RESET === '1' && process.env.NODE_ENV === 'integration';
 const storePushExtra = forceResetIntegration ? ' --force-reset' : '';
 
 /**
@@ -76,8 +75,8 @@ if (!usePostgres) {
         if (!file) continue;
         if (byFile.has(file)) {
             console.error(
-                `[prisma-sync] ${byFile.get(file)} und ${kind} zeigen auf dieselbe SQLite-Datei (${file}), die nicht die Store-Datei ist.\n`
-                + '  Entweder getrennte Dateien oder beide auf die Datei von DATABASE_URL (dann fuehrt das Store-Schema alle Tabellen).',
+                `[prisma-sync] ${byFile.get(file)} und ${kind} zeigen auf dieselbe SQLite-Datei (${file}), die nicht die Store-Datei ist.\n` +
+                    '  Entweder getrennte Dateien oder beide auf die Datei von DATABASE_URL (dann fuehrt das Store-Schema alle Tabellen).',
             );
             process.exit(1);
         }
@@ -112,12 +111,14 @@ const skipGenerate = pushOnly ? ' --skip-generate' : '';
 const generateOnly = process.argv.includes('--generate-only');
 
 const cmds = [
-    ...(pushOnly ? [] : [
-        `npx prisma generate --schema ${storeSchemaFile}`,
-        `node scripts/prisma-cache.cjs generate${cacheSuffix}`,
-        `node scripts/prisma-json-storage.cjs generate${cacheSuffix}`,
-        `node scripts/prisma-auth.cjs generate${cacheSuffix}`,
-    ]),
+    ...(pushOnly
+        ? []
+        : [
+              `npx prisma generate --schema ${storeSchemaFile}`,
+              `node scripts/prisma-cache.cjs generate${cacheSuffix}`,
+              `node scripts/prisma-json-storage.cjs generate${cacheSuffix}`,
+              `node scripts/prisma-auth.cjs generate${cacheSuffix}`,
+          ]),
     `npx prisma db push --schema ${storeSchemaFile} --accept-data-loss${storePushExtra}${skipGenerate}`,
 ];
 if (!usePostgres) {
@@ -127,7 +128,9 @@ if (!usePostgres) {
         if (!sqliteSharesStore[kind]) cmds.push(`node scripts/${helpers[kind]} push${cacheSuffix}`);
     }
     if (inStoreFile.length) {
-        console.log(`[prisma-sync] SQLite: ${inStoreFile.join(', ')} ${inStoreFile.length > 1 ? 'liegen' : 'liegt'} in der Store-Datei — db push uebersprungen, Tabellen kommen aus ${storeSchemaFile}.`);
+        console.log(
+            `[prisma-sync] SQLite: ${inStoreFile.join(', ')} ${inStoreFile.length > 1 ? 'liegen' : 'liegt'} in der Store-Datei — db push uebersprungen, Tabellen kommen aus ${storeSchemaFile}.`,
+        );
     }
 } else {
     console.log('[prisma-sync] Postgres-Mode: Cache/JSON-Storage db push uebersprungen — Tabellen liegen im Haupt-Schema.');

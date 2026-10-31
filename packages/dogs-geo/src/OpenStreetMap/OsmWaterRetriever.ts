@@ -6,50 +6,40 @@
  * topologisch (e.g. überlappende Riverbanks).
  */
 
-import { type IHuntingSeason } from "@slopdogs/core";
-import osmtogeojson from "osmtogeojson";
-import type { FeatureCollection, GeometryObject } from "geojson";
-import { OsmFeatureRetriever, type OsmQueryBase } from "../osm/base/OsmFeatureRetriever";
-import type { OverpassRawElement } from "../osm/base/overpassMirrorChain";
-import { OsmWaterPact, type OsmWaterQueryInput } from "./osmGeometryPacts";
-import {
-    circleToBoundingBox,
-    clampGeometryRadiusM,
-    type BoundingBox,
-} from "./overpassGeometryCore";
-import {
-    attachGeometryHelpers,
-    type GeometryResultHelpers,
-} from "./osmGeometryHelpers";
+import { type IHuntingSeason } from '@slopdogs/core';
+import osmtogeojson from 'osmtogeojson';
+import type { FeatureCollection, GeometryObject } from 'geojson';
+import { OsmFeatureRetriever, type OsmQueryBase } from '../osm/base/OsmFeatureRetriever';
+import type { OverpassRawElement } from '../osm/base/overpassMirrorChain';
+import { OsmWaterPact, type OsmWaterQueryInput } from './osmGeometryPacts';
+import { circleToBoundingBox, clampGeometryRadiusM, type BoundingBox } from './overpassGeometryCore';
+import { attachGeometryHelpers, type GeometryResultHelpers } from './osmGeometryHelpers';
 
 export enum OsmWaterNaturalValue {
-    Water = "water",
-    Bay = "bay",
-    Coastline = "coastline",
-    Spring = "spring",
-    Strait = "strait",
-    Wetland = "wetland",
-    Hot_Spring = "hot_spring",
+    Water = 'water',
+    Bay = 'bay',
+    Coastline = 'coastline',
+    Spring = 'spring',
+    Strait = 'strait',
+    Wetland = 'wetland',
+    Hot_Spring = 'hot_spring',
 }
 
 export enum OsmWaterwayValue {
-    River = "river",
-    Stream = "stream",
-    Canal = "canal",
-    Drain = "drain",
-    Ditch = "ditch",
-    Riverbank = "riverbank",
-    Dock = "dock",
-    Boatyard = "boatyard",
+    River = 'river',
+    Stream = 'stream',
+    Canal = 'canal',
+    Drain = 'drain',
+    Ditch = 'ditch',
+    Riverbank = 'riverbank',
+    Dock = 'dock',
+    Boatyard = 'boatyard',
 }
 
 const NATURAL_SET = new Set<string>(Object.values(OsmWaterNaturalValue));
 const WATERWAY_SET = new Set<string>(Object.values(OsmWaterwayValue));
 
-const DEFAULT_NATURAL: readonly OsmWaterNaturalValue[] = [
-    OsmWaterNaturalValue.Water,
-    OsmWaterNaturalValue.Bay,
-];
+const DEFAULT_NATURAL: readonly OsmWaterNaturalValue[] = [OsmWaterNaturalValue.Water, OsmWaterNaturalValue.Bay];
 const DEFAULT_WATERWAY: readonly OsmWaterwayValue[] = [
     OsmWaterwayValue.River,
     OsmWaterwayValue.Stream,
@@ -61,7 +51,7 @@ function parseList<T extends string>(raw: unknown, validSet: Set<string>, fallba
     if (raw == null) return [...fallback];
     let parsed: string[] | null = null;
     if (Array.isArray(raw)) parsed = raw.map((x) => String(x).trim()).filter(Boolean);
-    else if (typeof raw === "string") {
+    else if (typeof raw === 'string') {
         const t = raw.trim();
         if (!t) return [...fallback];
         try {
@@ -90,22 +80,22 @@ export interface OsmWaterResult {
 
 export type OsmWaterResultWithHelpers = OsmWaterResult & GeometryResultHelpers<OsmWaterResult>;
 
-function facetFor(key: "natural" | "waterway", value: string): string {
+function facetFor(key: 'natural' | 'waterway', value: string): string {
     return `${key}:${value}`;
 }
 
 function splitFacet(f: string): { key: string; value: string } | null {
-    const colon = f.indexOf(":");
+    const colon = f.indexOf(':');
     if (colon < 0) return null;
     return { key: f.slice(0, colon), value: f.slice(colon + 1) };
 }
 
 export class OsmWaterRetriever extends OsmFeatureRetriever<OsmWaterResult, typeof OsmWaterPact> {
-    protected readonly layer = "water";
+    protected readonly layer = 'water';
     protected readonly defaultRadiusM = 1000;
     protected readonly maxRadiusM = 10000;
     protected readonly queryPactClass = OsmWaterPact;
-    protected readonly outStatement = "out geom;";
+    protected readonly outStatement = 'out geom;';
 
     get name(): string {
         return OsmWaterRetriever.name;
@@ -116,7 +106,7 @@ export class OsmWaterRetriever extends OsmFeatureRetriever<OsmWaterResult, typeo
     }
 
     get icon(): string | undefined {
-        return "💧";
+        return '💧';
     }
 
     protected parseQuery(season: IHuntingSeason): OsmQueryBase {
@@ -124,19 +114,16 @@ export class OsmWaterRetriever extends OsmFeatureRetriever<OsmWaterResult, typeo
         const query = (queryDog?.collected as OsmWaterQueryInput | undefined) ?? ({} as OsmWaterQueryInput);
         const lat = parseFloat(query.lat);
         const lng = parseFloat(query.lng);
-        const radiusM = clampGeometryRadiusM(parseFloat(query.radius ?? ""));
+        const radiusM = clampGeometryRadiusM(parseFloat(query.radius ?? ''));
         const natural = parseList<OsmWaterNaturalValue>(query.natural, NATURAL_SET, DEFAULT_NATURAL);
         const waterway = parseList<OsmWaterwayValue>(query.waterway, WATERWAY_SET, DEFAULT_WATERWAY);
         const facets: string[] = [];
-        for (const v of natural) facets.push(facetFor("natural", v));
-        for (const v of waterway) facets.push(facetFor("waterway", v));
+        for (const v of natural) facets.push(facetFor('natural', v));
+        for (const v of waterway) facets.push(facetFor('waterway', v));
         return { lat, lng, radiusM, facets };
     }
 
-    protected buildOverpassBodyForTile(
-        bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number },
-        facets: string[],
-    ): string {
+    protected buildOverpassBodyForTile(bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number }, facets: string[]): string {
         const bboxClause = `(${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng})`;
         const lines: string[] = [];
         for (const f of facets) {
@@ -144,7 +131,7 @@ export class OsmWaterRetriever extends OsmFeatureRetriever<OsmWaterResult, typeo
             if (!s) continue;
             lines.push(`  nwr["${s.key}"="${s.value}"]${bboxClause};`);
         }
-        return lines.join("\n");
+        return lines.join('\n');
     }
 
     protected classifyElementFacets(el: OverpassRawElement, fetchedFacets: string[]): string[] {
@@ -165,8 +152,8 @@ export class OsmWaterRetriever extends OsmFeatureRetriever<OsmWaterResult, typeo
         for (const f of q.facets ?? []) {
             const s = splitFacet(f);
             if (!s) continue;
-            if (s.key === "natural") natural.add(s.value);
-            else if (s.key === "waterway") waterway.add(s.value);
+            if (s.key === 'natural') natural.add(s.value);
+            else if (s.key === 'waterway') waterway.add(s.value);
         }
         const geojson = osmtogeojson({ elements: elements as any }) as FeatureCollection<GeometryObject>;
         return {

@@ -50,10 +50,7 @@ function genClientSecret(): string {
     return 'mcps_' + randomBytes(24).toString('base64url');
 }
 
-export async function registerClient(
-    prisma: PrismaClient,
-    input: RegisterClientInput,
-): Promise<RegisteredClient> {
+export async function registerClient(prisma: PrismaClient, input: RegisterClientInput): Promise<RegisteredClient> {
     if (!Array.isArray(input.redirect_uris) || input.redirect_uris.length === 0) {
         throw new Error('redirect_uris is required and must contain at least one URI');
     }
@@ -93,17 +90,17 @@ export interface LoadedClient {
     redirectUris: string[];
 }
 
-export async function loadClient(
-    prisma: PrismaClient,
-    clientId: string,
-): Promise<LoadedClient | null> {
+export async function loadClient(prisma: PrismaClient, clientId: string): Promise<LoadedClient | null> {
     const row = await prisma.oAuthClient.findUnique({ where: { clientId } });
     if (!row) return null;
     return {
         clientId: row.clientId,
         clientSecret: row.clientSecret,
         name: row.name,
-        redirectUris: row.redirectUris.split(',').map((s) => s.trim()).filter(Boolean),
+        redirectUris: row.redirectUris
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
     };
 }
 

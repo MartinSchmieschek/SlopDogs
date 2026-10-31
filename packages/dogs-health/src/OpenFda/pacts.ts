@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface OpenFdaQuery {
     /** Endpoint: drug/event (Nebenwirkungen), drug/label (Beipackzettel), drug/enforcement (Rueckrufe), device/enforcement, food/enforcement */
@@ -11,7 +11,4 @@ export interface OpenFdaQuery {
     skip?: number;
 }
 
-export const OpenFdaQueryPact = createPact<OpenFdaQuery>(
-    "OpenFdaQueryProvider",
-    { fromSourceType: "OpenFdaQuery" }
-);
+export const OpenFdaQueryPact = createPact<OpenFdaQuery>('OpenFdaQueryProvider', { fromSourceType: 'OpenFdaQuery' });

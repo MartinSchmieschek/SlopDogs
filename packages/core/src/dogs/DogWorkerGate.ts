@@ -33,7 +33,7 @@
  * auch der OOM-Killer des Containers entscheidet. Prozesse daneben (npm, sh, cross-env) sieht sie nicht.
  */
 
-import { DOG_MEMPRESSURE_MARKER } from "../core/entities/IDogRunObserver";
+import { DOG_MEMPRESSURE_MARKER } from '../core/entities/IDogRunObserver';
 
 /** Default des globalen Slot-Deckels — auf 512 MB ausgelegt (2 Isolate ~ 2 x (64 + 16) MB Worst Case). */
 const DEFAULT_DOG_WORKER_GLOBAL_LIMIT = 2;
@@ -111,7 +111,9 @@ function readCgroupWorkingSetBytes(): number | null {
         try {
             const match = /^inactive_file (\d+)$/m.exec(fs.readFileSync(CGROUP_V2_STAT, 'utf8'));
             if (match) inactiveFile = Number(match[1]);
-        } catch { /* ohne memory.stat: memory.current allein */ }
+        } catch {
+            /* ohne memory.stat: memory.current allein */
+        }
         return Math.max(0, current - inactiveFile);
     } catch {
         return null;
@@ -311,8 +313,7 @@ export class DogWorkerGate {
      * Luft fuer ein frisch gespawntes Isolat (64 + 16 MB Deckel) zwischen Messung und hartem Deckel.
      */
     static memorySoftLimitMb(): number {
-        return positiveNumberFromEnv('MEMORY_SOFT_LIMIT_MB')
-            ?? Math.round(DogWorkerGate.memoryLimitMb() * DEFAULT_MEMORY_SOFT_LIMIT_SHARE);
+        return positiveNumberFromEnv('MEMORY_SOFT_LIMIT_MB') ?? Math.round(DogWorkerGate.memoryLimitMb() * DEFAULT_MEMORY_SOFT_LIMIT_SHARE);
     }
 
     /**
@@ -338,8 +339,7 @@ export class DogWorkerGate {
 
     /** Ab hier beendet der Laufzeit-Waechter laufende Isolate. Explizit via MEMORY_HARD_LIMIT_MB, sonst Budget - 96. */
     static memoryHardLimitMb(): number {
-        return positiveNumberFromEnv('MEMORY_HARD_LIMIT_MB')
-            ?? DogWorkerGate.memoryLimitMb() - DEFAULT_MEMORY_HARD_LIMIT_HEADROOM_MB;
+        return positiveNumberFromEnv('MEMORY_HARD_LIMIT_MB') ?? DogWorkerGate.memoryLimitMb() - DEFAULT_MEMORY_HARD_LIMIT_HEADROOM_MB;
     }
 
     static memoryRuntimeCheckMs(): number {
@@ -513,14 +513,16 @@ export class DogWorkerGate {
         const limitMb = DogWorkerGate.memoryLimitMb();
         const who = victim.applicant ? `${victim.applicant.storageId} ("${victim.applicant.name}")` : '(unbekannt)';
         console.warn(
-            `[DogWorkerGate] runtime memory guard terminated dog ${who}: ${source} ${usedMb} MB >= hard limit ${hardMb} MB `
-            + `of ${limitMb} MB, live isolates ${this.liveIsolates}, runtime kills since boot ${this.runtimeKills}`,
+            `[DogWorkerGate] runtime memory guard terminated dog ${who}: ${source} ${usedMb} MB >= hard limit ${hardMb} MB ` +
+                `of ${limitMb} MB, live isolates ${this.liveIsolates}, runtime kills since boot ${this.runtimeKills}`,
         );
-        victim.killForMemory(new Error(
-            `SerializedDog ${who}: ${DOG_MEMPRESSURE_MARKER} (runtime guard: ${source} ${usedMb} MB >= hard limit ${hardMb} MB `
-            + `of ${limitMb} MB; the dog was terminated mid-run to keep the container alive). Retry shortly. `
-            + `Tune via MEMORY_HARD_LIMIT_MB / MEMORY_LIMIT_MB, or lower DOG_WORKER_GLOBAL_LIMIT / DOG_WORKER_MAX_HEAP_MB.`,
-        ));
+        victim.killForMemory(
+            new Error(
+                `SerializedDog ${who}: ${DOG_MEMPRESSURE_MARKER} (runtime guard: ${source} ${usedMb} MB >= hard limit ${hardMb} MB ` +
+                    `of ${limitMb} MB; the dog was terminated mid-run to keep the container alive). Retry shortly. ` +
+                    `Tune via MEMORY_HARD_LIMIT_MB / MEMORY_LIMIT_MB, or lower DOG_WORKER_GLOBAL_LIMIT / DOG_WORKER_MAX_HEAP_MB.`,
+            ),
+        );
     }
 
     /** Nur fuer Tests: eine eigene Messung einsetzen; null stellt die echte wieder her. */
@@ -540,7 +542,7 @@ export class DogWorkerGate {
 
     /** Welche Zahl der Laufzeit-Waechter misst: 'cgroup' (memory.current - inactive_file) oder 'rss'. */
     get containerSource(): 'cgroup' | 'rss' {
-        return this.probe === this.processProbe ? this.processProbe.containerSource : (this.probe.containerBytes ? 'cgroup' : 'rss');
+        return this.probe === this.processProbe ? this.processProbe.containerSource : this.probe.containerBytes ? 'cgroup' : 'rss';
     }
 
     /** GC hoechstens alle MEMORY_GUARD_GC_MIN_INTERVAL_MS — ein voller GC haelt die Ereignisschleife an. */
@@ -566,11 +568,14 @@ export class DogWorkerGate {
                 clearTimeout(timer);
                 resolve();
             };
-            const timer = setTimeout(() => {
-                const index = this.exitWaiters.indexOf(wake);
-                if (index >= 0) this.exitWaiters.splice(index, 1);
-                wake();
-            }, Math.max(0, ms));
+            const timer = setTimeout(
+                () => {
+                    const index = this.exitWaiters.indexOf(wake);
+                    if (index >= 0) this.exitWaiters.splice(index, 1);
+                    wake();
+                },
+                Math.max(0, ms),
+            );
             timer.unref?.();
             this.exitWaiters.push(wake);
         });
@@ -585,17 +590,17 @@ export class DogWorkerGate {
         const limitMb = DogWorkerGate.memoryLimitMb();
         const reason = this.liveIsolates === 0 ? 'no other dog is running that could free memory' : `waited ${waitedMs} ms`;
         console.warn(
-            `[DogWorkerGate] memory guard refused dog ${applicant.storageId} ("${applicant.name}"): `
-            + `RSS ${rssMb} MB >= soft limit ${softMb} MB of ${limitMb} MB, live isolates ${this.liveIsolates}, `
-            + `waited ${waitedMs} ms, rejections since boot ${this.memoryRejections}`,
+            `[DogWorkerGate] memory guard refused dog ${applicant.storageId} ("${applicant.name}"): ` +
+                `RSS ${rssMb} MB >= soft limit ${softMb} MB of ${limitMb} MB, live isolates ${this.liveIsolates}, ` +
+                `waited ${waitedMs} ms, rejections since boot ${this.memoryRejections}`,
         );
         // Endet hier niemand mehr, warten die anderen sonst umsonst bis zur Frist.
         if (this.liveIsolates === 0) this.wakeAllMemoryWaiters();
         return new Error(
-            `SerializedDog ${applicant.storageId} ("${applicant.name}"): ${DOG_MEMPRESSURE_MARKER} `
-            + `(RSS ${rssMb} MB >= soft limit ${softMb} MB of ${limitMb} MB; ${reason}). `
-            + `The dog was not run to avoid an out-of-memory crash of the whole container; retry shortly. `
-            + `Tune via MEMORY_SOFT_LIMIT_MB / MEMORY_LIMIT_MB / MEMORY_GUARD_WAIT_MS, or lower DOG_WORKER_GLOBAL_LIMIT.`
+            `SerializedDog ${applicant.storageId} ("${applicant.name}"): ${DOG_MEMPRESSURE_MARKER} ` +
+                `(RSS ${rssMb} MB >= soft limit ${softMb} MB of ${limitMb} MB; ${reason}). ` +
+                `The dog was not run to avoid an out-of-memory crash of the whole container; retry shortly. ` +
+                `Tune via MEMORY_SOFT_LIMIT_MB / MEMORY_LIMIT_MB / MEMORY_GUARD_WAIT_MS, or lower DOG_WORKER_GLOBAL_LIMIT.`,
         );
     }
 }

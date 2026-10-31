@@ -13,10 +13,10 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from "@slopdogs/core";
-import { getBirds } from "./birdApiClient";
-import type { BirdResult } from "./interfaces/birdTypes";
-import { BirdQueryPact, type BirdQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@slopdogs/core';
+import { getBirds } from './birdApiClient';
+import type { BirdResult } from './interfaces/birdTypes';
+import { BirdQueryPact, type BirdQuery } from './pacts';
 
 /**
  * Arr, the BirdRetriever — a spectral hound that sniffs out
@@ -47,7 +47,7 @@ export class BirdRetriever extends Dog<BirdResult> implements ICacheable {
     }
 
     get icon(): string | undefined {
-        return "\uD83E\uDD86";
+        return '\uD83E\uDD86';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -59,7 +59,7 @@ export class BirdRetriever extends Dog<BirdResult> implements ICacheable {
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<BirdResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(BirdQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(BirdQueryPact, d));
         const query = (queryDog?.collected as BirdQuery | undefined) ?? ({} as BirdQuery);
 
         const lat = parseFloat(query['lat']);
@@ -71,14 +71,12 @@ export class BirdRetriever extends Dog<BirdResult> implements ICacheable {
             throw new Error('BirdRetriever: Missing required query params (lat, lng)');
         }
 
-        const key = geoBucketKey("birds", lat, lng, radiusKm * 1000, {
+        const key = geoBucketKey('birds', lat, lng, radiusKm * 1000, {
             extras: { back },
         });
 
         if (this.cacheHandler) {
-            return this.cacheHandler.getOrFetch(key, 15 * 60_000, () =>
-                getBirds(lat, lng, radiusKm, back)
-            );
+            return this.cacheHandler.getOrFetch(key, 15 * 60_000, () => getBirds(lat, lng, radiusKm, back));
         }
         return getBirds(lat, lng, radiusKm, back);
     };

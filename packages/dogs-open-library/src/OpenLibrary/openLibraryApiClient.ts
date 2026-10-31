@@ -10,10 +10,10 @@
  * =========================================================================
  */
 
-import type { BookEntry, OpenLibraryResult } from "./interfaces/openLibraryTypes";
+import type { BookEntry, OpenLibraryResult } from './interfaces/openLibraryTypes';
 
-const SEARCH_API_BASE = "https://openlibrary.org/search.json";
-const COVER_BASE = "https://covers.openlibrary.org/b/id";
+const SEARCH_API_BASE = 'https://openlibrary.org/search.json';
+const COVER_BASE = 'https://covers.openlibrary.org/b/id';
 
 interface OpenLibraryDoc {
     key: string;
@@ -35,11 +35,11 @@ interface OpenLibrarySearchResponse {
 /**
  * Search Open Library for books matching the given query.
  */
-export async function searchOpenLibrary(query: string, limit: string = "10"): Promise<OpenLibraryResult> {
+export async function searchOpenLibrary(query: string, limit: string = '10'): Promise<OpenLibraryResult> {
     const params = new URLSearchParams({
         q: query,
         limit,
-        fields: "key,title,author_name,first_publish_year,cover_i,subject,publisher,language,number_of_pages_median",
+        fields: 'key,title,author_name,first_publish_year,cover_i,subject,publisher,language,number_of_pages_median',
     });
 
     const url = `${SEARCH_API_BASE}?${params.toString()}`;
@@ -50,7 +50,7 @@ export async function searchOpenLibrary(query: string, limit: string = "10"): Pr
     let res: Response;
     try {
         res = await fetch(url, {
-            headers: { "Accept": "application/json", "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)" },
+            headers: { Accept: 'application/json', 'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)' },
             signal: controller.signal,
         });
     } finally {
@@ -58,13 +58,13 @@ export async function searchOpenLibrary(query: string, limit: string = "10"): Pr
     }
 
     if (!res.ok) {
-        const text = await res.text().catch(() => "");
+        const text = await res.text().catch(() => '');
         throw new Error(`Open Library search failed: ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
     }
 
-    const data = await res.json() as OpenLibrarySearchResponse;
+    const data = (await res.json()) as OpenLibrarySearchResponse;
 
-    const books: BookEntry[] = data.docs.map(doc => ({
+    const books: BookEntry[] = data.docs.map((doc) => ({
         key: doc.key,
         title: doc.title,
         authors: doc.author_name ?? [],

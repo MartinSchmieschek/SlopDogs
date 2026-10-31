@@ -37,13 +37,13 @@ import {
     tileBBox,
     tileKeyString,
     featureInRadius,
-} from "@slopdogs/core";
+} from '@slopdogs/core';
 import {
     fetchOverpassElementsWithFallback,
     overpassSettingsHeader,
     overpassElementRepresentativePoint,
     type OverpassRawElement,
-} from "./overpassMirrorChain";
+} from './overpassMirrorChain';
 
 export interface OsmQueryBase {
     lat: number;
@@ -68,10 +68,10 @@ export interface OsmBaseResult {
 /** Default-Facet wenn eine Subklasse keine Facet-Dimension hat. */
 export const DEFAULT_FACET = 'default';
 
-export abstract class OsmFeatureRetriever<
-    TResult extends OsmBaseResult,
-    TQueryPact extends new (...args: any[]) => IHuntingDog<unknown>,
-> extends Dog<TResult> implements ITileCacheable {
+export abstract class OsmFeatureRetriever<TResult extends OsmBaseResult, TQueryPact extends new (...args: any[]) => IHuntingDog<unknown>>
+    extends Dog<TResult>
+    implements ITileCacheable
+{
     private tileFeatureCache?: ITileFeatureCache;
 
     setTileFeatureCache(cache: ITileFeatureCache): void {
@@ -104,22 +104,16 @@ export abstract class OsmFeatureRetriever<
      * Subklasse gibt alle Facets zurueck, denen dieses Element zugeordnet
      * werden soll — eine Teilmenge von `fetchedFacets`. Leer → Element ignorieren.
      */
-    protected abstract classifyElementFacets(
-        el: OverpassRawElement,
-        fetchedFacets: string[],
-    ): string[];
+    protected abstract classifyElementFacets(el: OverpassRawElement, fetchedFacets: string[]): string[];
 
     /**
      * Subklasse baut ihr spezifisches Result aus den finalen, gefilterten Features.
      * Die Features sind bereits radius- und facet-gefiltert.
      */
-    protected abstract mapElements(
-        elements: OverpassRawElement[],
-        q: OsmQueryBase,
-    ): TResult;
+    protected abstract mapElements(elements: OverpassRawElement[], q: OsmQueryBase): TResult;
 
     /** Optional: anderes `out`-Statement. Default `out geom;` — Geometrie mitnehmen. */
-    protected readonly outStatement: string = "out geom;";
+    protected readonly outStatement: string = 'out geom;';
 
     /** Optional: TTL ueberschreiben (Default: 5 Tage). */
     protected readonly ttlMs: number = GEO_CACHE_TTL_OSM_MS;
@@ -144,8 +138,17 @@ export abstract class OsmFeatureRetriever<
     } {
         const tags = el.tags ?? {};
         const prefOrder = [
-            'highway', 'amenity', 'natural', 'leisure', 'tourism',
-            'historic', 'landuse', 'man_made', 'route', 'building', 'shop',
+            'highway',
+            'amenity',
+            'natural',
+            'leisure',
+            'tourism',
+            'historic',
+            'landuse',
+            'man_made',
+            'route',
+            'building',
+            'shop',
         ];
         for (const k of prefOrder) {
             if (tags[k]) return { primaryKey: k, primaryValue: tags[k]!, name: tags.name ?? null };
@@ -153,7 +156,7 @@ export abstract class OsmFeatureRetriever<
         const anyKey = Object.keys(tags).find((k) => !['name', 'note', 'source'].includes(k));
         return {
             primaryKey: anyKey ?? null,
-            primaryValue: anyKey ? tags[anyKey] ?? null : null,
+            primaryValue: anyKey ? (tags[anyKey] ?? null) : null,
             name: tags.name ?? null,
         };
     }
@@ -181,10 +184,7 @@ export abstract class OsmFeatureRetriever<
         return Math.min(Math.max(Math.round(parsed), this.minRadiusM), this.maxRadiusM);
     }
 
-    protected assembleOverpassQuery(
-        bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number },
-        facets: string[],
-    ): string {
+    protected assembleOverpassQuery(bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number }, facets: string[]): string {
         const body = this.buildOverpassBodyForTile(bbox, facets);
         return `${overpassSettingsHeader()}\n(\n${body}\n);\n${this.outStatement}`;
     }
@@ -209,8 +209,7 @@ export abstract class OsmFeatureRetriever<
         }
 
         // 1. Was haben wir schon, was fehlt?
-        const { features: cachedFeatures, missing } =
-            await this.tileFeatureCache.getCoveredFeatures(this.layer, tiles, facets);
+        const { features: cachedFeatures, missing } = await this.tileFeatureCache.getCoveredFeatures(this.layer, tiles, facets);
 
         // 2. Missing pro Tile gruppieren — pro Tile EINE Overpass-Query ueber alle fehlenden Facets.
         const tileMissing = new Map<string, { tile: TileKey; facets: Set<string> }>();
@@ -230,10 +229,7 @@ export abstract class OsmFeatureRetriever<
                 const fetchedFacets = Array.from(missingFacets).sort();
                 const bbox = tileBBox(tile);
                 const overpassQuery = this.assembleOverpassQuery(bbox, fetchedFacets);
-                const rawElements = await fetchOverpassElementsWithFallback(
-                    overpassQuery,
-                    this.name,
-                );
+                const rawElements = await fetchOverpassElementsWithFallback(overpassQuery, this.name);
 
                 const upserts: FeatureUpsert[] = [];
                 for (const el of rawElements) {
@@ -247,11 +243,7 @@ export abstract class OsmFeatureRetriever<
                     freshByKey.set(`${storedLike.osmType}:${storedLike.osmId}`, storedLike);
                 }
 
-                await this.tileFeatureCache!.storeFetchResult(
-                    this.layer,
-                    { tile, facets: fetchedFacets, features: upserts },
-                    this.ttlMs,
-                );
+                await this.tileFeatureCache!.storeFetchResult(this.layer, { tile, facets: fetchedFacets, features: upserts }, this.ttlMs);
             }),
         );
 
@@ -296,10 +288,7 @@ export abstract class OsmFeatureRetriever<
     };
 
     /** Fallback-Pfad ohne Tile-Cache — nur fuer Dev/Test. */
-    private async fetchAllTiles(
-        tiles: TileKey[],
-        facets: string[],
-    ): Promise<OverpassRawElement[]> {
+    private async fetchAllTiles(tiles: TileKey[], facets: string[]): Promise<OverpassRawElement[]> {
         const all: OverpassRawElement[] = [];
         for (const tile of tiles) {
             const bbox = tileBBox(tile);
@@ -311,10 +300,7 @@ export abstract class OsmFeatureRetriever<
     }
 
     /** Konvertiert ein Overpass-Raw-Element in einen FeatureUpsert. */
-    private elementToUpsert(
-        el: OverpassRawElement,
-        facets: string[],
-    ): FeatureUpsert {
+    private elementToUpsert(el: OverpassRawElement, facets: string[]): FeatureUpsert {
         const ident = this.extractFeatureIdentity(el);
         const point = overpassElementRepresentativePoint(el);
         const bbox = deriveBBoxFromElement(el);
@@ -381,8 +367,10 @@ function deriveBBoxFromElement(el: OverpassRawElement): {
         }
     }
     if (points.length === 0) return null;
-    let minLat = points[0].lat, maxLat = points[0].lat;
-    let minLng = points[0].lng, maxLng = points[0].lng;
+    let minLat = points[0].lat,
+        maxLat = points[0].lat;
+    let minLng = points[0].lng,
+        maxLng = points[0].lng;
     for (const p of points) {
         if (p.lat < minLat) minLat = p.lat;
         if (p.lat > maxLat) maxLat = p.lat;

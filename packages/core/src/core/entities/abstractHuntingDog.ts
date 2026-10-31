@@ -10,10 +10,9 @@
  * To cosmic forms from tangent planes, we end as we began.
  */
 
-import { DogClass, IHuntingDog } from "./IHuntingDog";
-import { IHuntingSeason } from "./IHuntingSeason";
-import { isRuntimeLogVerbose } from "../../runtimeLog";
-
+import { DogClass, IHuntingDog } from './IHuntingDog';
+import { IHuntingSeason } from './IHuntingSeason';
+import { isRuntimeLogVerbose } from '../../runtimeLog';
 
 /**
  * Arr, the abstract Dog -- the skeletal hull upon which every hunting hound is built,
@@ -22,11 +21,10 @@ import { isRuntimeLogVerbose } from "../../runtimeLog";
  * and yield collection through a Proxy-based tracking system that peers into the void.
  * @template Y The type of plunder this hound yields from the abyss
  */
-export abstract class Dog<Y> implements IHuntingDog<Y>{
-
+export abstract class Dog<Y> implements IHuntingDog<Y> {
     /** The plunder this hound brought back from the deep, or undefined if the hunt has not yet begun */
-    get collected(): Y|undefined{
-        return this.result
+    get collected(): Y | undefined {
+        return this.result;
     }
 
     /**
@@ -34,8 +32,8 @@ export abstract class Dog<Y> implements IHuntingDog<Y>{
      * wertet der Proxy diesen Getter auf dem echten Dog aus — der Rohwert, kein neuer Proxy. Fuer interne
      * Ablagen, die den Lauf ueberleben (Kontext-Cache, Aliasse): ein Proxy dort hielte die Season fest.
      */
-    get untrackedCollected(): Y|undefined{
-        return this.result
+    get untrackedCollected(): Y | undefined {
+        return this.result;
     }
 
     /** A brief description of what this hound does. Override in subclasses to speak yer purpose. */
@@ -54,12 +52,12 @@ export abstract class Dog<Y> implements IHuntingDog<Y>{
     }
 
     /** The hound's true name -- each must declare it or be lost to the void */
-    abstract get name():string
+    abstract get name(): string;
 
     /** Required parents -- hounds that MUST be exhausted before this one may run */
-    abstract get required():(new (...args: any[]) => IHuntingDog<unknown>)[]
+    abstract get required(): (new (...args: any[]) => IHuntingDog<unknown>)[];
     /** Optional parents -- hounds we wait fer IF they be aboard, but we sail without 'em if they ain't */
-    abstract get optional():(new (...args: any[]) => IHuntingDog<unknown>)[]
+    abstract get optional(): (new (...args: any[]) => IHuntingDog<unknown>)[];
 
     // Check if two classes intersect -- is one an instance of the other's dark lineage?
     private static isIntersecting(a: DogClass<IHuntingDog<unknown>>, b: DogClass<IHuntingDog<unknown>>): boolean {
@@ -68,46 +66,43 @@ export abstract class Dog<Y> implements IHuntingDog<Y>{
 
     // Find where two crews overlap -- which classes appear in both arrays
     private static intersection(arr1: any[], arr2: any[]): Array<DogClass<IHuntingDog<unknown>>> {
-        return arr1.filter(a => arr2.some(b => Dog.isIntersecting(a, b)));
+        return arr1.filter((a) => arr2.some((b) => Dog.isIntersecting(a, b)));
     }
 
     /**
      * Filter the exhausted hounds to find which ones satisfy this dog's required and optional dependencies.
      * The hunt demands accounting -- every parent must be traced.
      */
-    filterByRequirements(exhausted: IHuntingDog<unknown>[]):{
-        required:{instance:IHuntingDog<unknown>, constructor:DogClass<IHuntingDog<unknown>>}[],
-        optional:{instance:IHuntingDog<unknown>, constructor:DogClass<IHuntingDog<unknown>>}[],
+    filterByRequirements(exhausted: IHuntingDog<unknown>[]): {
+        required: { instance: IHuntingDog<unknown>; constructor: DogClass<IHuntingDog<unknown>> }[];
+        optional: { instance: IHuntingDog<unknown>; constructor: DogClass<IHuntingDog<unknown>> }[];
     } {
+        const requiredDogs = this.required;
+        const optionalDogs = this.optional;
 
-        const requiredDogs = this.required
-        const optionalDogs = this.optional
-
-        let requiredIntersections:{instance:IHuntingDog<unknown>, constructor:DogClass<IHuntingDog<unknown>>}[] = []
-        let optionalIntersections:{instance:IHuntingDog<unknown>, constructor:DogClass<IHuntingDog<unknown>>}[] = []
-        exhausted.forEach(e => {
-            requiredDogs.forEach(t => {
-                if (this.matchesParent(t, e)){
+        let requiredIntersections: { instance: IHuntingDog<unknown>; constructor: DogClass<IHuntingDog<unknown>> }[] = [];
+        let optionalIntersections: { instance: IHuntingDog<unknown>; constructor: DogClass<IHuntingDog<unknown>> }[] = [];
+        exhausted.forEach((e) => {
+            requiredDogs.forEach((t) => {
+                if (this.matchesParent(t, e)) {
                     requiredIntersections.push({
-                        constructor:t,
-                        instance:e
-                    })
+                        constructor: t,
+                        instance: e,
+                    });
                 }
-            })
+            });
 
-            optionalDogs.forEach(t => {
-                if (this.matchesParent(t, e)){
+            optionalDogs.forEach((t) => {
+                if (this.matchesParent(t, e)) {
                     optionalIntersections.push({
-                        constructor:t,
-                        instance:e
-                    })
+                        constructor: t,
+                        instance: e,
+                    });
                 }
-            })
-        })
+            });
+        });
 
-
-
-        return {required:requiredIntersections,optional:optionalIntersections}
+        return { required: requiredIntersections, optional: optionalIntersections };
     }
 
     /**
@@ -137,7 +132,7 @@ export abstract class Dog<Y> implements IHuntingDog<Y>{
 
         let foundCount = 0;
         for (const requiredClass of requiredDogs) {
-            const found = season.exhausted.some(dog => this.matchesParent(requiredClass, dog));
+            const found = season.exhausted.some((dog) => this.matchesParent(requiredClass, dog));
             if (found) {
                 foundCount++;
             }
@@ -157,12 +152,12 @@ export abstract class Dog<Y> implements IHuntingDog<Y>{
 
         for (const optionalClass of optionalDogs) {
             const inKennel =
-                season.withBeesInThePants.some(d => this.matchesParent(optionalClass, d)) ||
-                season.exhausted.some(d => this.matchesParent(optionalClass, d));
+                season.withBeesInThePants.some((d) => this.matchesParent(optionalClass, d)) ||
+                season.exhausted.some((d) => this.matchesParent(optionalClass, d));
 
             if (!inKennel) continue;
 
-            const isExhausted = season.exhausted.some(d => this.matchesParent(optionalClass, d));
+            const isExhausted = season.exhausted.some((d) => this.matchesParent(optionalClass, d));
             if (!isExhausted) return false;
         }
         return true;
@@ -188,7 +183,7 @@ export abstract class Dog<Y> implements IHuntingDog<Y>{
     }
 
     /** The yield collector -- the eldritch factory that produces this hound's plunder */
-    protected abstract yieldCollectorFactory:(season:IHuntingSeason) => Promise<Y>
+    protected abstract yieldCollectorFactory: (season: IHuntingSeason) => Promise<Y>;
 
     /**
      * Create a Proxy around the season that tracks every property read on collected yields.
@@ -226,7 +221,7 @@ export abstract class Dog<Y> implements IHuntingDog<Y>{
                         waveIndex: waveIndex,
                         readerInstance: readerInstance,
                         sourceInstance: sourceInstance,
-                        propertyPath: fullPropertyPath
+                        propertyPath: fullPropertyPath,
                     });
 
                     const value = (target as any)[prop];
@@ -236,7 +231,7 @@ export abstract class Dog<Y> implements IHuntingDog<Y>{
                     }
 
                     return value;
-                }
+                },
             });
         };
 
@@ -260,7 +255,7 @@ export abstract class Dog<Y> implements IHuntingDog<Y>{
                         return trackedCollected;
                     }
                     return (sourceInstanceTarget as any)[dogProp];
-                }
+                },
             });
         };
 
@@ -277,7 +272,7 @@ export abstract class Dog<Y> implements IHuntingDog<Y>{
                 // Array methods (find, forEach, map, etc.) -- the void intercepts them all
                 const value = (target as any)[prop];
                 if (typeof value === 'function') {
-                    return function(...args: any[]) {
+                    return function (...args: any[]) {
                         const result = value.apply(target, args);
 
                         // If result be an array of dogs (e.g. filter) -- wrap each one
@@ -301,7 +296,7 @@ export abstract class Dog<Y> implements IHuntingDog<Y>{
                 }
 
                 return value;
-            }
+            },
         });
 
         // Proxy around the season itself -- intercepts access to exhausted with our tracked version
@@ -311,33 +306,30 @@ export abstract class Dog<Y> implements IHuntingDog<Y>{
                     return trackedExhausted;
                 }
                 return (target as any)[prop];
-            }
+            },
         });
     }
 
     // The result -- what this hound plundered from the cosmic deep, or undefined if not yet run
-    private result:Y|undefined = undefined
+    private result: Y | undefined = undefined;
     /**
      * Collect this hound's yield -- if already collected, return the cached plunder.
      * If not, invoke the yieldCollectorFactory through a tracked season proxy,
      * so the void may observe every read. Arr, there be no secrets in these waters.
      */
-    async collectYield(season:IHuntingSeason): Promise<Y> {
-        if (this.result){
-                if (this.result instanceof Error)
-                    throw Error
-                else
-                    return this.result
+    async collectYield(season: IHuntingSeason): Promise<Y> {
+        if (this.result) {
+            if (this.result instanceof Error) throw Error;
+            else return this.result;
         } else {
             try {
                 // Wrap the season in a tracking proxy -- the void watches all data reads
                 const trackedSeason = this.createTrackedSeason(season);
-                this.result = await this.yieldCollectorFactory(trackedSeason)
-                return this.result
-            } catch(e){
-                throw e
+                this.result = await this.yieldCollectorFactory(trackedSeason);
+                return this.result;
+            } catch (e) {
+                throw e;
             }
         }
     }
-
 }

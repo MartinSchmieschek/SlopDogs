@@ -79,8 +79,7 @@ export interface ITileCacheable {
 }
 
 export function isTileCacheable(dog: unknown): dog is ITileCacheable {
-    return typeof (dog as { setTileFeatureCache?: unknown })
-        ?.setTileFeatureCache === 'function';
+    return typeof (dog as { setTileFeatureCache?: unknown })?.setTileFeatureCache === 'function';
 }
 
 export interface ITileFeatureCache {
@@ -89,11 +88,7 @@ export interface ITileFeatureCache {
      * fehlenden Kombinationen zurueck. In-flight dedup pro (dogType, zoom, tile, facet)
      * damit parallele Queries keine doppelten Overpass-Calls ausloesen.
      */
-    getCoveredFeatures(
-        dogType: string,
-        tiles: TileKey[],
-        facets: string[],
-    ): Promise<TileCoverageResult>;
+    getCoveredFeatures(dogType: string, tiles: TileKey[], facets: string[]): Promise<TileCoverageResult>;
 
     /**
      * Schreibt das Ergebnis eines Overpass-Fetches:
@@ -101,11 +96,7 @@ export interface ITileFeatureCache {
      *  - Fuer jede Feature-BBox: Membership in alle geschnittenen Tiles auf diesem Zoom.
      *  - Coverage-Row pro (tile, facet) — auch bei 0 Features.
      */
-    storeFetchResult(
-        dogType: string,
-        result: TileFetchResult,
-        ttlMs: number,
-    ): Promise<void>;
+    storeFetchResult(dogType: string, result: TileFetchResult, ttlMs: number): Promise<void>;
 
     /** Explizite Invalidation (z.B. Debug/Admin). */
     invalidateDogType(dogType: string): Promise<void>;

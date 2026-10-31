@@ -2,17 +2,17 @@
  * Shared Overpass geometry helpers: circle → bbox, fetch, OSM JSON → GeoJSON.
  */
 
-import osmtogeojson from "osmtogeojson";
-import type { FeatureCollection, GeometryObject } from "geojson";
-import { getOverpassFetchTimeoutMs } from "./overpassOsmShared";
+import osmtogeojson from 'osmtogeojson';
+import type { FeatureCollection, GeometryObject } from 'geojson';
+import { getOverpassFetchTimeoutMs } from './overpassOsmShared';
 
 /** Default instance; often overloaded — see `getOverpassEndpoints()` */
-export const OVERPASS_INTERPRETER_URL = "https://overpass-api.de/api/interpreter";
+export const OVERPASS_INTERPRETER_URL = 'https://overpass-api.de/api/interpreter';
 
 /** Used when `OVERPASS_INTERPRETER_URL` is unset: try main, then mirror */
 const DEFAULT_OVERPASS_ENDPOINTS: readonly string[] = [
-    "https://overpass-api.de/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter",
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
 ];
 
 /**
@@ -73,7 +73,7 @@ export function buildForestAreaOverpassQuery(
     bbox: BoundingBox,
     landuse: readonly string[],
     natural: readonly string[],
-    timeoutSec: number
+    timeoutSec: number,
 ): string {
     const bb = formatBBoxForOverpass(bbox);
     const lines: string[] = [];
@@ -87,29 +87,23 @@ export function buildForestAreaOverpassQuery(
     }
     return `[out:json][timeout:${timeoutSec}];
 (
-${lines.join("\n")}
+${lines.join('\n')}
 );
 (._;>;);
 out geom;`;
 }
 
 function escapeOverpassString(s: string): string {
-    return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
 
 /** Build Overpass QL for linear highway ways */
-export function buildStreetsOverpassQuery(
-    bbox: BoundingBox,
-    highways: readonly string[],
-    timeoutSec: number
-): string {
+export function buildStreetsOverpassQuery(bbox: BoundingBox, highways: readonly string[], timeoutSec: number): string {
     const bb = formatBBoxForOverpass(bbox);
-    const lines = highways.map(
-        (v) => `  way["highway"="${escapeOverpassString(v)}"](${bb});`
-    );
+    const lines = highways.map((v) => `  way["highway"="${escapeOverpassString(v)}"](${bb});`);
     return `[out:json][timeout:${timeoutSec}];
 (
-${lines.join("\n")}
+${lines.join('\n')}
 );
 out geom;`;
 }
@@ -123,17 +117,12 @@ export interface OverpassOsmJson {
  * POSTs to Overpass with retries on 502/503/504 and optional fallback mirrors.
  * `timeoutMs` is the client abort window per attempt (default: `getOverpassFetchTimeoutMs()` → 30s).
  */
-export async function fetchOverpassGeometry(
-    query: string,
-    timeoutMs = getOverpassFetchTimeoutMs(),
-): Promise<OverpassOsmJson> {
-    const userAgent =
-        process.env.OVERPASS_USER_AGENT ??
-        "jsonAggregator/OsmGeometryRetriever (contact: set OVERPASS_USER_AGENT)";
+export async function fetchOverpassGeometry(query: string, timeoutMs = getOverpassFetchTimeoutMs()): Promise<OverpassOsmJson> {
+    const userAgent = process.env.OVERPASS_USER_AGENT ?? 'jsonAggregator/OsmGeometryRetriever (contact: set OVERPASS_USER_AGENT)';
 
     const endpoints = getOverpassEndpoints();
     const maxAttemptsPerEndpoint = 3;
-    let lastError = "";
+    let lastError = '';
 
     for (const endpoint of endpoints) {
         for (let attempt = 0; attempt < maxAttemptsPerEndpoint; attempt++) {
@@ -141,16 +130,16 @@ export async function fetchOverpassGeometry(
             const timer = setTimeout(() => controller.abort(), timeoutMs);
             try {
                 const res = await fetch(endpoint, {
-                    method: "POST",
+                    method: 'POST',
                     headers: {
-                        "Content-Type": "application/x-www-form-urlencoded",
-                        "User-Agent": userAgent,
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'User-Agent': userAgent,
                     },
                     body: `data=${encodeURIComponent(query)}`,
                     signal: controller.signal,
                 });
 
-                const text = await res.text().catch(() => "");
+                const text = await res.text().catch(() => '');
 
                 if (res.ok) {
                     try {
@@ -174,7 +163,7 @@ export async function fetchOverpassGeometry(
 
                 throw new Error(formatOverpassUserHint(lastError));
             } catch (e) {
-                if (e instanceof Error && e.name === "AbortError") {
+                if (e instanceof Error && e.name === 'AbortError') {
                     lastError = `Overpass: request aborted after ${timeoutMs}ms (client timeout)`;
                     if (attempt < maxAttemptsPerEndpoint - 1) {
                         await sleep(2000 + attempt * 1500);
@@ -183,7 +172,7 @@ export async function fetchOverpassGeometry(
                     if (endpoints.length > 1 && endpoint === endpoints[0]) break;
                     throw new Error(formatOverpassUserHint(lastError));
                 }
-                if (e instanceof Error && e.message.startsWith("Overpass HTTP")) {
+                if (e instanceof Error && e.message.startsWith('Overpass HTTP')) {
                     throw e;
                 }
                 throw e;
@@ -193,22 +182,19 @@ export async function fetchOverpassGeometry(
         }
     }
 
-    throw new Error(
-        formatOverpassUserHint(lastError || "Overpass: all endpoints and retries exhausted")
-    );
+    throw new Error(formatOverpassUserHint(lastError || 'Overpass: all endpoints and retries exhausted'));
 }
 
 function formatOverpassHttpError(status: number, statusText: string, body: string): string {
-    if (body.includes("<?xml") || body.includes("<!DOCTYPE html")) {
+    if (body.includes('<?xml') || body.includes('<!DOCTYPE html')) {
         return `Overpass HTTP ${status} ${statusText} (gateway returned HTML/XML error page — query too heavy or server busy)`;
     }
-    return `Overpass HTTP ${status} ${statusText}${body ? ` — ${body.slice(0, 240)}` : ""}`;
+    return `Overpass HTTP ${status} ${statusText}${body ? ` — ${body.slice(0, 240)}` : ''}`;
 }
 
 function formatOverpassUserHint(detail: string): string {
-    const hint =
-        " Hint: use a smaller radius, fewer tags/highway classes, or set OVERPASS_INTERPRETER_URL to another Overpass instance.";
-    return detail.includes("Hint:") ? detail : `${detail}${hint}`;
+    const hint = ' Hint: use a smaller radius, fewer tags/highway classes, or set OVERPASS_INTERPRETER_URL to another Overpass instance.';
+    return detail.includes('Hint:') ? detail : `${detail}${hint}`;
 }
 
 export function overpassJsonToGeoJson(osm: OverpassOsmJson): FeatureCollection<GeometryObject> {

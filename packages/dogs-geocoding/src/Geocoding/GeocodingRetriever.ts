@@ -11,10 +11,10 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from "@slopdogs/core";
-import { forwardGeocode, reverseGeocode } from "./geocodingApiClient";
-import type { GeocodingResult } from "./interfaces/geocodingTypes";
-import { GeocodingQueryPact, type GeocodingQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@slopdogs/core';
+import { forwardGeocode, reverseGeocode } from './geocodingApiClient';
+import type { GeocodingResult } from './interfaces/geocodingTypes';
+import { GeocodingQueryPact, type GeocodingQuery } from './pacts';
 
 const GEOCODING_CACHE_TTL_MS = 24 * 60 * 60_000; // 24 h — Adressen aendern sich kaum
 
@@ -31,14 +31,24 @@ export class GeocodingRetriever extends Dog<GeocodingResult> implements ICacheab
         this.cacheHandler = handler;
     }
 
-    get name(): string { return GeocodingRetriever.name; }
-    get description(): string { return 'Converts addresses to GPS coordinates (forward) or GPS coordinates to addresses (reverse) via Nominatim/OpenStreetMap.'; }
-    get icon(): string | undefined { return "\uD83D\uDCCD"; }
-    get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] { return [GeocodingQueryPact]; }
-    get optional(): (new (...args: any[]) => IHuntingDog<unknown>)[] { return []; }
+    get name(): string {
+        return GeocodingRetriever.name;
+    }
+    get description(): string {
+        return 'Converts addresses to GPS coordinates (forward) or GPS coordinates to addresses (reverse) via Nominatim/OpenStreetMap.';
+    }
+    get icon(): string | undefined {
+        return '\uD83D\uDCCD';
+    }
+    get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
+        return [GeocodingQueryPact];
+    }
+    get optional(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
+        return [];
+    }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<GeocodingResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(GeocodingQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(GeocodingQueryPact, d));
         const query = (queryDog?.collected as GeocodingQuery | undefined) ?? ({} as GeocodingQuery);
 
         const address = query['address'];
@@ -57,7 +67,7 @@ export class GeocodingRetriever extends Dog<GeocodingResult> implements ICacheab
 
         // Reverse geocoding
         if (!isNaN(lat) && !isNaN(lng)) {
-            const key = geoBucketKey("geocoding:rev", lat, lng, 100);
+            const key = geoBucketKey('geocoding:rev', lat, lng, 100);
             if (this.cacheHandler) {
                 return this.cacheHandler.getOrFetch(key, GEOCODING_CACHE_TTL_MS, () => reverseGeocode(lat, lng));
             }

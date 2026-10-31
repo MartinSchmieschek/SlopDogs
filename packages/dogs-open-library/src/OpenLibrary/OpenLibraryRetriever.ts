@@ -9,10 +9,10 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from "@slopdogs/core";
-import { searchOpenLibrary } from "./openLibraryApiClient";
-import type { OpenLibraryResult } from "./interfaces/openLibraryTypes";
-import { OpenLibraryQueryPact, type OpenLibraryQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { searchOpenLibrary } from './openLibraryApiClient';
+import type { OpenLibraryResult } from './interfaces/openLibraryTypes';
+import { OpenLibraryQueryPact, type OpenLibraryQuery } from './pacts';
 
 /**
  * Arr, the OpenLibraryRetriever — a spectral hound that scours
@@ -34,7 +34,7 @@ export class OpenLibraryRetriever extends Dog<OpenLibraryResult> implements ICac
     }
 
     get icon(): string | undefined {
-        return "\uD83D\uDCDA";
+        return '\uD83D\uDCDA';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -46,7 +46,7 @@ export class OpenLibraryRetriever extends Dog<OpenLibraryResult> implements ICac
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<OpenLibraryResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(OpenLibraryQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(OpenLibraryQueryPact, d));
         const query = (queryDog?.collected as OpenLibraryQuery | undefined) ?? ({} as OpenLibraryQuery);
 
         const q = query['q'];
@@ -54,13 +54,11 @@ export class OpenLibraryRetriever extends Dog<OpenLibraryResult> implements ICac
             throw new Error('OpenLibraryRetriever: Missing required query param (q)');
         }
 
-        const limit = query['limit'] ?? "10";
+        const limit = query['limit'] ?? '10';
         const key = `openlibrary:${q.toLowerCase().trim()}:${limit}`;
 
         if (this.cacheHandler) {
-            return this.cacheHandler.getOrFetch(key, 60 * 60_000, () =>
-                searchOpenLibrary(q, limit)
-            );
+            return this.cacheHandler.getOrFetch(key, 60 * 60_000, () => searchOpenLibrary(q, limit));
         }
         return searchOpenLibrary(q, limit);
     };

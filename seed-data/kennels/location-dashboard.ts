@@ -10,31 +10,36 @@ export async function seedLocationDashboardKennel(nodesStore: IStore, kennelsSto
     // We need 5 MimicDogs (one per Pact) + 1 SerializedDog (lead combiner)
     const mimics: Array<{ lineageId: string; versionId: string; displayName: string; imitates: string; theRun: string }> = [
         {
-            lineageId: randomUUID(), versionId: randomUUID(),
+            lineageId: randomUUID(),
+            versionId: randomUUID(),
             displayName: 'Dashboard Weather Mapper',
             imitates: 'WeatherQueryProvider',
             theRun: `return { lat: QueryRetriever.lat, lng: QueryRetriever.lng }`,
         },
         {
-            lineageId: randomUUID(), versionId: randomUUID(),
+            lineageId: randomUUID(),
+            versionId: randomUUID(),
             displayName: 'Dashboard AirQuality Mapper',
             imitates: 'AirQualityQueryProvider',
             theRun: `return { lat: QueryRetriever.lat, lng: QueryRetriever.lng }`,
         },
         {
-            lineageId: randomUUID(), versionId: randomUUID(),
+            lineageId: randomUUID(),
+            versionId: randomUUID(),
             displayName: 'Dashboard Sun Mapper',
             imitates: 'SunQueryProvider',
             theRun: `return { lat: QueryRetriever.lat, lng: QueryRetriever.lng, days: "3" }`,
         },
         {
-            lineageId: randomUUID(), versionId: randomUUID(),
+            lineageId: randomUUID(),
+            versionId: randomUUID(),
             displayName: 'Dashboard Transport Mapper',
             imitates: 'PublicTransportQueryProvider',
             theRun: `return { lat: QueryRetriever.lat, lng: QueryRetriever.lng, radius: "500", results: "5" }`,
         },
         {
-            lineageId: randomUUID(), versionId: randomUUID(),
+            lineageId: randomUUID(),
+            versionId: randomUUID(),
             displayName: 'Dashboard Wiki Mapper',
             imitates: 'WikiNearbyQueryProvider',
             theRun: `return { lat: QueryRetriever.lat, lng: QueryRetriever.lng, radius: "500", limit: "5", lang: "de" }`,
@@ -73,13 +78,7 @@ export async function seedLocationDashboardKennel(nodesStore: IStore, kennelsSto
         lineageId: leadDogId,
         parentId: null,
         displayName: 'Location Dashboard',
-        parentsRequired: [
-            'WeatherRetriever',
-            'AirQualityRetriever',
-            'SunRetriever',
-            'PublicTransportRetriever',
-            'WikiNearbyRetriever',
-        ],
+        parentsRequired: ['WeatherRetriever', 'AirQualityRetriever', 'SunRetriever', 'PublicTransportRetriever', 'WikiNearbyRetriever'],
         parentsOptional: [],
         theRun: `
 const weather = WeatherRetriever;
@@ -163,7 +162,7 @@ return {
             BASE_DOG_PREFIX + 'SunRetriever',
             BASE_DOG_PREFIX + 'PublicTransportRetriever',
             BASE_DOG_PREFIX + 'WikiNearbyRetriever',
-            ...mimics.map(m => m.lineageId),
+            ...mimics.map((m) => m.lineageId),
         ],
         defaultQuery: { lat: '50.1109', lng: '8.6821' },
         createdAt: new Date(),

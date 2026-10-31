@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface HackerNewsQuery {
     /** Endpoint: top, new, best, ask, show, job — oder "item" fuer Einzeleintrag, "user" fuer Profil */
@@ -11,7 +11,4 @@ export interface HackerNewsQuery {
     hydrate?: boolean;
 }
 
-export const HackerNewsQueryPact = createPact<HackerNewsQuery>(
-    "HackerNewsQueryProvider",
-    { fromSourceType: "HackerNewsQuery" }
-);
+export const HackerNewsQueryPact = createPact<HackerNewsQuery>('HackerNewsQueryProvider', { fromSourceType: 'HackerNewsQuery' });

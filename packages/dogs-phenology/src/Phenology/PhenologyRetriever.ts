@@ -13,10 +13,10 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from "@slopdogs/core";
-import { getPhenologicalPhase } from "./phenologyData";
-import type { PhenologyResult } from "./interfaces/phenologyTypes";
-import { PhenologyQueryPact, type PhenologyQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { getPhenologicalPhase } from './phenologyData';
+import type { PhenologyResult } from './interfaces/phenologyTypes';
+import { PhenologyQueryPact, type PhenologyQuery } from './pacts';
 
 /**
  * Arr, the PhenologyRetriever — a spectral hound that reads the
@@ -40,7 +40,7 @@ export class PhenologyRetriever extends Dog<PhenologyResult> implements ICacheab
     }
 
     get icon(): string | undefined {
-        return "\uD83C\uDF38";
+        return '\uD83C\uDF38';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -52,7 +52,7 @@ export class PhenologyRetriever extends Dog<PhenologyResult> implements ICacheab
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<PhenologyResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(PhenologyQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(PhenologyQueryPact, d));
         const query = (queryDog?.collected as PhenologyQuery | undefined) ?? ({} as PhenologyQuery);
 
         const lat = parseFloat(query['lat']);

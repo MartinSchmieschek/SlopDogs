@@ -9,11 +9,7 @@
  * der Caller hat sie ueber Tile-Membership bereits geografisch vorselektiert.
  */
 
-import {
-    bboxIntersectsCircle,
-    haversineDistanceM,
-    type TileBBox,
-} from './tilingMath';
+import { bboxIntersectsCircle, haversineDistanceM, type TileBBox } from './tilingMath';
 
 export interface GeomFeatureLike {
     osmType: 'node' | 'way' | 'relation' | string;
@@ -28,30 +24,23 @@ export interface GeomFeatureLike {
     geometry?: Array<{ lat: number; lng: number }> | null;
 }
 
-export function featureInRadius(
-    feature: GeomFeatureLike,
-    queryCenter: { lat: number; lng: number },
-    queryRadiusM: number,
-): boolean {
+export function featureInRadius(feature: GeomFeatureLike, queryCenter: { lat: number; lng: number }, queryRadiusM: number): boolean {
     // Features ohne ableitbare Geometrie: vertraue der Tile-Membership.
     if (!feature.hasGeom) return true;
 
     // Node → klassischer Distance-Check.
     if (feature.osmType === 'node') {
         if (feature.lat == null || feature.lng == null) return true;
-        return haversineDistanceM(queryCenter, {
-            lat: feature.lat,
-            lng: feature.lng,
-        }) <= queryRadiusM;
+        return (
+            haversineDistanceM(queryCenter, {
+                lat: feature.lat,
+                lng: feature.lng,
+            }) <= queryRadiusM
+        );
     }
 
     // Way/Relation mit BBox → erst BBox-Circle-Intersect.
-    if (
-        feature.bboxMinLat != null &&
-        feature.bboxMinLng != null &&
-        feature.bboxMaxLat != null &&
-        feature.bboxMaxLng != null
-    ) {
+    if (feature.bboxMinLat != null && feature.bboxMinLng != null && feature.bboxMaxLat != null && feature.bboxMaxLng != null) {
         const bbox: TileBBox = {
             minLat: feature.bboxMinLat,
             minLng: feature.bboxMinLng,
@@ -76,10 +65,12 @@ export function featureInRadius(
 
     // BBox fehlt aber repraesentativer Punkt existiert.
     if (feature.lat != null && feature.lng != null) {
-        return haversineDistanceM(queryCenter, {
-            lat: feature.lat,
-            lng: feature.lng,
-        }) <= queryRadiusM;
+        return (
+            haversineDistanceM(queryCenter, {
+                lat: feature.lat,
+                lng: feature.lng,
+            }) <= queryRadiusM
+        );
     }
 
     return true;
@@ -93,19 +84,14 @@ function isPolygonal(feature: GeomFeatureLike): boolean {
 }
 
 /** Standard ray-casting point-in-polygon. Polygon als [lat,lng]-Ring. */
-function pointInPolygon(
-    point: { lat: number; lng: number },
-    ring: Array<{ lat: number; lng: number }>,
-): boolean {
+function pointInPolygon(point: { lat: number; lng: number }, ring: Array<{ lat: number; lng: number }>): boolean {
     let inside = false;
     for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
         const xi = ring[i].lng;
         const yi = ring[i].lat;
         const xj = ring[j].lng;
         const yj = ring[j].lat;
-        const intersect =
-            yi > point.lat !== yj > point.lat &&
-            point.lng < ((xj - xi) * (point.lat - yi)) / (yj - yi + 1e-12) + xi;
+        const intersect = yi > point.lat !== yj > point.lat && point.lng < ((xj - xi) * (point.lat - yi)) / (yj - yi + 1e-12) + xi;
         if (intersect) inside = !inside;
     }
     return inside;

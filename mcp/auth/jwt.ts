@@ -13,7 +13,7 @@ function getKey(): Uint8Array {
     if (!hex) {
         throw new Error(
             'MCP_TOKEN_SIGNING_KEY must be set in .env. Generate one with:\n' +
-            '  node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"',
+                "  node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"",
         );
     }
     if (!/^[0-9a-fA-F]+$/.test(hex)) {
@@ -22,7 +22,7 @@ function getKey(): Uint8Array {
     if (hex.length < 64) {
         throw new Error(
             `MCP_TOKEN_SIGNING_KEY too short (got ${hex.length} hex chars, need 64+ = 32+ bytes for HS256). Regenerate with:\n` +
-            '  node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"',
+                "  node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"",
         );
     }
     cachedKey = Buffer.from(hex, 'hex');
@@ -30,10 +30,10 @@ function getKey(): Uint8Array {
 }
 
 export interface AccessTokenClaims extends JWTPayload {
-    sub: string;       // userId
-    jti: string;       // unique token id (DB lookup for revocation)
-    aud: string;       // client_id
-    scope: string;     // space-separated scopes
+    sub: string; // userId
+    jti: string; // unique token id (DB lookup for revocation)
+    aud: string; // client_id
+    scope: string; // space-separated scopes
     iss: string;
     iat: number;
     exp: number;

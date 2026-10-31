@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface PicsumQuery {
     /** Modus: list (JSON-Metadaten), info (zu einer ID), randomUrl (direkte Bild-URL) — default "list" */
@@ -21,7 +21,4 @@ export interface PicsumQuery {
     blur?: number;
 }
 
-export const PicsumQueryPact = createPact<PicsumQuery>(
-    "PicsumQueryProvider",
-    { fromSourceType: "PicsumQuery" }
-);
+export const PicsumQueryPact = createPact<PicsumQuery>('PicsumQueryProvider', { fromSourceType: 'PicsumQuery' });

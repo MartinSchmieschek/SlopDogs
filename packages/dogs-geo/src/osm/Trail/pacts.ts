@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface TrailQuery {
     lat: string;
@@ -7,7 +7,4 @@ export interface TrailQuery {
     type?: string;
 }
 
-export const TrailQueryPact = createPact<TrailQuery>(
-    "TrailQueryProvider",
-    { fromSourceType: "TrailQuery" }
-);
+export const TrailQueryPact = createPact<TrailQuery>('TrailQueryProvider', { fromSourceType: 'TrailQuery' });

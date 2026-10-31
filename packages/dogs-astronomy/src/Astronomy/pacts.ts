@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface AstronomyQuery {
     lat: string;
@@ -6,7 +6,4 @@ export interface AstronomyQuery {
     date?: string;
 }
 
-export const AstronomyQueryPact = createPact<AstronomyQuery>(
-    "AstronomyQueryProvider",
-    { fromSourceType: "AstronomyQuery" }
-);
+export const AstronomyQueryPact = createPact<AstronomyQuery>('AstronomyQueryProvider', { fromSourceType: 'AstronomyQuery' });

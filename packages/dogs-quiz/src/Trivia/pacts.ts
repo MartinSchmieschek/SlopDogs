@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface TriviaQuery {
     /** Anzahl Fragen (1-50) — default 10 */
@@ -11,7 +11,4 @@ export interface TriviaQuery {
     type?: string;
 }
 
-export const TriviaQueryPact = createPact<TriviaQuery>(
-    "TriviaQueryProvider",
-    { fromSourceType: "TriviaQuery" }
-);
+export const TriviaQueryPact = createPact<TriviaQuery>('TriviaQueryProvider', { fromSourceType: 'TriviaQuery' });

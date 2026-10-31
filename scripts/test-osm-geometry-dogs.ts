@@ -16,8 +16,8 @@ import {
     OsmRailsGeometryPact,
     OsmLandscapeFeaturesRetriever,
     OsmLandscapeFeaturesPact,
-} from "@slopdogs/dogs-geo";
-import type { IHuntingSeason, IHuntingDog } from "@slopdogs/core";
+} from '@slopdogs/dogs-geo';
+import type { IHuntingSeason, IHuntingDog } from '@slopdogs/core';
 
 /**
  * Stellt eine Mock-Season her, in der ein Pact-Hund bereits "exhausted" ist
@@ -42,27 +42,29 @@ function mockSeason(pactClass: new () => IHuntingDog<unknown>, query: unknown): 
 function geomTypeHistogram(fc: { features: Array<{ geometry?: { type: string } }> }): string {
     const counts: Record<string, number> = {};
     for (const f of fc.features) {
-        const t = f.geometry?.type ?? "(none)";
+        const t = f.geometry?.type ?? '(none)';
         counts[t] = (counts[t] ?? 0) + 1;
     }
-    return Object.entries(counts).map(([k, v]) => `${k}=${v}`).join(", ");
+    return Object.entries(counts)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(', ');
 }
 
-const FRANKFURT = { lat: "50.1136", lng: "8.6797" }; // Goetheplatz
+const FRANKFURT = { lat: '50.1136', lng: '8.6797' }; // Goetheplatz
 
 async function testBuildings() {
-    console.log("\n--- OsmBuildingsRetriever ---");
+    console.log('\n--- OsmBuildingsRetriever ---');
     const dog = new OsmBuildingsRetriever();
     const season = mockSeason(OsmBuildingsGeometryPact, {
         ...FRANKFURT,
-        radius: "150",
+        radius: '150',
     });
     const t0 = Date.now();
     const r = await dog.collectYield(season);
     const elapsed = Date.now() - t0;
     console.log(`  fetched in ${elapsed}ms`);
     console.log(`  center: ${r.center.lat}, ${r.center.lng} | radius: ${r.radiusM}m`);
-    console.log(`  building filter: [${r.building.join(", ")}]`);
+    console.log(`  building filter: [${r.building.join(', ')}]`);
     console.log(`  features: ${r.geojson.features.length} (${geomTypeHistogram(r.geojson)})`);
 
     // Helper-Test: simplify
@@ -75,20 +77,20 @@ async function testBuildings() {
 }
 
 async function testRails() {
-    console.log("\n--- OsmRailsRetriever ---");
+    console.log('\n--- OsmRailsRetriever ---');
     const dog = new OsmRailsRetriever();
     // Frankfurt Hauptbahnhof / Innenstadt — groesserer Radius fuer Schienen.
     const season = mockSeason(OsmRailsGeometryPact, {
-        lat: "50.1078",
-        lng: "8.6638",
-        radius: "800",
+        lat: '50.1078',
+        lng: '8.6638',
+        radius: '800',
     });
     const t0 = Date.now();
     const r = await dog.collectYield(season);
     const elapsed = Date.now() - t0;
     console.log(`  fetched in ${elapsed}ms`);
     console.log(`  center: ${r.center.lat}, ${r.center.lng} | radius: ${r.radiusM}m`);
-    console.log(`  railway filter: [${r.railway.join(", ")}]`);
+    console.log(`  railway filter: [${r.railway.join(', ')}]`);
     console.log(`  features: ${r.geojson.features.length} (${geomTypeHistogram(r.geojson)})`);
 
     const simplified = (r as any).simplify(5);
@@ -96,11 +98,11 @@ async function testRails() {
 }
 
 async function testLandscape() {
-    console.log("\n--- OsmLandscapeFeaturesRetriever ---");
+    console.log('\n--- OsmLandscapeFeaturesRetriever ---');
     const dog = new OsmLandscapeFeaturesRetriever();
     const season = mockSeason(OsmLandscapeFeaturesPact, {
         ...FRANKFURT,
-        radius: "400",
+        radius: '400',
         // Defaults explizit dokumentieren — kann auch weggelassen werden.
     });
     const t0 = Date.now();
@@ -108,30 +110,37 @@ async function testLandscape() {
     const elapsed = Date.now() - t0;
     console.log(`  fetched in ${elapsed}ms`);
     console.log(`  center: ${r.center.lat}, ${r.center.lng} | radius: ${r.radiusM}m`);
-    console.log(`  nature: [${r.nature.join(", ")}]`);
-    console.log(`  barrier: [${r.barrier.join(", ")}]`);
-    console.log(`  manMade: [${r.manMade.join(", ")}]`);
+    console.log(`  nature: [${r.nature.join(', ')}]`);
+    console.log(`  barrier: [${r.barrier.join(', ')}]`);
+    console.log(`  manMade: [${r.manMade.join(', ')}]`);
     console.log(`  features: ${r.geojson.features.length} (${geomTypeHistogram(r.geojson)})`);
 
     // Aufteilung pro Tag-Key zeigen
     const byKey: Record<string, number> = {};
     for (const f of r.geojson.features) {
         const props = (f as any).properties ?? {};
-        const key = props.natural ? `natural=${props.natural}`
-            : props.barrier ? `barrier=${props.barrier}`
-            : props.man_made ? `man_made=${props.man_made}`
-            : "(other)";
+        const key = props.natural
+            ? `natural=${props.natural}`
+            : props.barrier
+              ? `barrier=${props.barrier}`
+              : props.man_made
+                ? `man_made=${props.man_made}`
+                : '(other)';
         byKey[key] = (byKey[key] ?? 0) + 1;
     }
-    console.log(`  by tag: ${Object.entries(byKey).map(([k, v]) => `${k}=${v}`).join(", ")}`);
+    console.log(
+        `  by tag: ${Object.entries(byKey)
+            .map(([k, v]) => `${k}=${v}`)
+            .join(', ')}`,
+    );
 }
 
 async function main() {
-    console.log("Testing 3 new OSM geometry dogs against live Overpass...");
+    console.log('Testing 3 new OSM geometry dogs against live Overpass...');
     const tasks = [
-        { name: "Buildings", fn: testBuildings },
-        { name: "Rails", fn: testRails },
-        { name: "LandscapeFeatures", fn: testLandscape },
+        { name: 'Buildings', fn: testBuildings },
+        { name: 'Rails', fn: testRails },
+        { name: 'LandscapeFeatures', fn: testLandscape },
     ];
     let failed = 0;
     for (let i = 0; i < tasks.length; i++) {
@@ -140,7 +149,7 @@ async function main() {
             await t.fn();
         } catch (e: any) {
             failed++;
-            console.error(`\n[FAIL] ${t.name}: ${(e?.message ?? String(e)).split("\n")[0]}`);
+            console.error(`\n[FAIL] ${t.name}: ${(e?.message ?? String(e)).split('\n')[0]}`);
         }
         // Overpass-Mirrors mit Atempause zwischen Hunden — sonst 429.
         if (i < tasks.length - 1) {
@@ -152,6 +161,6 @@ async function main() {
 }
 
 main().catch((e) => {
-    console.error("Fatal:", e);
+    console.error('Fatal:', e);
     process.exit(1);
 });

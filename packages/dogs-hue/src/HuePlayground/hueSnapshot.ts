@@ -6,9 +6,9 @@
  *  "To cosmic forms from tangent planes, we end as we began."
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
-import { api } from "node-hue-api";
-import type { HuePlaygroundLightEntry, HuePlaygroundSnapshot } from "./types";
-import { wrapHueApiError } from "./hueBridgeErrors";
+import { api } from 'node-hue-api';
+import type { HuePlaygroundLightEntry, HuePlaygroundSnapshot } from './types';
+import { wrapHueApiError } from './hueBridgeErrors';
 
 /** Map a raw lantern from the Bridge's unknowable depths into a readable entry. */
 function mapLight(raw: unknown): HuePlaygroundLightEntry {
@@ -21,10 +21,10 @@ function mapLight(raw: unknown): HuePlaygroundLightEntry {
     const state = L.state;
     const bri = state?.bri;
     return {
-        id: L.id ?? "",
-        name: String(L.name ?? ""),
+        id: L.id ?? '',
+        name: String(L.name ?? ''),
         on: Boolean(state?.on),
-        bri: typeof bri === "number" ? bri : null,
+        bri: typeof bri === 'number' ? bri : null,
         ...(L.uniqueid !== undefined ? { uniqueid: L.uniqueid } : {}),
     };
 }
@@ -34,17 +34,14 @@ function mapLight(raw: unknown): HuePlaygroundLightEntry {
  * and plunder every illuminated soul ye find anchored there.
  * "Through endless faces, countless forms, a multitude unfolds."
  */
-export async function fetchHueBridgeSnapshot(
-    bridgeHost: string,
-    bridgeUser: string
-): Promise<HuePlaygroundSnapshot> {
+export async function fetchHueBridgeSnapshot(bridgeHost: string, bridgeUser: string): Promise<HuePlaygroundSnapshot> {
     const trimmedHost = bridgeHost.trim();
     const trimmedUser = bridgeUser.trim();
     if (!trimmedHost) {
-        throw new Error("HuePlaygroundRetriever: bridgehost is missing or empty — the anchor coordinates be lost to the void!");
+        throw new Error('HuePlaygroundRetriever: bridgehost is missing or empty — the anchor coordinates be lost to the void!');
     }
     if (!trimmedUser) {
-        throw new Error("HuePlaygroundRetriever: bridgeuser is missing or empty — ye cannot board the Bridge without a name, matey!");
+        throw new Error('HuePlaygroundRetriever: bridgeuser is missing or empty — ye cannot board the Bridge without a name, matey!');
     }
 
     try {
@@ -53,6 +50,6 @@ export async function fetchHueBridgeSnapshot(
         const lights = allLights.map(mapLight);
         return { bridgeHost: trimmedHost, lights };
     } catch (e: unknown) {
-        throw wrapHueApiError(e, "HuePlaygroundRetriever (Snapshot)", trimmedHost);
+        throw wrapHueApiError(e, 'HuePlaygroundRetriever (Snapshot)', trimmedHost);
     }
 }

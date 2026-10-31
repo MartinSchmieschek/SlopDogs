@@ -71,11 +71,7 @@ export class PrismaTileFeatureCache implements ITileFeatureCache {
         this.prisma = prisma;
     }
 
-    async getCoveredFeatures(
-        dogType: string,
-        tiles: TileKey[],
-        facets: string[],
-    ): Promise<TileCoverageResult> {
+    async getCoveredFeatures(dogType: string, tiles: TileKey[], facets: string[]): Promise<TileCoverageResult> {
         if (tiles.length === 0 || facets.length === 0) {
             return { features: [], missing: [] };
         }
@@ -180,11 +176,7 @@ export class PrismaTileFeatureCache implements ITileFeatureCache {
         return { features, missing };
     }
 
-    async storeFetchResult(
-        dogType: string,
-        result: TileFetchResult,
-        ttlMs: number,
-    ): Promise<void> {
+    async storeFetchResult(dogType: string, result: TileFetchResult, ttlMs: number): Promise<void> {
         const now = BigInt(Date.now());
         const expiresAt = BigInt(Date.now() + ttlMs);
         const fetchTile = result.tile;
@@ -202,13 +194,7 @@ export class PrismaTileFeatureCache implements ITileFeatureCache {
         for (const f of result.features) {
             const osmId = BigInt(f.osmId);
             const membershipTiles: TileKey[] = [];
-            if (
-                f.hasGeom &&
-                f.bboxMinLat != null &&
-                f.bboxMinLng != null &&
-                f.bboxMaxLat != null &&
-                f.bboxMaxLng != null
-            ) {
+            if (f.hasGeom && f.bboxMinLat != null && f.bboxMinLng != null && f.bboxMaxLat != null && f.bboxMaxLng != null) {
                 membershipTiles.push(
                     ...tilesIntersectingBBox(
                         {
@@ -249,101 +235,104 @@ export class PrismaTileFeatureCache implements ITileFeatureCache {
 
         // Alles innerhalb einer Transaktion → atomar und ohne parallele Write-Lock-Konflikte.
         // Timeout generous: SQLite serialisiert Writes, PostgreSQL kann unter Last warten.
-        await this.prisma.$transaction(async (tx) => {
-            // 1. Features upsert: alte Reihen mit gleichem PK loeschen, dann createMany.
-            for (let i = 0; i < result.features.length; i += FEATURE_CHUNK) {
-                const chunk = result.features.slice(i, i + FEATURE_CHUNK);
-                if (chunk.length === 0) continue;
-                const refs = chunk.map((f) => ({
-                    osmType: f.osmType,
-                    osmId: BigInt(f.osmId),
-                }));
-                await tx.geoFeature.deleteMany({
-                    where: { dogType, OR: refs },
-                });
-                await tx.geoFeature.createMany({
-                    data: chunk.map((f) => ({
-                        dogType,
-                        osmType: f.osmType,
-                        osmId: BigInt(f.osmId),
-                        primaryKey: f.primaryKey,
-                        primaryValue: f.primaryValue,
-                        name: f.name,
-                        hasGeom: f.hasGeom,
-                        lat: f.lat,
-                        lng: f.lng,
-                        bboxMinLat: f.bboxMinLat,
-                        bboxMinLng: f.bboxMinLng,
-                        bboxMaxLat: f.bboxMaxLat,
-                        bboxMaxLng: f.bboxMaxLng,
-                        payload: f.payload,
-                        updatedAt: now,
-                    })),
-                });
-            }
-
-            // 2. Memberships: vor dem Insert die alten Memberships fuer
-            //    (Feature, refreshed-Facet) loeschen. Memberships fuer Facets,
-            //    die in diesem Fetch nicht angefasst wurden, bleiben unberuehrt.
-            if (result.features.length > 0 && result.facets.length > 0) {
+        await this.prisma.$transaction(
+            async (tx) => {
+                // 1. Features upsert: alte Reihen mit gleichem PK loeschen, dann createMany.
                 for (let i = 0; i < result.features.length; i += FEATURE_CHUNK) {
-                    const refs = result.features.slice(i, i + FEATURE_CHUNK).map((f) => ({
+                    const chunk = result.features.slice(i, i + FEATURE_CHUNK);
+                    if (chunk.length === 0) continue;
+                    const refs = chunk.map((f) => ({
                         osmType: f.osmType,
                         osmId: BigInt(f.osmId),
                     }));
-                    await tx.featureTileMembership.deleteMany({
-                        where: {
+                    await tx.geoFeature.deleteMany({
+                        where: { dogType, OR: refs },
+                    });
+                    await tx.geoFeature.createMany({
+                        data: chunk.map((f) => ({
                             dogType,
-                            facet: { in: result.facets },
-                            OR: refs,
-                        },
+                            osmType: f.osmType,
+                            osmId: BigInt(f.osmId),
+                            primaryKey: f.primaryKey,
+                            primaryValue: f.primaryValue,
+                            name: f.name,
+                            hasGeom: f.hasGeom,
+                            lat: f.lat,
+                            lng: f.lng,
+                            bboxMinLat: f.bboxMinLat,
+                            bboxMinLng: f.bboxMinLng,
+                            bboxMaxLat: f.bboxMaxLat,
+                            bboxMaxLng: f.bboxMaxLng,
+                            payload: f.payload,
+                            updatedAt: now,
+                        })),
                     });
                 }
-            }
-            for (let i = 0; i < memberships.length; i += MEM_CHUNK) {
-                const chunk = memberships.slice(i, i + MEM_CHUNK);
-                if (chunk.length === 0) continue;
-                await tx.featureTileMembership.createMany({
-                    data: chunk.map((m) => ({
-                        dogType,
-                        osmType: m.osmType,
-                        osmId: m.osmId,
-                        zoom: m.zoom,
-                        tileX: m.tileX,
-                        tileY: m.tileY,
-                        facet: m.facet,
-                    })),
-                });
-            }
 
-            // 3. Coverage upsert: alte Reihen fuer (tile, facet)-Kombi loeschen,
-            //    dann createMany (auch bei 0 Features — Negative-Cache).
-            if (result.facets.length > 0) {
-                await tx.tileCoverage.deleteMany({
-                    where: {
-                        dogType,
-                        zoom: fetchTile.zoom,
-                        tileX: fetchTile.x,
-                        tileY: fetchTile.y,
-                        facet: { in: result.facets },
-                    },
-                });
-                await tx.tileCoverage.createMany({
-                    data: result.facets.map((facet) => ({
-                        dogType,
-                        zoom: fetchTile.zoom,
-                        tileX: fetchTile.x,
-                        tileY: fetchTile.y,
-                        facet,
-                        fetchedAt: now,
-                        expiresAt,
-                    })),
-                });
-            }
-        }, {
-            maxWait: 60_000,
-            timeout: 60_000,
-        });
+                // 2. Memberships: vor dem Insert die alten Memberships fuer
+                //    (Feature, refreshed-Facet) loeschen. Memberships fuer Facets,
+                //    die in diesem Fetch nicht angefasst wurden, bleiben unberuehrt.
+                if (result.features.length > 0 && result.facets.length > 0) {
+                    for (let i = 0; i < result.features.length; i += FEATURE_CHUNK) {
+                        const refs = result.features.slice(i, i + FEATURE_CHUNK).map((f) => ({
+                            osmType: f.osmType,
+                            osmId: BigInt(f.osmId),
+                        }));
+                        await tx.featureTileMembership.deleteMany({
+                            where: {
+                                dogType,
+                                facet: { in: result.facets },
+                                OR: refs,
+                            },
+                        });
+                    }
+                }
+                for (let i = 0; i < memberships.length; i += MEM_CHUNK) {
+                    const chunk = memberships.slice(i, i + MEM_CHUNK);
+                    if (chunk.length === 0) continue;
+                    await tx.featureTileMembership.createMany({
+                        data: chunk.map((m) => ({
+                            dogType,
+                            osmType: m.osmType,
+                            osmId: m.osmId,
+                            zoom: m.zoom,
+                            tileX: m.tileX,
+                            tileY: m.tileY,
+                            facet: m.facet,
+                        })),
+                    });
+                }
+
+                // 3. Coverage upsert: alte Reihen fuer (tile, facet)-Kombi loeschen,
+                //    dann createMany (auch bei 0 Features — Negative-Cache).
+                if (result.facets.length > 0) {
+                    await tx.tileCoverage.deleteMany({
+                        where: {
+                            dogType,
+                            zoom: fetchTile.zoom,
+                            tileX: fetchTile.x,
+                            tileY: fetchTile.y,
+                            facet: { in: result.facets },
+                        },
+                    });
+                    await tx.tileCoverage.createMany({
+                        data: result.facets.map((facet) => ({
+                            dogType,
+                            zoom: fetchTile.zoom,
+                            tileX: fetchTile.x,
+                            tileY: fetchTile.y,
+                            facet,
+                            fetchedAt: now,
+                            expiresAt,
+                        })),
+                    });
+                }
+            },
+            {
+                maxWait: 60_000,
+                timeout: 60_000,
+            },
+        );
 
         if (isRuntimeLogVerbose()) {
             console.log(
@@ -435,7 +424,7 @@ export class PrismaTileFeatureCache implements ITileFeatureCache {
             )
         `;
 
-        if (isRuntimeLogVerbose() && (removedCoverages + removedMemberships + removedFeatures) > 0) {
+        if (isRuntimeLogVerbose() && removedCoverages + removedMemberships + removedFeatures > 0) {
             console.log(
                 `[TileFeatureCache] pruned coverages=${removedCoverages} memberships=${removedMemberships} features=${removedFeatures}`,
             );

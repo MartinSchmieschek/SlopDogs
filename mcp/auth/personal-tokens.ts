@@ -37,12 +37,23 @@ function patStatus(t: { revokedAt: Date | null; expiresAt: Date }, now: Date): P
 
 function parseRecentCalls(raw: string | null): Array<{ at: string; method: string; path: string }> {
     if (!raw) return [];
-    try { const p = JSON.parse(raw); return Array.isArray(p) ? p : []; } catch { return []; }
+    try {
+        const p = JSON.parse(raw);
+        return Array.isArray(p) ? p : [];
+    } catch {
+        return [];
+    }
 }
 
 function tokenJson(t: {
-    jti: string; name?: string | null; createdAt: Date; expiresAt: Date; revokedAt: Date | null;
-    lastUsedAt?: Date | null; useCount?: number; recentCalls?: string | null;
+    jti: string;
+    name?: string | null;
+    createdAt: Date;
+    expiresAt: Date;
+    revokedAt: Date | null;
+    lastUsedAt?: Date | null;
+    useCount?: number;
+    recentCalls?: string | null;
 }) {
     return {
         jti: t.jti,
@@ -173,12 +184,7 @@ export function createPersonalTokensRouter(prisma: PrismaClient): Router {
 }
 
 function escapeHtml(s: string): string {
-    return s
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 const PAGE_STYLES = `
@@ -216,56 +222,73 @@ td.id{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:#a0
 
 function renderListPage(
     tokens: Array<{
-        jti: string; name?: string | null; expiresAt: Date; revokedAt: Date | null; createdAt: Date;
-        lastUsedAt?: Date | null; useCount?: number; recentCalls?: string | null;
+        jti: string;
+        name?: string | null;
+        expiresAt: Date;
+        revokedAt: Date | null;
+        createdAt: Date;
+        lastUsedAt?: Date | null;
+        useCount?: number;
+        recentCalls?: string | null;
     }>,
     fresh: string | null,
 ): string {
     const now = new Date();
     const fmt = (d: Date | string) => escapeHtml(new Date(d).toISOString().slice(0, 16).replace('T', ' '));
-    const rows = tokens.length === 0
-        ? '<tr><td colspan="5" class="empty">No tokens yet — create one below.</td></tr>'
-        : tokens.map((t) => {
-            const st = patStatus(t, now);
-            const status = st === 'active'
-                ? '<span class="pill pill-ok">active</span>'
-                : `<span class="pill pill-rev">${st}</span>`;
-            const count = t.useCount ?? 0;
-            const used = count > 0
-                ? `${count}× · last ${t.lastUsedAt ? fmt(t.lastUsedAt) : '—'}`
-                : '<span class="muted">never used</span>';
-            const calls = parseRecentCalls(t.recentCalls ?? null);
-            const callsDetail = calls.length
-                ? '<details style="margin-top:4px"><summary class="muted">last ' + calls.length + ' calls</summary>'
-                  + '<ul style="margin:6px 0 0;padding-left:16px;font-size:.82em">'
-                  + calls.slice().reverse().map((c) =>
-                      `<li><span class="muted">${fmt(c.at)}</span> ${escapeHtml(String(c.method))} <code>${escapeHtml(String(c.path))}</code></li>`).join('')
-                  + '</ul></details>'
-                : '';
-            return [
-                '<tr>',
-                `<td><strong>${t.name ? escapeHtml(t.name) : '<span class="muted">unnamed</span>'}</strong>`
-                  + `<div class="id muted">${escapeHtml(t.jti.slice(0, 8))}…</div></td>`,
-                `<td>${status}</td>`,
-                `<td class="muted">${escapeHtml(t.expiresAt.toISOString().slice(0, 10))}</td>`,
-                `<td>${used}${callsDetail}</td>`,
-                t.revokedAt
-                    ? '<td></td>'
-                    : `<td><form method="POST" action="/auth/tokens/${escapeHtml(t.jti)}/revoke" style="display:inline">`
-                      + '<button class="btn btn-danger" type="submit">Revoke</button></form></td>',
-                '</tr>',
-            ].join('');
-        }).join('');
+    const rows =
+        tokens.length === 0
+            ? '<tr><td colspan="5" class="empty">No tokens yet — create one below.</td></tr>'
+            : tokens
+                  .map((t) => {
+                      const st = patStatus(t, now);
+                      const status =
+                          st === 'active' ? '<span class="pill pill-ok">active</span>' : `<span class="pill pill-rev">${st}</span>`;
+                      const count = t.useCount ?? 0;
+                      const used =
+                          count > 0
+                              ? `${count}× · last ${t.lastUsedAt ? fmt(t.lastUsedAt) : '—'}`
+                              : '<span class="muted">never used</span>';
+                      const calls = parseRecentCalls(t.recentCalls ?? null);
+                      const callsDetail = calls.length
+                          ? '<details style="margin-top:4px"><summary class="muted">last ' +
+                            calls.length +
+                            ' calls</summary>' +
+                            '<ul style="margin:6px 0 0;padding-left:16px;font-size:.82em">' +
+                            calls
+                                .slice()
+                                .reverse()
+                                .map(
+                                    (c) =>
+                                        `<li><span class="muted">${fmt(c.at)}</span> ${escapeHtml(String(c.method))} <code>${escapeHtml(String(c.path))}</code></li>`,
+                                )
+                                .join('') +
+                            '</ul></details>'
+                          : '';
+                      return [
+                          '<tr>',
+                          `<td><strong>${t.name ? escapeHtml(t.name) : '<span class="muted">unnamed</span>'}</strong>` +
+                              `<div class="id muted">${escapeHtml(t.jti.slice(0, 8))}…</div></td>`,
+                          `<td>${status}</td>`,
+                          `<td class="muted">${escapeHtml(t.expiresAt.toISOString().slice(0, 10))}</td>`,
+                          `<td>${used}${callsDetail}</td>`,
+                          t.revokedAt
+                              ? '<td></td>'
+                              : `<td><form method="POST" action="/auth/tokens/${escapeHtml(t.jti)}/revoke" style="display:inline">` +
+                                '<button class="btn btn-danger" type="submit">Revoke</button></form></td>',
+                          '</tr>',
+                      ].join('');
+                  })
+                  .join('');
 
     const freshBlock = fresh
         ? [
-            '<div class="token-new">',
-            '<strong>Your new token (copy now — you won\'t see it again):</strong>',
-            `<code>${escapeHtml(fresh)}</code>`,
-            '<div class="warn">Use as <code>Authorization: Bearer &lt;token&gt;</code> ',
-            'in your MCP client config or Custom GPT API Key field.</div>',
-            '</div>',
-        ].join('')
+              '<div class="token-new">',
+              "<strong>Your new token (copy now — you won't see it again):</strong>",
+              `<code>${escapeHtml(fresh)}</code>`,
+              '<div class="warn">Use as <code>Authorization: Bearer &lt;token&gt;</code> ',
+              'in your MCP client config or Custom GPT API Key field.</div>',
+              '</div>',
+          ].join('')
         : '';
 
     return [

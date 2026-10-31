@@ -11,9 +11,9 @@
  * =========================================================================
  */
 
-import type { Webcam } from "./interfaces/webcamTypes";
+import type { Webcam } from './interfaces/webcamTypes';
 
-const WINDY_BASE = "https://api.windy.com/webcams/api/v3/webcams";
+const WINDY_BASE = 'https://api.windy.com/webcams/api/v3/webcams';
 
 function getApiKey(): string {
     return process.env.WINDY_API_KEY ?? '';
@@ -46,19 +46,10 @@ function parseWebcam(raw: any): Webcam {
 /**
  * Fetch webcams near given GPS coordinates from Windy API v3.
  */
-export async function fetchNearbyWebcams(
-    lat: number,
-    lng: number,
-    radiusKm: number = 50,
-    limit: number = 10
-): Promise<Webcam[]> {
-    const params = [
-        `lat=${lat}`,
-        `lng=${lng}`,
-        `radius=${radiusKm}`,
-        `limit=${limit}`,
-        `include=images,location,player,categories`,
-    ].join('&');
+export async function fetchNearbyWebcams(lat: number, lng: number, radiusKm: number = 50, limit: number = 10): Promise<Webcam[]> {
+    const params = [`lat=${lat}`, `lng=${lng}`, `radius=${radiusKm}`, `limit=${limit}`, `include=images,location,player,categories`].join(
+        '&',
+    );
 
     const url = `${WINDY_BASE}?${params}`;
 
@@ -69,9 +60,9 @@ export async function fetchNearbyWebcams(
     try {
         res = await fetch(url, {
             headers: {
-                "Accept": "application/json",
-                "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)",
-                "x-windy-api-key": getApiKey(),
+                Accept: 'application/json',
+                'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)',
+                'x-windy-api-key': getApiKey(),
             },
             signal: controller.signal,
         });
@@ -80,11 +71,11 @@ export async function fetchNearbyWebcams(
     }
 
     if (!res.ok) {
-        const text = await res.text().catch(() => "");
+        const text = await res.text().catch(() => '');
         throw new Error(`Windy Webcams failed: ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
     }
 
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     const webcams = data?.webcams ?? data?.result?.webcams ?? [];
 
     return webcams.map(parseWebcam);

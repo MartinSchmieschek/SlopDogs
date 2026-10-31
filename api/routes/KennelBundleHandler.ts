@@ -20,12 +20,7 @@ import { DogAclIndex } from '../../services/dogAccess';
  * Export-Scan (P4c, L10): rohe Schluessel-Muster in Dog-Code und Kennel-Defaults. Eine Obermenge von
  * Plan 4c.6 bei `sk-` (auch `sk-proj-…` mit Binde- und Unterstrich). `{{key:alias}}` trifft keins davon.
  */
-const RAW_KEY_PATTERNS: RegExp[] = [
-    /sk-[A-Za-z0-9_-]{20,}/g,
-    /AKIA[0-9A-Z]{16}/g,
-    /ghp_[A-Za-z0-9]{36}/g,
-    /Bearer [A-Za-z0-9._-]{20,}/g,
-];
+const RAW_KEY_PATTERNS: RegExp[] = [/sk-[A-Za-z0-9_-]{20,}/g, /AKIA[0-9A-Z]{16}/g, /ghp_[A-Za-z0-9]{36}/g, /Bearer [A-Za-z0-9._-]{20,}/g];
 
 /** Ersetzt rohe Schluessel-Muster auf dem serialisierten Wert und zaehlt die Treffer. */
 export class RawKeyScan {
@@ -74,7 +69,11 @@ export class KennelBundleHandler {
         const raw = row?.serializedDogConfig;
         if (!raw) return {};
         if (typeof raw === 'string') {
-            try { return JSON.parse(raw); } catch { return {}; }
+            try {
+                return JSON.parse(raw);
+            } catch {
+                return {};
+            }
         }
         return raw;
     }
@@ -103,15 +102,15 @@ export class KennelBundleHandler {
                 return;
             }
 
-            const seedIds = (config.dogIds ?? []).filter(id => !id.startsWith('base:'));
+            const seedIds = (config.dogIds ?? []).filter((id) => !id.startsWith('base:'));
             const visited = new Set<string>();
             const collectedRows: any[] = [];
             const queue: string[] = [...seedIds];
 
             while (queue.length > 0) {
-                const batch = queue.splice(0, queue.length).filter(id => !visited.has(id));
+                const batch = queue.splice(0, queue.length).filter((id) => !visited.has(id));
                 if (batch.length === 0) continue;
-                batch.forEach(id => visited.add(id));
+                batch.forEach((id) => visited.add(id));
 
                 const [serialized, mimics] = await Promise.all([
                     this.nodesStore.findLatestVersionsByType(SerializedDog.name, batch),
@@ -119,7 +118,10 @@ export class KennelBundleHandler {
                 ]);
                 const rows = [...serialized, ...mimics] as any[];
                 // P3.5 (W10): the rights of a pinned version are those of its lineage head.
-                const acl = await DogAclIndex.load(this.nodesStore, rows.map((r) => ({ id: r.id, lineageId: r.lineageId })));
+                const acl = await DogAclIndex.load(
+                    this.nodesStore,
+                    rows.map((r) => ({ id: r.id, lineageId: r.lineageId })),
+                );
 
                 for (const row of rows) {
                     // SECURITY (Nira F1): a readable kennel may reference dogs the caller
@@ -140,18 +142,22 @@ export class KennelBundleHandler {
                 }
             }
 
-            const dogs = collectedRows.map(({ row, cfg }) => cfg === null ? {
-                lineageId: row.lineageId,
-                versionId: row.id,
-                displayName: row.displayName,
-                redacted: true,
-            } : {
-                lineageId: row.lineageId || cfg.lineageId,
-                versionId: row.id,
-                displayName: row.displayName || cfg.displayName,
-                type: cfg.imitates ? 'MimicDog' : 'SerializedDog',
-                config: cfg,
-            });
+            const dogs = collectedRows.map(({ row, cfg }) =>
+                cfg === null
+                    ? {
+                          lineageId: row.lineageId,
+                          versionId: row.id,
+                          displayName: row.displayName,
+                          redacted: true,
+                      }
+                    : {
+                          lineageId: row.lineageId || cfg.lineageId,
+                          versionId: row.id,
+                          displayName: row.displayName || cfg.displayName,
+                          type: cfg.imitates ? 'MimicDog' : 'SerializedDog',
+                          config: cfg,
+                      },
+            );
 
             // P4c (L10): der Key-Store reist nie mit; rohe Schluessel, die jemand in Code oder
             // Defaults geschrieben hat, werden ersetzt. `{{key:*}}`-Platzhalter reisen unveraendert.
@@ -171,12 +177,14 @@ export class KennelBundleHandler {
                     edges: config.edges,
                 },
                 dogs: dogs.map((d: any) => (d.config ? { ...d, config: scan.redact(d.config) } : d)),
-                ...(scan.hits > 0 ? {
-                    redactions: {
-                        count: scan.hits,
-                        note: 'Raw API keys were found in dog code or kennel defaults and replaced by [redacted]. Store keys with set_key and use {{key:<alias>}} with keys.fetch instead.',
-                    },
-                } : {}),
+                ...(scan.hits > 0
+                    ? {
+                          redactions: {
+                              count: scan.hits,
+                              note: 'Raw API keys were found in dog code or kennel defaults and replaced by [redacted]. Store keys with set_key and use {{key:<alias>}} with keys.fetch instead.',
+                          },
+                      }
+                    : {}),
             };
 
             res.json(bundle);
@@ -235,19 +243,15 @@ export class KennelBundleHandler {
             const kennelRows: KennelIdNameListEntry[] =
                 listRes.ok && listRes.data
                     ? (listRes.data as any[]).map((k) => ({
-                            lineageId: (k as any).lineageId,
-                            id: (k as any).id,
-                            name: (k as any).name,
-                        }))
+                          lineageId: (k as any).lineageId,
+                          id: (k as any).id,
+                          name: (k as any).name,
+                      }))
                     : [];
 
             let kennelId: string;
             let kennelName: string;
-            if (
-                importTarget &&
-                typeof importTarget.kennelId === 'string' &&
-                typeof importTarget.name === 'string'
-            ) {
+            if (importTarget && typeof importTarget.kennelId === 'string' && typeof importTarget.name === 'string') {
                 kennelId = importTarget.kennelId.trim();
                 kennelName = importTarget.name.trim() || kennelId;
             } else {
@@ -264,15 +268,11 @@ export class KennelBundleHandler {
             }
 
             if (isKennelIdTakenInList(kennelId, kennelRows)) {
-                res
-                    .status(400)
-                    .json({ error: `Kennel id is already in use: ${kennelId}. Choose a free id in the import dialog.` });
+                res.status(400).json({ error: `Kennel id is already in use: ${kennelId}. Choose a free id in the import dialog.` });
                 return;
             }
             if (isKennelNameTakenInList(kennelName, kennelRows)) {
-                res
-                    .status(400)
-                    .json({ error: `Kennel name is already in use: ${kennelName}. Change it in the import dialog.` });
+                res.status(400).json({ error: `Kennel name is already in use: ${kennelName}. Change it in the import dialog.` });
                 return;
             }
 
@@ -280,9 +280,10 @@ export class KennelBundleHandler {
             // persist. The reference stays as it is — it resolves if the dog exists on this
             // server and the importer may run it; otherwise the kennel reports it missing.
             const stubs = bundle.dogs.filter((dog: any) => dog?.redacted === true || !dog?.config);
-            const hinweise: string[] = stubs.map((dog: any) =>
-                `Dog ${dog?.displayName ?? dog?.lineageId ?? '?'} (${dog?.lineageId ?? dog?.versionId ?? '?'}) `
-                + 'kam als Referenz ohne Code (redacted) — nicht importiert, die Referenz bleibt stehen.',
+            const hinweise: string[] = stubs.map(
+                (dog: any) =>
+                    `Dog ${dog?.displayName ?? dog?.lineageId ?? '?'} (${dog?.lineageId ?? dog?.versionId ?? '?'}) ` +
+                    'kam als Referenz ohne Code (redacted) — nicht importiert, die Referenz bleibt stehen.',
             );
             const importDogs = bundle.dogs.filter((dog: any) => !stubs.includes(dog));
 
@@ -364,10 +365,10 @@ export class KennelBundleHandler {
                 : undefined;
             const remappedEdges = Array.isArray(bundle.kennel.edges)
                 ? bundle.kennel.edges.map((e: any) => ({
-                    ...e,
-                    fromId: remap(e.fromId),
-                    toId: remap(e.toId),
-                }))
+                      ...e,
+                      fromId: remap(e.fromId),
+                      toId: remap(e.toId),
+                  }))
                 : undefined;
             const createResult = await this.kennelsController.create({
                 id: kennelId,

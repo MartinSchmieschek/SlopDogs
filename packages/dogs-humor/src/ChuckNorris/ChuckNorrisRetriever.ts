@@ -1,7 +1,7 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from "@slopdogs/core";
-import { getChuckNorris } from "./chuckNorrisApiClient";
-import type { ChuckNorrisResult } from "./interfaces/chuckNorrisTypes";
-import { ChuckNorrisQueryPact, type ChuckNorrisQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { getChuckNorris } from './chuckNorrisApiClient';
+import type { ChuckNorrisResult } from './interfaces/chuckNorrisTypes';
+import { ChuckNorrisQueryPact, type ChuckNorrisQuery } from './pacts';
 
 export class ChuckNorrisRetriever extends Dog<ChuckNorrisResult> implements ICacheable {
     private cacheHandler?: ICacheHandler;
@@ -15,11 +15,11 @@ export class ChuckNorrisRetriever extends Dog<ChuckNorrisResult> implements ICac
     }
 
     get description(): string {
-        return "Holt einen Chuck-Norris-Fact von chucknorris.io (optional nach Kategorie).";
+        return 'Holt einen Chuck-Norris-Fact von chucknorris.io (optional nach Kategorie).';
     }
 
     get icon(): string | undefined {
-        return "\uD83E\uDD4B";
+        return '\uD83E\uDD4B';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -33,7 +33,7 @@ export class ChuckNorrisRetriever extends Dog<ChuckNorrisResult> implements ICac
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<ChuckNorrisResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(ChuckNorrisQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(ChuckNorrisQueryPact, d));
         const query = (queryDog?.collected as ChuckNorrisQuery | undefined) ?? ({} as ChuckNorrisQuery);
 
         return getChuckNorris(query.category);

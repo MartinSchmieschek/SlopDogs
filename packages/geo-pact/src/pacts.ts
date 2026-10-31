@@ -12,23 +12,14 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
-import type { GeoPoint, GeoArea, GeoRoute } from "./types";
+import { createPact } from '@slopdogs/core';
+import type { GeoPoint, GeoArea, GeoRoute } from './types';
 
 /** Pact fuer einen Geo-Punkt — Hunde, die nur Lat/Lng brauchen (Wetter, Sun, AirQuality, ...) */
-export const GeoPointPact = createPact<GeoPoint>(
-    "GeoPointProvider",
-    { fromSourceType: "GeoPoint" }
-);
+export const GeoPointPact = createPact<GeoPoint>('GeoPointProvider', { fromSourceType: 'GeoPoint' });
 
 /** Pact fuer eine Geo-Flaeche — Hunde, die Punkt + Radius brauchen (OSM, Wikipedia, Birds, ...) */
-export const GeoAreaPact = createPact<GeoArea>(
-    "GeoAreaProvider",
-    { fromSourceType: "GeoArea" }
-);
+export const GeoAreaPact = createPact<GeoArea>('GeoAreaProvider', { fromSourceType: 'GeoArea' });
 
 /** Pact fuer eine Geo-Route — Hunde, die Start/End/Waypoints brauchen (Bloodhound Routing) */
-export const GeoRoutePact = createPact<GeoRoute>(
-    "GeoRouteProvider",
-    { fromSourceType: "GeoRoute" }
-);
+export const GeoRoutePact = createPact<GeoRoute>('GeoRouteProvider', { fromSourceType: 'GeoRoute' });

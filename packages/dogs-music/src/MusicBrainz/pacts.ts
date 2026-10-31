@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface MusicBrainzQuery {
     /** Entity-Typ: artist, release, recording, release-group, work, label (default: artist) */
@@ -13,7 +13,4 @@ export interface MusicBrainzQuery {
     offset?: number;
 }
 
-export const MusicBrainzQueryPact = createPact<MusicBrainzQuery>(
-    "MusicBrainzQueryProvider",
-    { fromSourceType: "MusicBrainzQuery" }
-);
+export const MusicBrainzQueryPact = createPact<MusicBrainzQuery>('MusicBrainzQueryProvider', { fromSourceType: 'MusicBrainzQuery' });

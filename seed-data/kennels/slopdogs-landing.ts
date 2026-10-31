@@ -32,13 +32,22 @@ export class SlopdogsLandingSource {
 }
 
 /** Ein oeffentlicher Community-Dog (ownerId null) in seiner ersten Version; liefert die lineageId. */
-async function saveLandingDog(store: IStore, dog: {
-    displayName: string; theRun: string; parentsRequired: string[]; icon: string; description: string;
-}): Promise<string> {
+async function saveLandingDog(
+    store: IStore,
+    dog: {
+        displayName: string;
+        theRun: string;
+        parentsRequired: string[];
+        icon: string;
+        description: string;
+    },
+): Promise<string> {
     const versionId = randomUUID();
     const lineageId = randomUUID();
     const cfg = {
-        id: versionId, lineageId, parentId: null,
+        id: versionId,
+        lineageId,
+        parentId: null,
         displayName: dog.displayName,
         description: dog.description,
         icon: dog.icon,
@@ -47,9 +56,14 @@ async function saveLandingDog(store: IStore, dog: {
         theRun: dog.theRun,
     };
     await store.save({
-        id: versionId, type: SerializedDog.name, lineageId, parentId: null,
-        displayName: dog.displayName, serializedDogConfig: JSON.stringify(cfg),
-        visibility: 'public', createdAt: new Date(),
+        id: versionId,
+        type: SerializedDog.name,
+        lineageId,
+        parentId: null,
+        displayName: dog.displayName,
+        serializedDogConfig: JSON.stringify(cfg),
+        visibility: 'public',
+        createdAt: new Date(),
     });
     return lineageId;
 }
@@ -61,12 +75,16 @@ async function saveLandingDog(store: IStore, dog: {
  * haengen zu lassen. Geloescht wird nur, was dieser Kennel referenziert — keine fremden Dogs.
  * `kennelId` nur fuer Tests (ein frischer Kennel aus den Repo-Quellen neben dem gespeicherten).
  */
-export async function seedSlopdogsLandingKennel(nodesStore: IStore, kennelsStore: IStore, kennelId: string = SLOPDOGS_LANDING_KENNEL_ID): Promise<void> {
+export async function seedSlopdogsLandingKennel(
+    nodesStore: IStore,
+    kennelsStore: IStore,
+    kennelId: string = SLOPDOGS_LANDING_KENNEL_ID,
+): Promise<void> {
     const priorKennels = await kennelsStore.findByLineage('KennelConfig', kennelId);
     if (priorKennels.length) {
         const dogLineages = new Set<string>();
         for (const row of priorKennels as Array<{ id: string; dogIds?: unknown }>) {
-            const ids = typeof row.dogIds === 'string' ? JSON.parse(row.dogIds || '[]') : (row.dogIds || []);
+            const ids = typeof row.dogIds === 'string' ? JSON.parse(row.dogIds || '[]') : row.dogIds || [];
             for (const id of ids as unknown[]) if (id) dogLineages.add(String(id));
             await kennelsStore.delete(row.id);
         }
@@ -78,26 +96,37 @@ export async function seedSlopdogsLandingKennel(nodesStore: IStore, kennelsStore
 
     const source = SlopdogsLandingSource.locate();
     if (!source) {
-        console.warn(`[seed] ${kennelId}: Quellen (seed-data/kennels/slopdogs-landing/) nicht gefunden — / liefert den statischen Fallback.`);
+        console.warn(
+            `[seed] ${kennelId}: Quellen (seed-data/kennels/slopdogs-landing/) nicht gefunden — / liefert den statischen Fallback.`,
+        );
         return;
     }
 
     // Wave 1: der Inhalt — reine Daten, eine Quelle fuer Skin C.
     const contentId = await saveLandingDog(nodesStore, {
-        displayName: 'SlopdogsLandingContent', theRun: source.read('content.js'), parentsRequired: [],
-        icon: '🧾', description: 'SlopDogs landing copy as pure data; skin C renders it.',
+        displayName: 'SlopdogsLandingContent',
+        theRun: source.read('content.js'),
+        parentsRequired: [],
+        icon: '🧾',
+        description: 'SlopDogs landing copy as pure data; skin C renders it.',
     });
 
     // Wave 2: Skin C "Mixtape" rendert den Inhalt als ganze Seite — der einzige Look.
     const skinCId = await saveLandingDog(nodesStore, {
-        displayName: 'SlopdogsLandingSkinC', theRun: source.read('skin_c.js'), parentsRequired: [contentId],
-        icon: '📼', description: 'Landing skin C "Mixtape" rendering SlopdogsLandingContent.',
+        displayName: 'SlopdogsLandingSkinC',
+        theRun: source.read('skin_c.js'),
+        parentsRequired: [contentId],
+        icon: '📼',
+        description: 'Landing skin C "Mixtape" rendering SlopdogsLandingContent.',
     });
 
     // Wave 3: der Lead nimmt Skin C als Seite und verdrahtet /api/landing und den Host.
     const leadId = await saveLandingDog(nodesStore, {
-        displayName: 'SlopdogsLandingLead', theRun: source.read('lead.js'), parentsRequired: [skinCId],
-        icon: '🐕', description: 'Takes SlopdogsLandingSkinC as the page and wires the live rankings from /api/landing.',
+        displayName: 'SlopdogsLandingLead',
+        theRun: source.read('lead.js'),
+        parentsRequired: [skinCId],
+        icon: '🐕',
+        description: 'Takes SlopdogsLandingSkinC as the page and wires the live rankings from /api/landing.',
     });
 
     const now = new Date().toISOString();
@@ -116,9 +145,10 @@ export async function seedSlopdogsLandingKennel(nodesStore: IStore, kennelsStore
             { id: contentId, comment: 'Inhalt, die eine Quelle fuer Skin C.' },
             { id: skinCId, comment: 'Skin C Mixtape, der einzige Look.' },
         ]),
-        task: '## Wunsch\nDie SlopDogs-Landing ist selbst ein Kennel: ein Inhalt, ein Look (Mixtape), ohne Umschalter.\n\n'
-            + '## Quelle\nseed-data/kennels/slopdogs-landing/ (Seed); der statische Fallback public/landing/index.html wird daraus gebaut (scripts/build-landing.cjs).\n\n'
-            + '## Betrieb\nGET / bedient die Lead-Ausgabe aus einem HTML-Memo (LANDING_HTML_MEMO_MS), Quelle landing (rankt nicht). PLAN P5.',
+        task:
+            '## Wunsch\nDie SlopDogs-Landing ist selbst ein Kennel: ein Inhalt, ein Look (Mixtape), ohne Umschalter.\n\n' +
+            '## Quelle\nseed-data/kennels/slopdogs-landing/ (Seed); der statische Fallback public/landing/index.html wird daraus gebaut (scripts/build-landing.cjs).\n\n' +
+            '## Betrieb\nGET / bedient die Lead-Ausgabe aus einem HTML-Memo (LANDING_HTML_MEMO_MS), Quelle landing (rankt nicht). PLAN P5.',
         createdAt: now,
         updatedAt: now,
     });

@@ -1,4 +1,4 @@
-import type { WikivoyageResult } from "./interfaces/wikivoyageTypes";
+import type { WikivoyageResult } from './interfaces/wikivoyageTypes';
 
 function wikivoyageBase(lang: string): string {
     return `https://${lang}.wikivoyage.org/w/api.php`;
@@ -11,8 +11,8 @@ async function wvFetch<T>(url: string): Promise<T> {
     try {
         res = await fetch(url, {
             headers: {
-                "Accept": "application/json",
-                "User-Agent": "SlopDogs/0.1 (https://github.com/MartinSchmieschek/SlopDogs)",
+                Accept: 'application/json',
+                'User-Agent': 'SlopDogs/0.1 (https://github.com/MartinSchmieschek/SlopDogs)',
             },
             signal: controller.signal,
         });
@@ -20,26 +20,26 @@ async function wvFetch<T>(url: string): Promise<T> {
         clearTimeout(timer);
     }
     if (!res.ok) {
-        const text = await res.text().catch(() => "");
+        const text = await res.text().catch(() => '');
         throw new Error(`wikivoyage failed: ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
     }
     return res.json() as Promise<T>;
 }
 
-export async function getWikivoyageSnippet(place: string, lang: string = "en"): Promise<WikivoyageResult> {
+export async function getWikivoyageSnippet(place: string, lang: string = 'en'): Promise<WikivoyageResult> {
     if (!place || !place.trim()) {
         throw new Error("WikivoyageRetriever: 'place' is required");
     }
     const params = new URLSearchParams({
-        action: "query",
-        prop: "extracts|info",
-        exintro: "1",
-        explaintext: "1",
-        inprop: "url",
-        redirects: "1",
+        action: 'query',
+        prop: 'extracts|info',
+        exintro: '1',
+        explaintext: '1',
+        inprop: 'url',
+        redirects: '1',
         titles: place.trim(),
-        format: "json",
-        origin: "*",
+        format: 'json',
+        origin: '*',
     });
     const data = await wvFetch<any>(`${wikivoyageBase(lang)}?${params.toString()}`);
     const pages = data?.query?.pages ?? {};

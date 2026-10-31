@@ -9,5 +9,5 @@
  */
 
 export const GEO_CACHE_TTL_OSM_MS = 5 * 24 * 60 * 60 * 1000; // 5 Tage
-export const GEO_CACHE_TTL_WEATHER_MS = 15 * 60 * 1000;       // 15 Minuten
-export const GEO_CACHE_TTL_AIR_QUALITY_MS = 30 * 60 * 1000;   // 30 Minuten
+export const GEO_CACHE_TTL_WEATHER_MS = 15 * 60 * 1000; // 15 Minuten
+export const GEO_CACHE_TTL_AIR_QUALITY_MS = 30 * 60 * 1000; // 30 Minuten

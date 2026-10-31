@@ -8,7 +8,7 @@
 
 /** Arr, the gallery's cursed slots — title, thumbnails, and the button that opens the void's collection. */
 export enum GalleryLayoutEnum {
-    Title = "Title",
-    Thumbnails = "Thumbnails",
-    OpenGallery = "OpenGallery",
-  }
+    Title = 'Title',
+    Thumbnails = 'Thumbnails',
+    OpenGallery = 'OpenGallery',
+}

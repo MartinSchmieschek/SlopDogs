@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface PokeApiQuery {
     /** Endpoint: pokemon, pokemon-species, ability, type, move, generation, nature, berry */
@@ -13,7 +13,4 @@ export interface PokeApiQuery {
     offset?: number;
 }
 
-export const PokeApiQueryPact = createPact<PokeApiQuery>(
-    "PokeApiQueryProvider",
-    { fromSourceType: "PokeApiQuery" }
-);
+export const PokeApiQueryPact = createPact<PokeApiQuery>('PokeApiQueryProvider', { fromSourceType: 'PokeApiQuery' });

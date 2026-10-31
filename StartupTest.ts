@@ -127,7 +127,13 @@ export class StartupTest {
             // P3.5 Rechte v2: NONE < RUN < READ < EDIT < OWN
             await this.testRightsMatrix();
             await this.testPrivateKennelHiddenFromAnon(nodesStore, kennelsController as KennelController, baseDogsMap);
-            await this.testRunnerSeesOutputNotCode(nodesStore, kennelsStore, nodesController, kennelsController as KennelController, baseDogsMap);
+            await this.testRunnerSeesOutputNotCode(
+                nodesStore,
+                kennelsStore,
+                nodesController,
+                kennelsController as KennelController,
+                baseDogsMap,
+            );
             await this.testLeadFailureIsNot200(nodesStore, kennelsController as KennelController, baseDogsMap);
             // Spur L: der lokale Modus hat keinen Login — Boot-Guard und Netzgrenze sind dort die Zugriffspruefung.
             this.testLocalModeBootGuard();
@@ -139,10 +145,10 @@ export class StartupTest {
             // Cleanup: Lösche alle erstellten Test-Daten
             await this.cleanupTestData(nodesStore, kennelsStore, nodesController, kennelsController);
         }
-        
+
         // Zusammenfassung
         this.printSummary();
-        
+
         return this.results;
     }
 
@@ -153,12 +159,12 @@ export class StartupTest {
         nodesStore: IStore,
         kennelsStore: IStore,
         nodesController: Controller<ISerializedDogConfig>,
-        kennelsController: AbstractController<IKennelConfig>
+        kennelsController: AbstractController<IKennelConfig>,
     ): Promise<void> {
         if (this.createdTestIds.length === 0) {
             return; // Keine Test-Daten erstellt
         }
-        
+
         const v = isRuntimeLogVerbose();
         if (v) console.log('\n🧹 Räume Test-Daten auf...\n');
 
@@ -192,14 +198,20 @@ export class StartupTest {
             if (baseDogsMap.size === 0) {
                 throw new Error('Keine BaseDogs verfügbar');
             }
-            
-            const expectedDogs = ['RandomRecipesRetriever', 'CountryFlagBlackLab', 'DishFlagBlackLab', 'RandomEveryThingRetriever', 'TalkingDog'];
-            const missingDogs = expectedDogs.filter(name => !baseDogsMap.has(name));
-            
+
+            const expectedDogs = [
+                'RandomRecipesRetriever',
+                'CountryFlagBlackLab',
+                'DishFlagBlackLab',
+                'RandomEveryThingRetriever',
+                'TalkingDog',
+            ];
+            const missingDogs = expectedDogs.filter((name) => !baseDogsMap.has(name));
+
             if (missingDogs.length > 0) {
                 throw new Error(`Fehlende BaseDogs: ${missingDogs.join(', ')}`);
             }
-            
+
             // Prüfe ob alle BaseDogs eine name-Property haben
             for (const [name, DogClass] of baseDogsMap.entries()) {
                 const dog = new DogClass();
@@ -207,7 +219,7 @@ export class StartupTest {
                     throw new Error(`BaseDog ${name} hat keine korrekte name-Property`);
                 }
             }
-            
+
             this.addResult(testName, true);
         } catch (error) {
             this.addResult(testName, false, String(error));
@@ -218,7 +230,13 @@ export class StartupTest {
     private fakeMemoryProbe(rssMb: () => number): { probe: MemoryProbe; gcCalls: () => number } {
         let gc = 0;
         return {
-            probe: { rssBytes: () => rssMb() * 1024 * 1024, collectGarbage: () => { gc++; return true; } },
+            probe: {
+                rssBytes: () => rssMb() * 1024 * 1024,
+                collectGarbage: () => {
+                    gc++;
+                    return true;
+                },
+            },
             gcCalls: () => gc,
         };
     }
@@ -243,7 +261,11 @@ export class StartupTest {
      * Speicher-Waechter -> 503 + Retry-After, Lead ohne Wert -> 200 mit JSON null; READ sieht Details.
      * Dazu LeadOutcome direkt und openapi.json bei totem Lead.
      */
-    private async testLeadFailureIsNot200(nodesStore: IStore, kennelsController: KennelController, baseDogsMap: Map<string, any>): Promise<void> {
+    private async testLeadFailureIsNot200(
+        nodesStore: IStore,
+        kennelsController: KennelController,
+        baseDogsMap: Map<string, any>,
+    ): Promise<void> {
         const testName = 'P9 B1: Lead-Fehler -> 502/503 statt 200 mit leerem Rumpf';
         const stamp = Date.now();
         const kennelIds: string[] = [];
@@ -262,18 +284,29 @@ export class StartupTest {
             // run-only: Anonyme duerfen ausfuehren, aber nicht lesen — sie duerfen den Fehlertext nicht sehen.
             const throwing = await makeKennel('Throws', 'throw new Error("p9 secret boom");', 'run-only');
             const failed = await this.callHandler(runHandler, 'handlePublicGet', { params: { id: throwing }, ctx: anon });
-            if (failed.statusCode !== 502 || failed.body?.error !== 'lead_failed') throw new Error(`Wurf: ${failed.statusCode} ${JSON.stringify(failed.body)}`);
+            if (failed.statusCode !== 502 || failed.body?.error !== 'lead_failed')
+                throw new Error(`Wurf: ${failed.statusCode} ${JSON.stringify(failed.body)}`);
             if (JSON.stringify(failed.body).includes('p9 secret boom')) throw new Error('RUN-Leser sieht den Fehlertext');
-            const failedPost = await this.callHandler(runHandler, 'handlePublicPost', { params: { id: throwing }, ctx: anon, method: 'POST', body: {} });
+            const failedPost = await this.callHandler(runHandler, 'handlePublicPost', {
+                params: { id: throwing },
+                ctx: anon,
+                method: 'POST',
+                body: {},
+            });
             if (failedPost.statusCode !== 502) throw new Error(`POST Wurf: ${failedPost.statusCode}`);
-            const failedRead = await this.callHandler(runHandler, 'handlePublicGet', { params: { id: throwing }, ctx: this.fakeUser('UO') });
-            if (failedRead.statusCode !== 502 || !String(failedRead.body?.detail).includes('p9 secret boom')) throw new Error(`READ-Detail: ${JSON.stringify(failedRead.body)}`);
+            const failedRead = await this.callHandler(runHandler, 'handlePublicGet', {
+                params: { id: throwing },
+                ctx: this.fakeUser('UO'),
+            });
+            if (failedRead.statusCode !== 502 || !String(failedRead.body?.detail).includes('p9 secret boom'))
+                throw new Error(`READ-Detail: ${JSON.stringify(failedRead.body)}`);
             const failedExec = await this.callHandler(runHandler, 'handleExecute', { params: { id: throwing }, ctx: anon });
             if (failedExec.statusCode !== 502) throw new Error(`/execute Wurf: ${failedExec.statusCode}`);
 
             const empty = await makeKennel('Empty', 'return null;');
             const nothing = await this.callHandler(runHandler, 'handlePublicGet', { params: { id: empty }, ctx: anon });
-            if (nothing.statusCode !== 200 || nothing.body !== 'null') throw new Error(`leerer Lead: ${nothing.statusCode} ${JSON.stringify(nothing.body)}`);
+            if (nothing.statusCode !== 200 || nothing.body !== 'null')
+                throw new Error(`leerer Lead: ${nothing.statusCode} ${JSON.stringify(nothing.body)}`);
 
             // Speicher-Waechter: RSS ueber Soft-Limit, kein anderes Isolat -> 503 + Retry-After.
             const restoreGuard = this.withEnv({ MEMORY_GUARD: '1', MEMORY_SOFT_LIMIT_MB: '1', MEMORY_GUARD_GC_MIN_INTERVAL_MS: '0' });
@@ -296,14 +329,19 @@ export class StartupTest {
             const fromWaves = (waves: any) => LeadOutcome.fromWaves(waves, 'lead');
             if (fromWaves([[{ id: 'lead', result: 1 }]]).status !== 'ok') throw new Error('ok nicht erkannt');
             if (fromWaves([[{ id: 'lead', error: 'x' }]]).status !== 'failed') throw new Error('failed nicht erkannt');
-            if (!fromWaves([[{ id: 'lead', error: `a ${DOG_MEMPRESSURE_MARKER} b` }]]).memoryPressure) throw new Error('Speicherdruck nicht erkannt');
+            if (!fromWaves([[{ id: 'lead', error: `a ${DOG_MEMPRESSURE_MARKER} b` }]]).memoryPressure)
+                throw new Error('Speicherdruck nicht erkannt');
             if (fromWaves([[{ id: 'other', result: 1 }]]).status !== 'not_run') throw new Error('not_run nicht erkannt');
             this.addResult(testName, true);
         } catch (error) {
             this.addResult(testName, false, String(error));
         } finally {
             for (const id of kennelIds) {
-                try { await kennelsController.delete(id); } catch { /* ignore */ }
+                try {
+                    await kennelsController.delete(id);
+                } catch {
+                    /* ignore */
+                }
             }
         }
     }
@@ -343,10 +381,21 @@ export class StartupTest {
     private fakeResponse(): { res: any; out: { statusCode: number; body: any; headers: Record<string, string> } } {
         const out = { statusCode: 200, body: undefined as any, headers: {} as Record<string, string> };
         const res: any = {
-            status(code: number) { out.statusCode = code; return res; },
-            json(body: any) { out.body = body; return res; },
-            send(body: any) { out.body = body; return res; },
-            setHeader(k: string, v: string) { out.headers[k.toLowerCase()] = v; },
+            status(code: number) {
+                out.statusCode = code;
+                return res;
+            },
+            json(body: any) {
+                out.body = body;
+                return res;
+            },
+            send(body: any) {
+                out.body = body;
+                return res;
+            },
+            setHeader(k: string, v: string) {
+                out.headers[k.toLowerCase()] = v;
+            },
         };
         return { res, out };
     }
@@ -408,8 +457,11 @@ export class StartupTest {
             snapshotCache: new KennelSnapshotCache(),
             kennelStats: new KennelStatsService(StartupTest.NO_STATS_STORE, this.testCallCounter),
             callCounter: this.testCallCounter,
-            dogStats: new DogStatsService(StartupTest.NO_DOG_STATS_STORE, this.testCallCounter,
-                new KennelStatsService(StartupTest.NO_STATS_STORE, this.testCallCounter)),
+            dogStats: new DogStatsService(
+                StartupTest.NO_DOG_STATS_STORE,
+                this.testCallCounter,
+                new KennelStatsService(StartupTest.NO_STATS_STORE, this.testCallCounter),
+            ),
             // Ein Key-Store ohne Master-Key (P4c): die Werkzeug-Tests fassen keine Schluessel an.
             keyStore: new KeyStoreService(null as unknown as KeyStorePrisma, null),
         };
@@ -453,7 +505,12 @@ export class StartupTest {
                 public: { anonym: 'READ', fremd: 'READ', runner: 'READ', reader: 'READ', editor: 'EDIT', owner: 'OWN', superuser: 'OWN' },
             };
             const entity = (visibility: Visibility, extra: Partial<AclEntity> = {}): AclEntity => ({
-                visibility, ownerId: 'UO', editors: 'UE', viewers: 'UV', runners: 'UR', ...extra,
+                visibility,
+                ownerId: 'UO',
+                editors: 'UE',
+                viewers: 'UV',
+                runners: 'UR',
+                ...extra,
             });
             const wrong: string[] = [];
             for (const visibility of Object.keys(expected) as Visibility[]) {
@@ -477,18 +534,22 @@ export class StartupTest {
             const community = { visibility: 'private', ownerId: null } as AclEntity;
             if (this.levelOf(community, this.fakeUser('U9')) !== 'EDIT') throw new Error('Community: Eingeloggter nicht EDIT');
             if (this.levelOf(community, anon) !== 'NONE') throw new Error('Community privat: anonym nicht NONE');
-            if (this.levelOf({ visibility: null, ownerId: null } as AclEntity, anon) !== 'READ') throw new Error('Community ohne visibility: anonym nicht READ');
+            if (this.levelOf({ visibility: null, ownerId: null } as AclEntity, anon) !== 'READ')
+                throw new Error('Community ohne visibility: anonym nicht READ');
             if (this.levelOf(community, superUser) !== 'OWN') throw new Error('Community: Super-User nicht OWN');
 
             // Mehrfachrollen: die hoechste Stufe gewinnt; der Owner in runners bleibt OWN.
             if (this.levelOf(entity('private', { runners: 'UR', viewers: 'UR' }), this.fakeUser('UR')) !== 'READ') {
                 throw new Error('runner + reader: nicht READ');
             }
-            if (this.levelOf(entity('private', { runners: 'UO' }), this.fakeUser('UO')) !== 'OWN') throw new Error('Owner in runners: nicht OWN');
+            if (this.levelOf(entity('private', { runners: 'UO' }), this.fakeUser('UO')) !== 'OWN')
+                throw new Error('Owner in runners: nicht OWN');
 
             // myRights anonym auf public (3.5.7).
             const rights = rightsOf(entity('public'), anon);
-            if (JSON.stringify(rights) !== JSON.stringify({ run: true, read: true, edit: false, own: false, frozen: false, locked: null })) {
+            if (
+                JSON.stringify(rights) !== JSON.stringify({ run: true, read: true, edit: false, own: false, frozen: false, locked: null })
+            ) {
                 throw new Error(`myRights anonym/public: ${JSON.stringify(rights)}`);
             }
 
@@ -528,7 +589,7 @@ export class StartupTest {
      */
     private assertNoLeak(label: string, responses: unknown[], markers: string[]): void {
         for (const [i, r] of responses.entries()) {
-            const text = typeof r === 'string' ? r : JSON.stringify(r) ?? '';
+            const text = typeof r === 'string' ? r : (JSON.stringify(r) ?? '');
             for (const m of markers) {
                 if (text.includes(m)) throw new Error(`${label}: Antwort ${i} traegt "${m}"`);
             }
@@ -547,10 +608,17 @@ export class StartupTest {
         const testName = 'P3.5 T1: privater Kennel anonym ueberall 404';
         const kennelId = `test-t1-${Date.now()}`;
         try {
-            const dog = await this.saveAclTestDog(nodesStore, 'T1Dog', 'return { t1: "t1-out" }; /* p35-code-t1 */',
-                { visibility: 'private', ownerId: 'UO' });
+            const dog = await this.saveAclTestDog(nodesStore, 'T1Dog', 'return { t1: "t1-out" }; /* p35-code-t1 */', {
+                visibility: 'private',
+                ownerId: 'UO',
+            });
             const created = await kennelsController.create({
-                id: kennelId, name: 'T1 Private', dogIds: [dog], defaultBody: { mark: 'p35-default-t1' }, visibility: 'private', ownerId: 'UO',
+                id: kennelId,
+                name: 'T1 Private',
+                dogIds: [dog],
+                defaultBody: { mark: 'p35-default-t1' },
+                visibility: 'private',
+                ownerId: 'UO',
             });
             if (!created.ok) throw new Error(`Kennel nicht angelegt: ${created.error}`);
             const runHandler = new KennelRunHandler({ kennelsController, nodesStore, baseDogsMap, callCounter: this.testCallCounter });
@@ -570,12 +638,20 @@ export class StartupTest {
             for (const [label, out] of answers) {
                 if (out.statusCode !== 404) throw new Error(`${label}: erwartet 404, erhalten ${out.statusCode}`);
             }
-            this.assertNoLeak('T1', answers.map(([, out]) => out.body), ['p35-code-t1', 'p35-default-t1', 't1-out', 'T1 Private']);
+            this.assertNoLeak(
+                'T1',
+                answers.map(([, out]) => out.body),
+                ['p35-code-t1', 'p35-default-t1', 't1-out', 'T1 Private'],
+            );
             this.addResult(testName, true);
         } catch (error) {
             this.addResult(testName, false, String(error));
         } finally {
-            try { await kennelsController.delete(kennelId); } catch { /* ignore */ }
+            try {
+                await kennelsController.delete(kennelId);
+            } catch {
+                /* ignore */
+            }
         }
     }
 
@@ -594,10 +670,19 @@ export class StartupTest {
         const testName = 'P3.5 T3: runner sieht Output, nie Code';
         const kennelId = `test-t3-${Date.now()}`;
         try {
-            const x = await this.saveAclTestDog(nodesStore, 'T3ForeignDog', 'return { x: "t3-x-out" }; /* p35-code-t3 */',
-                { visibility: 'private', ownerId: 'UX', runners: 'UR' });
+            const x = await this.saveAclTestDog(nodesStore, 'T3ForeignDog', 'return { x: "t3-x-out" }; /* p35-code-t3 */', {
+                visibility: 'private',
+                ownerId: 'UX',
+                runners: 'UR',
+            });
             const xVersion = (await nodesStore.findLatestVersionsByType(SerializedDog.name, [x]))[0]?.id as string;
-            const created = await kennelsController.create({ id: kennelId, name: 'T3 Mine', dogIds: [xVersion], visibility: 'private', ownerId: 'UR' });
+            const created = await kennelsController.create({
+                id: kennelId,
+                name: 'T3 Mine',
+                dogIds: [xVersion],
+                visibility: 'private',
+                ownerId: 'UR',
+            });
             if (!created.ok) throw new Error(`Kennel nicht angelegt: ${created.error}`);
             const runHandler = new KennelRunHandler({ kennelsController, nodesStore, baseDogsMap, callCounter: this.testCallCounter });
             const deps = this.toolDeps(nodesStore, kennelsStore, nodesController, kennelsController, runHandler);
@@ -609,9 +694,12 @@ export class StartupTest {
             const node = (run.body?.waves ?? []).flat().find((n: any) => n.lineageId === x);
             if (!node) throw new Error(`/run: X nicht in den Waves: ${JSON.stringify(run.body).slice(0, 300)}`);
             if (node.result?.x !== 't3-x-out') throw new Error(`/run: X.result fehlt: ${JSON.stringify(node.result)}`);
-            if (node.codeTs !== undefined || node.vmContext !== undefined || node.access !== 'run') throw new Error('/run: X nicht auf RUN redigiert');
+            if (node.codeTs !== undefined || node.vmContext !== undefined || node.access !== 'run')
+                throw new Error('/run: X nicht auf RUN redigiert');
             if (node.version !== 1 || node.latestVersion !== 1 || node.latestId !== xVersion) {
-                throw new Error(`/run: Pin-Stand von X fehlt (P6 U3): ${JSON.stringify({ v: node.version, l: node.latestVersion, id: node.latestId })}`);
+                throw new Error(
+                    `/run: Pin-Stand von X fehlt (P6 U3): ${JSON.stringify({ v: node.version, l: node.latestVersion, id: node.latestId })}`,
+                );
             }
 
             const call = async (name: string, args: Record<string, any>) => {
@@ -640,7 +728,11 @@ export class StartupTest {
         } catch (error) {
             this.addResult(testName, false, String(error));
         } finally {
-            try { await kennelsController.delete(kennelId); } catch { /* ignore */ }
+            try {
+                await kennelsController.delete(kennelId);
+            } catch {
+                /* ignore */
+            }
         }
     }
 
@@ -656,10 +748,12 @@ export class StartupTest {
             // Container-Indiz ersetzbar: der Test laeuft auf Rechnern und in der CI, nicht im Container.
             const noContainer = () => null;
             const inContainer = () => '/.dockerenv';
-            if (LocalMode.bootError(base, noContainer) !== null) throw new Error(`Grundform abgewiesen: ${LocalMode.bootError(base, noContainer)}`);
+            if (LocalMode.bootError(base, noContainer) !== null)
+                throw new Error(`Grundform abgewiesen: ${LocalMode.bootError(base, noContainer)}`);
             if (LocalMode.bootError({ NODE_ENV: 'production' }, inContainer) !== null) throw new Error('ohne Schalter abgewiesen');
             if (LocalMode.bootError(base, inContainer) === null) throw new Error('Container: nicht abgewiesen');
-            if (LocalMode.bootError({ ...base, SLOPDOGS_LOCAL_ALLOW_CONTAINER: '1' }, inContainer) !== null) throw new Error('Container mit Freigabe abgewiesen');
+            if (LocalMode.bootError({ ...base, SLOPDOGS_LOCAL_ALLOW_CONTAINER: '1' }, inContainer) !== null)
+                throw new Error('Container mit Freigabe abgewiesen');
             const forbidden: Record<string, NodeJS.ProcessEnv> = {
                 'PUBLIC_API_BASE_URL oeffentlich': { ...base, PUBLIC_API_BASE_URL: 'https://example.com' },
                 'TRUST_PROXY_HOPS=1': { ...base, TRUST_PROXY_HOPS: '1' },
@@ -676,9 +770,12 @@ export class StartupTest {
                 if (LocalMode.bootError(env, noContainer) === null) throw new Error(`${label}: nicht abgewiesen`);
             }
             // Der Auth-Guard laesst production ohne Login nur im lokalen Modus durch — und nie an dessen Guard vorbei.
-            if (authModeBootError(base, undefined, noContainer) !== null) throw new Error('authModeBootError weist die lokale Grundform ab');
-            if (authModeBootError(forbidden['TRUST_PROXY_HOPS=1'], undefined, noContainer) === null) throw new Error('authModeBootError laesst TRUST_PROXY_HOPS=1 lokal durch');
-            if (authModeBootError({ NODE_ENV: 'production' }) === null) throw new Error('authModeBootError laesst production ohne Login durch');
+            if (authModeBootError(base, undefined, noContainer) !== null)
+                throw new Error('authModeBootError weist die lokale Grundform ab');
+            if (authModeBootError(forbidden['TRUST_PROXY_HOPS=1'], undefined, noContainer) === null)
+                throw new Error('authModeBootError laesst TRUST_PROXY_HOPS=1 lokal durch');
+            if (authModeBootError({ NODE_ENV: 'production' }) === null)
+                throw new Error('authModeBootError laesst production ohne Login durch');
             this.addResult(testName, true);
         } catch (error) {
             this.addResult(testName, false, String(error));
@@ -704,43 +801,134 @@ export class StartupTest {
             if (NetworkBoundary.forEnvironment({}, { nodeEnv: 'production', localMode: false }, system) !== null) {
                 throw new Error('production ohne lokalen Modus bekommt eine Grenze (Verhalten heute: keine)');
             }
-            const call = (req: { method?: string; url?: string; remoteAddress: string; host: string; headers?: Record<string, string> }, b: NetworkBoundary = boundary) => {
+            const call = (
+                req: { method?: string; url?: string; remoteAddress: string; host: string; headers?: Record<string, string> },
+                b: NetworkBoundary = boundary,
+            ) => {
                 const { res, out } = this.fakeResponse();
                 let passed = false;
                 const headers: Record<string, string> = { host: req.host, ...(req.headers ?? {}) };
-                b.middleware()({ method: req.method ?? 'GET', url: req.url ?? '/', headers, socket: { remoteAddress: req.remoteAddress } } as any, res, () => { passed = true; });
+                b.middleware()(
+                    { method: req.method ?? 'GET', url: req.url ?? '/', headers, socket: { remoteAddress: req.remoteAddress } } as any,
+                    res,
+                    () => {
+                        passed = true;
+                    },
+                );
                 return { passed, status: out.statusCode, error: out.body?.error, headers: out.headers };
             };
-            const crossSite = (dest: string) => ({ 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': dest === 'image' ? 'no-cors' : 'navigate', 'sec-fetch-dest': dest });
+            const crossSite = (dest: string) => ({
+                'sec-fetch-site': 'cross-site',
+                'sec-fetch-mode': dest === 'image' ? 'no-cors' : 'navigate',
+                'sec-fetch-dest': dest,
+            });
             const expectBlocked = (label: string, r: ReturnType<typeof call>, error: string) => {
-                if (r.passed || r.status !== 403 || r.error !== error) throw new Error(`${label}: erwartet 403 ${error}, erhalten ${JSON.stringify(r)}`);
+                if (r.passed || r.status !== 403 || r.error !== error)
+                    throw new Error(`${label}: erwartet 403 ${error}, erhalten ${JSON.stringify(r)}`);
             };
             const expectPassed = (label: string, r: ReturnType<typeof call>) => {
                 if (!r.passed) throw new Error(`${label}: abgewiesen ${JSON.stringify(r)}`);
             };
-            expectBlocked('oeffentliche Socket-Adresse', call({ remoteAddress: '203.0.113.5', host: 'raspberrypi.local:3000', headers: { 'x-forwarded-for': '192.168.1.30' } }), 'client_not_in_lan');
-            expectBlocked('Tunnel auf dem Pi (Loopback + Weiterleitungs-Header)', call({ remoteAddress: '127.0.0.1', host: 'localhost:3000', headers: { 'x-forwarded-for': '198.51.100.7' } }), 'proxied_request');
+            expectBlocked(
+                'oeffentliche Socket-Adresse',
+                call({ remoteAddress: '203.0.113.5', host: 'raspberrypi.local:3000', headers: { 'x-forwarded-for': '192.168.1.30' } }),
+                'client_not_in_lan',
+            );
+            expectBlocked(
+                'Tunnel auf dem Pi (Loopback + Weiterleitungs-Header)',
+                call({ remoteAddress: '127.0.0.1', host: 'localhost:3000', headers: { 'x-forwarded-for': '198.51.100.7' } }),
+                'proxied_request',
+            );
             expectBlocked('fremder Host', call({ remoteAddress: '192.168.1.30', host: 'evil.example:3000' }), 'host_not_allowed');
-            expectBlocked('fremde Origin bei POST', call({ method: 'POST', remoteAddress: '192.168.1.30', host: 'raspberrypi.local:3000', headers: { origin: 'http://evil.example' } }), 'origin_not_allowed');
-            expectBlocked('fremde Seite per GET (img/fetch)', call({ remoteAddress: '192.168.1.30', host: 'raspberrypi.local:3000', headers: { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'no-cors' } }), 'cross_site');
-            expectBlocked('fremde Seite bettet einen Lauf ein (iframe)', call({ url: '/k/slopdogs-landing?x=1', remoteAddress: '192.168.1.30', host: 'raspberrypi.local:3000', headers: crossSite('iframe') }), 'cross_site');
-            expectBlocked('Cross-Site-Navigation auf die API', call({ url: '/api/kennels/x/run', remoteAddress: '192.168.1.30', host: 'raspberrypi.local:3000', headers: crossSite('document') }), 'cross_site');
-            expectPassed('Cross-Site-Navigation auf eine UI-Seite', call({ url: '/kennels', remoteAddress: '192.168.1.30', host: 'raspberrypi.local:3000', headers: crossSite('document') }));
-            expectPassed('globale IPv6 im eigenen On-Link-Praefix', call({ remoteAddress: '2001:db8:1:2::77', host: 'raspberrypi.local:3000' }));
-            expectBlocked('globale IPv6 ausserhalb des Praefixes', call({ remoteAddress: '2001:db8:9::1', host: 'raspberrypi.local:3000' }), 'client_not_in_lan');
+            expectBlocked(
+                'fremde Origin bei POST',
+                call({
+                    method: 'POST',
+                    remoteAddress: '192.168.1.30',
+                    host: 'raspberrypi.local:3000',
+                    headers: { origin: 'http://evil.example' },
+                }),
+                'origin_not_allowed',
+            );
+            expectBlocked(
+                'fremde Seite per GET (img/fetch)',
+                call({
+                    remoteAddress: '192.168.1.30',
+                    host: 'raspberrypi.local:3000',
+                    headers: { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'no-cors' },
+                }),
+                'cross_site',
+            );
+            expectBlocked(
+                'fremde Seite bettet einen Lauf ein (iframe)',
+                call({
+                    url: '/k/slopdogs-landing?x=1',
+                    remoteAddress: '192.168.1.30',
+                    host: 'raspberrypi.local:3000',
+                    headers: crossSite('iframe'),
+                }),
+                'cross_site',
+            );
+            expectBlocked(
+                'Cross-Site-Navigation auf die API',
+                call({
+                    url: '/api/kennels/x/run',
+                    remoteAddress: '192.168.1.30',
+                    host: 'raspberrypi.local:3000',
+                    headers: crossSite('document'),
+                }),
+                'cross_site',
+            );
+            expectPassed(
+                'Cross-Site-Navigation auf eine UI-Seite',
+                call({ url: '/kennels', remoteAddress: '192.168.1.30', host: 'raspberrypi.local:3000', headers: crossSite('document') }),
+            );
+            expectPassed(
+                'globale IPv6 im eigenen On-Link-Praefix',
+                call({ remoteAddress: '2001:db8:1:2::77', host: 'raspberrypi.local:3000' }),
+            );
+            expectBlocked(
+                'globale IPv6 ausserhalb des Praefixes',
+                call({ remoteAddress: '2001:db8:9::1', host: 'raspberrypi.local:3000' }),
+                'client_not_in_lan',
+            );
             const framed = call({ remoteAddress: '192.168.1.30', host: 'raspberrypi.local:3000' });
-            if (framed.headers['content-security-policy'] !== "frame-ancestors 'self'" || framed.headers['x-frame-options'] !== 'SAMEORIGIN') {
+            if (
+                framed.headers['content-security-policy'] !== "frame-ancestors 'self'" ||
+                framed.headers['x-frame-options'] !== 'SAMEORIGIN'
+            ) {
                 throw new Error(`Rahmenschutz fehlt: ${JSON.stringify(framed.headers)}`);
             }
             expectPassed('erlaubter Host, private Adresse', call({ remoteAddress: '192.168.1.30', host: 'raspberrypi.local:3000' }));
-            expectPassed('LAN-IP als Host, IPv4-mapped', call({ method: 'POST', remoteAddress: '::ffff:10.0.0.4', host: '192.168.1.20:3000', headers: { origin: 'http://192.168.1.20:3000' } }));
-            const upgrade = { headers: { host: 'raspberrypi.local:3000', origin: 'http://evil.example' }, socket: { remoteAddress: '192.168.1.30' } };
+            expectPassed(
+                'LAN-IP als Host, IPv4-mapped',
+                call({
+                    method: 'POST',
+                    remoteAddress: '::ffff:10.0.0.4',
+                    host: '192.168.1.20:3000',
+                    headers: { origin: 'http://192.168.1.20:3000' },
+                }),
+            );
+            const upgrade = {
+                headers: { host: 'raspberrypi.local:3000', origin: 'http://evil.example' },
+                socket: { remoteAddress: '192.168.1.30' },
+            };
             if (boundary.admitsUpgrade(upgrade as any)) throw new Error('WebSocket-Upgrade mit fremder Origin angenommen');
 
             // Dev: dieselbe Host-/Origin-Pruefung, aber keine Socket-Pruefung (heutiges Verhalten im LAN bleibt).
-            const dev = NetworkBoundary.forEnvironment({ PORT: '3000' }, { nodeEnv: 'development', localMode: false, devUiOrigin: 'http://localhost:4300' }, system);
+            const dev = NetworkBoundary.forEnvironment(
+                { PORT: '3000' },
+                { nodeEnv: 'development', localMode: false, devUiOrigin: 'http://localhost:4300' },
+                system,
+            );
             if (!dev) throw new Error('forEnvironment liefert in dev keine Grenze');
-            expectPassed('dev: ng-serve-Origin bei POST', call({ method: 'POST', remoteAddress: '203.0.113.5', host: '127.0.0.1:3000', headers: { origin: 'http://localhost:4300' } }, dev));
+            expectPassed(
+                'dev: ng-serve-Origin bei POST',
+                call(
+                    { method: 'POST', remoteAddress: '203.0.113.5', host: '127.0.0.1:3000', headers: { origin: 'http://localhost:4300' } },
+                    dev,
+                ),
+            );
             expectBlocked('dev: fremder Host', call({ remoteAddress: '127.0.0.1', host: 'evil.example:3000' }, dev), 'host_not_allowed');
 
             // Die Grenze im montierten Server (test:startup bootet dev) ist die erste eigene Middleware — vor CORS und Routen.
@@ -771,8 +959,8 @@ export class StartupTest {
      * Druckt eine Zusammenfassung der Tests
      */
     private printSummary(): void {
-        const passed = this.results.filter(r => r.passed).length;
-        const failed = this.results.filter(r => !r.passed).length;
+        const passed = this.results.filter((r) => r.passed).length;
+        const failed = this.results.filter((r) => !r.passed).length;
         const total = this.results.length;
         const v = isRuntimeLogVerbose();
 
@@ -791,12 +979,11 @@ export class StartupTest {
         if (failed > 0) {
             console.log('⚠️  Fehlgeschlagene Tests:');
             this.results
-                .filter(r => !r.passed)
-                .forEach(r => {
+                .filter((r) => !r.passed)
+                .forEach((r) => {
                     console.log(`   ❌ ${r.name}: ${r.error || 'Unbekannter Fehler'}`);
                 });
             console.log('');
         }
     }
 }
-

@@ -22,7 +22,7 @@ export const DEFAULT_OVERPASS_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 /** Liest den Deckel aus `OVERPASS_MAX_RESPONSE_BYTES`; alles Unbrauchbare faellt auf den Default. */
 export function getOverpassMaxResponseBytes(): number {
     const raw = process.env.OVERPASS_MAX_RESPONSE_BYTES;
-    if (raw == null || raw === "") return DEFAULT_OVERPASS_MAX_RESPONSE_BYTES;
+    if (raw == null || raw === '') return DEFAULT_OVERPASS_MAX_RESPONSE_BYTES;
     const parsed = parseInt(raw, 10);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_OVERPASS_MAX_RESPONSE_BYTES;
 }
@@ -49,9 +49,9 @@ export class OverpassResponseTooLargeError extends Error {
             : `response is ${observedBytes} bytes (${asMib(observedBytes)})`;
         super(
             `${userAgentLabel}: Overpass response too large — ${observed}, allowed are ${maxBytes} bytes ` +
-            `(${asMib(maxBytes)}, OVERPASS_MAX_RESPONSE_BYTES). Narrow the query area or raise the limit.`,
+                `(${asMib(maxBytes)}, OVERPASS_MAX_RESPONSE_BYTES). Narrow the query area or raise the limit.`,
         );
-        this.name = "OverpassResponseTooLargeError";
+        this.name = 'OverpassResponseTooLargeError';
     }
 }
 
@@ -65,7 +65,7 @@ export class OverpassResponseTooLargeError extends Error {
 export async function readOverpassBodyText(res: Response, userAgentLabel: string): Promise<string> {
     const maxBytes = getOverpassMaxResponseBytes();
 
-    const declared = parseInt(res.headers.get("content-length") ?? "", 10);
+    const declared = parseInt(res.headers.get('content-length') ?? '', 10);
     if (Number.isFinite(declared) && declared > maxBytes) {
         throw new OverpassResponseTooLargeError(userAgentLabel, declared, maxBytes, false);
     }
@@ -99,5 +99,5 @@ export async function readOverpassBodyText(res: Response, userAgentLabel: string
     }
     parts.push(decoder.decode());
 
-    return parts.join("");
+    return parts.join('');
 }

@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface ScryfallQuery {
     /** Modus: named (exact/fuzzy), search (Volltext), random */
@@ -11,7 +11,4 @@ export interface ScryfallQuery {
     page?: number;
 }
 
-export const ScryfallQueryPact = createPact<ScryfallQuery>(
-    "ScryfallQueryProvider",
-    { fromSourceType: "ScryfallQuery" }
-);
+export const ScryfallQueryPact = createPact<ScryfallQuery>('ScryfallQueryProvider', { fromSourceType: 'ScryfallQuery' });

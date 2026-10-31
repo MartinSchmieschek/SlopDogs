@@ -41,7 +41,7 @@ export interface GeoLocation {
 /** Gesamtergebnis des Geocoding Retrievers */
 export interface GeocodingResult {
     /** Modus: "forward" (Adresse->GPS) oder "reverse" (GPS->Adresse) */
-    mode: "forward" | "reverse";
+    mode: 'forward' | 'reverse';
     /** Suchanfrage (Adresse oder Koordinaten) */
     query: string;
     /** Gefundene Ergebnisse */

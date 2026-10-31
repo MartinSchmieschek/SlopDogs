@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** Abfrage fuer JokeAPI (jokeapi.dev) */
 export interface JokeQuery {
@@ -12,7 +12,4 @@ export interface JokeQuery {
     type?: string;
 }
 
-export const JokeQueryPact = createPact<JokeQuery>(
-    "JokeQueryProvider",
-    { fromSourceType: "JokeQuery" }
-);
+export const JokeQueryPact = createPact<JokeQuery>('JokeQueryProvider', { fromSourceType: 'JokeQuery' });

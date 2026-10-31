@@ -41,10 +41,7 @@ export function sendLoginRequired(req: Request, res: Response, description = 'Lo
     const proto = (req.get('x-forwarded-proto') || req.protocol || 'http').split(',')[0].trim();
     const host = (req.get('x-forwarded-host') || req.get('host') || 'localhost:3000').split(',')[0].trim();
     const base = process.env.MCP_BASE_URL?.replace(/\/$/, '') || `${proto}://${host}`;
-    res.setHeader(
-        'WWW-Authenticate',
-        `Bearer realm="SlopDogs", resource_metadata="${base}/.well-known/oauth-protected-resource"`,
-    );
+    res.setHeader('WWW-Authenticate', `Bearer realm="SlopDogs", resource_metadata="${base}/.well-known/oauth-protected-resource"`);
     res.status(401).json({ error: 'unauthorized', error_description: description });
 }
 
@@ -116,11 +113,7 @@ export class ConfigRouteHandler {
     }
 
     /** True if subpath==='nodes' and the user can mutate this node (owner / editor / community / super). */
-    private async canMutateForSubpath(
-        subpath: string,
-        entity: any,
-        req: Request,
-    ): Promise<boolean> {
+    private async canMutateForSubpath(subpath: string, entity: any, req: Request): Promise<boolean> {
         if (subpath === 'nodes' && this.kennelStore) {
             return await canMutateNode(entity, req.ctx, this.kennelStore);
         }
@@ -422,9 +415,7 @@ export class ConfigRouteHandler {
                 theRun: tsCode,
                 parentsRequired: req.body.parentsRequired ?? existingConfig.parentsRequired ?? [],
                 parentsOptional: req.body.parentsOptional ?? existingConfig.parentsOptional ?? [],
-                ...(req.body.icon !== undefined
-                    ? { icon: req.body.icon === '' ? undefined : req.body.icon }
-                    : {}),
+                ...(req.body.icon !== undefined ? { icon: req.body.icon === '' ? undefined : req.body.icon } : {}),
                 ...(typeof req.body.description === 'string' ? { description: req.body.description } : {}),
                 ...(req.body.lineDocs !== undefined ? { lineDocs: sanitizeLineDocs(req.body.lineDocs) } : {}),
             };
@@ -478,7 +469,11 @@ export class ConfigRouteHandler {
             const allowed = await this.canMutateForSubpath(subpath, existing.data, req);
             if (!allowed) {
                 ConfigRouteHandler.sendMutationRefused(
-                    res, existing.data, req, id, `Nicht berechtigt, diese ${subpath === 'kennels' ? 'Kennel' : 'Node'} zu ändern`,
+                    res,
+                    existing.data,
+                    req,
+                    id,
+                    `Nicht berechtigt, diese ${subpath === 'kennels' ? 'Kennel' : 'Node'} zu ändern`,
                 );
                 return;
             }
@@ -558,7 +553,10 @@ export class ConfigRouteHandler {
             } else if (outcome.code === 'not_found') {
                 res.status(404).json({ error: 'not_found' });
             } else {
-                res.status(400).json({ error: outcome.code, error_description: 'Delete failed. Nothing or only part of it may be gone — reload and try again.' });
+                res.status(400).json({
+                    error: outcome.code,
+                    error_description: 'Delete failed. Nothing or only part of it may be gone — reload and try again.',
+                });
             }
         } catch (e) {
             console.error(`[ConfigRouteHandler.handleDelete] Fehler:`, e);
@@ -577,7 +575,10 @@ export class ConfigRouteHandler {
             res.status(409).json({ error: 'frozen', error_description: 'Frozen. Unfreeze it first.' });
             return;
         }
-        res.status(403).json({ error: 'forbidden', error_description: `Not allowed to delete this ${subpath === 'kennels' ? 'kennel' : 'dog'}.` });
+        res.status(403).json({
+            error: 'forbidden',
+            error_description: `Not allowed to delete this ${subpath === 'kennels' ? 'kennel' : 'dog'}.`,
+        });
     }
 
     /**
@@ -609,7 +610,11 @@ export class ConfigRouteHandler {
             const allowed = await this.canMutateForSubpath(subpath, existing.data, req);
             if (!allowed) {
                 ConfigRouteHandler.sendMutationRefused(
-                    res, existing.data, req, id, `Nicht berechtigt, diese ${subpath === 'kennels' ? 'Kennel' : 'Node'} umzubenennen`,
+                    res,
+                    existing.data,
+                    req,
+                    id,
+                    `Nicht berechtigt, diese ${subpath === 'kennels' ? 'Kennel' : 'Node'} umzubenennen`,
                 );
                 return;
             }
@@ -660,4 +665,3 @@ export class ConfigRouteHandler {
         }
     }
 }
-

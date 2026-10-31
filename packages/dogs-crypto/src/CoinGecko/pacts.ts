@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface CoinGeckoQuery {
     /** Modus: price (simple/price), markets (top coins), coin (Detail-Info), trending,
@@ -18,7 +18,4 @@ export interface CoinGeckoQuery {
     includeChange?: boolean;
 }
 
-export const CoinGeckoQueryPact = createPact<CoinGeckoQuery>(
-    "CoinGeckoQueryProvider",
-    { fromSourceType: "CoinGeckoQuery" }
-);
+export const CoinGeckoQueryPact = createPact<CoinGeckoQuery>('CoinGeckoQueryProvider', { fromSourceType: 'CoinGeckoQuery' });

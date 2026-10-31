@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface RandomUserQuery {
     /** Anzahl — default 1 (max 5000) */
@@ -11,7 +11,4 @@ export interface RandomUserQuery {
     seed?: string;
 }
 
-export const RandomUserQueryPact = createPact<RandomUserQuery>(
-    "RandomUserQueryProvider",
-    { fromSourceType: "RandomUserQuery" }
-);
+export const RandomUserQueryPact = createPact<RandomUserQuery>('RandomUserQueryProvider', { fromSourceType: 'RandomUserQuery' });

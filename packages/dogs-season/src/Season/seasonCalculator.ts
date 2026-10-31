@@ -9,47 +9,52 @@
  * =========================================================================
  */
 
-import type { SeasonResult, SeasonEvent } from "./interfaces/seasonTypes";
+import type { SeasonResult, SeasonEvent } from './interfaces/seasonTypes';
 
 /** Astronomische Wendepunkte (Nordhemisphaere, Naeherungswerte) */
 const EVENTS_NORTHERN = [
-    { name: "Vernal Equinox",   month: 3,  day: 20 },
-    { name: "Summer Solstice",  month: 6,  day: 21 },
-    { name: "Autumnal Equinox", month: 9,  day: 22 },
-    { name: "Winter Solstice",  month: 12, day: 21 },
+    { name: 'Vernal Equinox', month: 3, day: 20 },
+    { name: 'Summer Solstice', month: 6, day: 21 },
+    { name: 'Autumnal Equinox', month: 9, day: 22 },
+    { name: 'Winter Solstice', month: 12, day: 21 },
 ];
 
 const EVENTS_SOUTHERN = [
-    { name: "Autumnal Equinox", month: 3,  day: 20 },
-    { name: "Winter Solstice",  month: 6,  day: 21 },
-    { name: "Vernal Equinox",   month: 9,  day: 22 },
-    { name: "Summer Solstice",  month: 12, day: 21 },
+    { name: 'Autumnal Equinox', month: 3, day: 20 },
+    { name: 'Winter Solstice', month: 6, day: 21 },
+    { name: 'Vernal Equinox', month: 9, day: 22 },
+    { name: 'Summer Solstice', month: 12, day: 21 },
 ];
 
 /** Astronomische Jahreszeiten (Nordhemisphaere) */
 function getAstronomicalSeasonNorthern(month: number, day: number): string {
-    if ((month === 3 && day >= 20) || month === 4 || month === 5 || (month === 6 && day <= 20)) return "Spring";
-    if ((month === 6 && day >= 21) || month === 7 || month === 8 || (month === 9 && day <= 21)) return "Summer";
-    if ((month === 9 && day >= 22) || month === 10 || month === 11 || (month === 12 && day <= 20)) return "Autumn";
-    return "Winter";
+    if ((month === 3 && day >= 20) || month === 4 || month === 5 || (month === 6 && day <= 20)) return 'Spring';
+    if ((month === 6 && day >= 21) || month === 7 || month === 8 || (month === 9 && day <= 21)) return 'Summer';
+    if ((month === 9 && day >= 22) || month === 10 || month === 11 || (month === 12 && day <= 20)) return 'Autumn';
+    return 'Winter';
 }
 
 /** Meteorologische Jahreszeiten */
 function getMeteorologicalSeason(month: number): string {
-    if (month >= 3 && month <= 5) return "Spring";
-    if (month >= 6 && month <= 8) return "Summer";
-    if (month >= 9 && month <= 11) return "Autumn";
-    return "Winter";
+    if (month >= 3 && month <= 5) return 'Spring';
+    if (month >= 6 && month <= 8) return 'Summer';
+    if (month >= 9 && month <= 11) return 'Autumn';
+    return 'Winter';
 }
 
 /** Reversed season names for southern hemisphere */
 function reverseSeason(season: string): string {
     switch (season) {
-        case "Spring": return "Autumn";
-        case "Summer": return "Winter";
-        case "Autumn": return "Spring";
-        case "Winter": return "Summer";
-        default: return season;
+        case 'Spring':
+            return 'Autumn';
+        case 'Summer':
+            return 'Winter';
+        case 'Autumn':
+            return 'Spring';
+        case 'Winter':
+            return 'Summer';
+        default:
+            return season;
     }
 }
 
@@ -73,10 +78,10 @@ function daysBetween(a: Date, b: Date): number {
  */
 function calculateDaylight(doy: number, lat: number): number {
     const PI = Math.PI;
-    const sinDoy = Math.sin((2 * PI / 365) * (doy - 80));
-    const sinLat = Math.sin(lat * PI / 180);
-    const sinTilt = Math.sin(23.44 * PI / 180);
-    const hours = 12 + 2.4 * sinDoy * sinLat / sinTilt;
+    const sinDoy = Math.sin(((2 * PI) / 365) * (doy - 80));
+    const sinLat = Math.sin((lat * PI) / 180);
+    const sinTilt = Math.sin((23.44 * PI) / 180);
+    const hours = 12 + (2.4 * sinDoy * sinLat) / sinTilt;
     return Math.round(Math.max(0, Math.min(24, hours)) * 100) / 100;
 }
 

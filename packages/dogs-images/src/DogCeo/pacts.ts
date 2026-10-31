@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface DogCeoQuery {
     /** Rasse (lowercase, e.g. "husky", "labrador"). Leer = zufaellige Rasse. */
@@ -9,7 +9,4 @@ export interface DogCeoQuery {
     count?: number;
 }
 
-export const DogCeoQueryPact = createPact<DogCeoQuery>(
-    "DogCeoQueryProvider",
-    { fromSourceType: "DogCeoQuery" }
-);
+export const DogCeoQueryPact = createPact<DogCeoQuery>('DogCeoQueryProvider', { fromSourceType: 'DogCeoQuery' });

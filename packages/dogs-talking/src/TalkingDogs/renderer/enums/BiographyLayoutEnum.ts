@@ -9,8 +9,8 @@
 
 /** Arr, the pieces of a biography — portrait, name, birth, and the eldritch story of one's days. */
 export enum BiographyLayoutEnum {
-    Portrait = "Portrait",
-    Name = "Name",
-    BirthInfo = "BirthInfo",
-    Story = "Story",
-  }
+    Portrait = 'Portrait',
+    Name = 'Name',
+    BirthInfo = 'BirthInfo',
+    Story = 'Story',
+}

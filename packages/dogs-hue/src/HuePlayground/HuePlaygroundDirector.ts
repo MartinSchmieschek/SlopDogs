@@ -12,18 +12,18 @@
  *  eldritch HTTP-429 guardian of the abyss.
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
-import { api } from "node-hue-api";
-import type { HuePlaygroundLightEntry } from "./types";
-import { fetchHueBridgeSnapshot } from "./hueSnapshot";
-import { wrapHueApiError } from "./hueBridgeErrors";
+import { api } from 'node-hue-api';
+import type { HuePlaygroundLightEntry } from './types';
+import { fetchHueBridgeSnapshot } from './hueSnapshot';
+import { wrapHueApiError } from './hueBridgeErrors';
 
 /** Arr, the Bridge-Client conjured lazily from the node-hue-api depths. */
-type HueApiClient = Awaited<ReturnType<ReturnType<typeof api.createLocal>["connect"]>>;
+type HueApiClient = Awaited<ReturnType<ReturnType<typeof api.createLocal>['connect']>>;
 
 /** Parse the inter-command delay from the environment's murky waters. */
 function parseInterCommandDelayMs(): number {
     const raw = process.env.HUE_INTER_COMMAND_DELAY_MS;
-    if (raw === undefined || raw === "") {
+    if (raw === undefined || raw === '') {
         return 120;
     }
     const n = parseInt(String(raw), 10);
@@ -58,7 +58,7 @@ export class HuePlaygroundDirector {
     constructor(
         readonly bridgeHost: string,
         private readonly bridgeUser: string,
-        lights: HuePlaygroundLightEntry[]
+        lights: HuePlaygroundLightEntry[],
     ) {
         this.lights = [...lights];
         this.interCommandDelayMs = parseInterCommandDelayMs();
@@ -76,7 +76,7 @@ export class HuePlaygroundDirector {
                     await new Promise<void>((r) => setTimeout(r, this.interCommandDelayMs));
                 }
             },
-            () => undefined
+            () => undefined,
         );
         return run;
     }
@@ -162,10 +162,7 @@ export class HuePlaygroundDirector {
      * Carrion hordes trill their profane accord with eldritch plans —
      * and so too do we impose our will upon these cursed lanterns.
      */
-    async setState(
-        id: number | string,
-        state: { on?: boolean; bri?: number }
-    ): Promise<void> {
+    async setState(id: number | string, state: { on?: boolean; bri?: number }): Promise<void> {
         return this.enqueueHue(async () => {
             try {
                 const hueApi = await this.ensureApi();
@@ -175,7 +172,7 @@ export class HuePlaygroundDirector {
                     body.bri = Math.min(254, Math.max(1, Math.round(state.bri)));
                 }
                 await hueApi.lights.setLightState(id, body);
-                const patch: Partial<Pick<HuePlaygroundLightEntry, "on" | "bri">> = {};
+                const patch: Partial<Pick<HuePlaygroundLightEntry, 'on' | 'bri'>> = {};
                 if (state.on !== undefined) patch.on = state.on;
                 if (state.bri !== undefined) patch.bri = state.bri;
                 if (state.on === false) patch.bri = null;
@@ -187,10 +184,7 @@ export class HuePlaygroundDirector {
     }
 
     /** Patch the local cache — to cosmic forms from tangent planes, we end as we began. */
-    private patchLocal(
-        id: number | string,
-        patch: Partial<Pick<HuePlaygroundLightEntry, "on" | "bri">>
-    ): void {
+    private patchLocal(id: number | string, patch: Partial<Pick<HuePlaygroundLightEntry, 'on' | 'bri'>>): void {
         const s = String(id);
         const idx = this.lights.findIndex((l) => String(l.id) === s);
         if (idx < 0) {

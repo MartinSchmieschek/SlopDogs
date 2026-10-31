@@ -9,14 +9,14 @@
  * =========================================================================
  */
 
-import type { RandomFactApiResponse, RandomFactResult } from "./interfaces/randomFactTypes";
+import type { RandomFactApiResponse, RandomFactResult } from './interfaces/randomFactTypes';
 
-const USELESS_FACTS_BASE = "https://uselessfacts.jsph.pl/api/v2/facts/random";
+const USELESS_FACTS_BASE = 'https://uselessfacts.jsph.pl/api/v2/facts/random';
 
 /**
  * Fetch a random fun fact from uselessfacts API.
  */
-export async function getRandomFact(lang: string = "en"): Promise<RandomFactResult> {
+export async function getRandomFact(lang: string = 'en'): Promise<RandomFactResult> {
     const url = `${USELESS_FACTS_BASE}?language=${encodeURIComponent(lang)}`;
 
     const controller = new AbortController();
@@ -25,7 +25,7 @@ export async function getRandomFact(lang: string = "en"): Promise<RandomFactResu
     let res: Response;
     try {
         res = await fetch(url, {
-            headers: { "Accept": "application/json", "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)" },
+            headers: { Accept: 'application/json', 'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)' },
             signal: controller.signal,
         });
     } finally {
@@ -33,11 +33,11 @@ export async function getRandomFact(lang: string = "en"): Promise<RandomFactResu
     }
 
     if (!res.ok) {
-        const text = await res.text().catch(() => "");
+        const text = await res.text().catch(() => '');
         throw new Error(`uselessfacts API failed: ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
     }
 
-    const data = await res.json() as RandomFactApiResponse;
+    const data = (await res.json()) as RandomFactApiResponse;
 
     return {
         fact: data.text,

@@ -9,27 +9,23 @@
  * =========================================================================
  */
 
-import type { SunDay, SunResult } from "./interfaces/sunTypes";
+import type { SunDay, SunResult } from './interfaces/sunTypes';
 
-const OPEN_METEO_BASE = "https://api.open-meteo.com/v1/forecast";
+const OPEN_METEO_BASE = 'https://api.open-meteo.com/v1/forecast';
 
 /** UV-Index -> Risikobewertung */
 function describeUvRisk(uv: number): string {
-    if (uv <= 2) return "Niedrig";
-    if (uv <= 5) return "Maessig";
-    if (uv <= 7) return "Hoch";
-    if (uv <= 10) return "Sehr hoch";
-    return "Extrem";
+    if (uv <= 2) return 'Niedrig';
+    if (uv <= 5) return 'Maessig';
+    if (uv <= 7) return 'Hoch';
+    if (uv <= 10) return 'Sehr hoch';
+    return 'Extrem';
 }
 
 /**
  * Fetch sun data from Open-Meteo.
  */
-export async function getSunData(
-    lat: number,
-    lng: number,
-    forecastDays: number = 7
-): Promise<SunResult> {
+export async function getSunData(lat: number, lng: number, forecastDays: number = 7): Promise<SunResult> {
     const days = Math.min(Math.max(forecastDays, 1), 16);
     const params = [
         `latitude=${lat}`,
@@ -37,7 +33,7 @@ export async function getSunData(
         `daily=sunrise,sunset,daylight_duration,sunshine_duration,uv_index_max`,
         `timezone=auto`,
         `forecast_days=${days}`,
-    ].join("&");
+    ].join('&');
 
     const url = `${OPEN_METEO_BASE}?${params}`;
 
@@ -47,7 +43,7 @@ export async function getSunData(
     let res: Response;
     try {
         res = await fetch(url, {
-            headers: { "Accept": "application/json", "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)" },
+            headers: { Accept: 'application/json', 'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)' },
             signal: controller.signal,
         });
     } finally {
@@ -55,11 +51,11 @@ export async function getSunData(
     }
 
     if (!res.ok) {
-        const text = await res.text().catch(() => "");
+        const text = await res.text().catch(() => '');
         throw new Error(`Open-Meteo sun failed: ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
     }
 
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     const d = data.daily;
     const times: string[] = d.time ?? [];
 

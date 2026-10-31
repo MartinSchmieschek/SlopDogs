@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface CurrencyQuery {
     /** Base currency code (e.g. "EUR", "USD"). Defaults to EUR. */
@@ -11,7 +11,4 @@ export interface CurrencyQuery {
     date?: string;
 }
 
-export const CurrencyQueryPact = createPact<CurrencyQuery>(
-    "CurrencyQueryProvider",
-    { fromSourceType: "CurrencyQuery" }
-);
+export const CurrencyQueryPact = createPact<CurrencyQuery>('CurrencyQueryProvider', { fromSourceType: 'CurrencyQuery' });

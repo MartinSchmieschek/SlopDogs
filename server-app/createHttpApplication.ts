@@ -1,11 +1,6 @@
 import express, { type Application } from 'express';
 import cookieParser from 'cookie-parser';
-import {
-    ISerializedDogConfig,
-    SerializedDog,
-    MimicDog,
-    type ICacheHandler,
-} from '@slopdogs/core';
+import { ISerializedDogConfig, SerializedDog, MimicDog, type ICacheHandler } from '@slopdogs/core';
 import { IStore } from '../store/IStore';
 import { Controller } from '../api/Controller';
 import { KennelController } from '../api/KennelController';
@@ -196,7 +191,9 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
         // Lokal: CORS nur fuer die eigenen Namen — dieselbe Liste wie Host- und Origin-Pruefung.
         if (localMode) return networkBoundary?.corsOriginFor(origin);
 
-        const list = process.env.CORS_ALLOWED_ORIGINS?.split(',').map((s) => s.trim()).filter(Boolean);
+        const list = process.env.CORS_ALLOWED_ORIGINS?.split(',')
+            .map((s) => s.trim())
+            .filter(Boolean);
         if (list?.length) {
             return list.includes(origin) ? origin : undefined;
         }
@@ -299,7 +296,8 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     };
     const listDogsOf = async (lineageIds: string[]): Promise<any[]> => {
         const [serialized, mimics] = await Promise.all([
-            nodesController.listLatest(undefined, lineageIds), mimicsReader.listLatest(undefined, lineageIds),
+            nodesController.listLatest(undefined, lineageIds),
+            mimicsReader.listLatest(undefined, lineageIds),
         ]);
         const wanted = new Set(lineageIds);
         return oneDogPerLineage(serialized.data ?? [], mimics.data ?? []).filter((d) => wanted.has(d.lineageId || d.id));
@@ -365,9 +363,11 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     // Beta (SLOPDOGS_STAGE=beta, Beta-Keys): /api/beta, /api/beta/keys, /api/beta/keys/:id — ebenfalls VOR /api/:subpath.
     new BetaRouteHandler(new BetaKeys(authPrisma as unknown as BetaKeyPrisma)).registerRoutes(app);
     const stage = BetaKeys.stage();
-    console.log(BetaKeys.required()
-        ? '[beta] SLOPDOGS_STAGE=beta, Auth an: jedes Google-Konto braucht einmal einen Beta-Key'
-        : `[beta] Stage ${stage || '(keine)'}: Anmeldung ohne Beta-Key${stage === BetaKeys.BETA_STAGE ? ' (Auth aus, lokal)' : ''}`);
+    console.log(
+        BetaKeys.required()
+            ? '[beta] SLOPDOGS_STAGE=beta, Auth an: jedes Google-Konto braucht einmal einen Beta-Key'
+            : `[beta] Stage ${stage || '(keine)'}: Anmeldung ohne Beta-Key${stage === BetaKeys.BETA_STAGE ? ' (Auth aus, lokal)' : ''}`,
+    );
 
     const routeHandler = new ConfigRouteHandler(registry, kennelsStore, kennelStats, dogStats, kennelFavorites);
     routeHandler.registerRoutes(app, '/api');
@@ -380,7 +380,13 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     const prismaCacheHandler = new PrismaCacheHandler(input.prismaClients, input.resolveCacheDatabaseUrl());
     const cacheHandler: ICacheHandler = withResilientCacheInfra(prismaCacheHandler);
 
-    const kennelRunHandler = new KennelRunHandler({ kennelsController, nodesStore, baseDogsMap, cacheHandler, callCounter: input.callCounter });
+    const kennelRunHandler = new KennelRunHandler({
+        kennelsController,
+        nodesStore,
+        baseDogsMap,
+        cacheHandler,
+        callCounter: input.callCounter,
+    });
     landingPage.useRunner(kennelRunHandler);
     const kennelSwaggerHandler = new KennelSwaggerHandler(kennelRunHandler, nodesStore);
     const kennelBundleHandler = new KennelBundleHandler(kennelRunHandler, kennelsController, nodesStore, baseDogsMap);
@@ -478,16 +484,15 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     // Jeder Disconnect fuer sich gekapselt: ein sterbender Pool darf den naechsten
     // nicht mit in die Tiefe ziehen. Geliehene Store-Clients bleiben verbunden (release trennt nur eigene).
     const disconnect = async (): Promise<void> => {
-        await Promise.allSettled([
-            prismaCacheHandler.disconnect(),
-            authLease.release(),
-        ]);
+        await Promise.allSettled([prismaCacheHandler.disconnect(), authLease.release()]);
     };
 
     return { app, serveBuiltAngular, runStartupTests, runStartupSuite, disconnect, keyStore, networkBoundary };
 }
 
-async function upsertLocalUser(prisma: ReturnType<typeof createPrismaAuthClient>): Promise<{ id: string; email: string; name: string | null }> {
+async function upsertLocalUser(
+    prisma: ReturnType<typeof createPrismaAuthClient>,
+): Promise<{ id: string; email: string; name: string | null }> {
     const { id, email, name, googleSub } = LOCAL_USER;
     return prisma.user.upsert({
         where: { id },

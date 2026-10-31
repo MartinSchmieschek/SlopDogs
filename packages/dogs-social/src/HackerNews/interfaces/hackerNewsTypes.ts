@@ -1,6 +1,6 @@
 export interface HackerNewsItem {
     id: number;
-    type?: "story" | "comment" | "job" | "poll" | "pollopt";
+    type?: 'story' | 'comment' | 'job' | 'poll' | 'pollopt';
     by?: string;
     time?: number;
     text?: string;

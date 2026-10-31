@@ -7,10 +7,10 @@
  *  — see HuePlaygroundDirector fer the full manifest of eldritch rites.
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
-import { Dog, IHuntingDog, IHuntingSeason } from "@slopdogs/core";
-import { HueBridgeQueryPact, type HueBridgeQueryInput } from "./pacts";
-import { fetchHueBridgeSnapshot } from "./hueSnapshot";
-import { HuePlaygroundDirector } from "./HuePlaygroundDirector";
+import { Dog, IHuntingDog, IHuntingSeason } from '@slopdogs/core';
+import { HueBridgeQueryPact, type HueBridgeQueryInput } from './pacts';
+import { fetchHueBridgeSnapshot } from './hueSnapshot';
+import { HuePlaygroundDirector } from './HuePlaygroundDirector';
 
 /**
  * Arr, the Retriever — this experimental Hue-Dog dredges snapshot data and
@@ -30,7 +30,7 @@ export class HuePlaygroundRetriever extends Dog<HuePlaygroundDirector> {
 
     /** @returns The icon sigil of this retriever, plundered from the base dog glyph manifest. */
     get icon(): string | undefined {
-        return "\uD83D\uDCA1";
+        return '\uD83D\uDCA1';
     }
 
     /** @returns The required pacts — the HueBridgeQueryPact, without which the crew drifts anchorless into the deep. */
@@ -44,20 +44,16 @@ export class HuePlaygroundRetriever extends Dog<HuePlaygroundDirector> {
     }
 
     /** Plunder the Bridge snapshot and forge a Director — the crew's anchor to the luminous void. */
-    protected yieldCollectorFactory = async (
-        season: IHuntingSeason
-    ): Promise<HuePlaygroundDirector> => {
+    protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<HuePlaygroundDirector> => {
         const queryDog = season.exhausted.find((d) => this.matchesParent(HueBridgeQueryPact, d));
-        const query =
-            (queryDog?.collected as HueBridgeQueryInput | undefined) ??
-            ({} as HueBridgeQueryInput);
+        const query = (queryDog?.collected as HueBridgeQueryInput | undefined) ?? ({} as HueBridgeQueryInput);
 
-        const bridgeHost = query.bridgehost?.trim() ?? "";
-        const bridgeUser = query.bridgeuser?.trim() ?? "";
+        const bridgeHost = query.bridgehost?.trim() ?? '';
+        const bridgeUser = query.bridgeuser?.trim() ?? '';
 
         if (!bridgeHost || !bridgeUser) {
             throw new Error(
-                "HuePlaygroundRetriever: HueBridgeQueryPact requires bridgehost and bridgeuser (QueryRetriever keys). Without them, ye drift anchorless into the nameless deep!"
+                'HuePlaygroundRetriever: HueBridgeQueryPact requires bridgehost and bridgeuser (QueryRetriever keys). Without them, ye drift anchorless into the nameless deep!',
             );
         }
 

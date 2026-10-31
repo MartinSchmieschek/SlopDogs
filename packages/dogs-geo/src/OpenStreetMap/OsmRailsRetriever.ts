@@ -6,22 +6,15 @@
  * effektiv ein No-Op fuer Linien (sie werden unveraendert durchgereicht).
  */
 
-import { type IHuntingSeason } from "@slopdogs/core";
-import osmtogeojson from "osmtogeojson";
-import type { FeatureCollection, GeometryObject } from "geojson";
-import { OsmFeatureRetriever, type OsmQueryBase } from "../osm/base/OsmFeatureRetriever";
-import type { OverpassRawElement } from "../osm/base/overpassMirrorChain";
-import { OsmRailsGeometryPact, type OsmRailsGeometryQueryInput } from "./osmGeometryPacts";
-import { parseOsmRailwayList, type OsmRailwayValue } from "./osmGeometryEnums";
-import {
-    circleToBoundingBox,
-    clampGeometryRadiusM,
-    type BoundingBox,
-} from "./overpassGeometryCore";
-import {
-    attachGeometryHelpers,
-    type GeometryResultHelpers,
-} from "./osmGeometryHelpers";
+import { type IHuntingSeason } from '@slopdogs/core';
+import osmtogeojson from 'osmtogeojson';
+import type { FeatureCollection, GeometryObject } from 'geojson';
+import { OsmFeatureRetriever, type OsmQueryBase } from '../osm/base/OsmFeatureRetriever';
+import type { OverpassRawElement } from '../osm/base/overpassMirrorChain';
+import { OsmRailsGeometryPact, type OsmRailsGeometryQueryInput } from './osmGeometryPacts';
+import { parseOsmRailwayList, type OsmRailwayValue } from './osmGeometryEnums';
+import { circleToBoundingBox, clampGeometryRadiusM, type BoundingBox } from './overpassGeometryCore';
+import { attachGeometryHelpers, type GeometryResultHelpers } from './osmGeometryHelpers';
 
 export interface OsmRailsResult {
     center: { lat: number; lng: number };
@@ -34,11 +27,11 @@ export interface OsmRailsResult {
 export type OsmRailsResultWithHelpers = OsmRailsResult & GeometryResultHelpers<OsmRailsResult>;
 
 export class OsmRailsRetriever extends OsmFeatureRetriever<OsmRailsResult, typeof OsmRailsGeometryPact> {
-    protected readonly layer = "rails";
+    protected readonly layer = 'rails';
     protected readonly defaultRadiusM = 1000;
     protected readonly maxRadiusM = 10000;
     protected readonly queryPactClass = OsmRailsGeometryPact;
-    protected readonly outStatement = "out geom;";
+    protected readonly outStatement = 'out geom;';
 
     get name(): string {
         return OsmRailsRetriever.name;
@@ -49,7 +42,7 @@ export class OsmRailsRetriever extends OsmFeatureRetriever<OsmRailsResult, typeo
     }
 
     get icon(): string | undefined {
-        return "🚆";
+        return '🚆';
     }
 
     protected parseQuery(season: IHuntingSeason): OsmQueryBase {
@@ -57,25 +50,22 @@ export class OsmRailsRetriever extends OsmFeatureRetriever<OsmRailsResult, typeo
         const query = (queryDog?.collected as OsmRailsGeometryQueryInput | undefined) ?? ({} as OsmRailsGeometryQueryInput);
         const lat = parseFloat(query.lat);
         const lng = parseFloat(query.lng);
-        const radiusM = clampGeometryRadiusM(parseFloat(query.radius ?? ""));
+        const radiusM = clampGeometryRadiusM(parseFloat(query.radius ?? ''));
         const railway = parseOsmRailwayList(query.railway);
         return { lat, lng, radiusM, facets: [...railway] };
     }
 
-    protected buildOverpassBodyForTile(
-        bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number },
-        facets: string[],
-    ): string {
+    protected buildOverpassBodyForTile(bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number }, facets: string[]): string {
         const bboxClause = `(${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng})`;
         const lines: string[] = [];
         for (const r of facets) {
             lines.push(`  way["railway"="${r}"]${bboxClause};`);
         }
-        return lines.join("\n");
+        return lines.join('\n');
     }
 
     protected classifyElementFacets(el: OverpassRawElement, fetchedFacets: string[]): string[] {
-        const r = el.tags?.["railway"];
+        const r = el.tags?.['railway'];
         if (!r) return [];
         return fetchedFacets.filter((f) => f === r);
     }

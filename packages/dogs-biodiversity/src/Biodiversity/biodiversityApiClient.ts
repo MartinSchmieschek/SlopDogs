@@ -11,9 +11,9 @@
  * =========================================================================
  */
 
-import type { SpeciesObservation, BiodiversityResult } from "./interfaces/biodiversityTypes";
+import type { SpeciesObservation, BiodiversityResult } from './interfaces/biodiversityTypes';
 
-const INATURALIST_BASE = "https://api.inaturalist.org/v1";
+const INATURALIST_BASE = 'https://api.inaturalist.org/v1';
 
 /** Parse a single iNaturalist observation into our typed form */
 function parseObservation(raw: any): SpeciesObservation {
@@ -45,7 +45,7 @@ export async function fetchSpeciesObservations(
     lng: number,
     radiusKm: number = 10,
     taxon?: string,
-    months?: string
+    months?: string,
 ): Promise<{ observations: SpeciesObservation[]; totalResults: number }> {
     const params: string[] = [
         `lat=${lat}`,
@@ -74,8 +74,8 @@ export async function fetchSpeciesObservations(
     try {
         res = await fetch(url, {
             headers: {
-                "Accept": "application/json",
-                "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)",
+                Accept: 'application/json',
+                'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)',
             },
             signal: controller.signal,
         });
@@ -84,11 +84,11 @@ export async function fetchSpeciesObservations(
     }
 
     if (!res.ok) {
-        const text = await res.text().catch(() => "");
+        const text = await res.text().catch(() => '');
         throw new Error(`iNaturalist failed: ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
     }
 
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     const observations = (data.results ?? []).map(parseObservation);
 
     return {
@@ -105,7 +105,7 @@ export async function getSpecies(
     lng: number,
     radiusKm: number = 10,
     taxon?: string,
-    months?: string
+    months?: string,
 ): Promise<BiodiversityResult> {
     const { observations, totalResults } = await fetchSpeciesObservations(lat, lng, radiusKm, taxon, months);
 

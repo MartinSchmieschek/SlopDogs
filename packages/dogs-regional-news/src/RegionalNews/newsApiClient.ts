@@ -12,13 +12,19 @@
  * =========================================================================
  */
 
-import type { NewsItem, RegionalNewsResult } from "./interfaces/newsTypes";
+import type { NewsItem, RegionalNewsResult } from './interfaces/newsTypes';
 
 /** Strip HTML tags from a string */
 function stripHtml(html: string): string {
-    return html.replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-        .replace(/&nbsp;/g, ' ').trim();
+    return html
+        .replace(/<[^>]*>/g, '')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&nbsp;/g, ' ')
+        .trim();
 }
 
 /** Extract text content between XML tags */
@@ -56,8 +62,8 @@ export async function fetchRssItems(feedUrl: string, sourceName: string): Promis
     try {
         res = await fetch(feedUrl, {
             headers: {
-                "Accept": "application/rss+xml, application/xml, text/xml, */*",
-                "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)",
+                Accept: 'application/rss+xml, application/xml, text/xml, */*',
+                'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)',
             },
             signal: controller.signal,
         });
@@ -66,7 +72,7 @@ export async function fetchRssItems(feedUrl: string, sourceName: string): Promis
     }
 
     if (!res.ok) {
-        const text = await res.text().catch(() => "");
+        const text = await res.text().catch(() => '');
         throw new Error(`RSS fetch failed: ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
     }
 
@@ -75,29 +81,27 @@ export async function fetchRssItems(feedUrl: string, sourceName: string): Promis
     // Split into <item> blocks
     const itemBlocks = xml.split(/<item[\s>]/i).slice(1);
 
-    return itemBlocks.map(block => {
-        const itemXml = block.split(/<\/item>/i)[0] ?? block;
+    return itemBlocks
+        .map((block) => {
+            const itemXml = block.split(/<\/item>/i)[0] ?? block;
 
-        return {
-            title: stripHtml(extractTag(itemXml, 'title')),
-            link: extractTag(itemXml, 'link'),
-            description: stripHtml(extractTag(itemXml, 'description')).slice(0, 500),
-            pubDate: extractTag(itemXml, 'pubDate'),
-            source: sourceName,
-            category: extractTag(itemXml, 'category') || null,
-            imageUrl: extractImageUrl(itemXml),
-        };
-    }).filter(item => item.title.length > 0);
+            return {
+                title: stripHtml(extractTag(itemXml, 'title')),
+                link: extractTag(itemXml, 'link'),
+                description: stripHtml(extractTag(itemXml, 'description')).slice(0, 500),
+                pubDate: extractTag(itemXml, 'pubDate'),
+                source: sourceName,
+                category: extractTag(itemXml, 'category') || null,
+                imageUrl: extractImageUrl(itemXml),
+            };
+        })
+        .filter((item) => item.title.length > 0);
 }
 
 /**
  * Build a RegionalNewsResult from a query string and optional custom feeds.
  */
-export async function getRegionalNews(
-    query: string,
-    customFeedUrls: string | undefined,
-    limit: number = 20
-): Promise<RegionalNewsResult> {
+export async function getRegionalNews(query: string, customFeedUrls: string | undefined, limit: number = 20): Promise<RegionalNewsResult> {
     const feedUrls: string[] = [];
     const allItems: NewsItem[] = [];
 
@@ -107,7 +111,10 @@ export async function getRegionalNews(
 
     // Custom feeds if provided
     if (customFeedUrls) {
-        const urls = customFeedUrls.split(',').map(u => u.trim()).filter(Boolean);
+        const urls = customFeedUrls
+            .split(',')
+            .map((u) => u.trim())
+            .filter(Boolean);
         feedUrls.push(...urls);
     }
 
@@ -116,7 +123,7 @@ export async function getRegionalNews(
         feedUrls.map(async (url, i) => {
             const sourceName = i === 0 ? `Google News (${query})` : new URL(url).hostname;
             return fetchRssItems(url, sourceName);
-        })
+        }),
     );
 
     for (const result of results) {

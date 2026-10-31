@@ -4,7 +4,7 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** Optionale Sprache fuer die Fun-Fact-Abfrage */
 export interface RandomFactQuery {
@@ -13,7 +13,4 @@ export interface RandomFactQuery {
 }
 
 /** Der Pact fuer RandomFact-Queries */
-export const RandomFactQueryPact = createPact<RandomFactQuery>(
-    "RandomFactQueryProvider",
-    { fromSourceType: "RandomFactQuery" }
-);
+export const RandomFactQueryPact = createPact<RandomFactQuery>('RandomFactQueryProvider', { fromSourceType: 'RandomFactQuery' });

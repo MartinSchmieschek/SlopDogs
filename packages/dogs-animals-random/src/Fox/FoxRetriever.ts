@@ -1,7 +1,7 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from "@slopdogs/core";
-import { getRandomFox } from "./foxApiClient";
-import type { FoxResult } from "./interfaces/foxTypes";
-import { FoxQueryPact } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { getRandomFox } from './foxApiClient';
+import type { FoxResult } from './interfaces/foxTypes';
+import { FoxQueryPact } from './pacts';
 
 export class FoxRetriever extends Dog<FoxResult> implements ICacheable {
     private cacheHandler?: ICacheHandler;
@@ -15,11 +15,11 @@ export class FoxRetriever extends Dog<FoxResult> implements ICacheable {
     }
 
     get description(): string {
-        return "Holt ein zufaelliges Fuchs-Bild von randomfox.ca.";
+        return 'Holt ein zufaelliges Fuchs-Bild von randomfox.ca.';
     }
 
     get icon(): string | undefined {
-        return "\uD83E\uDD8A";
+        return '\uD83E\uDD8A';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {

@@ -21,7 +21,6 @@ export interface IClassTypeResult {
  * for IntelliSense, pact return types, and the void's own schema definitions.
  */
 export class CompilerCache {
-
     /** Materialisierter Cache: Pact-Source-Typname → Return-Typ-Definition. Wird in int/prod aus dist/type-defs.json geladen. */
     private static pactReturnTypeCache: Map<string, string> = new Map();
 
@@ -54,9 +53,7 @@ export class CompilerCache {
         const configPath = ts.findConfigFile(process.cwd(), ts.sys.fileExists, 'tsconfig.json');
         if (!configPath) throw new Error('tsconfig.json not found');
         const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
-        const parsed = ts.parseJsonConfigFileContent(
-            configFile.config, ts.sys, path.dirname(configPath)
-        );
+        const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, path.dirname(configPath));
         const program = ts.createProgram(parsed.fileNames, parsed.options);
         return { program, checker: program.getTypeChecker() };
     }
@@ -80,11 +77,7 @@ export class CompilerCache {
      * @param type - The type to recursively plunder for references.
      * @param collected - A set accumulating the names of discovered interfaces.
      */
-    private static collectReferencedTypes(
-        checker: ts.TypeChecker,
-        type: ts.Type,
-        collected: Set<string>
-    ): void {
+    private static collectReferencedTypes(checker: ts.TypeChecker, type: ts.Type, collected: Set<string>): void {
         if (type.isUnion()) {
             for (const t of type.types) {
                 this.collectReferencedTypes(checker, t, collected);
@@ -142,11 +135,7 @@ export class CompilerCache {
      * @param program - The TypeScript program harboring the source files.
      * @returns The interface definition string, or null if the abyss yields nothing.
      */
-    private static emitInterfaceDefinition(
-        checker: ts.TypeChecker,
-        interfaceName: string,
-        program: ts.Program
-    ): string | null {
+    private static emitInterfaceDefinition(checker: ts.TypeChecker, interfaceName: string, program: ts.Program): string | null {
         for (const sourceFile of program.getSourceFiles()) {
             if (sourceFile.isDeclarationFile) continue;
             const result = this.findInterfaceInFile(sourceFile, interfaceName);
@@ -164,10 +153,7 @@ export class CompilerCache {
      * @param name - The interface name sought by the crew.
      * @returns The interface declaration node, or null if the void conceals it.
      */
-    private static findInterfaceInFile(
-        sourceFile: ts.SourceFile,
-        name: string
-    ): ts.InterfaceDeclaration | null {
+    private static findInterfaceInFile(sourceFile: ts.SourceFile, name: string): ts.InterfaceDeclaration | null {
         let found: ts.InterfaceDeclaration | null = null;
         const visit = (node: ts.Node) => {
             if (found) return;
@@ -191,7 +177,7 @@ export class CompilerCache {
      */
     private static findNamedTypeDeclarationInSourceFile(
         sourceFile: ts.SourceFile,
-        name: string
+        name: string,
     ): ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.EnumDeclaration | null {
         let found: ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.EnumDeclaration | null = null;
         const visit = (node: ts.Node) => {
@@ -223,7 +209,7 @@ export class CompilerCache {
      */
     private static findNamedTypeDeclaration(
         program: ts.Program,
-        name: string
+        name: string,
     ): ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.EnumDeclaration | null {
         for (const sourceFile of program.getSourceFiles()) {
             if (sourceFile.isDeclarationFile) continue;
@@ -257,11 +243,7 @@ export class CompilerCache {
      * @param program - The program from which referenced interfaces be plundered.
      * @returns The complete pact definition string with all referenced interfaces.
      */
-    private static typeAliasNodeToPactDef(
-        checker: ts.TypeChecker,
-        node: ts.TypeAliasDeclaration,
-        program: ts.Program
-    ): string {
+    private static typeAliasNodeToPactDef(checker: ts.TypeChecker, node: ts.TypeAliasDeclaration, program: ts.Program): string {
         const name = node.name.text;
         const symbol = checker.getSymbolAtLocation(node.name);
         if (!symbol) {
@@ -331,19 +313,14 @@ export class CompilerCache {
      * @param iface - The interface whose referenced enums be sought.
      * @returns A string of printed enum declarations, joined from the abyss.
      */
-    private static emitReferencedEnumsForInterface(
-        program: ts.Program,
-        iface: ts.InterfaceDeclaration
-    ): string {
+    private static emitReferencedEnumsForInterface(program: ts.Program, iface: ts.InterfaceDeclaration): string {
         const names = new Set<string>();
         this.collectReferencedEnumNamesFromInterface(iface, names);
         const blocks: string[] = [];
         for (const en of [...names].sort()) {
             const d = this.findNamedTypeDeclaration(program, en);
             if (d && ts.isEnumDeclaration(d)) {
-                blocks.push(
-                    this.pactPrinter.printNode(ts.EmitHint.Unspecified, d, d.getSourceFile()).trim()
-                );
+                blocks.push(this.pactPrinter.printNode(ts.EmitHint.Unspecified, d, d.getSourceFile()).trim());
             }
         }
         return blocks.join('\n\n');
@@ -358,15 +335,11 @@ export class CompilerCache {
      * @param checker - The type checker for resolving the eldritch type details.
      * @returns The complete pact return type definition string.
      */
-    private static buildPactReturnTypeDef(
-        symbolName: string,
-        program: ts.Program,
-        checker: ts.TypeChecker
-    ): string {
+    private static buildPactReturnTypeDef(symbolName: string, program: ts.Program, checker: ts.TypeChecker): string {
         const decl = this.findNamedTypeDeclaration(program, symbolName);
         if (!decl) {
             throw new Error(
-                `[CompilerCache] Pact-Quelltyp "${symbolName}" nicht gefunden. Prüfe Schreibweise und ob die Quell-Datei über tsconfig.json eingebunden ist (nicht nur Deklarationen in node_modules).`
+                `[CompilerCache] Pact-Quelltyp "${symbolName}" nicht gefunden. Prüfe Schreibweise und ob die Quell-Datei über tsconfig.json eingebunden ist (nicht nur Deklarationen in node_modules).`,
             );
         }
         if (ts.isInterfaceDeclaration(decl)) {
@@ -404,7 +377,7 @@ export class CompilerCache {
         if (!this.useLiveCompiler) {
             throw new Error(
                 `[CompilerCache] Vorbereitete Type-Definitions fehlen für: ${missing.join(', ')}. ` +
-                `Build neu erzeugen (npm run build:prod / build:integration).`
+                    `Build neu erzeugen (npm run build:prod / build:integration).`,
             );
         }
 
@@ -428,9 +401,7 @@ export class CompilerCache {
         const cached = this.pactReturnTypeCache.get(symbolName);
         if (cached !== undefined) return cached;
         if (!this.useLiveCompiler) {
-            throw new Error(
-                `[CompilerCache] Vorbereitete Type-Definition fehlt für "${symbolName}". Build neu erzeugen.`
-            );
+            throw new Error(`[CompilerCache] Vorbereitete Type-Definition fehlt für "${symbolName}". Build neu erzeugen.`);
         }
         const { program, checker } = this.createProgram();
         const def = this.buildPactReturnTypeDef(symbolName, program, checker);
@@ -446,10 +417,7 @@ export class CompilerCache {
      * @param node - The interface declaration to serialize.
      * @returns A TypeScript interface definition string, plundered from the AST.
      */
-    private static interfaceNodeToString(
-        checker: ts.TypeChecker,
-        node: ts.InterfaceDeclaration
-    ): string {
+    private static interfaceNodeToString(checker: ts.TypeChecker, node: ts.InterfaceDeclaration): string {
         const name = node.name.text;
         const members: string[] = [];
 
@@ -460,18 +428,12 @@ export class CompilerCache {
                 let typeStr: string | undefined;
                 if (member.type) {
                     const t = checker.getTypeAtLocation(member.type);
-                    typeStr = checker.typeToString(
-                        t,
-                        member.type,
-                        ts.TypeFormatFlags.NoTruncation
-                    );
+                    typeStr = checker.typeToString(t, member.type, ts.TypeFormatFlags.NoTruncation);
                 } else {
                     const symbol = checker.getSymbolAtLocation(member.name);
                     if (symbol) {
                         const memberType = checker.getTypeOfSymbol(symbol);
-                        typeStr = checker.typeToString(
-                            memberType, node, ts.TypeFormatFlags.NoTruncation
-                        );
+                        typeStr = checker.typeToString(memberType, node, ts.TypeFormatFlags.NoTruncation);
                     }
                 }
                 if (typeStr !== undefined) {
@@ -483,13 +445,11 @@ export class CompilerCache {
                 const sig = checker.getSignatureFromDeclaration(member);
                 if (sig) {
                     const returnType = checker.getReturnTypeOfSignature(sig);
-                    const params = sig.parameters.map(p => {
+                    const params = sig.parameters.map((p) => {
                         const pType = checker.getTypeOfSymbol(p);
                         return `${p.name}: ${checker.typeToString(pType)}`;
                     });
-                    const retStr = checker.typeToString(
-                        returnType, node, ts.TypeFormatFlags.NoTruncation
-                    );
+                    const retStr = checker.typeToString(returnType, node, ts.TypeFormatFlags.NoTruncation);
                     members.push(`  ${memberName}${optional}(${params.join(', ')}): ${retStr};`);
                 }
             } else if (ts.isIndexSignatureDeclaration(member)) {
@@ -501,7 +461,7 @@ export class CompilerCache {
                         const valueType = checker.typeToString(
                             checker.getReturnTypeOfSignature(indexSig),
                             node,
-                            ts.TypeFormatFlags.NoTruncation
+                            ts.TypeFormatFlags.NoTruncation,
                         );
                         members.push(`  [${param.name}: ${keyType}]: ${valueType};`);
                     }
@@ -539,11 +499,7 @@ export class CompilerCache {
      * Extrahierter Body von getClassType — operiert auf einem von außen übergebenen Program/Checker,
      * damit der Build-Schritt alle Klassen mit einem einzigen ts.Program berechnen kann.
      */
-    private static computeClassType(
-        className: string,
-        program: ts.Program,
-        checker: ts.TypeChecker
-    ): IClassTypeResult | null {
+    private static computeClassType(className: string, program: ts.Program, checker: ts.TypeChecker): IClassTypeResult | null {
         try {
             const members: Record<string, string> = {};
             const referencedTypeNames = new Set<string>();
@@ -570,13 +526,11 @@ export class CompilerCache {
                     if (!sig) continue;
 
                     const returnType = checker.getReturnTypeOfSignature(sig);
-                    const params = sig.parameters.map(p => {
+                    const params = sig.parameters.map((p) => {
                         const pType = checker.getTypeOfSymbol(p);
                         return `${p.name}: ${checker.typeToString(pType)}`;
                     });
-                    const retStr = checker.typeToString(
-                        returnType, member, ts.TypeFormatFlags.NoTruncation
-                    );
+                    const retStr = checker.typeToString(returnType, member, ts.TypeFormatFlags.NoTruncation);
                     members[name] = `(${params.join(', ')}) => ${retStr}`;
 
                     for (const p of sig.parameters) {
@@ -590,9 +544,7 @@ export class CompilerCache {
                     const sig = checker.getSignatureFromDeclaration(member);
                     if (sig) {
                         const returnType = checker.getReturnTypeOfSignature(sig);
-                        members[name] = checker.typeToString(
-                            returnType, member, ts.TypeFormatFlags.NoTruncation
-                        );
+                        members[name] = checker.typeToString(returnType, member, ts.TypeFormatFlags.NoTruncation);
                         this.collectReferencedTypes(checker, returnType, referencedTypeNames);
                     }
                 }
@@ -602,9 +554,7 @@ export class CompilerCache {
                     const symbol = checker.getSymbolAtLocation(member.name);
                     if (symbol) {
                         const propType = checker.getTypeOfSymbol(symbol);
-                        members[name] = checker.typeToString(
-                            propType, member, ts.TypeFormatFlags.NoTruncation
-                        );
+                        members[name] = checker.typeToString(propType, member, ts.TypeFormatFlags.NoTruncation);
                         this.collectReferencedTypes(checker, propType, referencedTypeNames);
                     }
                 }
@@ -614,9 +564,7 @@ export class CompilerCache {
                     const symbol = checker.getSymbolAtLocation(member.name);
                     if (symbol) {
                         const propType = checker.getTypeOfSymbol(symbol);
-                        members[name] = checker.typeToString(
-                            propType, member, ts.TypeFormatFlags.NoTruncation
-                        );
+                        members[name] = checker.typeToString(propType, member, ts.TypeFormatFlags.NoTruncation);
                         this.collectReferencedTypes(checker, propType, referencedTypeNames);
                     }
                 }
@@ -634,9 +582,7 @@ export class CompilerCache {
                         const symbol = checker.getSymbolAtLocation(param.name);
                         if (symbol) {
                             const propType = checker.getTypeOfSymbol(symbol);
-                            members[name] = checker.typeToString(
-                                propType, param, ts.TypeFormatFlags.NoTruncation
-                            );
+                            members[name] = checker.typeToString(propType, param, ts.TypeFormatFlags.NoTruncation);
                             this.collectReferencedTypes(checker, propType, referencedTypeNames);
                         }
                     }
@@ -651,7 +597,7 @@ export class CompilerCache {
 
             return {
                 members,
-                referencedInterfaces: interfaceDefs.join('\n\n')
+                referencedInterfaces: interfaceDefs.join('\n\n'),
             };
         } catch (e) {
             console.error('[CompilerCache] Error extracting class type:', e);
@@ -674,11 +620,7 @@ export class CompilerCache {
         for (const sourceFile of program.getSourceFiles()) {
             if (sourceFile.isDeclarationFile) continue;
             const visit = (node: ts.Node): void => {
-                if (
-                    ts.isCallExpression(node) &&
-                    ts.isIdentifier(node.expression) &&
-                    node.expression.text === 'createPact'
-                ) {
+                if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'createPact') {
                     const arg2 = node.arguments[1];
                     if (arg2 && ts.isObjectLiteralExpression(arg2)) {
                         for (const prop of arg2.properties) {

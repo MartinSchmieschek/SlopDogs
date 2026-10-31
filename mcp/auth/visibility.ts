@@ -83,7 +83,10 @@ export interface MyRights {
 export function parseList(raw: string[] | string | null | undefined): string[] {
     if (Array.isArray(raw)) return raw.filter((s) => typeof s === 'string' && s.length > 0);
     if (typeof raw !== 'string' || raw.length === 0) return [];
-    return raw.split(',').map((s) => s.trim()).filter(Boolean);
+    return raw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
 }
 
 export function serializeList(list: string[]): string | null {
@@ -152,8 +155,20 @@ export function accessOf(k: AclEntity, ctx: AuthCtx | undefined): Access {
  * Schnittstelle eines Dogs — nie Code, Konfig, Defaults, Task, Layout, dogIds oder ACL-Listen.
  */
 const RUN_VIEW_FIELDS = [
-    'id', 'lineageId', 'name', 'displayName', 'emoji', 'icon', 'description', 'visibility',
-    'type', 'contextName', 'parentsRequired', 'parentsOptional', 'createdAt', 'updatedAt',
+    'id',
+    'lineageId',
+    'name',
+    'displayName',
+    'emoji',
+    'icon',
+    'description',
+    'visibility',
+    'type',
+    'contextName',
+    'parentsRequired',
+    'parentsOptional',
+    'createdAt',
+    'updatedAt',
 ] as const;
 
 export function runView(k: AclEntity & Record<string, any>, ctx: AuthCtx | undefined): Record<string, unknown> {
@@ -269,6 +284,6 @@ export function filterRunnable<T extends AclEntity>(items: T[], ctx: AuthCtx | u
 /** Default je Erstellung: private — auch fuer den Super-User (P3.5). */
 export function applyCreateDefaults(input: any, ctx: AuthCtx | undefined): any {
     const visibility: Visibility = normalizeVisibility(input?.visibility) ?? 'private';
-    const ownerId = ctx?.isSuperUser ? input?.ownerId ?? null : ctx?.user?.id ?? null;
+    const ownerId = ctx?.isSuperUser ? (input?.ownerId ?? null) : (ctx?.user?.id ?? null);
     return { ...input, visibility, ownerId };
 }

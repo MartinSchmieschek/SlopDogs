@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /**
  * Gemeinsamer Name-Query-Pact fuer alle Name-Insight-Hunde.
@@ -11,7 +11,4 @@ export interface NameQuery {
     country?: string;
 }
 
-export const NameQueryPact = createPact<NameQuery>(
-    "NameQueryProvider",
-    { fromSourceType: "NameQuery" }
-);
+export const NameQueryPact = createPact<NameQuery>('NameQueryProvider', { fromSourceType: 'NameQuery' });

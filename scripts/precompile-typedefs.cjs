@@ -29,5 +29,5 @@ fs.writeFileSync(outPath, JSON.stringify(payload));
 const pactCount = Object.keys(payload.pactReturnTypes).length;
 const classCount = Object.keys(payload.classTypes).length;
 console.log(
-    `[precompile-typedefs] ${pactCount} Pact-Typen, ${classCount} Klassen-Typen → ${path.relative(projectRoot, outPath)} (${elapsed}s)`
+    `[precompile-typedefs] ${pactCount} Pact-Typen, ${classCount} Klassen-Typen → ${path.relative(projectRoot, outPath)} (${elapsed}s)`,
 );

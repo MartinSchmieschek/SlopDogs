@@ -9,26 +9,23 @@ import {
     MAX_OSM_RADIUS_M,
     overpassSettingsHeader,
     type OsmGeoElement,
-} from "./overpassOsmShared";
+} from './overpassOsmShared';
 
 export const DEFAULT_FAST_ROADS_RADIUS_M = DEFAULT_OSM_RADIUS_M;
 export const MAX_FAST_ROADS_RADIUS_M = MAX_OSM_RADIUS_M;
 
 /** OSM highway=* values for fast / major roads */
 export enum FastRoadsOverpassFacet {
-    Motorway = "motorway",
-    MotorwayLink = "motorway_link",
-    Trunk = "trunk",
-    TrunkLink = "trunk_link",
-    Primary = "primary",
-    Secondary = "secondary",
+    Motorway = 'motorway',
+    MotorwayLink = 'motorway_link',
+    Trunk = 'trunk',
+    TrunkLink = 'trunk_link',
+    Primary = 'primary',
+    Secondary = 'secondary',
 }
 
 /** Default: Autobahn-äquivalent + Schnellstraßen (ohne jede innerörtliche primary) */
-export const DEFAULT_FAST_ROADS_FACETS: readonly FastRoadsOverpassFacet[] = [
-    FastRoadsOverpassFacet.Motorway,
-    FastRoadsOverpassFacet.Trunk,
-];
+export const DEFAULT_FAST_ROADS_FACETS: readonly FastRoadsOverpassFacet[] = [FastRoadsOverpassFacet.Motorway, FastRoadsOverpassFacet.Trunk];
 
 export const ALL_FAST_ROADS_OVERPASS_FACETS: readonly FastRoadsOverpassFacet[] = [
     FastRoadsOverpassFacet.Motorway,
@@ -47,12 +44,12 @@ export interface OsmFastRoadsResult {
 }
 
 const HIGHWAY_BY_FACET: Record<FastRoadsOverpassFacet, string> = {
-    [FastRoadsOverpassFacet.Motorway]: "motorway",
-    [FastRoadsOverpassFacet.MotorwayLink]: "motorway_link",
-    [FastRoadsOverpassFacet.Trunk]: "trunk",
-    [FastRoadsOverpassFacet.TrunkLink]: "trunk_link",
-    [FastRoadsOverpassFacet.Primary]: "primary",
-    [FastRoadsOverpassFacet.Secondary]: "secondary",
+    [FastRoadsOverpassFacet.Motorway]: 'motorway',
+    [FastRoadsOverpassFacet.MotorwayLink]: 'motorway_link',
+    [FastRoadsOverpassFacet.Trunk]: 'trunk',
+    [FastRoadsOverpassFacet.TrunkLink]: 'trunk_link',
+    [FastRoadsOverpassFacet.Primary]: 'primary',
+    [FastRoadsOverpassFacet.Secondary]: 'secondary',
 };
 
 function lineForFacet(f: FastRoadsOverpassFacet, r: number, lat: number, lng: number): string {
@@ -72,7 +69,7 @@ function dedupeFacets(facets: FastRoadsOverpassFacet[]): FastRoadsOverpassFacet[
 }
 
 function coerceFacet(raw: unknown): FastRoadsOverpassFacet | null {
-    if (typeof raw !== "string") {
+    if (typeof raw !== 'string') {
         const vals = Object.values(FastRoadsOverpassFacet) as FastRoadsOverpassFacet[];
         return vals.includes(raw as FastRoadsOverpassFacet) ? (raw as FastRoadsOverpassFacet) : null;
     }
@@ -94,10 +91,10 @@ export function parseFastRoadsFacets(raw: unknown): FastRoadsOverpassFacet[] {
         }
         return mapped.length ? dedupeFacets(mapped) : base;
     }
-    if (typeof raw === "string") {
+    if (typeof raw === 'string') {
         const v = raw.toLowerCase();
-        if (v === "" || v === "default") return base;
-        if (v === "full") {
+        if (v === '' || v === 'default') return base;
+        if (v === 'full') {
             return dedupeFacets([...ALL_FAST_ROADS_OVERPASS_FACETS]);
         }
         const one = coerceFacet(raw);
@@ -107,18 +104,13 @@ export function parseFastRoadsFacets(raw: unknown): FastRoadsOverpassFacet[] {
     return single != null ? [single] : base;
 }
 
-export function buildFastRoadsOverpassQuery(
-    lat: number,
-    lng: number,
-    radiusM: number,
-    facets: FastRoadsOverpassFacet[]
-): string {
+export function buildFastRoadsOverpassQuery(lat: number, lng: number, radiusM: number, facets: FastRoadsOverpassFacet[]): string {
     const r = radiusM;
     const list = facets.length ? dedupeFacets(facets) : [...DEFAULT_FAST_ROADS_FACETS];
     const lines = list.map((f) => lineForFacet(f, r, lat, lng));
     return `${overpassSettingsHeader()}
 (
-${lines.join("\n")}
+${lines.join('\n')}
 );
 out center;`;
 }
@@ -131,11 +123,11 @@ export async function fetchNearbyFastRoads(
     lat: number,
     lng: number,
     radiusM: number,
-    facets: FastRoadsOverpassFacet[]
+    facets: FastRoadsOverpassFacet[],
 ): Promise<OsmFastRoadsResult> {
     const normalized = facets.length ? dedupeFacets(facets) : [...DEFAULT_FAST_ROADS_FACETS];
     const query = buildFastRoadsOverpassQuery(lat, lng, radiusM, normalized);
-    const elements = await fetchOverpassElements(query, "OsmFastRoadsRetriever");
+    const elements = await fetchOverpassElements(query, 'OsmFastRoadsRetriever');
     return {
         center: { lat, lng },
         radiusM,

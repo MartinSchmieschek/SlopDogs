@@ -5,134 +5,134 @@
 
 /** `landuse=*` values selectable for area geometry queries */
 export enum OsmLanduseValue {
-    Forest = "forest",
-    Meadow = "meadow",
-    Farmland = "farmland",
-    Residential = "residential",
-    Industrial = "industrial",
-    Commercial = "commercial",
-    Orchard = "orchard",
-    Vineyard = "vineyard",
-    Grass = "grass",
-    Cemetery = "cemetery",
-    RecreationGround = "recreation_ground",
-    Allotments = "allotments",
-    Farmyard = "farmyard",
-    Greenfield = "greenfield",
-    Brownfield = "brownfield",
-    Landfill = "landfill",
-    Reservoir = "reservoir",
-    Basin = "basin",
-    SaltPond = "salt_pond",
-    VillageGreen = "village_green",
-    Retail = "retail",
-    Construction = "construction",
+    Forest = 'forest',
+    Meadow = 'meadow',
+    Farmland = 'farmland',
+    Residential = 'residential',
+    Industrial = 'industrial',
+    Commercial = 'commercial',
+    Orchard = 'orchard',
+    Vineyard = 'vineyard',
+    Grass = 'grass',
+    Cemetery = 'cemetery',
+    RecreationGround = 'recreation_ground',
+    Allotments = 'allotments',
+    Farmyard = 'farmyard',
+    Greenfield = 'greenfield',
+    Brownfield = 'brownfield',
+    Landfill = 'landfill',
+    Reservoir = 'reservoir',
+    Basin = 'basin',
+    SaltPond = 'salt_pond',
+    VillageGreen = 'village_green',
+    Retail = 'retail',
+    Construction = 'construction',
 }
 
 /** `natural=*` values selectable for area geometry queries */
 export enum OsmNaturalValue {
-    Wood = "wood",
-    Scrub = "scrub",
-    Grassland = "grassland",
-    Water = "water",
-    Wetland = "wetland",
-    Sand = "sand",
-    Beach = "beach",
-    Cliff = "cliff",
-    Peak = "peak",
-    TreeRow = "tree_row",
-    Tree = "tree",
-    BareRock = "bare_rock",
-    Fell = "fell",
-    Heath = "heath",
-    Moor = "moor",
-    Glacier = "glacier",
-    Bay = "bay",
-    Coastline = "coastline",
-    Spring = "spring",
+    Wood = 'wood',
+    Scrub = 'scrub',
+    Grassland = 'grassland',
+    Water = 'water',
+    Wetland = 'wetland',
+    Sand = 'sand',
+    Beach = 'beach',
+    Cliff = 'cliff',
+    Peak = 'peak',
+    TreeRow = 'tree_row',
+    Tree = 'tree',
+    BareRock = 'bare_rock',
+    Fell = 'fell',
+    Heath = 'heath',
+    Moor = 'moor',
+    Glacier = 'glacier',
+    Bay = 'bay',
+    Coastline = 'coastline',
+    Spring = 'spring',
 }
 
 /** `railway=*` values selectable for rail line geometry queries */
 export enum OsmRailwayValue {
-    Rail = "rail",
-    Tram = "tram",
-    Subway = "subway",
-    LightRail = "light_rail",
-    Monorail = "monorail",
-    NarrowGauge = "narrow_gauge",
-    Funicular = "funicular",
-    Preserved = "preserved",
-    Disused = "disused",
-    Abandoned = "abandoned",
-    Construction = "construction",
+    Rail = 'rail',
+    Tram = 'tram',
+    Subway = 'subway',
+    LightRail = 'light_rail',
+    Monorail = 'monorail',
+    NarrowGauge = 'narrow_gauge',
+    Funicular = 'funicular',
+    Preserved = 'preserved',
+    Disused = 'disused',
+    Abandoned = 'abandoned',
+    Construction = 'construction',
 }
 
 /** `man_made=*` values for vertical structures and industrial facilities */
 export enum OsmManMadeValue {
-    Tower = "tower",
-    Chimney = "chimney",
-    Mast = "mast",
-    Silo = "silo",
-    WaterTower = "water_tower",
-    CommunicationsTower = "communications_tower",
-    Lighthouse = "lighthouse",
-    Antenna = "antenna",
-    Incinerator = "incinerator",
-    Crane = "crane",
-    Windmill = "windmill",
-    Watermill = "watermill",
-    Storage_Tank = "storage_tank",
-    GasTank = "gasometer",
-    Works = "works",
+    Tower = 'tower',
+    Chimney = 'chimney',
+    Mast = 'mast',
+    Silo = 'silo',
+    WaterTower = 'water_tower',
+    CommunicationsTower = 'communications_tower',
+    Lighthouse = 'lighthouse',
+    Antenna = 'antenna',
+    Incinerator = 'incinerator',
+    Crane = 'crane',
+    Windmill = 'windmill',
+    Watermill = 'watermill',
+    Storage_Tank = 'storage_tank',
+    GasTank = 'gasometer',
+    Works = 'works',
 }
 
 /** `barrier=*` linear values — walls, fences, hedges */
 export enum OsmBarrierValue {
-    Wall = "wall",
-    CityWall = "city_wall",
-    RetainingWall = "retaining_wall",
-    Fence = "fence",
-    Hedge = "hedge",
-    Ditch = "ditch",
-    Guard_Rail = "guard_rail",
+    Wall = 'wall',
+    CityWall = 'city_wall',
+    RetainingWall = 'retaining_wall',
+    Fence = 'fence',
+    Hedge = 'hedge',
+    Ditch = 'ditch',
+    Guard_Rail = 'guard_rail',
 }
 
 /** `natural=*` point/line values (trees and tree rows) — distinct from polygon vegetation */
 export enum OsmNaturePointValue {
-    Tree = "tree",
-    TreeRow = "tree_row",
+    Tree = 'tree',
+    TreeRow = 'tree_row',
 }
 
 /** `highway=*` values selectable for street geometry queries */
 export enum OsmHighwayValue {
-    Motorway = "motorway",
-    Trunk = "trunk",
-    Primary = "primary",
-    Secondary = "secondary",
-    Tertiary = "tertiary",
-    Unclassified = "unclassified",
-    Residential = "residential",
-    LivingStreet = "living_street",
-    Service = "service",
-    Footway = "footway",
-    Path = "path",
-    Track = "track",
-    Cycleway = "cycleway",
-    Steps = "steps",
-    Pedestrian = "pedestrian",
-    MotorwayLink = "motorway_link",
-    TrunkLink = "trunk_link",
-    PrimaryLink = "primary_link",
-    SecondaryLink = "secondary_link",
-    TertiaryLink = "tertiary_link",
-    BusGuideway = "bus_guideway",
-    Raceway = "raceway",
-    Road = "road",
+    Motorway = 'motorway',
+    Trunk = 'trunk',
+    Primary = 'primary',
+    Secondary = 'secondary',
+    Tertiary = 'tertiary',
+    Unclassified = 'unclassified',
+    Residential = 'residential',
+    LivingStreet = 'living_street',
+    Service = 'service',
+    Footway = 'footway',
+    Path = 'path',
+    Track = 'track',
+    Cycleway = 'cycleway',
+    Steps = 'steps',
+    Pedestrian = 'pedestrian',
+    MotorwayLink = 'motorway_link',
+    TrunkLink = 'trunk_link',
+    PrimaryLink = 'primary_link',
+    SecondaryLink = 'secondary_link',
+    TertiaryLink = 'tertiary_link',
+    BusGuideway = 'bus_guideway',
+    Raceway = 'raceway',
+    Road = 'road',
 }
 
 /** Preset name that expands to a fixed highway set */
 export enum OsmHighwayPreset {
-    MajorOnly = "major_only",
+    MajorOnly = 'major_only',
 }
 
 const LANDUSE_SET = new Set<string>(Object.values(OsmLanduseValue));
@@ -165,17 +165,10 @@ export const DEFAULT_MAN_MADE: readonly OsmManMadeValue[] = [
 ];
 
 /** Default barriers — solid linear obstructions */
-export const DEFAULT_BARRIER: readonly OsmBarrierValue[] = [
-    OsmBarrierValue.Wall,
-    OsmBarrierValue.CityWall,
-    OsmBarrierValue.RetainingWall,
-];
+export const DEFAULT_BARRIER: readonly OsmBarrierValue[] = [OsmBarrierValue.Wall, OsmBarrierValue.CityWall, OsmBarrierValue.RetainingWall];
 
 /** Default nature point/line features */
-export const DEFAULT_NATURE_POINT: readonly OsmNaturePointValue[] = [
-    OsmNaturePointValue.Tree,
-    OsmNaturePointValue.TreeRow,
-];
+export const DEFAULT_NATURE_POINT: readonly OsmNaturePointValue[] = [OsmNaturePointValue.Tree, OsmNaturePointValue.TreeRow];
 
 /** Default street classes when none are given */
 export const DEFAULT_STREET_HIGHWAY: readonly OsmHighwayValue[] = [
@@ -191,7 +184,7 @@ function parseStringList(raw: unknown): string[] | null {
     if (Array.isArray(raw)) {
         return raw.map((x) => String(x).trim()).filter(Boolean);
     }
-    if (typeof raw === "string") {
+    if (typeof raw === 'string') {
         const t = raw.trim();
         if (!t) return [];
         try {
@@ -281,7 +274,7 @@ function highwayPresetValues(preset: string): OsmHighwayValue[] | null {
 }
 
 export function parseOsmHighwayList(raw: unknown, presetRaw: unknown): OsmHighwayValue[] {
-    if (typeof presetRaw === "string" && presetRaw.trim()) {
+    if (typeof presetRaw === 'string' && presetRaw.trim()) {
         const expanded = highwayPresetValues(presetRaw.trim());
         if (expanded) return expanded;
     }

@@ -12,12 +12,7 @@ import http from 'http';
 import https from 'https';
 import zlib from 'zlib';
 import { isIP } from 'net';
-import {
-    envFirst,
-    isPrivateNetworkAddress,
-    registerVmGlobalCapability,
-    type VmGlobalCapabilityContext,
-} from '@slopdogs/core';
+import { envFirst, isPrivateNetworkAddress, registerVmGlobalCapability, type VmGlobalCapabilityContext } from '@slopdogs/core';
 import { KeyStoreService, hostAllowedBy, type UserKeyRow } from './KeyStoreService';
 
 /** Was an die Stelle eines Werts tritt — in Antworten, Waves, Snapshot, Fehlern und Log. */
@@ -32,10 +27,10 @@ const DROPPED_RESPONSE_HEADERS = new Set(['set-cookie', 'set-cookie2', 'authoriz
 
 /** Die Kurzdoku, mit der sich die Capability im Werkzeugkasten ankuendigt. */
 export const KEYS_CAPABILITY_DOC =
-    'keys.fetch(url, {method, headers, body}) — ersetzt `{{key:<alias>}}` in URL, Header-Werten und Body serverseitig '
-    + 'durch deinen hinterlegten Schluessel (set_key) und ruft nur Domains, die der Key erlaubt (https, keine privaten Netze, '
-    + 'keine Umleitungen); liefert {status, headers, body} ohne den Wert. keys.list() — nur Aliase, last4 und Domains. '
-    + 'Kein keys.get: den Klartext sieht der Dog-Code nie. Laeuft mit den Keys dessen, der den Kennel ausfuehrt.';
+    'keys.fetch(url, {method, headers, body}) — ersetzt `{{key:<alias>}}` in URL, Header-Werten und Body serverseitig ' +
+    'durch deinen hinterlegten Schluessel (set_key) und ruft nur Domains, die der Key erlaubt (https, keine privaten Netze, ' +
+    'keine Umleitungen); liefert {status, headers, body} ohne den Wert. keys.list() — nur Aliase, last4 und Domains. ' +
+    'Kein keys.get: den Klartext sieht der Dog-Code nie. Laeuft mit den Keys dessen, der den Kennel ausfuehrt.';
 
 /**
  * Der Zustand eines Laufs: welche Werte benutzt wurden (fuer den Scrub) und welche Schluessel schon
@@ -177,45 +172,53 @@ export const nodeKeysNetwork: KeysNetwork = {
         const family = isIP(address);
         const lib = url.protocol === 'https:' ? https : http;
         return new Promise<KeysFetchResult>((resolve, reject) => {
-            const req = lib.request({
-                protocol: url.protocol,
-                hostname: url.hostname,
-                port: url.port || undefined,
-                path: `${url.pathname}${url.search}`,
-                method: request.method,
-                headers: request.body !== undefined
-                    ? { ...request.headers, 'content-length': String(Buffer.byteLength(request.body)) }
-                    : request.headers,
-                lookup: (_host: string, options: any, cb: any) => {
-                    if (options && options.all) cb(null, [{ address, family }]);
-                    else cb(null, address, family);
+            const req = lib.request(
+                {
+                    protocol: url.protocol,
+                    hostname: url.hostname,
+                    port: url.port || undefined,
+                    path: `${url.pathname}${url.search}`,
+                    method: request.method,
+                    headers:
+                        request.body !== undefined
+                            ? { ...request.headers, 'content-length': String(Buffer.byteLength(request.body)) }
+                            : request.headers,
+                    lookup: (_host: string, options: any, cb: any) => {
+                        if (options && options.all) cb(null, [{ address, family }]);
+                        else cb(null, address, family);
+                    },
                 },
-            }, (res) => {
-                const encoding = String(res.headers['content-encoding'] || '').toLowerCase();
-                const stream = encoding === 'gzip' ? res.pipe(zlib.createGunzip())
-                    : encoding === 'deflate' ? res.pipe(zlib.createInflate())
-                        : encoding === 'br' ? res.pipe(zlib.createBrotliDecompress())
-                            : res;
-                const chunks: Buffer[] = [];
-                let size = 0;
-                stream.on('data', (chunk: Buffer) => {
-                    size += chunk.length;
-                    if (size > MAX_RESPONSE_BYTES) {
-                        req.destroy(new Error(`response larger than ${MAX_RESPONSE_BYTES} bytes`));
-                        return;
-                    }
-                    chunks.push(chunk);
-                });
-                stream.on('error', reject);
-                stream.on('end', () => {
-                    const headers: Record<string, string> = {};
-                    for (const [name, value] of Object.entries(res.headers)) {
-                        if (value === undefined) continue;
-                        headers[name] = Array.isArray(value) ? value.join(', ') : String(value);
-                    }
-                    resolve({ status: res.statusCode ?? 0, headers, body: Buffer.concat(chunks).toString('utf8') });
-                });
-            });
+                (res) => {
+                    const encoding = String(res.headers['content-encoding'] || '').toLowerCase();
+                    const stream =
+                        encoding === 'gzip'
+                            ? res.pipe(zlib.createGunzip())
+                            : encoding === 'deflate'
+                              ? res.pipe(zlib.createInflate())
+                              : encoding === 'br'
+                                ? res.pipe(zlib.createBrotliDecompress())
+                                : res;
+                    const chunks: Buffer[] = [];
+                    let size = 0;
+                    stream.on('data', (chunk: Buffer) => {
+                        size += chunk.length;
+                        if (size > MAX_RESPONSE_BYTES) {
+                            req.destroy(new Error(`response larger than ${MAX_RESPONSE_BYTES} bytes`));
+                            return;
+                        }
+                        chunks.push(chunk);
+                    });
+                    stream.on('error', reject);
+                    stream.on('end', () => {
+                        const headers: Record<string, string> = {};
+                        for (const [name, value] of Object.entries(res.headers)) {
+                            if (value === undefined) continue;
+                            headers[name] = Array.isArray(value) ? value.join(', ') : String(value);
+                        }
+                        resolve({ status: res.statusCode ?? 0, headers, body: Buffer.concat(chunks).toString('utf8') });
+                    });
+                },
+            );
             req.setTimeout(request.timeoutMs, () => req.destroy(new Error(`timeout after ${request.timeoutMs} ms`)));
             req.on('error', reject);
             if (request.body !== undefined) req.write(request.body);
@@ -242,7 +245,10 @@ export class KeysCapability {
         registerVmGlobalCapability('keys', (ctx) => this.bundleFor(ctx), KEYS_CAPABILITY_DOC);
     }
 
-    bundleFor(ctx: VmGlobalCapabilityContext): { fetch: (url: unknown, opts?: unknown) => Promise<KeysFetchResult>; list: () => Promise<unknown[]> } {
+    bundleFor(ctx: VmGlobalCapabilityContext): {
+        fetch: (url: unknown, opts?: unknown) => Promise<KeysFetchResult>;
+        list: () => Promise<unknown[]>;
+    } {
         const run = KeyRunState.of(ctx) ?? new KeyRunState();
         return {
             fetch: (url: unknown, opts?: unknown) => this.fetch(ctx, run, url, opts),
@@ -273,7 +279,8 @@ export class KeysCapability {
     async fetch(ctx: VmGlobalCapabilityContext, run: KeyRunState, rawUrl: unknown, rawOpts?: unknown): Promise<KeysFetchResult> {
         const request = KeysCapability.parseRequest(rawUrl, rawOpts);
         const aliases = KeysCapability.aliasesIn(request);
-        if (aliases.length === 0) throw new KeysFetchError('keys.fetch needs at least one {{key:<alias>}} placeholder — use fetch for calls without a key');
+        if (aliases.length === 0)
+            throw new KeysFetchError('keys.fetch needs at least one {{key:<alias>}} placeholder — use fetch for calls without a key');
         KeysCapability.assertNoPlaceholderInHost(request.url);
         if (!this.store.enabled) throw new KeysFetchError('keys_unavailable');
 
@@ -282,10 +289,11 @@ export class KeysCapability {
         for (const alias of aliases) resolvedKeys.set(alias, await this.resolve(ctx, run, alias));
 
         // Ersetzen: URL-kodiert in der URL, roh in Header-Werten und Body.
-        const substitute = (text: string, encode: boolean) => text.replace(PLACEHOLDER_RX, (_m, alias: string) => {
-            const secret = resolvedKeys.get(alias)!.secret;
-            return encode ? encodeURIComponent(secret) : secret;
-        });
+        const substitute = (text: string, encode: boolean) =>
+            text.replace(PLACEHOLDER_RX, (_m, alias: string) => {
+                const secret = resolvedKeys.get(alias)!.secret;
+                return encode ? encodeURIComponent(secret) : secret;
+            });
         let url: URL;
         try {
             url = new URL(substitute(request.url, true));
@@ -368,16 +376,21 @@ export class KeysCapability {
         }
         if (grantOwner) {
             const kennel = ctx.kennelLineageId as string;
-            const granted = await run.resolveOnce(`grant\u0000${grantOwner}\u0000${kennel}\u0000${alias}`,
-                async () => decrypted(await this.store.findGrantedRow(grantOwner, alias, kennel)));
+            const granted = await run.resolveOnce(`grant\u0000${grantOwner}\u0000${kennel}\u0000${alias}`, async () =>
+                decrypted(await this.store.findGrantedRow(grantOwner, alias, kennel)),
+            );
             if (granted) return granted;
         }
         throw new KeysFetchError(runner ? `key_not_found:${alias}` : 'keys_unavailable');
     }
 
     /** Die Argumente des Dogs in eine feste Form: URL-Text, Methode, String-Header, String-Body. */
-    private static parseRequest(rawUrl: unknown, rawOpts: unknown): { url: string; method: string; headers: Record<string, string>; body?: string } {
-        if (typeof rawUrl !== 'string' || rawUrl.length === 0 || rawUrl.length > 8192) throw new KeysFetchError('keys.fetch: url must be a string');
+    private static parseRequest(
+        rawUrl: unknown,
+        rawOpts: unknown,
+    ): { url: string; method: string; headers: Record<string, string>; body?: string } {
+        if (typeof rawUrl !== 'string' || rawUrl.length === 0 || rawUrl.length > 8192)
+            throw new KeysFetchError('keys.fetch: url must be a string');
         const opts = (rawOpts && typeof rawOpts === 'object' ? rawOpts : {}) as Record<string, unknown>;
         const method = typeof opts.method === 'string' && /^[A-Za-z]{1,16}$/.test(opts.method) ? opts.method.toUpperCase() : 'GET';
         const headers: Record<string, string> = {};
@@ -427,7 +440,11 @@ export class KeysCapability {
  * Die Senke fuer `console` im Dog-Code (P4c, L7): jede Zeile wird mit dem Laufzustand ihres Dogs
  * bereinigt, bevor sie ausgegeben wird.
  */
-export function scrubbingConsoleSink(level: 'log' | 'info' | 'warn' | 'error' | 'debug', line: string, ctx: VmGlobalCapabilityContext): void {
+export function scrubbingConsoleSink(
+    level: 'log' | 'info' | 'warn' | 'error' | 'debug',
+    line: string,
+    ctx: VmGlobalCapabilityContext,
+): void {
     const text = (KeyRunState.of(ctx) ?? EMPTY_RUN).scrubText(line);
     const out = console[level] ?? console.log;
     out.call(console, text);

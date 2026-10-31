@@ -135,13 +135,13 @@ export class DogRunPolicy {
     private readonly kennelOwnerCtx: AuthCtx;
     private readonly runnerCtx: AuthCtx | undefined;
 
-    constructor(kennel: IKennelConfig, private readonly capabilityCtx: VmGlobalCapabilityContext | undefined) {
+    constructor(
+        kennel: IKennelConfig,
+        private readonly capabilityCtx: VmGlobalCapabilityContext | undefined,
+    ) {
         this.kennelOwnerId = (kennel as any).ownerId ?? null;
         this.kennelVisibility = effectiveVisibility(kennel as AclEntity);
-        this.kennelHands = new Set([
-            ...(this.kennelOwnerId ? [this.kennelOwnerId] : []),
-            ...parseList((kennel as any).editors),
-        ]);
+        this.kennelHands = new Set([...(this.kennelOwnerId ? [this.kennelOwnerId] : []), ...parseList((kennel as any).editors)]);
         this.kennelOwnerCtx = {
             user: this.kennelOwnerId ? { id: this.kennelOwnerId, email: '', name: null } : null,
             isSuperUser: false,
@@ -179,7 +179,12 @@ export class DogRunPolicy {
     }
 
     /** Die Instanz fuer den Lauf — im eigenen Namensraum, wenn sie dem Aufrufer fremd ist. */
-    instantiate(config: ISerializedDogConfig | IMimicDogConfig, storageId: string, dog: AclEntity, lineageId: string): SerializedDog<unknown> {
+    instantiate(
+        config: ISerializedDogConfig | IMimicDogConfig,
+        storageId: string,
+        dog: AclEntity,
+        lineageId: string,
+    ): SerializedDog<unknown> {
         const imitates = (config as IMimicDogConfig).imitates;
         const isMimic = typeof imitates === 'string' && imitates.length > 0;
         if (!this.isForeignToRunner(dog)) {
@@ -216,7 +221,11 @@ export function scopeCapabilityToDog(
 
 /** Ein SerializedDog, der dem Aufrufer fremd ist: gleicher Code, eigener Namensraum. */
 export class RunnerScopedSerializedDog<T> extends SerializedDog<T> {
-    constructor(config: ISerializedDogConfig, storageId: string, private readonly scope: ForeignDogScope) {
+    constructor(
+        config: ISerializedDogConfig,
+        storageId: string,
+        private readonly scope: ForeignDogScope,
+    ) {
         super(config, storageId);
     }
 
@@ -227,7 +236,11 @@ export class RunnerScopedSerializedDog<T> extends SerializedDog<T> {
 
 /** Dasselbe fuer einen MimicDog. */
 export class RunnerScopedMimicDog<T> extends MimicDog<T> {
-    constructor(config: IMimicDogConfig, storageId: string, private readonly scope: ForeignDogScope) {
+    constructor(
+        config: IMimicDogConfig,
+        storageId: string,
+        private readonly scope: ForeignDogScope,
+    ) {
         super(config, storageId);
     }
 

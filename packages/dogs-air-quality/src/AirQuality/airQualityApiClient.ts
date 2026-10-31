@@ -10,18 +10,18 @@
  * =========================================================================
  */
 
-import type { CurrentAirQuality, PollenData, HourlyAirQuality, AirQualityResult } from "./interfaces/airQualityTypes";
+import type { CurrentAirQuality, PollenData, HourlyAirQuality, AirQualityResult } from './interfaces/airQualityTypes';
 
-const AQ_API_BASE = "https://air-quality-api.open-meteo.com/v1/air-quality";
+const AQ_API_BASE = 'https://air-quality-api.open-meteo.com/v1/air-quality';
 
 /** European AQI -> menschenlesbare Beschreibung */
 function describeAqi(aqi: number): string {
-    if (aqi <= 20) return "Gut";
-    if (aqi <= 40) return "Befriedigend";
-    if (aqi <= 60) return "Maessig";
-    if (aqi <= 80) return "Schlecht";
-    if (aqi <= 100) return "Sehr schlecht";
-    return "Extrem schlecht";
+    if (aqi <= 20) return 'Gut';
+    if (aqi <= 40) return 'Befriedigend';
+    if (aqi <= 60) return 'Maessig';
+    if (aqi <= 80) return 'Schlecht';
+    if (aqi <= 100) return 'Sehr schlecht';
+    return 'Extrem schlecht';
 }
 
 /**
@@ -35,7 +35,7 @@ export async function getAirQuality(lat: number, lng: number): Promise<AirQualit
         `hourly=european_aqi,pm2_5,pm10,ozone,birch_pollen,grass_pollen,alder_pollen,ragweed_pollen,mugwort_pollen,olive_pollen`,
         `timezone=auto`,
         `forecast_days=2`,
-    ].join("&");
+    ].join('&');
 
     const url = `${AQ_API_BASE}?${params}`;
 
@@ -45,7 +45,7 @@ export async function getAirQuality(lat: number, lng: number): Promise<AirQualit
     let res: Response;
     try {
         res = await fetch(url, {
-            headers: { "Accept": "application/json", "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)" },
+            headers: { Accept: 'application/json', 'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)' },
             signal: controller.signal,
         });
     } finally {
@@ -53,11 +53,11 @@ export async function getAirQuality(lat: number, lng: number): Promise<AirQualit
     }
 
     if (!res.ok) {
-        const text = await res.text().catch(() => "");
+        const text = await res.text().catch(() => '');
         throw new Error(`Open-Meteo Air Quality failed: ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
     }
 
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
 
     // Current air quality
     const c = data.current;

@@ -1,7 +1,7 @@
-import type { GitHubPublicResult } from "./interfaces/gitHubPublicTypes";
+import type { GitHubPublicResult } from './interfaces/gitHubPublicTypes';
 
-const GH_BASE = "https://api.github.com";
-const SEARCH_TYPES = new Set(["repositories", "users", "issues"]);
+const GH_BASE = 'https://api.github.com';
+const SEARCH_TYPES = new Set(['repositories', 'users', 'issues']);
 
 async function ghFetch(url: string): Promise<{ data: unknown; rateLimitRemaining?: number }> {
     const controller = new AbortController();
@@ -10,9 +10,9 @@ async function ghFetch(url: string): Promise<{ data: unknown; rateLimitRemaining
     try {
         res = await fetch(url, {
             headers: {
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-                "User-Agent": "SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)",
+                Accept: 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28',
+                'User-Agent': 'SlopDogs/0.2 (+https://github.com/MartinSchmieschek/SlopDogs)',
             },
             signal: controller.signal,
         });
@@ -20,21 +20,21 @@ async function ghFetch(url: string): Promise<{ data: unknown; rateLimitRemaining
         clearTimeout(timer);
     }
     if (!res.ok) {
-        const text = await res.text().catch(() => "");
+        const text = await res.text().catch(() => '');
         throw new Error(`github failed: ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
     }
-    const remaining = res.headers.get("x-ratelimit-remaining");
-    const data = await res.json() as unknown;
+    const remaining = res.headers.get('x-ratelimit-remaining');
+    const data = (await res.json()) as unknown;
     return { data, rateLimitRemaining: remaining ? Number(remaining) : undefined };
 }
 
 export async function queryGitHubPublic(
-    mode: string = "repo",
+    mode: string = 'repo',
     login?: string,
     repo?: string,
     q?: string,
-    searchType: string = "repositories",
-    sort: string = "stars",
+    searchType: string = 'repositories',
+    sort: string = 'stars',
     page: number = 1,
     perPage: number = 30,
 ): Promise<GitHubPublicResult> {
@@ -43,40 +43,40 @@ export async function queryGitHubPublic(
     const pageClamped = Math.max(1, Math.floor(page));
 
     let url: string;
-    if (m === "user") {
+    if (m === 'user') {
         if (!login?.trim()) throw new Error("GitHubPublicRetriever: mode=user requires 'login'");
         url = `${GH_BASE}/users/${encodeURIComponent(login.trim())}`;
-    } else if (m === "repo") {
-        if (!repo?.trim() || !repo.includes("/")) {
+    } else if (m === 'repo') {
+        if (!repo?.trim() || !repo.includes('/')) {
             throw new Error("GitHubPublicRetriever: mode=repo requires 'repo' in owner/repo format");
         }
-        const [owner, name] = repo.split("/").map(s => s.trim());
+        const [owner, name] = repo.split('/').map((s) => s.trim());
         url = `${GH_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
-    } else if (m === "userrepos") {
+    } else if (m === 'userrepos') {
         if (!login?.trim()) throw new Error("GitHubPublicRetriever: mode=userRepos requires 'login'");
         const p = new URLSearchParams({
-            sort: sort === "stars" ? "updated" : sort,
+            sort: sort === 'stars' ? 'updated' : sort,
             per_page: String(perPageClamped),
             page: String(pageClamped),
         });
         url = `${GH_BASE}/users/${encodeURIComponent(login.trim())}/repos?${p.toString()}`;
-    } else if (m === "orgrepos") {
+    } else if (m === 'orgrepos') {
         if (!login?.trim()) throw new Error("GitHubPublicRetriever: mode=orgRepos requires 'login'");
         const p = new URLSearchParams({
             per_page: String(perPageClamped),
             page: String(pageClamped),
         });
         url = `${GH_BASE}/orgs/${encodeURIComponent(login.trim())}/repos?${p.toString()}`;
-    } else if (m === "search") {
+    } else if (m === 'search') {
         if (!q?.trim()) throw new Error("GitHubPublicRetriever: mode=search requires 'q'");
         const st = searchType.toLowerCase();
         if (!SEARCH_TYPES.has(st)) {
-            throw new Error(`GitHubPublicRetriever: unknown searchType "${searchType}" (expected: ${[...SEARCH_TYPES].join(", ")})`);
+            throw new Error(`GitHubPublicRetriever: unknown searchType "${searchType}" (expected: ${[...SEARCH_TYPES].join(', ')})`);
         }
         const p = new URLSearchParams({
             q: q.trim(),
             sort,
-            order: "desc",
+            order: 'desc',
             per_page: String(perPageClamped),
             page: String(pageClamped),
         });

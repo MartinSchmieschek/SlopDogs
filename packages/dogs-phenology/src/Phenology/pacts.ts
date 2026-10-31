@@ -9,7 +9,7 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** Query parameters for the phenology hunt */
 export interface PhenologyQuery {
@@ -22,7 +22,4 @@ export interface PhenologyQuery {
 }
 
 /** Der Pact fuer Phenology-Queries */
-export const PhenologyQueryPact = createPact<PhenologyQuery>(
-    "PhenologyQueryProvider",
-    { fromSourceType: "PhenologyQuery" }
-);
+export const PhenologyQueryPact = createPact<PhenologyQuery>('PhenologyQueryProvider', { fromSourceType: 'PhenologyQuery' });

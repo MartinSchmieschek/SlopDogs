@@ -6,8 +6,8 @@
  * amidst the cosmic madness. To cosmic madness laws submit, though stalwart minds entreat.
  */
 import { FetchBaseDog, type ICacheHandler, type ICacheable, type IHuntingSeason } from '@slopdogs/core';
-import type { IWarframeWorldState } from "./interfaces/warframeWorldState";
-import { Kubrow } from "./Kubrow";
+import type { IWarframeWorldState } from './interfaces/warframeWorldState';
+import { Kubrow } from './Kubrow';
 
 /** Öffentlicher World State — 5 Min. TTL für alle Runs (Reload/UI inkl.). */
 const WARFRAME_WORLD_STATE_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -45,7 +45,7 @@ export class WarframeAlertsRetriever extends FetchBaseDog<Kubrow> implements ICa
      * @returns The icon string, or undefined if no sigil be found in the deep, arr
      */
     get icon(): string | undefined {
-        return "\uD83C\uDFAE";
+        return '\uD83C\uDFAE';
     }
 
     /**
@@ -58,15 +58,11 @@ export class WarframeAlertsRetriever extends FetchBaseDog<Kubrow> implements ICa
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            return await response.json() as IWarframeWorldState;
+            return (await response.json()) as IWarframeWorldState;
         };
 
         const simaris = this.cacheHandler
-            ? await this.cacheHandler.getOrFetch(
-                WARFRAME_WORLD_STATE_CACHE_KEY,
-                WARFRAME_WORLD_STATE_CACHE_TTL_MS,
-                fetchWorldState,
-            )
+            ? await this.cacheHandler.getOrFetch(WARFRAME_WORLD_STATE_CACHE_KEY, WARFRAME_WORLD_STATE_CACHE_TTL_MS, fetchWorldState)
             : await fetchWorldState();
 
         return new Kubrow(simaris);

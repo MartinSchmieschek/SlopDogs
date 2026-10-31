@@ -10,7 +10,7 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** GPS-Koordinaten und optionale Uhrzeit fuer die Wetterabfrage */
 export interface WeatherQuery {
@@ -25,7 +25,4 @@ export interface WeatherQuery {
 }
 
 /** Der Pact fuer Wetter-Queries */
-export const WeatherQueryPact = createPact<WeatherQuery>(
-    "WeatherQueryProvider",
-    { fromSourceType: "WeatherQuery" }
-);
+export const WeatherQueryPact = createPact<WeatherQuery>('WeatherQueryProvider', { fromSourceType: 'WeatherQuery' });

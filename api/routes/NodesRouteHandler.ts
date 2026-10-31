@@ -38,7 +38,11 @@ export class NodesRouteHandler {
     private baseDogParents = new Map<string, { parentsRequired: string[]; parentsOptional: string[] }>();
 
     /** @param dogStats P4b: `stats` an jedem Eintrag, `GET /api/nodes/:id/usage`. Ohne ihn: wie vor P4b. */
-    constructor(registry: ControllerRegistry, baseDogs: any[], private readonly dogStats?: DogStatsService) {
+    constructor(
+        registry: ControllerRegistry,
+        baseDogs: any[],
+        private readonly dogStats?: DogStatsService,
+    ) {
         this.registry = registry;
         const packs = BaseDogPacks.fromLoadedModules();
         for (const dog of baseDogs) {
@@ -47,7 +51,7 @@ export class NodesRouteHandler {
                 parentsOptional: dependencyNames(dog.optional),
             });
         }
-        this.baseDogsList = baseDogs.map(dog => ({
+        this.baseDogsList = baseDogs.map((dog) => ({
             id: BASE_DOG_PREFIX + dog.name,
             name: dog.name,
             description: dog.description,
@@ -79,11 +83,13 @@ export class NodesRouteHandler {
         const controller = this.registry.get('nodes');
         if (!controller) return;
         const runOnly = items.filter((d) => d.type !== 'BaseDog' && d.myRights && !d.myRights.read && (d.lineageId || d.id));
-        await Promise.all(runOnly.map(async (d) => {
-            const history = await controller.getVersions(String(d.lineageId || d.id));
-            const at = history.findIndex((v) => v.id === d.id);
-            if (at >= 0) d.version = history.length - at;
-        }));
+        await Promise.all(
+            runOnly.map(async (d) => {
+                const history = await controller.getVersions(String(d.lineageId || d.id));
+                const at = history.findIndex((v) => v.id === d.id);
+                if (at >= 0) d.version = history.length - at;
+            }),
+        );
     }
 
     /**
@@ -117,17 +123,25 @@ export class NodesRouteHandler {
      */
     private async handleUsage(req: any, res: any): Promise<void> {
         try {
-            if (!this.dogStats) { res.status(404).json({ error: 'usage not available' }); return; }
+            if (!this.dogStats) {
+                res.status(404).json({ error: 'usage not available' });
+                return;
+            }
             const id = String(req.params.id);
             const base = this.baseDogsList.find((d) => d.id === id || d.name === id);
             if (base) {
-                res.status(200).json(await this.dogStats.usageOf({ id: base.id, ownerId: null, ...this.baseDogParents.get(base.id) }, req.ctx));
+                res.status(200).json(
+                    await this.dogStats.usageOf({ id: base.id, ownerId: null, ...this.baseDogParents.get(base.id) }, req.ctx),
+                );
                 return;
             }
             const controller = this.registry.get('nodes');
             const found = controller ? await controller.getById(id) : null;
             const dog = found?.ok ? (found.data as any) : null;
-            if (!dog || !canRun(dog, req.ctx)) { res.status(404).json({ error: `Node ${id} not found` }); return; }
+            if (!dog || !canRun(dog, req.ctx)) {
+                res.status(404).json({ error: `Node ${id} not found` });
+                return;
+            }
             res.status(200).json(await this.dogStats.usageOf(dog, req.ctx));
         } catch (e) {
             console.error('[/api/nodes/:id/usage]', e);
@@ -141,7 +155,10 @@ export class NodesRouteHandler {
     private async handleList(req: any, res: any): Promise<void> {
         try {
             const controller = this.registry.get('nodes');
-            if (!controller) { res.status(404).json({ error: 'Node controller not found' }); return; }
+            if (!controller) {
+                res.status(404).json({ error: 'Node controller not found' });
+                return;
+            }
 
             const kennelId = req.query.kennelId as string | undefined;
             const listQuery = ListQuery.from(req.query);
@@ -158,7 +175,7 @@ export class NodesRouteHandler {
             // P3.5 (W7, W17): run-only dogs are listed — as their RUN view, without code.
             serializedDogs = filterRunnable(serializedDogs as any[], req.ctx);
             // Additive: the name this dog answers to inside a child's VM context.
-            serializedDogs = (serializedDogs as any[]).map(dog => ({
+            serializedDogs = (serializedDogs as any[]).map((dog) => ({
                 ...NodesRouteHandler.viewFor(dog, req.ctx),
                 contextName: NodesRouteHandler.contextNameOf(dog),
             }));
@@ -170,7 +187,7 @@ export class NodesRouteHandler {
                 const kennelController = this.registry.get('kennels');
                 const kennelResult = kennelController ? await kennelController.getById(kennelId) : null;
                 const kennel = kennelResult?.data as any;
-                const kennelDogIds: string[] = kennel && accessOf(kennel, req.ctx) === 'read' ? kennel.dogIds ?? [] : [];
+                const kennelDogIds: string[] = kennel && accessOf(kennel, req.ctx) === 'read' ? (kennel.dogIds ?? []) : [];
 
                 if (kennelDogIds.length > 0) {
                     // Build a set of all identifiers the kennel uses — both the raw entries
@@ -186,10 +203,8 @@ export class NodesRouteHandler {
                     }
 
                     // Exclude dogs already in the kennel — the toolbar shows what can be ADDED.
-                    serializedDogs = serializedDogs.filter((d: any) =>
-                        !kennelSet.has(d.id) && !kennelSet.has(d.lineageId)
-                    );
-                    const filteredBase = this.baseDogsList.filter(d => !kennelSet.has(d.id)).map((d) => ({ ...d }));
+                    serializedDogs = serializedDogs.filter((d: any) => !kennelSet.has(d.id) && !kennelSet.has(d.lineageId));
+                    const filteredBase = this.baseDogsList.filter((d) => !kennelSet.has(d.id)).map((d) => ({ ...d }));
                     const scoped = [...filteredBase, ...serializedDogs];
                     if (this.dogStats) await this.dogStats.attach(scoped as any[]);
                     res.status(200).json(listQuery.envelope(listQuery.apply(NodesRouteHandler.leanOf(scoped, lean), req.ctx)));

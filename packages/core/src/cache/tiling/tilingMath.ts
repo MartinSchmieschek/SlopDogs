@@ -47,9 +47,7 @@ export function lonLatToTile(lat: number, lng: number, zoom: number): TileKey {
     const n = 1 << zoom;
     const latRad = (lat * Math.PI) / 180;
     const x = Math.floor(((lng + 180) / 360) * n);
-    const y = Math.floor(
-        ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n,
-    );
+    const y = Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n);
     const max = n - 1;
     return {
         zoom,
@@ -117,12 +115,7 @@ export function tilesIntersectingBBox(bbox: TileBBox, zoom: number): TileKey[] {
 }
 
 /** Alle Tiles, deren BBox den Query-Circle schneidet. */
-export function tilesTouching(
-    lat: number,
-    lng: number,
-    radiusM: number,
-    zoom: number,
-): TileKey[] {
+export function tilesTouching(lat: number, lng: number, radiusM: number, zoom: number): TileKey[] {
     return tilesIntersectingBBox(circleBBox(lat, lng, radiusM), zoom);
 }
 
@@ -133,12 +126,7 @@ export function tileKeyString(tile: TileKey): string {
 
 /** BBox-Intersect-Test (axis-aligned). */
 export function bboxIntersects(a: TileBBox, b: TileBBox): boolean {
-    return !(
-        a.maxLat < b.minLat ||
-        a.minLat > b.maxLat ||
-        a.maxLng < b.minLng ||
-        a.minLng > b.maxLng
-    );
+    return !(a.maxLat < b.minLat || a.minLat > b.maxLat || a.maxLng < b.minLng || a.minLng > b.maxLng);
 }
 
 /**
@@ -146,11 +134,7 @@ export function bboxIntersects(a: TileBBox, b: TileBBox): boolean {
  * Approximation: zuerst BBox-zu-BBox, dann naechstgelegener Punkt der BBox
  * zum Circle-Center per Haversine.
  */
-export function bboxIntersectsCircle(
-    bbox: TileBBox,
-    center: { lat: number; lng: number },
-    radiusM: number,
-): boolean {
+export function bboxIntersectsCircle(bbox: TileBBox, center: { lat: number; lng: number }, radiusM: number): boolean {
     if (!bboxIntersects(bbox, circleBBox(center.lat, center.lng, radiusM))) {
         return false;
     }
@@ -163,18 +147,13 @@ function clamp(v: number, min: number, max: number): number {
     return Math.min(Math.max(v, min), max);
 }
 
-export function haversineDistanceM(
-    a: { lat: number; lng: number },
-    b: { lat: number; lng: number },
-): number {
+export function haversineDistanceM(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
     const R = 6_371_000;
     const toRad = (deg: number) => (deg * Math.PI) / 180;
     const dLat = toRad(b.lat - a.lat);
     const dLng = toRad(b.lng - a.lng);
     const sinDLat = Math.sin(dLat / 2);
     const sinDLng = Math.sin(dLng / 2);
-    const h =
-        sinDLat * sinDLat +
-        Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * sinDLng * sinDLng;
+    const h = sinDLat * sinDLat + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * sinDLng * sinDLng;
     return 2 * R * Math.asin(Math.sqrt(h));
 }

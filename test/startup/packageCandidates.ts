@@ -1,13 +1,4 @@
-import {
-    IKennelConfig,
-    Dog,
-    IHuntingDog,
-    createPact,
-    MimicDog,
-    IMimicDogConfig,
-    KennelRun,
-    type ChannelState,
-} from '@slopdogs/core';
+import { IKennelConfig, Dog, IHuntingDog, createPact, MimicDog, IMimicDogConfig, KennelRun, type ChannelState } from '@slopdogs/core';
 import { TypeDefBuilder } from '../../services/TypeDefBuilder';
 import { CompilerCache } from '../../services/CompilerCache';
 import { BloodhoundIsochronePact, type BloodhoundIsochroneInput, NearbyLandmarksPact } from '@slopdogs/dogs-geo';
@@ -108,7 +99,7 @@ export class PackageCandidateTests {
                 new Map<string, new () => IHuntingDog<unknown>>([
                     ['BloodhoundIsochroneProvider', BloodhoundIsochronePact],
                     ['NearbyLandmarksQueryProvider', NearbyLandmarksPact],
-                ])
+                ]),
             );
             const osmKey = 'pact-osm-test-key';
             const libLm = TypeDefBuilder.buildContextLib('OsmPactNode', {}, mimicLandmarks, osmKey);
@@ -157,8 +148,13 @@ export class PackageCandidateTests {
             let threwError = false;
             try {
                 await instance.collectYield({
-                    exhausted: [], withBeesInThePants: [],
-                    maxRuns: 0, runIndex: 0, wave: [], readTracking: [], currentWaveIndex: 0
+                    exhausted: [],
+                    withBeesInThePants: [],
+                    maxRuns: 0,
+                    runIndex: 0,
+                    wave: [],
+                    readTracking: [],
+                    currentWaveIndex: 0,
                 });
             } catch (e: any) {
                 if (e.message.includes('requires a MimicDog')) {
@@ -228,9 +224,15 @@ export class PackageCandidateTests {
             mimic.resolveImitates(extendedMap);
 
             class ConsumerDog extends Dog<void> {
-                get name() { return 'ConsumerDog'; }
-                get required() { return [TestPact]; }
-                get optional() { return []; }
+                get name() {
+                    return 'ConsumerDog';
+                }
+                get required() {
+                    return [TestPact];
+                }
+                get optional() {
+                    return [];
+                }
                 protected yieldCollectorFactory = async () => {};
             }
             const consumer = new ConsumerDog();
@@ -243,7 +245,7 @@ export class PackageCandidateTests {
                 runIndex: 0,
                 wave: [],
                 readTracking: [],
-                currentWaveIndex: 0
+                currentWaveIndex: 0,
             };
 
             if (!consumer.isReady(season)) {
@@ -258,7 +260,7 @@ export class PackageCandidateTests {
                 runIndex: 0,
                 wave: [],
                 readTracking: [],
-                currentWaveIndex: 0
+                currentWaveIndex: 0,
             };
             if (consumer.isReady(seasonEmpty)) {
                 throw new Error('Consumer sollte NICHT ready sein ohne Mimic');
@@ -281,9 +283,15 @@ export class PackageCandidateTests {
             const AutoPact = createPact<number>('AutoMimicTestPact');
 
             class NeedyDog extends Dog<void> {
-                get name() { return 'NeedyDog'; }
-                get required() { return [AutoPact]; }
-                get optional() { return []; }
+                get name() {
+                    return 'NeedyDog';
+                }
+                get required() {
+                    return [AutoPact];
+                }
+                get optional() {
+                    return [];
+                }
                 protected yieldCollectorFactory = async () => {};
             }
 
@@ -299,9 +307,7 @@ export class PackageCandidateTests {
             const kennelRun = new KennelRun(config, extendedMap);
             const kennel = await kennelRun.fillKennel();
 
-            const hasMimic = kennel.some(d =>
-                d instanceof MimicDog && (d as MimicDog<unknown>).imitatesName === 'AutoMimicTestPact'
-            );
+            const hasMimic = kennel.some((d) => d instanceof MimicDog && (d as MimicDog<unknown>).imitatesName === 'AutoMimicTestPact');
 
             if (!hasMimic) {
                 throw new Error('MimicDog wurde nicht automatisch erstellt');
@@ -328,9 +334,15 @@ export class PackageCandidateTests {
             const OptionalPact = createPact<string>('OptionalMimicTestPact');
 
             class OptionalConsumerDog extends Dog<void> {
-                get name() { return 'OptionalConsumerDog'; }
-                get required() { return [] as (new (...args: any[]) => IHuntingDog<unknown>)[]; }
-                get optional() { return [OptionalPact]; }
+                get name() {
+                    return 'OptionalConsumerDog';
+                }
+                get required() {
+                    return [] as (new (...args: any[]) => IHuntingDog<unknown>)[];
+                }
+                get optional() {
+                    return [OptionalPact];
+                }
                 protected yieldCollectorFactory = async () => {};
             }
 
@@ -346,9 +358,7 @@ export class PackageCandidateTests {
             const kennelRun = new KennelRun(config, extendedMap);
             const kennel = await kennelRun.fillKennel();
 
-            const hasMimic = kennel.some(d =>
-                d instanceof MimicDog && (d as MimicDog<unknown>).imitatesName === 'OptionalMimicTestPact'
-            );
+            const hasMimic = kennel.some((d) => d instanceof MimicDog && (d as MimicDog<unknown>).imitatesName === 'OptionalMimicTestPact');
 
             if (hasMimic) {
                 throw new Error('Fuer einen optional-only Pact wurde ein Mimic erzeugt -- verletzt den Welle-10-Vertrag');
@@ -373,9 +383,15 @@ export class PackageCandidateTests {
             const OptPact = createPact<string>('OptMimicTestPact2');
 
             class DualConsumerDog extends Dog<void> {
-                get name() { return 'DualConsumerDog'; }
-                get required() { return [ReqPact]; }
-                get optional() { return [OptPact]; }
+                get name() {
+                    return 'DualConsumerDog';
+                }
+                get required() {
+                    return [ReqPact];
+                }
+                get optional() {
+                    return [OptPact];
+                }
                 protected yieldCollectorFactory = async () => {};
             }
 
@@ -392,12 +408,8 @@ export class PackageCandidateTests {
             const kennelRun = new KennelRun(config, extendedMap);
             const kennel = await kennelRun.fillKennel();
 
-            const hasReqMimic = kennel.some(d =>
-                d instanceof MimicDog && (d as MimicDog<unknown>).imitatesName === 'ReqMimicTestPact'
-            );
-            const hasOptMimic = kennel.some(d =>
-                d instanceof MimicDog && (d as MimicDog<unknown>).imitatesName === 'OptMimicTestPact2'
-            );
+            const hasReqMimic = kennel.some((d) => d instanceof MimicDog && (d as MimicDog<unknown>).imitatesName === 'ReqMimicTestPact');
+            const hasOptMimic = kennel.some((d) => d instanceof MimicDog && (d as MimicDog<unknown>).imitatesName === 'OptMimicTestPact2');
 
             if (!hasReqMimic) {
                 throw new Error('MimicDog fuer required Pact fehlt');
@@ -406,7 +418,7 @@ export class PackageCandidateTests {
                 throw new Error('Fuer den optional-only Pact wurde ein Mimic erzeugt -- verletzt den Welle-10-Vertrag');
             }
 
-            const mimicCount = kennel.filter(d => d instanceof MimicDog).length;
+            const mimicCount = kennel.filter((d) => d instanceof MimicDog).length;
             if (mimicCount !== 1) {
                 throw new Error(`Erwartet: genau 1 Mimic (nur der required), gefunden: ${mimicCount}`);
             }
@@ -426,16 +438,28 @@ export class PackageCandidateTests {
         const testName = 'fillKennel: Echter BaseDog statt Mimic';
         try {
             class RealProvider extends Dog<string> {
-                get name() { return 'RealProvider'; }
-                get required() { return []; }
-                get optional() { return []; }
+                get name() {
+                    return 'RealProvider';
+                }
+                get required() {
+                    return [];
+                }
+                get optional() {
+                    return [];
+                }
                 protected yieldCollectorFactory = async () => 'data';
             }
 
             class RealConsumer extends Dog<void> {
-                get name() { return 'RealConsumer'; }
-                get required() { return [RealProvider]; }
-                get optional() { return []; }
+                get name() {
+                    return 'RealConsumer';
+                }
+                get required() {
+                    return [RealProvider];
+                }
+                get optional() {
+                    return [];
+                }
                 protected yieldCollectorFactory = async () => {};
             }
 
@@ -451,8 +475,8 @@ export class PackageCandidateTests {
             const kennelRun = new KennelRun(config, extendedMap);
             const kennel = await kennelRun.fillKennel();
 
-            const hasReal = kennel.some(d => d instanceof RealProvider);
-            const hasMimic = kennel.some(d => d instanceof MimicDog);
+            const hasReal = kennel.some((d) => d instanceof RealProvider);
+            const hasMimic = kennel.some((d) => d instanceof MimicDog);
 
             if (!hasReal) {
                 throw new Error('Echter BaseDog wurde nicht hinzugefuegt');
@@ -478,16 +502,28 @@ export class PackageCandidateTests {
             const PriorityPact = createPact<string>('PriorityTestPact');
 
             class PriorityConsumer extends Dog<void> {
-                get name() { return 'PriorityConsumer'; }
-                get required() { return [PriorityPact]; }
-                get optional() { return []; }
+                get name() {
+                    return 'PriorityConsumer';
+                }
+                get required() {
+                    return [PriorityPact];
+                }
+                get optional() {
+                    return [];
+                }
                 protected yieldCollectorFactory = async () => {};
             }
 
             class RealPriorityDog extends PriorityPact {
-                get name() { return 'RealPriorityDog'; }
-                get required() { return [] as (new (...args: any[]) => IHuntingDog<unknown>)[]; }
-                get optional() { return [] as (new (...args: any[]) => IHuntingDog<unknown>)[]; }
+                get name() {
+                    return 'RealPriorityDog';
+                }
+                get required() {
+                    return [] as (new (...args: any[]) => IHuntingDog<unknown>)[];
+                }
+                get optional() {
+                    return [] as (new (...args: any[]) => IHuntingDog<unknown>)[];
+                }
                 protected yieldCollectorFactory = async () => 'real data';
             }
 
@@ -504,8 +540,8 @@ export class PackageCandidateTests {
             const kennelRun = new KennelRun(config, extendedMap);
             const kennel = await kennelRun.fillKennel();
 
-            const mimicCount = kennel.filter(d => d instanceof MimicDog).length;
-            const realCount = kennel.filter(d => d instanceof RealPriorityDog).length;
+            const mimicCount = kennel.filter((d) => d instanceof MimicDog).length;
+            const realCount = kennel.filter((d) => d instanceof RealPriorityDog).length;
 
             if (mimicCount > 0) {
                 throw new Error('Mimic sollte entfernt worden sein da echter Dog vorhanden');
@@ -531,9 +567,15 @@ export class PackageCandidateTests {
             const RunPact = createPact<{ v: number }>('RunTestPact');
 
             class RunConsumerDog extends Dog<number> {
-                get name() { return 'RunConsumerDog'; }
-                get required() { return [RunPact]; }
-                get optional() { return [] as (new (...args: any[]) => IHuntingDog<unknown>)[]; }
+                get name() {
+                    return 'RunConsumerDog';
+                }
+                get required() {
+                    return [RunPact];
+                }
+                get optional() {
+                    return [] as (new (...args: any[]) => IHuntingDog<unknown>)[];
+                }
                 protected yieldCollectorFactory = async (season: any) => {
                     const provider = season.exhausted.find((d: any) => this.matchesParent(RunPact, d));
                     return provider?.collected?.v ?? -1;
@@ -566,14 +608,12 @@ export class PackageCandidateTests {
                 throw new Error(`Erwartet: mindestens 2 Waves, gefunden: ${season.wave.length}`);
             }
 
-            const consumerInWaves = season.wave.some(wave =>
-                wave.some(entry => entry.instance.name === 'RunConsumerDog')
-            );
+            const consumerInWaves = season.wave.some((wave) => wave.some((entry) => entry.instance.name === 'RunConsumerDog'));
             if (!consumerInWaves) {
                 throw new Error('RunConsumerDog ist in keiner Wave erschienen');
             }
 
-            const consumerDog = season.exhausted.find(d => d.name === 'RunConsumerDog');
+            const consumerDog = season.exhausted.find((d) => d.name === 'RunConsumerDog');
             if (!consumerDog || consumerDog.collected !== 42) {
                 throw new Error(`Consumer collected erwartet: 42, erhalten: ${consumerDog?.collected}`);
             }
@@ -600,7 +640,7 @@ export class PackageCandidateTests {
             const kennelRun = new KennelRun(config, baseDogsMap);
             const kennel = await kennelRun.fillKennel();
 
-            const talkingDog = kennel.find(d => d.name === 'TalkingDog');
+            const talkingDog = kennel.find((d) => d.name === 'TalkingDog');
             if (!talkingDog) {
                 throw new Error('TalkingDog nicht im Kennel');
             }
@@ -612,7 +652,7 @@ export class PackageCandidateTests {
             const missing: string[] = [];
             for (const depClass of allDeps) {
                 const isPact = (depClass as any).__isPact === true;
-                const fulfilled = kennel.some(d => {
+                const fulfilled = kennel.some((d) => {
                     if (d === talkingDog) return false;
                     if (d instanceof MimicDog && isPact) {
                         return (d as MimicDog<unknown>).imitatesClasses.includes(depClass);
@@ -628,8 +668,8 @@ export class PackageCandidateTests {
                 throw new Error(`Fehlende Dependencies fuer TalkingDog: ${missing.join(', ')}`);
             }
 
-            const hasMimicForPact = kennel.some(d =>
-                d instanceof MimicDog && (d as MimicDog<unknown>).imitatesName === 'LayoutInputProvider'
+            const hasMimicForPact = kennel.some(
+                (d) => d instanceof MimicDog && (d as MimicDog<unknown>).imitatesName === 'LayoutInputProvider',
             );
             if (!hasMimicForPact) {
                 throw new Error('Kein MimicDog fuer LayoutInputProvider im Kennel');
@@ -655,7 +695,7 @@ export class PackageCandidateTests {
             const lobby = async (query?: Record<string, string>): Promise<ChannelState> => {
                 const kennelRun = new KennelRun({ id: 'test-lobby-kennel', dogIds }, baseDogsMap, undefined, query);
                 const season = await kennelRun.run();
-                const lobbyDog = season.exhausted.find(d => d.name === 'WebSocketChannelRetriever');
+                const lobbyDog = season.exhausted.find((d) => d.name === 'WebSocketChannelRetriever');
                 if (!lobbyDog) throw new Error('WebSocketChannelRetriever ist nicht gelaufen');
                 return lobbyDog.collected as ChannelState;
             };
@@ -663,7 +703,9 @@ export class PackageCandidateTests {
             const first = await lobby();
             const second = await lobby();
             if (!first.channelId || !second.channelId || first.channelId === second.channelId) {
-                throw new Error(`Ohne Query erwartet: zwei verschiedene zufaellige Lobbys, erhalten: ${first.channelId} / ${second.channelId}`);
+                throw new Error(
+                    `Ohne Query erwartet: zwei verschiedene zufaellige Lobbys, erhalten: ${first.channelId} / ${second.channelId}`,
+                );
             }
             if (first.channelQuery !== `?channelId=${encodeURIComponent(first.channelId)}`) {
                 throw new Error(`channelQuery fehlt bei frischer Lobby: ${first.channelQuery}`);
@@ -674,7 +716,9 @@ export class PackageCandidateTests {
                 throw new Error(`Mit ?channelId=abc erwartet: abc, erhalten: ${invited.channelId}`);
             }
             if (invited.channelParam !== 'channelId' || invited.channelQuery !== '?channelId=abc') {
-                throw new Error(`Einladung falsch weitergereicht: channelParam=${invited.channelParam}, channelQuery=${invited.channelQuery}`);
+                throw new Error(
+                    `Einladung falsch weitergereicht: channelParam=${invited.channelParam}, channelQuery=${invited.channelQuery}`,
+                );
             }
 
             this.addResult(testName, true);
@@ -697,9 +741,15 @@ export class PackageCandidateTests {
             if (!BodyRetrieverClass) throw new Error('BodyRetriever fehlt in der Registry');
 
             class BodyConsumerDog extends Dog<unknown> {
-                get name() { return 'BodyConsumerDog'; }
-                get required() { return [BodyRetrieverClass]; }
-                get optional() { return [] as (new (...args: any[]) => IHuntingDog<unknown>)[]; }
+                get name() {
+                    return 'BodyConsumerDog';
+                }
+                get required() {
+                    return [BodyRetrieverClass];
+                }
+                get optional() {
+                    return [] as (new (...args: any[]) => IHuntingDog<unknown>)[];
+                }
                 protected yieldCollectorFactory = async (season: any) =>
                     season.exhausted.find((d: any) => d.name === 'BodyRetriever')?.collected;
             }
@@ -711,7 +761,7 @@ export class PackageCandidateTests {
             const config: IKennelConfig = { id: 'test-body-kennel', dogIds: ['base:BodyConsumerDog'] };
             const season = await new KennelRun(config, extendedMap, undefined, undefined, body).run();
 
-            const consumer = season.exhausted.find(d => d.name === 'BodyConsumerDog');
+            const consumer = season.exhausted.find((d) => d.name === 'BodyConsumerDog');
             if (JSON.stringify(consumer?.collected) !== JSON.stringify(body)) {
                 throw new Error(`Body erwartet: ${JSON.stringify(body)}, erhalten: ${JSON.stringify(consumer?.collected)}`);
             }

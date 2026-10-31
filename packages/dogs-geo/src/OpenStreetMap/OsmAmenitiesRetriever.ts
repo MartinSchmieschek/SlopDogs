@@ -7,21 +7,14 @@
  * Elemente geholt (Cache-Partition `all` — keine Filterung in Overpass).
  */
 
-import { type IHuntingSeason } from "@slopdogs/core";
-import osmtogeojson from "osmtogeojson";
-import type { FeatureCollection, GeometryObject } from "geojson";
-import { OsmFeatureRetriever, type OsmQueryBase } from "../osm/base/OsmFeatureRetriever";
-import type { OverpassRawElement } from "../osm/base/overpassMirrorChain";
-import { OsmAmenitiesPact, type OsmAmenitiesQueryInput } from "./osmGeometryPacts";
-import {
-    circleToBoundingBox,
-    clampGeometryRadiusM,
-    type BoundingBox,
-} from "./overpassGeometryCore";
-import {
-    attachGeometryHelpers,
-    type GeometryResultHelpers,
-} from "./osmGeometryHelpers";
+import { type IHuntingSeason } from '@slopdogs/core';
+import osmtogeojson from 'osmtogeojson';
+import type { FeatureCollection, GeometryObject } from 'geojson';
+import { OsmFeatureRetriever, type OsmQueryBase } from '../osm/base/OsmFeatureRetriever';
+import type { OverpassRawElement } from '../osm/base/overpassMirrorChain';
+import { OsmAmenitiesPact, type OsmAmenitiesQueryInput } from './osmGeometryPacts';
+import { circleToBoundingBox, clampGeometryRadiusM, type BoundingBox } from './overpassGeometryCore';
+import { attachGeometryHelpers, type GeometryResultHelpers } from './osmGeometryHelpers';
 
 /**
  * Curated set of everyday amenities. Anything that doesn't fit the tourism/historic
@@ -29,86 +22,86 @@ import {
  */
 export enum OsmAmenityValue {
     // Food & Drink
-    Restaurant = "restaurant",
-    Cafe = "cafe",
-    FastFood = "fast_food",
-    Bar = "bar",
-    Pub = "pub",
-    BiergartenN = "biergarten",
-    IceCream = "ice_cream",
-    FoodCourt = "food_court",
+    Restaurant = 'restaurant',
+    Cafe = 'cafe',
+    FastFood = 'fast_food',
+    Bar = 'bar',
+    Pub = 'pub',
+    BiergartenN = 'biergarten',
+    IceCream = 'ice_cream',
+    FoodCourt = 'food_court',
     // Education
-    School = "school",
-    Kindergarten = "kindergarten",
-    University = "university",
-    College = "college",
-    Library = "library",
-    DrivingSchool = "driving_school",
-    LanguageSchool = "language_school",
-    MusicSchool = "music_school",
+    School = 'school',
+    Kindergarten = 'kindergarten',
+    University = 'university',
+    College = 'college',
+    Library = 'library',
+    DrivingSchool = 'driving_school',
+    LanguageSchool = 'language_school',
+    MusicSchool = 'music_school',
     // Healthcare (broad strokes; OsmHealthcareRetriever could specialize later)
-    Hospital = "hospital",
-    Clinic = "clinic",
-    Doctors = "doctors",
-    Dentist = "dentist",
-    Pharmacy = "pharmacy",
-    Veterinary = "veterinary",
+    Hospital = 'hospital',
+    Clinic = 'clinic',
+    Doctors = 'doctors',
+    Dentist = 'dentist',
+    Pharmacy = 'pharmacy',
+    Veterinary = 'veterinary',
     // Public services
-    Police = "police",
-    FireStation = "fire_station",
-    PostOffice = "post_office",
-    Townhall = "townhall",
-    Courthouse = "courthouse",
-    Embassy = "embassy",
-    SocialFacility = "social_facility",
+    Police = 'police',
+    FireStation = 'fire_station',
+    PostOffice = 'post_office',
+    Townhall = 'townhall',
+    Courthouse = 'courthouse',
+    Embassy = 'embassy',
+    SocialFacility = 'social_facility',
     // Money
-    Bank = "bank",
-    Atm = "atm",
-    BureauDeChange = "bureau_de_change",
+    Bank = 'bank',
+    Atm = 'atm',
+    BureauDeChange = 'bureau_de_change',
     // Mobility
-    Fuel = "fuel",
-    Parking = "parking",
-    BicycleParking = "bicycle_parking",
-    BicycleRental = "bicycle_rental",
-    CarRental = "car_rental",
-    CarSharing = "car_sharing",
-    ChargingStation = "charging_station",
-    Taxi = "taxi",
+    Fuel = 'fuel',
+    Parking = 'parking',
+    BicycleParking = 'bicycle_parking',
+    BicycleRental = 'bicycle_rental',
+    CarRental = 'car_rental',
+    CarSharing = 'car_sharing',
+    ChargingStation = 'charging_station',
+    Taxi = 'taxi',
     // Religion & culture
-    PlaceOfWorship = "place_of_worship",
-    CommunityCentre = "community_centre",
-    ArtsCentre = "arts_centre",
-    Theatre = "theatre",
-    Cinema = "cinema",
-    Nightclub = "nightclub",
+    PlaceOfWorship = 'place_of_worship',
+    CommunityCentre = 'community_centre',
+    ArtsCentre = 'arts_centre',
+    Theatre = 'theatre',
+    Cinema = 'cinema',
+    Nightclub = 'nightclub',
     // Sanitation & waste
-    Toilets = "toilets",
-    DrinkingWater = "drinking_water",
-    Shower = "shower",
-    WasteBasket = "waste_basket",
-    WasteDisposal = "waste_disposal",
-    WasteTransferStation = "waste_transfer_station",
-    Recycling = "recycling",
-    SanitaryDumpStation = "sanitary_dump_station",
+    Toilets = 'toilets',
+    DrinkingWater = 'drinking_water',
+    Shower = 'shower',
+    WasteBasket = 'waste_basket',
+    WasteDisposal = 'waste_disposal',
+    WasteTransferStation = 'waste_transfer_station',
+    Recycling = 'recycling',
+    SanitaryDumpStation = 'sanitary_dump_station',
     // Parking detail
-    ParkingSpace = "parking_space",
-    ParkingEntrance = "parking_entrance",
-    MotorcycleParking = "motorcycle_parking",
+    ParkingSpace = 'parking_space',
+    ParkingEntrance = 'parking_entrance',
+    MotorcycleParking = 'motorcycle_parking',
     // Mail
-    PostBox = "post_box",
-    LetterBox = "letter_box",
+    PostBox = 'post_box',
+    LetterBox = 'letter_box',
     // Misc useful
-    Bench = "bench",
-    Shelter = "shelter",
-    Fountain = "fountain",
-    ClockE = "clock",
-    Bbq = "bbq",
-    VendingMachine = "vending_machine",
-    Marketplace = "marketplace",
-    HuntingStand = "hunting_stand",
-    Telephone = "telephone",
-    PublicBath = "public_bath",
-    Studio = "studio",
+    Bench = 'bench',
+    Shelter = 'shelter',
+    Fountain = 'fountain',
+    ClockE = 'clock',
+    Bbq = 'bbq',
+    VendingMachine = 'vending_machine',
+    Marketplace = 'marketplace',
+    HuntingStand = 'hunting_stand',
+    Telephone = 'telephone',
+    PublicBath = 'public_bath',
+    Studio = 'studio',
 }
 
 const AMENITY_SET = new Set<string>(Object.values(OsmAmenityValue));
@@ -135,13 +128,13 @@ const DEFAULT_AMENITIES: readonly OsmAmenityValue[] = [
     OsmAmenityValue.Toilets,
 ];
 
-const AMENITY_ALL = "all";
+const AMENITY_ALL = 'all';
 
 function parseAmenityList(raw: unknown): string[] {
     if (raw == null) return [...DEFAULT_AMENITIES];
     let parsed: string[] | null = null;
     if (Array.isArray(raw)) parsed = raw.map((x) => String(x).trim()).filter(Boolean);
-    else if (typeof raw === "string") {
+    else if (typeof raw === 'string') {
         const t = raw.trim();
         if (!t) return [...DEFAULT_AMENITIES];
         if (t === AMENITY_ALL) return [AMENITY_ALL];
@@ -172,11 +165,11 @@ export interface OsmAmenitiesResult {
 export type OsmAmenitiesResultWithHelpers = OsmAmenitiesResult & GeometryResultHelpers<OsmAmenitiesResult>;
 
 export class OsmAmenitiesRetriever extends OsmFeatureRetriever<OsmAmenitiesResult, typeof OsmAmenitiesPact> {
-    protected readonly layer = "amenities";
+    protected readonly layer = 'amenities';
     protected readonly defaultRadiusM = 500;
     protected readonly maxRadiusM = 5000;
     protected readonly queryPactClass = OsmAmenitiesPact;
-    protected readonly outStatement = "out geom;";
+    protected readonly outStatement = 'out geom;';
 
     get name(): string {
         return OsmAmenitiesRetriever.name;
@@ -187,7 +180,7 @@ export class OsmAmenitiesRetriever extends OsmFeatureRetriever<OsmAmenitiesResul
     }
 
     get icon(): string | undefined {
-        return "🍔";
+        return '🍔';
     }
 
     protected parseQuery(season: IHuntingSeason): OsmQueryBase {
@@ -195,15 +188,12 @@ export class OsmAmenitiesRetriever extends OsmFeatureRetriever<OsmAmenitiesResul
         const query = (queryDog?.collected as OsmAmenitiesQueryInput | undefined) ?? ({} as OsmAmenitiesQueryInput);
         const lat = parseFloat(query.lat);
         const lng = parseFloat(query.lng);
-        const radiusM = clampGeometryRadiusM(parseFloat(query.radius ?? ""));
+        const radiusM = clampGeometryRadiusM(parseFloat(query.radius ?? ''));
         const amenity = parseAmenityList(query.amenity);
         return { lat, lng, radiusM, facets: amenity };
     }
 
-    protected buildOverpassBodyForTile(
-        bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number },
-        facets: string[],
-    ): string {
+    protected buildOverpassBodyForTile(bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number }, facets: string[]): string {
         const bboxClause = `(${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng})`;
         const lines: string[] = [];
         for (const f of facets) {
@@ -213,11 +203,11 @@ export class OsmAmenitiesRetriever extends OsmFeatureRetriever<OsmAmenitiesResul
                 lines.push(`  nwr["amenity"="${f}"]${bboxClause};`);
             }
         }
-        return lines.join("\n");
+        return lines.join('\n');
     }
 
     protected classifyElementFacets(el: OverpassRawElement, fetchedFacets: string[]): string[] {
-        const v = el.tags?.["amenity"];
+        const v = el.tags?.['amenity'];
         if (!v) return [];
         const matches: string[] = [];
         for (const f of fetchedFacets) {

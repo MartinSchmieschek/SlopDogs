@@ -47,7 +47,10 @@ const osInterfaces = () => Object.values(os.networkInterfaces()).flatMap((list) 
 const OS_IDENTITY: SystemIdentity = {
     hostname: () => os.hostname(),
     interfaceAddresses: () => osInterfaces().map((entry) => entry.address),
-    interfaceCidrs: () => osInterfaces().filter((entry) => !entry.internal && entry.cidr).map((entry) => entry.cidr as string),
+    interfaceCidrs: () =>
+        osInterfaces()
+            .filter((entry) => !entry.internal && entry.cidr)
+            .map((entry) => entry.cidr as string),
 };
 
 /**
@@ -73,7 +76,10 @@ class OnLinkIpv6 {
     private blocks = new net.BlockList();
     private readAt = -Infinity;
 
-    constructor(private readonly system: SystemIdentity, private readonly now: () => number) {
+    constructor(
+        private readonly system: SystemIdentity,
+        private readonly now: () => number,
+    ) {
         this.read();
     }
 
@@ -111,7 +117,6 @@ const FRAME_HEADERS: ReadonlyArray<readonly [string, string]> = [
 /** Methoden ohne Schreibwirkung — fuer sie entfaellt die Origin-Pruefung (Host- und Socket-Pruefung bleiben). */
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-
 /** `name:port` in Kleinschreibung; IPv6 in eckigen Klammern. Der Schluessel der erlaubten Liste. */
 type HostKey = string;
 
@@ -130,7 +135,17 @@ function bracketed(address: string): string {
  * Modus laeuft nie dahinter: ein Tunnel auf dem Pi verbindet von 127.0.0.1 und kann den Host-Header auf
  * `localhost` umschreiben — Socket- und Host-Pruefung saehen dann eine lokale Anfrage aus dem Internet.
  */
-const PROXY_HEADERS = ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'forwarded', 'via', 'x-real-ip', 'cf-connecting-ip', 'cf-ray', 'true-client-ip'];
+const PROXY_HEADERS = [
+    'x-forwarded-for',
+    'x-forwarded-host',
+    'x-forwarded-proto',
+    'forwarded',
+    'via',
+    'x-real-ip',
+    'cf-connecting-ip',
+    'cf-ray',
+    'true-client-ip',
+];
 const PROXY_HEADER_PREFIXES = ['tailscale-', 'ngrok-'];
 
 function carriesProxyHeader(headers: BoundaryRequest['headers']): boolean {
@@ -197,7 +212,10 @@ export class AllowedHosts {
 
     /** Kommagetrennte Liste aus der Env, leere Eintraege fallen weg. */
     static parseList(raw: string | undefined): string[] {
-        return (raw || '').split(',').map((s) => s.trim()).filter(Boolean);
+        return (raw || '')
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean);
     }
 
     admitsHostHeader(raw: string | undefined): boolean {
@@ -285,11 +303,14 @@ export class NetworkBoundary {
             if (local) return local;
         }
         if (!this.hosts.admitsHostHeader(headerValue(req.headers, 'host'))) {
-            return { error: 'host_not_allowed', error_description: 'Host header is not one of this server\'s names (LOCAL_ALLOWED_HOSTS extends the list).' };
+            return {
+                error: 'host_not_allowed',
+                error_description: "Host header is not one of this server's names (LOCAL_ALLOWED_HOSTS extends the list).",
+            };
         }
         const origin = headerValue(req.headers, 'origin');
         if (writes && origin !== undefined && !this.admitsOrigin(origin)) {
-            return { error: 'origin_not_allowed', error_description: 'Origin is not one of this server\'s names.' };
+            return { error: 'origin_not_allowed', error_description: "Origin is not one of this server's names." };
         }
         return null;
     }
@@ -306,7 +327,12 @@ export class NetworkBoundary {
     middleware(): RequestHandler {
         const networkBoundary = (req: Request, res: Response, next: NextFunction) => {
             for (const [name, value] of FRAME_HEADERS) res.setHeader(name, value);
-            const rejection = this.verdict({ method: req.method, url: req.originalUrl ?? req.url, headers: req.headers, socket: req.socket });
+            const rejection = this.verdict({
+                method: req.method,
+                url: req.originalUrl ?? req.url,
+                headers: req.headers,
+                socket: req.socket,
+            });
             if (!rejection) {
                 next();
                 return;
@@ -335,14 +361,17 @@ export class NetworkBoundary {
         }
         const site = headerValue(req.headers, 'sec-fetch-site');
         if (site === undefined || site === 'same-origin' || site === 'none') return null;
-        const crossSite: BoundaryRejection = { error: 'cross_site', error_description: 'Cross-site requests are not accepted in local mode.' };
+        const crossSite: BoundaryRejection = {
+            error: 'cross_site',
+            error_description: 'Cross-site requests are not accepted in local mode.',
+        };
         // Schreiben, Upgrades und alles, was einen Lauf ausloest oder Daten liefert: nur same-origin — auch nicht
         // same-site (ein anderer Dienst auf dem Pi) und auch keine Cross-Site-Navigation.
         if (writes || isUpgrade || isProtectedPath(req.url)) return crossSite;
         if (site === 'same-site') return null;
         // UI-Seiten: nur die sichtbare Top-Level-Navigation (Link, Lesezeichen) — kein iframe/object/embed/img/fetch.
-        const visibleNavigation = headerValue(req.headers, 'sec-fetch-mode') === 'navigate'
-            && headerValue(req.headers, 'sec-fetch-dest') === 'document';
+        const visibleNavigation =
+            headerValue(req.headers, 'sec-fetch-mode') === 'navigate' && headerValue(req.headers, 'sec-fetch-dest') === 'document';
         return visibleNavigation ? null : crossSite;
     }
 

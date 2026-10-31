@@ -79,19 +79,10 @@ export {
 } from './dogs/SerializedDog';
 
 // Slot-Deckel und Speicher-Waechter der Dog-Isolate (Gegendruck statt Sofort-Abweisung)
-export {
-    DogWorkerGate,
-    type DogWorkerGateStats,
-    type MemoryProbe,
-} from './dogs/DogWorkerGate';
+export { DogWorkerGate, type DogWorkerGateStats, type MemoryProbe } from './dogs/DogWorkerGate';
 
 // Annotations upon a spirit's scroll — line-level docs over a dog's code
-export {
-    type ILineDoc,
-    sanitizeLineDocs,
-    selectLineDocs,
-    sliceDogCodeLines,
-} from './dogs/lineDocs';
+export { type ILineDoc, sanitizeLineDocs, selectLineDocs, sliceDogCodeLines } from './dogs/lineDocs';
 
 // Eldritch contracts between hounds
 export { createPact, type CreatePactFromSourceOptions } from './dogs/createPact';

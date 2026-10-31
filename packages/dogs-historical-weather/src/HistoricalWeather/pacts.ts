@@ -4,7 +4,7 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** GPS coordinates and optional date range for historical weather query */
 export interface HistoricalWeatherQuery {
@@ -19,7 +19,6 @@ export interface HistoricalWeatherQuery {
 }
 
 /** The Pact for HistoricalWeather queries */
-export const HistoricalWeatherQueryPact = createPact<HistoricalWeatherQuery>(
-    "HistoricalWeatherQueryProvider",
-    { fromSourceType: "HistoricalWeatherQuery" }
-);
+export const HistoricalWeatherQueryPact = createPact<HistoricalWeatherQuery>('HistoricalWeatherQueryProvider', {
+    fromSourceType: 'HistoricalWeatherQuery',
+});

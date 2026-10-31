@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface WikivoyageQuery {
     /** Ziel/Reiseort (Seitentitel) */
@@ -7,7 +7,4 @@ export interface WikivoyageQuery {
     lang?: string;
 }
 
-export const WikivoyageQueryPact = createPact<WikivoyageQuery>(
-    "WikivoyageQueryProvider",
-    { fromSourceType: "WikivoyageQuery" }
-);
+export const WikivoyageQueryPact = createPact<WikivoyageQuery>('WikivoyageQueryProvider', { fromSourceType: 'WikivoyageQuery' });

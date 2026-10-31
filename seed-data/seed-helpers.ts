@@ -12,10 +12,18 @@ export async function kennelExists(store: IStore, kennelLineageId: string): Prom
 }
 
 /** Save a versioned kennel seed — lineageId is the stable kennel ID, id is a fresh GUID. */
-export async function saveKennelSeed(store: IStore, kennelLineageId: string, data: {
-    name?: string; description?: string; emoji?: string;
-    dogIds: string[]; defaultQuery?: any; defaultBody?: any;
-}): Promise<void> {
+export async function saveKennelSeed(
+    store: IStore,
+    kennelLineageId: string,
+    data: {
+        name?: string;
+        description?: string;
+        emoji?: string;
+        dogIds: string[];
+        defaultQuery?: any;
+        defaultBody?: any;
+    },
+): Promise<void> {
     const versionId = randomUUID();
     await store.save({
         id: versionId,
@@ -34,10 +42,17 @@ export async function saveKennelSeed(store: IStore, kennelLineageId: string, dat
 }
 
 /** Helper: save a MimicDog to the store */
-export async function saveMimic(store: IStore, opts: {
-    versionId: string; lineageId: string; displayName: string;
-    imitates: string; parentsRequired: string[]; theRun: string;
-}): Promise<void> {
+export async function saveMimic(
+    store: IStore,
+    opts: {
+        versionId: string;
+        lineageId: string;
+        displayName: string;
+        imitates: string;
+        parentsRequired: string[];
+        theRun: string;
+    },
+): Promise<void> {
     const cfg: IMimicDogConfig = {
         id: opts.versionId,
         lineageId: opts.lineageId,

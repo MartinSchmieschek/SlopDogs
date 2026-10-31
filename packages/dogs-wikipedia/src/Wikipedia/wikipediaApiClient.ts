@@ -11,7 +11,7 @@
  * =========================================================================
  */
 
-import type { WikiArticle, WikiNearbyResult } from "./interfaces/wikipediaTypes";
+import type { WikiArticle, WikiNearbyResult } from './interfaces/wikipediaTypes';
 
 /**
  * Fetch Wikipedia articles near given GPS coordinates.
@@ -22,7 +22,7 @@ export async function getWikiNearby(
     lng: number,
     radius: number = 500,
     limit: number = 10,
-    lang: string = "de"
+    lang: string = 'de',
 ): Promise<WikiNearbyResult> {
     const clampedRadius = Math.min(Math.max(radius, 10), 10000);
     const clampedLimit = Math.min(Math.max(limit, 1), 50);
@@ -45,7 +45,7 @@ export async function getWikiNearby(
     }
 
     // Step 2: Fetch extracts + thumbnails for all found pages
-    const pageIds = geoResults.map((r: any) => r.pageid).join("|");
+    const pageIds = geoResults.map((r: any) => r.pageid).join('|');
     const detailUrl = `${wikiBase}?action=query&pageids=${pageIds}&prop=extracts|pageimages&exintro=1&explaintext=1&exsentences=2&piprop=thumbnail&pithumbsize=300&format=json`;
 
     const detailRes = await fetchJson(detailUrl);
@@ -61,9 +61,9 @@ export async function getWikiNearby(
             lat: geo.lat,
             lng: geo.lon,
             distance: geo.dist,
-            extract: page.extract ?? "",
+            extract: page.extract ?? '',
             thumbnailUrl: page.thumbnail?.source ?? null,
-            articleUrl: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(geo.title.replace(/ /g, "_"))}`,
+            articleUrl: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(geo.title.replace(/ /g, '_'))}`,
         };
     });
 
@@ -85,8 +85,8 @@ async function fetchJson(url: string): Promise<any> {
     try {
         res = await fetch(url, {
             headers: {
-                "Accept": "application/json",
-                "User-Agent": "SlopDogs/0.1 (https://github.com/MartinSchmieschek/SlopDogs)",
+                Accept: 'application/json',
+                'User-Agent': 'SlopDogs/0.1 (https://github.com/MartinSchmieschek/SlopDogs)',
             },
             signal: controller.signal,
         });
@@ -98,5 +98,5 @@ async function fetchJson(url: string): Promise<any> {
         throw new Error(`Wikipedia API failed: ${res.status} ${res.statusText}`);
     }
 
-    return await res.json() as any;
+    return (await res.json()) as any;
 }

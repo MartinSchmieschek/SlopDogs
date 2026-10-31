@@ -13,10 +13,10 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from "@slopdogs/core";
-import { fetchNearbyWebcams } from "./webcamApiClient";
-import type { WebcamResult } from "./interfaces/webcamTypes";
-import { WebcamQueryPact, type WebcamQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable, geoBucketKey } from '@slopdogs/core';
+import { fetchNearbyWebcams } from './webcamApiClient';
+import type { WebcamResult } from './interfaces/webcamTypes';
+import { WebcamQueryPact, type WebcamQuery } from './pacts';
 
 /**
  * Arr, the WebcamRetriever — a spectral hound that sniffs out
@@ -47,7 +47,7 @@ export class WebcamRetriever extends Dog<WebcamResult> implements ICacheable {
     }
 
     get icon(): string | undefined {
-        return "\uD83D\uDCF7";
+        return '\uD83D\uDCF7';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -59,7 +59,7 @@ export class WebcamRetriever extends Dog<WebcamResult> implements ICacheable {
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<WebcamResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(WebcamQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(WebcamQueryPact, d));
         const query = (queryDog?.collected as WebcamQuery | undefined) ?? ({} as WebcamQuery);
 
         const lat = parseFloat(query['lat']);
@@ -71,7 +71,7 @@ export class WebcamRetriever extends Dog<WebcamResult> implements ICacheable {
             throw new Error('WebcamRetriever: Missing required query params (lat, lng)');
         }
 
-        const key = geoBucketKey("webcams", lat, lng, radiusKm * 1000, {
+        const key = geoBucketKey('webcams', lat, lng, radiusKm * 1000, {
             extras: { limit },
         });
 

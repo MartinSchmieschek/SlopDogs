@@ -22,10 +22,15 @@ export class LandingKennels {
         const raw = list || alias;
         if (!list && alias && LandingKennels.aliasLogged !== alias) {
             LandingKennels.aliasLogged = alias;
-            console.log(`[landing] LANDING_KENNEL_ID=${alias} gelesen als LANDING_KENNEL_IDS (Alias, ein Eintrag) — bitte auf LANDING_KENNEL_IDS umstellen.`);
+            console.log(
+                `[landing] LANDING_KENNEL_ID=${alias} gelesen als LANDING_KENNEL_IDS (Alias, ein Eintrag) — bitte auf LANDING_KENNEL_IDS umstellen.`,
+            );
         }
         if (LandingKennels.parsed?.raw !== raw) {
-            const ids = raw.split(',').map((id) => id.trim()).filter(Boolean);
+            const ids = raw
+                .split(',')
+                .map((id) => id.trim())
+                .filter(Boolean);
             LandingKennels.parsed = { raw, ids: ids.filter((id, i) => ids.findIndex((o) => o.toLowerCase() === id.toLowerCase()) === i) };
         }
         return [...LandingKennels.parsed.ids];

@@ -8,20 +8,30 @@
  * =========================================================================
  */
 
-import { Dog, IHuntingDog, IHuntingSeason } from "@slopdogs/core";
-import { getSunData } from "./sunApiClient";
-import type { SunResult } from "./interfaces/sunTypes";
-import { SunQueryPact, type SunQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason } from '@slopdogs/core';
+import { getSunData } from './sunApiClient';
+import type { SunResult } from './interfaces/sunTypes';
+import { SunQueryPact, type SunQuery } from './pacts';
 
 export class SunRetriever extends Dog<SunResult> {
-    get name(): string { return SunRetriever.name; }
-    get description(): string { return 'Fetches sunrise, sunset, and daylight data for given GPS coordinates.'; }
-    get icon(): string | undefined { return "\u2600\uFE0F"; }
-    get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] { return [SunQueryPact]; }
-    get optional(): (new (...args: any[]) => IHuntingDog<unknown>)[] { return []; }
+    get name(): string {
+        return SunRetriever.name;
+    }
+    get description(): string {
+        return 'Fetches sunrise, sunset, and daylight data for given GPS coordinates.';
+    }
+    get icon(): string | undefined {
+        return '\u2600\uFE0F';
+    }
+    get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
+        return [SunQueryPact];
+    }
+    get optional(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
+        return [];
+    }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<SunResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(SunQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(SunQueryPact, d));
         const query = (queryDog?.collected as SunQuery | undefined) ?? ({} as SunQuery);
 
         const lat = parseFloat(query['lat']);

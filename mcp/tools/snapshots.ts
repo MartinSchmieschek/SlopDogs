@@ -16,8 +16,7 @@ import { REDACTED_TEXT, redactWavesForCtx } from '../../services/wavesRedaction'
  * Duplicated from kennels.ts so snapshots.ts doesn't depend on a method that
  * may be missing from a stale-compiled KennelRunHandler at runtime.
  */
-function authCtxToCapabilityCtx(ctx: AuthCtx | undefined | null):
-    { userId: string | null; isSuperUser: boolean } | undefined {
+function authCtxToCapabilityCtx(ctx: AuthCtx | undefined | null): { userId: string | null; isSuperUser: boolean } | undefined {
     if (!ctx) return undefined;
     return {
         userId: ctx.user?.id ?? null,
@@ -174,9 +173,7 @@ async function redactSnapshotForCtx(
     if (!snapshot.waves) return snapshot;
     const waves = await redactWavesForCtx(snapshot.waves, ctx, deps.nodesStore);
     if (waves === snapshot.waves) return snapshot;
-    const lead = snapshot.leadDogId
-        ? waves.flat().find((d) => d.id === snapshot.leadDogId)
-        : undefined;
+    const lead = snapshot.leadDogId ? waves.flat().find((d) => d.id === snapshot.leadDogId) : undefined;
     const leadResult = lead && (lead as any).redacted ? lead.result : snapshot.leadResult;
     return { ...snapshot, waves, leadResult };
 }
@@ -241,7 +238,8 @@ export function getSnapshotTools(): ToolDef[] {
                     vmTimeoutMs: {
                         type: 'number',
                         minimum: 1,
-                        description: 'Per-run VM timeout in ms. Overrides SLOPDOGS_VM_TIMEOUT_MS (default 10000); capped at SLOPDOGS_VM_TIMEOUT_MAX_MS (default 60000). Run-time-only, not persisted.',
+                        description:
+                            'Per-run VM timeout in ms. Overrides SLOPDOGS_VM_TIMEOUT_MS (default 10000); capped at SLOPDOGS_VM_TIMEOUT_MAX_MS (default 60000). Run-time-only, not persisted.',
                     },
                 },
             },
@@ -264,23 +262,14 @@ export function getSnapshotTools(): ToolDef[] {
 
                 const query = (args.query as Record<string, string> | undefined) ?? undefined;
                 const body = args.body;
-                const vmTimeoutMs = typeof args.vmTimeoutMs === 'number' && args.vmTimeoutMs > 0
-                    ? args.vmTimeoutMs
-                    : undefined;
+                const vmTimeoutMs = typeof args.vmTimeoutMs === 'number' && args.vmTimeoutMs > 0 ? args.vmTimeoutMs : undefined;
                 // Dieselbe Zulassung wie jeder Kennel-Lauf. Die Sperre je Quelle (429) und eine volle
                 // Schlange (503) antworten SOFORT als Tool-Fehler; sonst wartet der Hintergrund-Lauf auf
                 // seinen Platz (Status bleibt 'running') und haelt ihn bis Laufende.
                 const admission = McpRunAdmission.request(deps, ctx);
                 const refused = admission.immediateFailure;
                 if (refused) return refused;
-                deps.snapshotCache.startJob(
-                    lineageId,
-                    viewer,
-                    kennelVersionId,
-                    query,
-                    body,
-                    ctx.user?.id ?? null,
-                );
+                deps.snapshotCache.startJob(lineageId, viewer, kennelVersionId, query, body, ctx.user?.id ?? null);
 
                 // Async hunt — return now, let the dogs run.
                 void (async () => {
@@ -295,10 +284,7 @@ export function getSnapshotTools(): ToolDef[] {
                             deps.snapshotCache.markFailed(lineageId, viewer, `Kennel ${id} not found`);
                             return;
                         }
-                        const mergedQuery = deps.kennelRunHandler.mergeQueryParams(
-                            freshConfig.defaultQuery,
-                            query ?? {},
-                        );
+                        const mergedQuery = deps.kennelRunHandler.mergeQueryParams(freshConfig.defaultQuery, query ?? {});
                         const effectiveBody = body !== undefined ? body : freshConfig.defaultBody;
                         const waves = await deps.kennelRunHandler.runKennel(
                             freshConfig,
@@ -457,7 +443,7 @@ export function getSnapshotTools(): ToolDef[] {
         {
             name: 'get_kennel_snapshot_lead_result',
             description:
-                'Returns the snapshot\'s lead result — the same payload that the public GET /k/<kennelId> endpoint yields. Dogs you may not read are redacted (no code, no context, no result), exactly like /api/kennels/:id/run.',
+                "Returns the snapshot's lead result — the same payload that the public GET /k/<kennelId> endpoint yields. Dogs you may not read are redacted (no code, no context, no result), exactly like /api/kennels/:id/run.",
             inputSchema: {
                 type: 'object',
                 required: ['id'],
@@ -519,7 +505,8 @@ export function getSnapshotTools(): ToolDef[] {
 
         {
             name: 'get_snapshot_dog_result',
-            description: 'Returns only the dog\'s result payload from the snapshot. Dogs you may not read are redacted (no code, no context, no result), exactly like /api/kennels/:id/run.',
+            description:
+                "Returns only the dog's result payload from the snapshot. Dogs you may not read are redacted (no code, no context, no result), exactly like /api/kennels/:id/run.",
             inputSchema: {
                 type: 'object',
                 required: ['id', 'dogId'],
@@ -538,7 +525,7 @@ export function getSnapshotTools(): ToolDef[] {
         {
             name: 'get_snapshot_dog_code',
             description:
-                'Returns the dog\'s TypeScript source (codeTs). null for BaseDogs (they are hardcoded). Dogs you may not read are redacted (no code, no context, no result), exactly like /api/kennels/:id/run.',
+                "Returns the dog's TypeScript source (codeTs). null for BaseDogs (they are hardcoded). Dogs you may not read are redacted (no code, no context, no result), exactly like /api/kennels/:id/run.",
             inputSchema: {
                 type: 'object',
                 required: ['id', 'dogId'],
@@ -557,7 +544,7 @@ export function getSnapshotTools(): ToolDef[] {
         {
             name: 'get_snapshot_dog_typedef',
             description:
-                'Returns the dog\'s VM type definition library and expected return-type alias — schema only, no runtime data. Dogs you may not read are redacted (no code, no context, no result), exactly like /api/kennels/:id/run.',
+                "Returns the dog's VM type definition library and expected return-type alias — schema only, no runtime data. Dogs you may not read are redacted (no code, no context, no result), exactly like /api/kennels/:id/run.",
             inputSchema: {
                 type: 'object',
                 required: ['id', 'dogId'],
@@ -600,8 +587,7 @@ export function getSnapshotTools(): ToolDef[] {
 
         {
             name: 'get_snapshot_dog_parents',
-            description:
-                'Returns the dog\'s declared parents — required and optional refs (storageId, lineageId or BaseDog name).',
+            description: "Returns the dog's declared parents — required and optional refs (storageId, lineageId or BaseDog name).",
             inputSchema: {
                 type: 'object',
                 required: ['id', 'dogId'],
@@ -622,7 +608,7 @@ export function getSnapshotTools(): ToolDef[] {
 
         {
             name: 'get_snapshot_dog_error',
-            description: 'Returns the dog\'s error message if it failed; null otherwise.',
+            description: "Returns the dog's error message if it failed; null otherwise.",
             inputSchema: {
                 type: 'object',
                 required: ['id', 'dogId'],
@@ -662,7 +648,7 @@ export function getSnapshotTools(): ToolDef[] {
         {
             name: 'get_snapshot_dog_read_by',
             description:
-                'Returns which downstream readers consumed this dog\'s yield — ReadTrackingEntry[] with waveIndex, readerInstanceName, propertyPath.',
+                "Returns which downstream readers consumed this dog's yield — ReadTrackingEntry[] with waveIndex, readerInstanceName, propertyPath.",
             inputSchema: {
                 type: 'object',
                 required: ['id', 'dogId'],
@@ -692,7 +678,8 @@ export function getSnapshotTools(): ToolDef[] {
                 const gate = await loadVisibleSnapshot(String(args.id), ctx, deps);
                 if (!gate.ok) return gate.result;
                 const waves = gate.data.snapshot.waves ?? [];
-                const dogIds = waves.flat()
+                const dogIds = waves
+                    .flat()
                     .filter((d) => d.onLeadDependencyPath === true)
                     .map((d) => d.id);
                 return ok({ dogIds });
@@ -800,8 +787,7 @@ export function getSnapshotTools(): ToolDef[] {
 
         {
             name: 'get_snapshot_layout',
-            description:
-                'Pass-through of the kennel\'s node/edge layout annotations as captured at run time (position hints, comments).',
+            description: "Pass-through of the kennel's node/edge layout annotations as captured at run time (position hints, comments).",
             inputSchema: {
                 type: 'object',
                 required: ['id'],
@@ -848,9 +834,7 @@ export function getSnapshotTools(): ToolDef[] {
                 const gate = await loadVisibleSnapshot(String(args.id), ctx, deps);
                 if (!gate.ok) return gate.result;
                 const where = (args.where as Record<string, unknown>) ?? {};
-                const needle = typeof where.displayNameContains === 'string'
-                    ? where.displayNameContains.toLowerCase()
-                    : null;
+                const needle = typeof where.displayNameContains === 'string' ? where.displayNameContains.toLowerCase() : null;
                 const waves = gate.data.snapshot.waves ?? [];
                 const out: Array<Record<string, unknown>> = [];
                 waves.forEach((wave, idx) => {
@@ -880,7 +864,7 @@ export function getSnapshotTools(): ToolDef[] {
         {
             name: 'get_snapshot_dog_chain',
             description:
-                'Walks the dog\'s ancestry transitively (BFS over parentsRequired/parentsOptional) up to the roots. Returns ordered ancestors with depth (0 = the dog itself).',
+                "Walks the dog's ancestry transitively (BFS over parentsRequired/parentsOptional) up to the roots. Returns ordered ancestors with depth (0 = the dog itself).",
             inputSchema: {
                 type: 'object',
                 required: ['id', 'dogId'],

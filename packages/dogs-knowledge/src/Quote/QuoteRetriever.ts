@@ -1,7 +1,7 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from "@slopdogs/core";
-import { getRandomQuote } from "./quoteApiClient";
-import type { QuoteResult } from "./interfaces/quoteTypes";
-import { QuoteQueryPact, type QuoteQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { getRandomQuote } from './quoteApiClient';
+import type { QuoteResult } from './interfaces/quoteTypes';
+import { QuoteQueryPact, type QuoteQuery } from './pacts';
 
 export class QuoteRetriever extends Dog<QuoteResult> implements ICacheable {
     private cacheHandler?: ICacheHandler;
@@ -15,11 +15,11 @@ export class QuoteRetriever extends Dog<QuoteResult> implements ICacheable {
     }
 
     get description(): string {
-        return "Zufallszitat von quotable.io (optional nach Autor, Tag, Laenge gefiltert).";
+        return 'Zufallszitat von quotable.io (optional nach Autor, Tag, Laenge gefiltert).';
     }
 
     get icon(): string | undefined {
-        return "\uD83D\uDCAC";
+        return '\uD83D\uDCAC';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -31,7 +31,7 @@ export class QuoteRetriever extends Dog<QuoteResult> implements ICacheable {
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<QuoteResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(QuoteQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(QuoteQueryPact, d));
         const query = (queryDog?.collected as QuoteQuery | undefined) ?? ({} as QuoteQuery);
         return getRandomQuote(query.author, query.tag, query.minLength, query.maxLength);
     };

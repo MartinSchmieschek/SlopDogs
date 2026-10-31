@@ -1,7 +1,7 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from "@slopdogs/core";
-import { getDadJoke } from "./dadJokeApiClient";
-import type { DadJokeResult } from "./interfaces/dadJokeTypes";
-import { DadJokeQueryPact, type DadJokeQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { getDadJoke } from './dadJokeApiClient';
+import type { DadJokeResult } from './interfaces/dadJokeTypes';
+import { DadJokeQueryPact, type DadJokeQuery } from './pacts';
 
 export class DadJokeRetriever extends Dog<DadJokeResult> implements ICacheable {
     private cacheHandler?: ICacheHandler;
@@ -15,11 +15,11 @@ export class DadJokeRetriever extends Dog<DadJokeResult> implements ICacheable {
     }
 
     get description(): string {
-        return "Holt einen Dad-Joke von icanhazdadjoke.com (optional nach Suchbegriff).";
+        return 'Holt einen Dad-Joke von icanhazdadjoke.com (optional nach Suchbegriff).';
     }
 
     get icon(): string | undefined {
-        return "\uD83E\uDD26";
+        return '\uD83E\uDD26';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -32,7 +32,7 @@ export class DadJokeRetriever extends Dog<DadJokeResult> implements ICacheable {
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<DadJokeResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(DadJokeQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(DadJokeQueryPact, d));
         const query = (queryDog?.collected as DadJokeQuery | undefined) ?? ({} as DadJokeQuery);
 
         return getDadJoke(query.term);

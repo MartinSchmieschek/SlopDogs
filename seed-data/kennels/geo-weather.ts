@@ -36,11 +36,7 @@ export async function seedSunKennel(nodesStore: IStore, kennelsStore: IStore): P
         name: 'Sun',
         description: 'Sonne: Aufgang, Untergang, Taglaenge, UV-Index per GPS',
         emoji: '\u2600\uFE0F',
-        dogIds: [
-            BASE_DOG_PREFIX + 'SunRetriever',
-            BASE_DOG_PREFIX + 'QueryRetriever',
-            mimicDogId,
-        ],
+        dogIds: [BASE_DOG_PREFIX + 'SunRetriever', BASE_DOG_PREFIX + 'QueryRetriever', mimicDogId],
         defaultQuery: { lat: '50.1109', lng: '8.6821' },
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -103,11 +99,7 @@ return {
         name: 'Wikipedia Nearby',
         description: 'Wikipedia: Artikel ueber Orte und Sehenswuerdigkeiten in der Naehe',
         emoji: '\uD83D\uDCDA',
-        dogIds: [
-            BASE_DOG_PREFIX + 'WikiNearbyRetriever',
-            BASE_DOG_PREFIX + 'QueryRetriever',
-            mimicDogId,
-        ],
+        dogIds: [BASE_DOG_PREFIX + 'WikiNearbyRetriever', BASE_DOG_PREFIX + 'QueryRetriever', mimicDogId],
         defaultQuery: { lat: '50.1109', lng: '8.6821' },
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -170,11 +162,7 @@ return {
         name: 'Geocoding',
         description: 'Geocoding: Adresse zu GPS oder GPS zu Adresse (Nominatim/OSM)',
         emoji: '\uD83D\uDCCD',
-        dogIds: [
-            BASE_DOG_PREFIX + 'GeocodingRetriever',
-            BASE_DOG_PREFIX + 'QueryRetriever',
-            mimicDogId,
-        ],
+        dogIds: [BASE_DOG_PREFIX + 'GeocodingRetriever', BASE_DOG_PREFIX + 'QueryRetriever', mimicDogId],
         defaultQuery: { address: 'Hauptwache, Frankfurt am Main' },
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -236,11 +224,7 @@ return {
         name: 'Isochrone',
         description: 'Erreichbarkeit (Isochrone) vom Punkt aus — OpenRouteService, Profil z. B. zu Fuss oder Rad',
         emoji: '\u23F1\uFE0F',
-        dogIds: [
-            BASE_DOG_PREFIX + 'BloodhoundIsochroneRetriever',
-            BASE_DOG_PREFIX + 'QueryRetriever',
-            mimicDogId,
-        ],
+        dogIds: [BASE_DOG_PREFIX + 'BloodhoundIsochroneRetriever', BASE_DOG_PREFIX + 'QueryRetriever', mimicDogId],
         defaultQuery: { lat: '50.1109', lng: '8.6821', range: '900' },
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -295,11 +279,7 @@ export async function seedAirQualityKennel(nodesStore: IStore, kennelsStore: ISt
         name: 'Air Quality',
         description: 'Luftqualitaet: Feinstaub, Ozon, NO2, Pollenflug per GPS',
         emoji: '\uD83C\uDF2B\uFE0F',
-        dogIds: [
-            BASE_DOG_PREFIX + 'AirQualityRetriever',
-            BASE_DOG_PREFIX + 'QueryRetriever',
-            mimicDogId,
-        ],
+        dogIds: [BASE_DOG_PREFIX + 'AirQualityRetriever', BASE_DOG_PREFIX + 'QueryRetriever', mimicDogId],
         defaultQuery: { lat: '50.1109', lng: '8.6821' },
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -363,11 +343,7 @@ return {
         name: 'Weather',
         description: 'Wetter: Aktuelle Bedingungen und Vorhersage per GPS',
         emoji: '\u26C5',
-        dogIds: [
-            BASE_DOG_PREFIX + 'WeatherRetriever',
-            BASE_DOG_PREFIX + 'QueryRetriever',
-            mimicDogId,
-        ],
+        dogIds: [BASE_DOG_PREFIX + 'WeatherRetriever', BASE_DOG_PREFIX + 'QueryRetriever', mimicDogId],
         defaultQuery: { lat: '50.1109', lng: '8.6821' },
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -403,7 +379,9 @@ export async function seedWindMapKennel(nodesStore: IStore, kennelsStore: IStore
     const fetcherVersionId = randomUUID();
     const fetcherDogId = randomUUID();
     const fetcherCfg = {
-        id: fetcherVersionId, lineageId: fetcherDogId, parentId: null,
+        id: fetcherVersionId,
+        lineageId: fetcherDogId,
+        parentId: null,
         displayName: 'WindGridFetcher',
         parentsRequired: ['QueryRetriever'],
         parentsOptional: [],
@@ -430,30 +408,44 @@ var results = (Array.isArray(data) ? data : [data]).map(function(d,i) {
 return { center: {lat:lat, lng:lng}, points: results };
 `,
     };
-    await nodesStore.save({ id: fetcherVersionId, type: SerializedDog.name, lineageId: fetcherDogId, parentId: null, displayName: 'WindGridFetcher', serializedDogConfig: JSON.stringify(fetcherCfg), createdAt: new Date() });
+    await nodesStore.save({
+        id: fetcherVersionId,
+        type: SerializedDog.name,
+        lineageId: fetcherDogId,
+        parentId: null,
+        displayName: 'WindGridFetcher',
+        serializedDogConfig: JSON.stringify(fetcherCfg),
+        createdAt: new Date(),
+    });
 
     // Wave 3: WindMapRenderer (lead)
     const rendererVersionId = randomUUID();
     const rendererDogId = randomUUID();
     const rendererCfg = {
-        id: rendererVersionId, lineageId: rendererDogId, parentId: null,
+        id: rendererVersionId,
+        lineageId: rendererDogId,
+        parentId: null,
         displayName: 'WindMapRenderer',
         parentsRequired: [fetcherDogId],
         parentsOptional: [],
         theRun: WIND_MAP_RENDERER_CODE,
     };
-    await nodesStore.save({ id: rendererVersionId, type: SerializedDog.name, lineageId: rendererDogId, parentId: null, displayName: 'WindMapRenderer', serializedDogConfig: JSON.stringify(rendererCfg), createdAt: new Date() });
+    await nodesStore.save({
+        id: rendererVersionId,
+        type: SerializedDog.name,
+        lineageId: rendererDogId,
+        parentId: null,
+        displayName: 'WindMapRenderer',
+        serializedDogConfig: JSON.stringify(rendererCfg),
+        createdAt: new Date(),
+    });
 
     const kennelConfig: IKennelConfig = {
         id: kennelId,
         name: 'Wind Map',
         description: 'Wind-Grid auf Leaflet-Karte — Open-Meteo Windgeschwindigkeit, Richtung, Boeen',
         emoji: '\uD83C\uDF2C\uFE0F',
-        dogIds: [
-            rendererDogId,
-            fetcherDogId,
-            BASE_DOG_PREFIX + 'QueryRetriever',
-        ],
+        dogIds: [rendererDogId, fetcherDogId, BASE_DOG_PREFIX + 'QueryRetriever'],
         defaultQuery: { lat: '54.5997', lng: '9.5142' },
         createdAt: new Date(),
         updatedAt: new Date(),

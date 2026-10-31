@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface AirportQuery {
     /** IATA-Code (3 Buchstaben, z.B. "FRA", "JFK") */
@@ -7,7 +7,4 @@ export interface AirportQuery {
     icao?: string;
 }
 
-export const AirportQueryPact = createPact<AirportQuery>(
-    "AirportQueryProvider",
-    { fromSourceType: "AirportQuery" }
-);
+export const AirportQueryPact = createPact<AirportQuery>('AirportQueryProvider', { fromSourceType: 'AirportQuery' });

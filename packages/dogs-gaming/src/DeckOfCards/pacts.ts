@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface DeckOfCardsQuery {
     /** Modus: newShuffled (neues gemischtes Deck), draw (Karten aus Deck ziehen), shuffle (reshuffle) */
@@ -13,7 +13,4 @@ export interface DeckOfCardsQuery {
     jokers?: boolean;
 }
 
-export const DeckOfCardsQueryPact = createPact<DeckOfCardsQuery>(
-    "DeckOfCardsQueryProvider",
-    { fromSourceType: "DeckOfCardsQuery" }
-);
+export const DeckOfCardsQueryPact = createPact<DeckOfCardsQuery>('DeckOfCardsQueryProvider', { fromSourceType: 'DeckOfCardsQuery' });

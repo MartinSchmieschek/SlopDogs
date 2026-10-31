@@ -28,7 +28,7 @@ export interface WikidataSparqlResult {
 }
 
 export interface WikidataResult {
-    mode: "search" | "entity" | "sparql";
+    mode: 'search' | 'entity' | 'sparql';
     query: string;
     lang: string;
     /** Bei mode=search */

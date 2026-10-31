@@ -4,20 +4,20 @@ import type {
     WikidataEntity,
     WikidataEntityClaim,
     WikidataSparqlResult,
-} from "./interfaces/wikidataTypes";
+} from './interfaces/wikidataTypes';
 
-const WIKIDATA_API = "https://www.wikidata.org/w/api.php";
-const SPARQL_ENDPOINT = "https://query.wikidata.org/sparql";
+const WIKIDATA_API = 'https://www.wikidata.org/w/api.php';
+const SPARQL_ENDPOINT = 'https://query.wikidata.org/sparql';
 
-async function wikiFetch<T>(url: string, accept: string = "application/json"): Promise<T> {
+async function wikiFetch<T>(url: string, accept: string = 'application/json'): Promise<T> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 25000);
     let res: Response;
     try {
         res = await fetch(url, {
             headers: {
-                "Accept": accept,
-                "User-Agent": "SlopDogs/0.1 (https://github.com/MartinSchmieschek/SlopDogs)",
+                Accept: accept,
+                'User-Agent': 'SlopDogs/0.1 (https://github.com/MartinSchmieschek/SlopDogs)',
             },
             signal: controller.signal,
         });
@@ -25,7 +25,7 @@ async function wikiFetch<T>(url: string, accept: string = "application/json"): P
         clearTimeout(timer);
     }
     if (!res.ok) {
-        const text = await res.text().catch(() => "");
+        const text = await res.text().catch(() => '');
         throw new Error(`wikidata failed: ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
     }
     return res.json() as Promise<T>;
@@ -33,29 +33,29 @@ async function wikiFetch<T>(url: string, accept: string = "application/json"): P
 
 async function searchEntities(term: string, lang: string, limit: number): Promise<WikidataSearchHit[]> {
     const params = new URLSearchParams({
-        action: "wbsearchentities",
+        action: 'wbsearchentities',
         search: term,
         language: lang,
         limit: String(Math.max(1, Math.min(50, Math.floor(limit)))),
-        format: "json",
-        origin: "*",
+        format: 'json',
+        origin: '*',
     });
     const data = await wikiFetch<{ search?: WikidataSearchHit[] }>(`${WIKIDATA_API}?${params.toString()}`);
     return data.search ?? [];
 }
 
 function stringifyClaimValue(mainsnak: any): string {
-    if (!mainsnak || mainsnak.snaktype !== "value") return String(mainsnak?.snaktype ?? "");
+    if (!mainsnak || mainsnak.snaktype !== 'value') return String(mainsnak?.snaktype ?? '');
     const dv = mainsnak.datavalue;
-    if (!dv) return "";
+    if (!dv) return '';
     const type = dv.type;
     const value = dv.value;
-    if (type === "string") return String(value);
-    if (type === "wikibase-entityid") return String(value?.id ?? "");
-    if (type === "time") return String(value?.time ?? "");
-    if (type === "quantity") return String(value?.amount ?? "");
-    if (type === "globecoordinate") return `${value?.latitude ?? "?"},${value?.longitude ?? "?"}`;
-    if (type === "monolingualtext") return `${value?.text ?? ""}@${value?.language ?? ""}`;
+    if (type === 'string') return String(value);
+    if (type === 'wikibase-entityid') return String(value?.id ?? '');
+    if (type === 'time') return String(value?.time ?? '');
+    if (type === 'quantity') return String(value?.amount ?? '');
+    if (type === 'globecoordinate') return `${value?.latitude ?? '?'},${value?.longitude ?? '?'}`;
+    if (type === 'monolingualtext') return `${value?.text ?? ''}@${value?.language ?? ''}`;
     try {
         return JSON.stringify(value);
     } catch {
@@ -65,11 +65,11 @@ function stringifyClaimValue(mainsnak: any): string {
 
 async function getEntity(id: string, lang: string): Promise<WikidataEntity> {
     const params = new URLSearchParams({
-        action: "wbgetentities",
+        action: 'wbgetentities',
         ids: id,
         languages: lang,
-        format: "json",
-        origin: "*",
+        format: 'json',
+        origin: '*',
     });
     const data = await wikiFetch<{ entities?: Record<string, any> }>(`${WIKIDATA_API}?${params.toString()}`);
     const ent = data.entities?.[id];
@@ -103,18 +103,18 @@ export async function queryWikidata(
     sparql?: string,
     search?: string,
     entity?: string,
-    lang: string = "en",
+    lang: string = 'en',
     limit: number = 10,
 ): Promise<WikidataResult> {
     if (sparql && sparql.trim()) {
-        return { mode: "sparql", query: sparql, lang, sparql: await runSparql(sparql) };
+        return { mode: 'sparql', query: sparql, lang, sparql: await runSparql(sparql) };
     }
     if (entity && entity.trim()) {
         const id = entity.trim().toUpperCase();
-        return { mode: "entity", query: id, lang, entity: await getEntity(id, lang) };
+        return { mode: 'entity', query: id, lang, entity: await getEntity(id, lang) };
     }
     if (search && search.trim()) {
-        return { mode: "search", query: search.trim(), lang, hits: await searchEntities(search.trim(), lang, limit) };
+        return { mode: 'search', query: search.trim(), lang, hits: await searchEntities(search.trim(), lang, limit) };
     }
     throw new Error("WikidataRetriever: provide one of 'sparql', 'entity', or 'search'");
 }

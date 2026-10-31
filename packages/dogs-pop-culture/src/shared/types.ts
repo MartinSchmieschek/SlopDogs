@@ -4,7 +4,7 @@
  * wir exponieren sie daher als `items[]` beliebiger Form.
  */
 export interface PopCultureListResult<T = unknown> {
-    mode: "list";
+    mode: 'list';
     source: string;
     resource: string;
     count: number;
@@ -14,7 +14,7 @@ export interface PopCultureListResult<T = unknown> {
 }
 
 export interface PopCultureItemResult<T = unknown> {
-    mode: "item";
+    mode: 'item';
     source: string;
     resource: string;
     id: string;

@@ -5,21 +5,14 @@
  * Brückenmodell: Spaeter soll eine schnelle Cache-Anbindung (Postgres o. a.) im Fokus sein;
  * dieses Wrapper ist nur Dev-Schutz, kein Ersatz fuer Cache-Tuning oder Monitoring.
  */
-import type {
-    ICacheHandler,
-    ITileFeatureCache,
-    TileCoverageResult,
-    TileKey,
-} from '@slopdogs/core';
+import type { ICacheHandler, ITileFeatureCache, TileCoverageResult, TileKey } from '@slopdogs/core';
 
 export function isCacheInfraError(err: unknown): boolean {
     const code = (err as { code?: string })?.code;
     // P2024: kein freier Platz im Pool (pool_timeout). Seit P1.4 teilt der Cache in Single-DB den Pool mit Store und Auth.
     if (code === 'P1008' || code === 'P2024' || code === 'P2034') return true;
     const msg = (err as Error)?.message ?? String(err);
-    return /failed to respond to a query within the configured timeout|Operations timed out|SQLite busy|database is locked/i.test(
-        msg,
-    );
+    return /failed to respond to a query within the configured timeout|Operations timed out|SQLite busy|database is locked/i.test(msg);
 }
 
 function warnCacheInfra(op: string, err: unknown): void {
@@ -50,15 +43,13 @@ function allTilesMissing(tiles: TileKey[], facets: string[]): TileCoverageResult
 function wrapTileCache(inner: ITileFeatureCache): ITileFeatureCache {
     return {
         getCoveredFeatures: (dogType, tiles, facets) =>
-            guard(
-                'getCoveredFeatures',
-                () => inner.getCoveredFeatures(dogType, tiles, facets),
-                { features: [], missing: allTilesMissing(tiles, facets) },
-            ),
+            guard('getCoveredFeatures', () => inner.getCoveredFeatures(dogType, tiles, facets), {
+                features: [],
+                missing: allTilesMissing(tiles, facets),
+            }),
         storeFetchResult: (dogType, result, ttlMs) =>
             guard('storeFetchResult', () => inner.storeFetchResult(dogType, result, ttlMs), undefined),
-        invalidateDogType: (dogType) =>
-            guard('invalidateDogType', () => inner.invalidateDogType(dogType), undefined),
+        invalidateDogType: (dogType) => guard('invalidateDogType', () => inner.invalidateDogType(dogType), undefined),
     };
 }
 
@@ -78,8 +69,7 @@ export function withResilientCacheInfra(handler: ICacheHandler): ICacheHandler {
             }
         },
         invalidate: (key) => guard('invalidate', () => handler.invalidate(key), undefined),
-        invalidateByPrefix: (prefix) =>
-            guard('invalidateByPrefix', () => handler.invalidateByPrefix(prefix), undefined),
+        invalidateByPrefix: (prefix) => guard('invalidateByPrefix', () => handler.invalidateByPrefix(prefix), undefined),
         prune: () => guard('prune', () => handler.prune(), undefined),
         getTileFeatureCache: () => wrapTileCache(handler.getTileFeatureCache()),
     };

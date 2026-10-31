@@ -33,9 +33,13 @@ export function renderBetaKeyPage(opts: { reason: BetaKeyRefusal; returnTo?: str
         '<form method="GET" action="/auth/google/login" class="card">',
         '<span class="chip">closed beta</span>',
         '<h1>Got a key?</h1>',
-        '<p role="alert">', text, '</p>',
+        '<p role="alert">',
+        text,
+        '</p>',
         '<p>One key unlocks one Google account, once. After that you sign in without it.</p>',
-        '<input type="hidden" name="returnTo" value="', returnTo, '" />',
+        '<input type="hidden" name="returnTo" value="',
+        returnTo,
+        '" />',
         '<label for="betaKey">Beta key</label>',
         '<input id="betaKey" name="betaKey" autocomplete="off" autocapitalize="off" spellcheck="false" required />',
         '<button type="submit">Continue with Google</button>',
@@ -45,10 +49,5 @@ export function renderBetaKeyPage(opts: { reason: BetaKeyRefusal; returnTo?: str
 }
 
 function escapeHtml(s: string): string {
-    return s
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }

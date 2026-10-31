@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface ChessQuery {
     /** Endpoint: profile, stats, puzzleDaily, tournament, topPlayers — default "profile" */
@@ -11,7 +11,4 @@ export interface ChessQuery {
     limit?: number;
 }
 
-export const ChessQueryPact = createPact<ChessQuery>(
-    "ChessQueryProvider",
-    { fromSourceType: "ChessQuery" }
-);
+export const ChessQueryPact = createPact<ChessQuery>('ChessQueryProvider', { fromSourceType: 'ChessQuery' });

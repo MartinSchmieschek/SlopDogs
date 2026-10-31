@@ -1,7 +1,7 @@
-import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from "@slopdogs/core";
-import { getBoredActivity } from "./boredApiClient";
-import type { BoredResult } from "./interfaces/boredTypes";
-import { BoredQueryPact, type BoredQuery } from "./pacts";
+import { Dog, IHuntingDog, IHuntingSeason, type ICacheHandler, type ICacheable } from '@slopdogs/core';
+import { getBoredActivity } from './boredApiClient';
+import type { BoredResult } from './interfaces/boredTypes';
+import { BoredQueryPact, type BoredQuery } from './pacts';
 
 export class BoredRetriever extends Dog<BoredResult> implements ICacheable {
     private cacheHandler?: ICacheHandler;
@@ -15,11 +15,11 @@ export class BoredRetriever extends Dog<BoredResult> implements ICacheable {
     }
 
     get description(): string {
-        return "Bored-API: Vorschlaege fuer Aktivitaeten nach Typ, Teilnehmern, Preis.";
+        return 'Bored-API: Vorschlaege fuer Aktivitaeten nach Typ, Teilnehmern, Preis.';
     }
 
     get icon(): string | undefined {
-        return "\uD83E\uDD71";
+        return '\uD83E\uDD71';
     }
 
     get required(): (new (...args: any[]) => IHuntingDog<unknown>)[] {
@@ -31,7 +31,7 @@ export class BoredRetriever extends Dog<BoredResult> implements ICacheable {
     }
 
     protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<BoredResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(BoredQueryPact, d));
+        const queryDog = season.exhausted.find((d) => this.matchesParent(BoredQueryPact, d));
         const query = (queryDog?.collected as BoredQuery | undefined) ?? {};
         return getBoredActivity(query.type, query.participants, query.maxPrice, query.maxAccessibility);
     };

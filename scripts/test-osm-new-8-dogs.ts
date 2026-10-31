@@ -9,16 +9,24 @@
 export {};
 
 import {
-    OsmWaterRetriever, OsmWaterPact,
-    OsmLanduseRetriever, OsmLandusePact,
-    OsmAmenitiesRetriever, OsmAmenitiesPact,
-    OsmBoundariesRetriever, OsmBoundariesPact,
-    OsmPowerRetriever, OsmPowerPact,
-    OsmPublicTransitStopsRetriever, OsmPublicTransitStopsPact,
-    OsmShopsRetriever, OsmShopsPact,
-    OsmSportsRecreationRetriever, OsmSportsRecreationPact,
-} from "@slopdogs/dogs-geo";
-import type { IHuntingSeason, IHuntingDog } from "@slopdogs/core";
+    OsmWaterRetriever,
+    OsmWaterPact,
+    OsmLanduseRetriever,
+    OsmLandusePact,
+    OsmAmenitiesRetriever,
+    OsmAmenitiesPact,
+    OsmBoundariesRetriever,
+    OsmBoundariesPact,
+    OsmPowerRetriever,
+    OsmPowerPact,
+    OsmPublicTransitStopsRetriever,
+    OsmPublicTransitStopsPact,
+    OsmShopsRetriever,
+    OsmShopsPact,
+    OsmSportsRecreationRetriever,
+    OsmSportsRecreationPact,
+} from '@slopdogs/dogs-geo';
+import type { IHuntingSeason, IHuntingDog } from '@slopdogs/core';
 
 function mockSeason(pactClass: new () => IHuntingDog<unknown>, query: unknown): IHuntingSeason {
     const pactInstance = new pactClass();
@@ -37,13 +45,15 @@ function mockSeason(pactClass: new () => IHuntingDog<unknown>, query: unknown): 
 function geomTypeHistogram(fc: { features: Array<{ geometry?: { type: string } }> }): string {
     const counts: Record<string, number> = {};
     for (const f of fc.features) {
-        const t = f.geometry?.type ?? "(none)";
+        const t = f.geometry?.type ?? '(none)';
         counts[t] = (counts[t] ?? 0) + 1;
     }
-    return Object.entries(counts).map(([k, v]) => `${k}=${v}`).join(", ");
+    return Object.entries(counts)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(', ');
 }
 
-const FRANKFURT_HBF = { lat: "50.1078", lng: "8.6638" };
+const FRANKFURT_HBF = { lat: '50.1078', lng: '8.6638' };
 
 interface DogProbe {
     name: string;
@@ -53,75 +63,112 @@ interface DogProbe {
 
 const probes: DogProbe[] = [
     {
-        name: "Water",
-        radius: "1500",
+        name: 'Water',
+        radius: '1500',
         runner: async () => {
             const dog = new OsmWaterRetriever();
-            const r: any = await dog.collectYield(mockSeason(OsmWaterPact, { ...FRANKFURT_HBF, radius: "1500" }));
-            return { featureCount: r.geojson.features.length, geomTypes: geomTypeHistogram(r.geojson), sampleTag: r.geojson.features[0]?.properties?.name ?? r.geojson.features[0]?.properties?.waterway ?? r.geojson.features[0]?.properties?.natural };
+            const r: any = await dog.collectYield(mockSeason(OsmWaterPact, { ...FRANKFURT_HBF, radius: '1500' }));
+            return {
+                featureCount: r.geojson.features.length,
+                geomTypes: geomTypeHistogram(r.geojson),
+                sampleTag:
+                    r.geojson.features[0]?.properties?.name ??
+                    r.geojson.features[0]?.properties?.waterway ??
+                    r.geojson.features[0]?.properties?.natural,
+            };
         },
     },
     {
-        name: "Landuse",
-        radius: "800",
+        name: 'Landuse',
+        radius: '800',
         runner: async () => {
             const dog = new OsmLanduseRetriever();
-            const r: any = await dog.collectYield(mockSeason(OsmLandusePact, { ...FRANKFURT_HBF, radius: "800" }));
-            return { featureCount: r.geojson.features.length, geomTypes: geomTypeHistogram(r.geojson), sampleTag: r.geojson.features[0]?.properties?.landuse };
+            const r: any = await dog.collectYield(mockSeason(OsmLandusePact, { ...FRANKFURT_HBF, radius: '800' }));
+            return {
+                featureCount: r.geojson.features.length,
+                geomTypes: geomTypeHistogram(r.geojson),
+                sampleTag: r.geojson.features[0]?.properties?.landuse,
+            };
         },
     },
     {
-        name: "Amenities",
-        radius: "300",
+        name: 'Amenities',
+        radius: '300',
         runner: async () => {
             const dog = new OsmAmenitiesRetriever();
-            const r: any = await dog.collectYield(mockSeason(OsmAmenitiesPact, { ...FRANKFURT_HBF, radius: "300" }));
-            return { featureCount: r.geojson.features.length, geomTypes: geomTypeHistogram(r.geojson), sampleTag: r.geojson.features[0]?.properties?.amenity };
+            const r: any = await dog.collectYield(mockSeason(OsmAmenitiesPact, { ...FRANKFURT_HBF, radius: '300' }));
+            return {
+                featureCount: r.geojson.features.length,
+                geomTypes: geomTypeHistogram(r.geojson),
+                sampleTag: r.geojson.features[0]?.properties?.amenity,
+            };
         },
     },
     {
-        name: "Boundaries",
-        radius: "5000",
+        name: 'Boundaries',
+        radius: '5000',
         runner: async () => {
             const dog = new OsmBoundariesRetriever();
-            const r: any = await dog.collectYield(mockSeason(OsmBoundariesPact, { ...FRANKFURT_HBF, radius: "5000", adminLevel: "[4,6,8]" }));
-            return { featureCount: r.geojson.features.length, geomTypes: geomTypeHistogram(r.geojson), sampleTag: r.geojson.features[0]?.properties?.name };
+            const r: any = await dog.collectYield(
+                mockSeason(OsmBoundariesPact, { ...FRANKFURT_HBF, radius: '5000', adminLevel: '[4,6,8]' }),
+            );
+            return {
+                featureCount: r.geojson.features.length,
+                geomTypes: geomTypeHistogram(r.geojson),
+                sampleTag: r.geojson.features[0]?.properties?.name,
+            };
         },
     },
     {
-        name: "Power",
-        radius: "5000",
+        name: 'Power',
+        radius: '5000',
         runner: async () => {
             const dog = new OsmPowerRetriever();
-            const r: any = await dog.collectYield(mockSeason(OsmPowerPact, { ...FRANKFURT_HBF, radius: "5000" }));
-            return { featureCount: r.geojson.features.length, geomTypes: geomTypeHistogram(r.geojson), sampleTag: r.geojson.features[0]?.properties?.power };
+            const r: any = await dog.collectYield(mockSeason(OsmPowerPact, { ...FRANKFURT_HBF, radius: '5000' }));
+            return {
+                featureCount: r.geojson.features.length,
+                geomTypes: geomTypeHistogram(r.geojson),
+                sampleTag: r.geojson.features[0]?.properties?.power,
+            };
         },
     },
     {
-        name: "PublicTransitStops",
-        radius: "500",
+        name: 'PublicTransitStops',
+        radius: '500',
         runner: async () => {
             const dog = new OsmPublicTransitStopsRetriever();
-            const r: any = await dog.collectYield(mockSeason(OsmPublicTransitStopsPact, { ...FRANKFURT_HBF, radius: "500" }));
-            return { featureCount: r.geojson.features.length, geomTypes: geomTypeHistogram(r.geojson), sampleTag: r.geojson.features[0]?.properties?.name };
+            const r: any = await dog.collectYield(mockSeason(OsmPublicTransitStopsPact, { ...FRANKFURT_HBF, radius: '500' }));
+            return {
+                featureCount: r.geojson.features.length,
+                geomTypes: geomTypeHistogram(r.geojson),
+                sampleTag: r.geojson.features[0]?.properties?.name,
+            };
         },
     },
     {
-        name: "Shops",
-        radius: "300",
+        name: 'Shops',
+        radius: '300',
         runner: async () => {
             const dog = new OsmShopsRetriever();
-            const r: any = await dog.collectYield(mockSeason(OsmShopsPact, { ...FRANKFURT_HBF, radius: "300" }));
-            return { featureCount: r.geojson.features.length, geomTypes: geomTypeHistogram(r.geojson), sampleTag: r.geojson.features[0]?.properties?.shop };
+            const r: any = await dog.collectYield(mockSeason(OsmShopsPact, { ...FRANKFURT_HBF, radius: '300' }));
+            return {
+                featureCount: r.geojson.features.length,
+                geomTypes: geomTypeHistogram(r.geojson),
+                sampleTag: r.geojson.features[0]?.properties?.shop,
+            };
         },
     },
     {
-        name: "SportsRecreation",
-        radius: "2000",
+        name: 'SportsRecreation',
+        radius: '2000',
         runner: async () => {
             const dog = new OsmSportsRecreationRetriever();
-            const r: any = await dog.collectYield(mockSeason(OsmSportsRecreationPact, { ...FRANKFURT_HBF, radius: "2000" }));
-            return { featureCount: r.geojson.features.length, geomTypes: geomTypeHistogram(r.geojson), sampleTag: r.geojson.features[0]?.properties?.leisure };
+            const r: any = await dog.collectYield(mockSeason(OsmSportsRecreationPact, { ...FRANKFURT_HBF, radius: '2000' }));
+            return {
+                featureCount: r.geojson.features.length,
+                geomTypes: geomTypeHistogram(r.geojson),
+                sampleTag: r.geojson.features[0]?.properties?.leisure,
+            };
         },
     },
 ];
@@ -136,12 +183,12 @@ async function main() {
         try {
             const r = await p.runner();
             const ms = Date.now() - t0;
-            const summary = `count=${r.featureCount} (${r.geomTypes})${r.sampleTag ? ` first=${r.sampleTag}` : ""}`;
+            const summary = `count=${r.featureCount} (${r.geomTypes})${r.sampleTag ? ` first=${r.sampleTag}` : ''}`;
             console.log(`OK in ${ms}ms — ${summary}`);
             results.push({ name: p.name, ok: true, ms, summary });
         } catch (e: any) {
             const ms = Date.now() - t0;
-            const error = (e?.message ?? String(e)).split("\n")[0].slice(0, 200);
+            const error = (e?.message ?? String(e)).split('\n')[0].slice(0, 200);
             console.log(`FAIL in ${ms}ms — ${error}`);
             results.push({ name: p.name, ok: false, ms, error });
         }
@@ -154,6 +201,6 @@ async function main() {
 }
 
 main().catch((e) => {
-    console.error("Fatal:", e);
+    console.error('Fatal:', e);
     process.exit(1);
 });

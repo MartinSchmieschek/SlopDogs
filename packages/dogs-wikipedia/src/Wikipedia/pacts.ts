@@ -4,7 +4,7 @@
  * =========================================================================
  */
 
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 /** GPS-Koordinaten und Optionen fuer die Wikipedia-Nearby-Suche */
 export interface WikiNearbyQuery {
@@ -21,7 +21,4 @@ export interface WikiNearbyQuery {
 }
 
 /** Der Pact fuer Wikipedia-Nearby-Queries */
-export const WikiNearbyQueryPact = createPact<WikiNearbyQuery>(
-    "WikiNearbyQueryProvider",
-    { fromSourceType: "WikiNearbyQuery" }
-);
+export const WikiNearbyQueryPact = createPact<WikiNearbyQuery>('WikiNearbyQueryProvider', { fromSourceType: 'WikiNearbyQuery' });

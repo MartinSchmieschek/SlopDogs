@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface LemmyQuery {
     /** Fediverse-Instanz (z.B. "lemmy.world", "beehaw.org") — default "lemmy.world" */
@@ -21,7 +21,4 @@ export interface LemmyQuery {
     page?: number;
 }
 
-export const LemmyQueryPact = createPact<LemmyQuery>(
-    "LemmyQueryProvider",
-    { fromSourceType: "LemmyQuery" }
-);
+export const LemmyQueryPact = createPact<LemmyQuery>('LemmyQueryProvider', { fromSourceType: 'LemmyQuery' });

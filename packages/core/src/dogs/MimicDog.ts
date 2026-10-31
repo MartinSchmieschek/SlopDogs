@@ -11,8 +11,8 @@
  * the MimicDog rises -- through endless faces, countless forms.
  */
 
-import { DogClass, IHuntingDog } from "../core/entities/IHuntingDog";
-import { SerializedDog, ISerializedDogConfig } from "./SerializedDog";
+import { DogClass, IHuntingDog } from '../core/entities/IHuntingDog';
+import { SerializedDog, ISerializedDogConfig } from './SerializedDog';
 
 /** Config fer the shapeshifter -- includes which form it wears */
 export interface IMimicDogConfig extends ISerializedDogConfig {
@@ -28,7 +28,6 @@ export interface IMimicDogConfig extends ISerializedDogConfig {
  * @template T The type of plunder this shapeshifter yields while wearing its stolen face
  */
 export class MimicDog<T> extends SerializedDog<T> {
-
     // The classes this shapeshifter pretends to be -- its borrowed faces
     private _imitatesClasses: (new (...args: any[]) => IHuntingDog<unknown>)[] = [];
     // The name of the form it wears -- resolved to actual classes later

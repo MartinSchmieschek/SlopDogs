@@ -33,49 +33,121 @@ export async function seedEarthPulseKennel(nodesStore: IStore, kennelsStore: ISt
 
     // --- Wave 4: GPS Mimics (all read from GeocodingRetriever) ---
     const weatherMimic = { lineageId: randomUUID(), versionId: randomUUID() };
-    await saveMimic(nodesStore, { ...weatherMimic, displayName: 'EP: GPS → Weather', imitates: 'WeatherQueryProvider', parentsRequired: ['GeocodingRetriever'], theRun: gpsTheRun });
+    await saveMimic(nodesStore, {
+        ...weatherMimic,
+        displayName: 'EP: GPS → Weather',
+        imitates: 'WeatherQueryProvider',
+        parentsRequired: ['GeocodingRetriever'],
+        theRun: gpsTheRun,
+    });
 
     const sunMimic = { lineageId: randomUUID(), versionId: randomUUID() };
-    await saveMimic(nodesStore, { ...sunMimic, displayName: 'EP: GPS → Sun', imitates: 'SunQueryProvider', parentsRequired: ['GeocodingRetriever'], theRun: gpsTheRun });
+    await saveMimic(nodesStore, {
+        ...sunMimic,
+        displayName: 'EP: GPS → Sun',
+        imitates: 'SunQueryProvider',
+        parentsRequired: ['GeocodingRetriever'],
+        theRun: gpsTheRun,
+    });
 
     const airMimic = { lineageId: randomUUID(), versionId: randomUUID() };
-    await saveMimic(nodesStore, { ...airMimic, displayName: 'EP: GPS → Air', imitates: 'AirQualityQueryProvider', parentsRequired: ['GeocodingRetriever'], theRun: gpsTheRun });
+    await saveMimic(nodesStore, {
+        ...airMimic,
+        displayName: 'EP: GPS → Air',
+        imitates: 'AirQualityQueryProvider',
+        parentsRequired: ['GeocodingRetriever'],
+        theRun: gpsTheRun,
+    });
 
     const bioMimic = { lineageId: randomUUID(), versionId: randomUUID() };
-    await saveMimic(nodesStore, { ...bioMimic, displayName: 'EP: GPS → Species', imitates: 'BiodiversityQueryProvider', parentsRequired: ['GeocodingRetriever'], theRun: gpsTheRun });
+    await saveMimic(nodesStore, {
+        ...bioMimic,
+        displayName: 'EP: GPS → Species',
+        imitates: 'BiodiversityQueryProvider',
+        parentsRequired: ['GeocodingRetriever'],
+        theRun: gpsTheRun,
+    });
 
     const phenoMimic = { lineageId: randomUUID(), versionId: randomUUID() };
-    await saveMimic(nodesStore, { ...phenoMimic, displayName: 'EP: GPS → Phenology', imitates: 'PhenologyQueryProvider', parentsRequired: ['GeocodingRetriever'], theRun: gpsTheRun });
+    await saveMimic(nodesStore, {
+        ...phenoMimic,
+        displayName: 'EP: GPS → Phenology',
+        imitates: 'PhenologyQueryProvider',
+        parentsRequired: ['GeocodingRetriever'],
+        theRun: gpsTheRun,
+    });
 
     const landmarkMimic = { lineageId: randomUUID(), versionId: randomUUID() };
-    await saveMimic(nodesStore, { ...landmarkMimic, displayName: 'EP: GPS → Landmarks', imitates: 'NearbyLandmarksQueryProvider', parentsRequired: ['GeocodingRetriever'], theRun: gpsTheRun });
+    await saveMimic(nodesStore, {
+        ...landmarkMimic,
+        displayName: 'EP: GPS → Landmarks',
+        imitates: 'NearbyLandmarksQueryProvider',
+        parentsRequired: ['GeocodingRetriever'],
+        theRun: gpsTheRun,
+    });
 
     const transitMimic = { lineageId: randomUUID(), versionId: randomUUID() };
-    await saveMimic(nodesStore, { ...transitMimic, displayName: 'EP: GPS → Transit', imitates: 'TransitTripQueryProvider', parentsRequired: ['GeocodingRetriever'], theRun: `var g = GeocodingRetriever; var loc = (g.results || [])[0] || {}; return { lat: String(loc.lat), lng: String(loc.lng), radius: "2000" }` });
+    await saveMimic(nodesStore, {
+        ...transitMimic,
+        displayName: 'EP: GPS → Transit',
+        imitates: 'TransitTripQueryProvider',
+        parentsRequired: ['GeocodingRetriever'],
+        theRun: `var g = GeocodingRetriever; var loc = (g.results || [])[0] || {}; return { lat: String(loc.lat), lng: String(loc.lng), radius: "2000" }`,
+    });
 
     // --- Wave 6: PulsData (combines all retriever yields) ---
     const pulsDataVersionId = randomUUID();
     const pulsDataDogId = randomUUID();
     const pulsDataCfg = {
-        id: pulsDataVersionId, lineageId: pulsDataDogId, parentId: null,
+        id: pulsDataVersionId,
+        lineageId: pulsDataDogId,
+        parentId: null,
         displayName: 'Pulsdata',
-        parentsRequired: ['WeatherRetriever', 'SunRetriever', 'AirQualityRetriever', 'SpeciesRetriever', 'PhenologyRetriever', 'OsmLandmarksRetriever', 'RegionalNewsRetriever', 'GeocodingRetriever', 'TransitTripRetriever'],
+        parentsRequired: [
+            'WeatherRetriever',
+            'SunRetriever',
+            'AirQualityRetriever',
+            'SpeciesRetriever',
+            'PhenologyRetriever',
+            'OsmLandmarksRetriever',
+            'RegionalNewsRetriever',
+            'GeocodingRetriever',
+            'TransitTripRetriever',
+        ],
         parentsOptional: [],
         theRun: EARTH_PULSE_DATA_CODE,
     };
-    await nodesStore.save({ id: pulsDataVersionId, type: SerializedDog.name, lineageId: pulsDataDogId, parentId: null, displayName: 'Pulsdata', serializedDogConfig: JSON.stringify(pulsDataCfg), createdAt: new Date() });
+    await nodesStore.save({
+        id: pulsDataVersionId,
+        type: SerializedDog.name,
+        lineageId: pulsDataDogId,
+        parentId: null,
+        displayName: 'Pulsdata',
+        serializedDogConfig: JSON.stringify(pulsDataCfg),
+        createdAt: new Date(),
+    });
 
     // --- Wave 7: PulsRenderer (lead — generates HTML) ---
     const rendererVersionId = randomUUID();
     const rendererDogId = randomUUID();
     const rendererCfg = {
-        id: rendererVersionId, lineageId: rendererDogId, parentId: null,
+        id: rendererVersionId,
+        lineageId: rendererDogId,
+        parentId: null,
         displayName: 'PulsRenderer',
         parentsRequired: [pulsDataDogId],
         parentsOptional: [],
         theRun: EARTH_PULSE_RENDERER_CODE,
     };
-    await nodesStore.save({ id: rendererVersionId, type: SerializedDog.name, lineageId: rendererDogId, parentId: null, displayName: 'PulsRenderer', serializedDogConfig: JSON.stringify(rendererCfg), createdAt: new Date() });
+    await nodesStore.save({
+        id: rendererVersionId,
+        type: SerializedDog.name,
+        lineageId: rendererDogId,
+        parentId: null,
+        displayName: 'PulsRenderer',
+        serializedDogConfig: JSON.stringify(rendererCfg),
+        createdAt: new Date(),
+    });
 
     const kennelConfig: IKennelConfig = {
         id: kennelId,

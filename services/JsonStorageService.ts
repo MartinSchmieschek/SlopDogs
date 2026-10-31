@@ -19,7 +19,9 @@ import type { PrismaClient } from '../store/generated/prisma-json-storage-client
 import type { PrismaClientLease, SharedPrismaClients } from '../store/SharedPrismaClients';
 
 function createPrismaJsonStorageClient(dbUrl: string): PrismaClient {
-    const mod = require(path.join(process.cwd(), 'store/generated/prisma-json-storage-client')) as typeof import('../store/generated/prisma-json-storage-client');
+    const mod = require(
+        path.join(process.cwd(), 'store/generated/prisma-json-storage-client'),
+    ) as typeof import('../store/generated/prisma-json-storage-client');
     return new mod.PrismaClient({
         datasources: { db: { url: dbUrl } },
     });

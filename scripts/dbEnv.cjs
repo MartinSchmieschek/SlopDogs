@@ -199,8 +199,8 @@ function prismaVariantFor(env = process.env) {
     // andere URL-Form (prisma://, prisma+postgres://, Anfuehrungszeichen) wuerde jetzt still SQLite-Clients bauen.
     if (!usePostgres && (env.RENDER || '').trim() !== '') {
         const err = new Error(
-            '\n[ENV] RENDER ist gesetzt, aber DATABASE_URL beginnt nicht mit postgres:// oder postgresql:// — '
-            + 'Build und Prisma-Generierung waehlen das Schema nach der URL. Wert im Render-Dashboard pruefen.',
+            '\n[ENV] RENDER ist gesetzt, aber DATABASE_URL beginnt nicht mit postgres:// oder postgresql:// — ' +
+                'Build und Prisma-Generierung waehlen das Schema nach der URL. Wert im Render-Dashboard pruefen.',
         );
         err.name = 'DbEnvError';
         throw err;
@@ -368,7 +368,9 @@ function resolveJsonStorageDatabaseUrl() {
     if (jsonStorageUrl) return withPostgresPoolLimit(jsonStorageUrl);
     const pathOnly = (process.env.JSON_STORAGE_DB_PATH || '').trim();
     if (!pathOnly) {
-        throw new Error('resolveJsonStorageDatabaseUrl: JSON_STORAGE_DATABASE_URL / JSON_STORAGE_DB_PATH fehlt (assertRequiredDbEnv zuerst aufrufen).');
+        throw new Error(
+            'resolveJsonStorageDatabaseUrl: JSON_STORAGE_DATABASE_URL / JSON_STORAGE_DB_PATH fehlt (assertRequiredDbEnv zuerst aufrufen).',
+        );
     }
     if (pathOnly.startsWith('file:')) return pathOnly;
     return `file:${pathOnly.replace(/\\/g, '/')}`;

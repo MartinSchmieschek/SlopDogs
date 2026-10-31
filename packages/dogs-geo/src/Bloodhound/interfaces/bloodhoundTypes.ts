@@ -7,7 +7,7 @@
  * =========================================================================
  */
 
-import type { GeoPoint } from "@slopdogs/geo-pact";
+import type { GeoPoint } from '@slopdogs/geo-pact';
 
 /**
  * Arr, a single step upon the route — safe for JSON.stringify, free of

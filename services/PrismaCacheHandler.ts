@@ -23,7 +23,9 @@ import { isCacheInfraError } from './resilientCacheHandler';
 import type { PrismaClientLease, SharedPrismaClients } from '../store/SharedPrismaClients';
 
 function createPrismaCacheClient(dbUrl: string): PrismaClient {
-    const mod = require(path.join(process.cwd(), 'store/generated/prisma-cache-client')) as typeof import('../store/generated/prisma-cache-client');
+    const mod = require(
+        path.join(process.cwd(), 'store/generated/prisma-cache-client'),
+    ) as typeof import('../store/generated/prisma-cache-client');
     return new mod.PrismaClient({
         datasources: { db: { url: dbUrl } },
     });
@@ -68,9 +70,7 @@ function isTransientProviderError(err: unknown): boolean {
     if (!err) return false;
     const msg = (err as Error)?.message ?? String(err);
     // Overpass/OpenMeteo/Nominatim typische Muster: 429, 502, 503, 504, timeouts.
-    return /(\b429\b|\b502\b|\b503\b|\b504\b|timeout|timed\s*out|ETIMEDOUT|ECONNRESET|EAI_AGAIN|rate\s*limit)/i.test(
-        msg,
-    );
+    return /(\b429\b|\b502\b|\b503\b|\b504\b|timeout|timed\s*out|ETIMEDOUT|ECONNRESET|EAI_AGAIN|rate\s*limit)/i.test(msg);
 }
 
 export class PrismaCacheHandler implements ICacheHandler {
@@ -184,11 +184,7 @@ export class PrismaCacheHandler implements ICacheHandler {
                     // Kurzer Negative-Cache-Eintrag — stoppt den Retry-Sturm,
                     // laeuft naturgemaess schnell wieder ab.
                     const msg = (err as Error)?.message ?? String(err);
-                    await this.set(
-                        key,
-                        NEGATIVE_MARKER_PREFIX + msg,
-                        NEGATIVE_CACHE_TTL_MS,
-                    );
+                    await this.set(key, NEGATIVE_MARKER_PREFIX + msg, NEGATIVE_CACHE_TTL_MS);
                     if (v) console.log(`[PrismaCacheHandler] NEG-STORED: ${key} (${msg.slice(0, 80)})`);
                 }
                 throw err;

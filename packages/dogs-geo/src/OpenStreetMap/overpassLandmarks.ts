@@ -12,7 +12,7 @@ import {
     overpassSettingsHeader,
     type OsmGeoElement,
     OsmGeoElementType,
-} from "./overpassOsmShared";
+} from './overpassOsmShared';
 
 /** @deprecated use DEFAULT_OSM_RADIUS_M from overpassOsmShared */
 export const DEFAULT_LANDMARK_RADIUS_M = DEFAULT_OSM_RADIUS_M;
@@ -26,35 +26,35 @@ export type OsmLandmarkElement = OsmGeoElement;
  * OSM facets for the Overpass query — POI-style features (no highway=maxspeed, no generic landcover).
  */
 export enum LandmarksOverpassFacet {
-    Tourism = "tourism",
-    Historic = "historic",
-    Museum = "museum",
-    Peak = "peak",
-    Cemetery = "cemetery",
-    Bridge = "bridge",
-    Waterfall = "waterfall",
-    Spring = "spring",
-    Cave = "cave",
-    Beach = "beach",
-    Fountain = "fountain",
-    PlaceOfWorship = "place_of_worship",
-    Library = "library",
-    Theatre = "theatre",
-    Memorial = "memorial",
-    Castle = "castle",
-    Ruins = "ruins",
-    ArchaeologicalSite = "archaeological_site",
-    Battlefield = "battlefield",
-    Monument = "monument",
-    Windmill = "windmill",
-    Lighthouse = "lighthouse",
-    Dam = "dam",
-    Zoo = "zoo",
-    PicnicSite = "picnic_site",
-    Artwork = "artwork",
-    Viewpoint = "viewpoint",
-    Information = "information",
-    Military = "military",
+    Tourism = 'tourism',
+    Historic = 'historic',
+    Museum = 'museum',
+    Peak = 'peak',
+    Cemetery = 'cemetery',
+    Bridge = 'bridge',
+    Waterfall = 'waterfall',
+    Spring = 'spring',
+    Cave = 'cave',
+    Beach = 'beach',
+    Fountain = 'fountain',
+    PlaceOfWorship = 'place_of_worship',
+    Library = 'library',
+    Theatre = 'theatre',
+    Memorial = 'memorial',
+    Castle = 'castle',
+    Ruins = 'ruins',
+    ArchaeologicalSite = 'archaeological_site',
+    Battlefield = 'battlefield',
+    Monument = 'monument',
+    Windmill = 'windmill',
+    Lighthouse = 'lighthouse',
+    Dam = 'dam',
+    Zoo = 'zoo',
+    PicnicSite = 'picnic_site',
+    Artwork = 'artwork',
+    Viewpoint = 'viewpoint',
+    Information = 'information',
+    Military = 'military',
 }
 
 export const DEFAULT_LANDMARKS_FACETS: readonly LandmarksOverpassFacet[] = [
@@ -108,72 +108,40 @@ export interface OsmLandmarksResult {
 type LineGen = (r: number, lat: number, lng: number) => string;
 
 const OVERPASS_LINE_BY_FACET: Record<LandmarksOverpassFacet, LineGen> = {
-    [LandmarksOverpassFacet.Tourism]: (r, lat, lng) =>
-        `  nwr["tourism"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Historic]: (r, lat, lng) =>
-        `  nwr["historic"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Museum]: (r, lat, lng) =>
-        `  nwr["amenity"="museum"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Peak]: (r, lat, lng) =>
-        `  nwr["natural"="peak"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Cemetery]: (r, lat, lng) =>
-        `  nwr["amenity"="grave_yard"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Bridge]: (r, lat, lng) =>
-        `  nwr["man_made"="bridge"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Waterfall]: (r, lat, lng) =>
-        `  nwr["waterway"="waterfall"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Spring]: (r, lat, lng) =>
-        `  nwr["natural"="spring"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Cave]: (r, lat, lng) =>
-        `  nwr["natural"="cave"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Beach]: (r, lat, lng) =>
-        `  nwr["natural"="beach"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Fountain]: (r, lat, lng) =>
-        `  nwr["amenity"="fountain"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.PlaceOfWorship]: (r, lat, lng) =>
-        `  nwr["amenity"="place_of_worship"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Library]: (r, lat, lng) =>
-        `  nwr["amenity"="library"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Theatre]: (r, lat, lng) =>
-        `  nwr["amenity"="theatre"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Memorial]: (r, lat, lng) =>
-        `  nwr["historic"="memorial"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Castle]: (r, lat, lng) =>
-        `  nwr["historic"="castle"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Ruins]: (r, lat, lng) =>
-        `  nwr["historic"="ruins"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.ArchaeologicalSite]: (r, lat, lng) =>
-        `  nwr["historic"="archaeological_site"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Battlefield]: (r, lat, lng) =>
-        `  nwr["historic"="battlefield"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Monument]: (r, lat, lng) =>
-        `  nwr["historic"="monument"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Windmill]: (r, lat, lng) =>
-        `  nwr["man_made"="windmill"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Lighthouse]: (r, lat, lng) =>
-        `  nwr["man_made"="lighthouse"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Dam]: (r, lat, lng) =>
-        `  nwr["waterway"="dam"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Zoo]: (r, lat, lng) =>
-        `  nwr["tourism"="zoo"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.PicnicSite]: (r, lat, lng) =>
-        `  nwr["tourism"="picnic_site"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Artwork]: (r, lat, lng) =>
-        `  nwr["tourism"="artwork"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Viewpoint]: (r, lat, lng) =>
-        `  nwr["tourism"="viewpoint"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Information]: (r, lat, lng) =>
-        `  nwr["tourism"="information"](around:${r},${lat},${lng});`,
-    [LandmarksOverpassFacet.Military]: (r, lat, lng) =>
-        `  nwr["military"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Tourism]: (r, lat, lng) => `  nwr["tourism"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Historic]: (r, lat, lng) => `  nwr["historic"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Museum]: (r, lat, lng) => `  nwr["amenity"="museum"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Peak]: (r, lat, lng) => `  nwr["natural"="peak"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Cemetery]: (r, lat, lng) => `  nwr["amenity"="grave_yard"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Bridge]: (r, lat, lng) => `  nwr["man_made"="bridge"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Waterfall]: (r, lat, lng) => `  nwr["waterway"="waterfall"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Spring]: (r, lat, lng) => `  nwr["natural"="spring"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Cave]: (r, lat, lng) => `  nwr["natural"="cave"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Beach]: (r, lat, lng) => `  nwr["natural"="beach"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Fountain]: (r, lat, lng) => `  nwr["amenity"="fountain"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.PlaceOfWorship]: (r, lat, lng) => `  nwr["amenity"="place_of_worship"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Library]: (r, lat, lng) => `  nwr["amenity"="library"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Theatre]: (r, lat, lng) => `  nwr["amenity"="theatre"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Memorial]: (r, lat, lng) => `  nwr["historic"="memorial"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Castle]: (r, lat, lng) => `  nwr["historic"="castle"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Ruins]: (r, lat, lng) => `  nwr["historic"="ruins"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.ArchaeologicalSite]: (r, lat, lng) => `  nwr["historic"="archaeological_site"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Battlefield]: (r, lat, lng) => `  nwr["historic"="battlefield"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Monument]: (r, lat, lng) => `  nwr["historic"="monument"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Windmill]: (r, lat, lng) => `  nwr["man_made"="windmill"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Lighthouse]: (r, lat, lng) => `  nwr["man_made"="lighthouse"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Dam]: (r, lat, lng) => `  nwr["waterway"="dam"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Zoo]: (r, lat, lng) => `  nwr["tourism"="zoo"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.PicnicSite]: (r, lat, lng) => `  nwr["tourism"="picnic_site"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Artwork]: (r, lat, lng) => `  nwr["tourism"="artwork"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Viewpoint]: (r, lat, lng) => `  nwr["tourism"="viewpoint"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Information]: (r, lat, lng) => `  nwr["tourism"="information"](around:${r},${lat},${lng});`,
+    [LandmarksOverpassFacet.Military]: (r, lat, lng) => `  nwr["military"](around:${r},${lat},${lng});`,
 };
 
 function facetLines(f: LandmarksOverpassFacet, r: number, lat: number, lng: number): string[] {
     if (f === LandmarksOverpassFacet.Cemetery) {
-        return [
-            OVERPASS_LINE_BY_FACET[f](r, lat, lng),
-            `  nwr["landuse"="cemetery"](around:${r},${lat},${lng});`,
-        ];
+        return [OVERPASS_LINE_BY_FACET[f](r, lat, lng), `  nwr["landuse"="cemetery"](around:${r},${lat},${lng});`];
     }
     return [OVERPASS_LINE_BY_FACET[f](r, lat, lng)];
 }
@@ -190,7 +158,7 @@ function dedupeFacets(facets: LandmarksOverpassFacet[]): LandmarksOverpassFacet[
 }
 
 function coerceFacet(raw: unknown): LandmarksOverpassFacet | null {
-    if (typeof raw !== "string") {
+    if (typeof raw !== 'string') {
         const vals = Object.values(LandmarksOverpassFacet) as LandmarksOverpassFacet[];
         return vals.includes(raw as LandmarksOverpassFacet) ? (raw as LandmarksOverpassFacet) : null;
     }
@@ -216,17 +184,13 @@ export function parseLandmarkFacets(raw: unknown): LandmarksOverpassFacet[] {
         }
         return mapped.length ? dedupeFacets(mapped) : base;
     }
-    if (typeof raw === "string") {
+    if (typeof raw === 'string') {
         const v = raw.toLowerCase();
-        if (v === "" || v === "landmarks") return base;
-        if (v === "extended") {
-            return dedupeFacets([
-                ...base,
-                LandmarksOverpassFacet.Museum,
-                LandmarksOverpassFacet.Peak,
-            ]);
+        if (v === '' || v === 'landmarks') return base;
+        if (v === 'extended') {
+            return dedupeFacets([...base, LandmarksOverpassFacet.Museum, LandmarksOverpassFacet.Peak]);
         }
-        if (v === "full") {
+        if (v === 'full') {
             return dedupeFacets([...ALL_LANDMARKS_OVERPASS_FACETS]);
         }
         const one = coerceFacet(raw);
@@ -241,18 +205,13 @@ export function parseLandmarksPreset(raw: string | LandmarksOverpassFacet | unde
     return parseLandmarkFacets(raw);
 }
 
-export function buildLandmarksOverpassQuery(
-    lat: number,
-    lng: number,
-    radiusM: number,
-    facets: LandmarksOverpassFacet[]
-): string {
+export function buildLandmarksOverpassQuery(lat: number, lng: number, radiusM: number, facets: LandmarksOverpassFacet[]): string {
     const r = radiusM;
     const list = facets.length ? dedupeFacets(facets) : [...DEFAULT_LANDMARKS_FACETS];
     const lines = list.flatMap((f) => facetLines(f, r, lat, lng));
     return `${overpassSettingsHeader()}
 (
-${lines.join("\n")}
+${lines.join('\n')}
 );
 out center;`;
 }
@@ -265,11 +224,11 @@ export async function fetchNearbyLandmarks(
     lat: number,
     lng: number,
     radiusM: number,
-    facets: LandmarksOverpassFacet[]
+    facets: LandmarksOverpassFacet[],
 ): Promise<OsmLandmarksResult> {
     const normalized = facets.length ? dedupeFacets(facets) : [...DEFAULT_LANDMARKS_FACETS];
     const query = buildLandmarksOverpassQuery(lat, lng, radiusM, normalized);
-    const elements = await fetchOverpassElements(query, "OsmLandmarksRetriever");
+    const elements = await fetchOverpassElements(query, 'OsmLandmarksRetriever');
     return {
         center: { lat, lng },
         radiusM,

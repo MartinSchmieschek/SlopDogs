@@ -16,15 +16,14 @@ import { LEGACY_ROUTE, PUBLIC_ROUTE } from './routeTable';
  * Delegates kennel loading and running to the KennelRunHandler.
  */
 function escapeHtml(text: string): string {
-    return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 export class KennelSwaggerHandler {
-    constructor(private runHandler: KennelRunHandler, private nodesStore: IStore) {}
+    constructor(
+        private runHandler: KennelRunHandler,
+        private nodesStore: IStore,
+    ) {}
 
     /**
      * Doku und Spec gehoeren zur Ware: `/k/:id/docs` und `/k/:id/openapi.json`.
@@ -33,12 +32,8 @@ export class KennelSwaggerHandler {
     registerRoutes(app: any): void {
         app.get(PUBLIC_ROUTE.openapi, (req: any, res: any) => this.handleSwaggerJson(req, res));
         app.get(PUBLIC_ROUTE.docs, (req: any, res: any) => this.handleSwaggerUi(req, res));
-        app.get(LEGACY_ROUTE.swagger, (req: any, res: any) =>
-            this.redirectLegacy(req, res, publicKennelOpenApiPath(req.params.id)),
-        );
-        app.get(LEGACY_ROUTE.docs, (req: any, res: any) =>
-            this.redirectLegacy(req, res, publicKennelDocsPath(req.params.id)),
-        );
+        app.get(LEGACY_ROUTE.swagger, (req: any, res: any) => this.redirectLegacy(req, res, publicKennelOpenApiPath(req.params.id)));
+        app.get(LEGACY_ROUTE.docs, (req: any, res: any) => this.redirectLegacy(req, res, publicKennelDocsPath(req.params.id)));
     }
 
     /** 308 auf die neue Adresse; die Query (z. B. `?version=`) reist unveraendert mit. */
@@ -69,9 +64,9 @@ export class KennelSwaggerHandler {
             }
             const query = this.runHandler.mergeQueryParams(config.defaultQuery, req.query);
             const body = config.defaultBody;
-            const rawWaves = await this.runHandler.runKennel(
-                config, query, body, this.runHandler.toCapabilityCtx(req.ctx), undefined, { source: 'swagger' },
-            );
+            const rawWaves = await this.runHandler.runKennel(config, query, body, this.runHandler.toCapabilityCtx(req.ctx), undefined, {
+                source: 'swagger',
+            });
             // Ein toter Lead liefert keine ehrliche Spec (kein Schema, kein Beispiel) — dieselbe Antwort wie
             // /k/:id: 503 + Retry-After beim Speicher-Waechter, sonst 502 lead_failed. "empty" bleibt 200:
             // ein Lead ohne Wert ist eine gueltige, nur beispiellose Spec.
@@ -84,16 +79,18 @@ export class KennelSwaggerHandler {
             // may not read inside a readable kennel are redacted exactly like /run.
             const waves = access === 'read' ? await redactWavesForCtx(rawWaves, req.ctx, this.nodesStore) : rawWaves;
 
-            const spec: any = castGrimoire(toSwaggridCast(config, waves, {
-                includeDefaults: access === 'read',
-                leadOnly: access !== 'read',
-            }));
+            const spec: any = castGrimoire(
+                toSwaggridCast(config, waves, {
+                    includeDefaults: access === 'read',
+                    leadOnly: access !== 'read',
+                }),
+            );
             this.augmentForVisibility(spec, config, req);
             res.json(spec);
         } catch (err) {
             console.error('[KennelSwaggerHandler.handleSwaggerJson]', err);
             // W13 wie die Lauf-Handler: nur READ-Leser sehen den Text eines Laufs, nie einen Stack.
-            res.status(500).json({ error: access === 'read' ? ((err as any)?.message || String(err)) : REDACTED_TEXT });
+            res.status(500).json({ error: access === 'read' ? (err as any)?.message || String(err) : REDACTED_TEXT });
         }
     }
 

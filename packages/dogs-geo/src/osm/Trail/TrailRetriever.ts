@@ -1,9 +1,9 @@
-import { IHuntingSeason } from "@slopdogs/core";
-import { OsmFeatureRetriever, type OsmQueryBase } from "../base/OsmFeatureRetriever";
-import { type OverpassRawElement } from "../base/overpassMirrorChain";
-import { TrailQueryPact, type TrailQuery } from "./pacts";
+import { IHuntingSeason } from '@slopdogs/core';
+import { OsmFeatureRetriever, type OsmQueryBase } from '../base/OsmFeatureRetriever';
+import { type OverpassRawElement } from '../base/overpassMirrorChain';
+import { TrailQueryPact, type TrailQuery } from './pacts';
 
-export type TrailType = "hiking" | "bicycle" | "both" | "walkable";
+export type TrailType = 'hiking' | 'bicycle' | 'both' | 'walkable';
 
 /**
  * Highways die Menschen betreten duerfen (ohne foot=no-Ausschluss).
@@ -11,32 +11,32 @@ export type TrailType = "hiking" | "bicycle" | "both" | "walkable";
  * geteilte Service-Wege.
  */
 const WALKABLE_HIGHWAYS = new Set([
-    "footway",
-    "path",
-    "pedestrian",
-    "living_street",
-    "steps",
-    "track",
-    "residential",
-    "service",
-    "unclassified",
-    "cycleway",
+    'footway',
+    'path',
+    'pedestrian',
+    'living_street',
+    'steps',
+    'track',
+    'residential',
+    'service',
+    'unclassified',
+    'cycleway',
 ]);
 
 function isWalkable(tags: Record<string, string>): boolean {
-    if (tags["foot"] === "no") return false;
-    if (tags["access"] === "no" || tags["access"] === "private") return false;
-    if (tags["route"] === "hiking" || tags["route"] === "foot") return true;
-    const hw = tags["highway"];
+    if (tags['foot'] === 'no') return false;
+    if (tags['access'] === 'no' || tags['access'] === 'private') return false;
+    if (tags['route'] === 'hiking' || tags['route'] === 'foot') return true;
+    const hw = tags['highway'];
     return !!hw && WALKABLE_HIGHWAYS.has(hw);
 }
 export type TrailPoint = { lat: number; lng: number };
 
 export interface TrailElement {
     id: number;
-    type: "way" | "relation";
+    type: 'way' | 'relation';
     name?: string;
-    trailType: "hiking" | "bicycle";
+    trailType: 'hiking' | 'bicycle';
     distance?: string;
     surface?: string;
     /** Flat list: concatenation of all segments (for legacy consumers). */
@@ -60,36 +60,36 @@ export interface TrailResult {
     resolveAll: () => Array<{
         id: number;
         name?: string;
-        trailType: "hiking" | "bicycle";
+        trailType: 'hiking' | 'bicycle';
         segments: TrailPoint[][];
     }>;
     toGeoJSON: () => {
-        type: "FeatureCollection";
+        type: 'FeatureCollection';
         features: Array<{
-            type: "Feature";
-            geometry: { type: "LineString" | "MultiLineString"; coordinates: any };
+            type: 'Feature';
+            geometry: { type: 'LineString' | 'MultiLineString'; coordinates: any };
             properties: Record<string, any>;
         }>;
     };
 }
 
-function classifyTrailType(tags: Record<string, string>): "hiking" | "bicycle" {
-    const route = tags["route"] ?? "";
-    if (route === "bicycle") return "bicycle";
-    if (route === "hiking" || route === "foot") return "hiking";
-    const highway = tags["highway"] ?? "";
-    if (highway === "cycleway") return "bicycle";
-    if (tags["bicycle"] === "yes" && highway !== "footway") return "bicycle";
-    return "hiking";
+function classifyTrailType(tags: Record<string, string>): 'hiking' | 'bicycle' {
+    const route = tags['route'] ?? '';
+    if (route === 'bicycle') return 'bicycle';
+    if (route === 'hiking' || route === 'foot') return 'hiking';
+    const highway = tags['highway'] ?? '';
+    if (highway === 'cycleway') return 'bicycle';
+    if (tags['bicycle'] === 'yes' && highway !== 'footway') return 'bicycle';
+    return 'hiking';
 }
 
 function parseTrailType(raw?: string): TrailType {
-    if (!raw) return "both";
+    if (!raw) return 'both';
     const v = raw.toLowerCase();
-    if (v === "walkable" || v === "pedestrian" || v === "all_walkable") return "walkable";
-    if (v === "hiking" || v === "walking" || v === "foot") return "hiking";
-    if (v === "bicycle" || v === "cycling" || v === "bike") return "bicycle";
-    return "both";
+    if (v === 'walkable' || v === 'pedestrian' || v === 'all_walkable') return 'walkable';
+    if (v === 'hiking' || v === 'walking' || v === 'foot') return 'hiking';
+    if (v === 'bicycle' || v === 'cycling' || v === 'bike') return 'bicycle';
+    return 'both';
 }
 
 function makeToPolylines(): (element: TrailElement) => TrailPoint[][] {
@@ -105,7 +105,7 @@ function makeToPolylines(): (element: TrailElement) => TrailPoint[][] {
     };
 }
 
-function attachTrailHelpers(raw: Omit<TrailResult, "toPolylines" | "resolveAll" | "toGeoJSON">): TrailResult {
+function attachTrailHelpers(raw: Omit<TrailResult, 'toPolylines' | 'resolveAll' | 'toGeoJSON'>): TrailResult {
     const trails = raw.trails ?? [];
     const toPolylines = makeToPolylines();
     const resolveAll = () =>
@@ -116,19 +116,19 @@ function attachTrailHelpers(raw: Omit<TrailResult, "toPolylines" | "resolveAll" 
             segments: toPolylines(t),
         }));
     const toGeoJSON = () => ({
-        type: "FeatureCollection" as const,
+        type: 'FeatureCollection' as const,
         features: trails.map((t) => {
             const polylines = toPolylines(t);
             const isMulti = polylines.length !== 1;
             return {
-                type: "Feature" as const,
+                type: 'Feature' as const,
                 geometry: isMulti
                     ? {
-                          type: "MultiLineString" as const,
+                          type: 'MultiLineString' as const,
                           coordinates: polylines.map((seg) => seg.map((p) => [p.lng, p.lat])),
                       }
                     : {
-                          type: "LineString" as const,
+                          type: 'LineString' as const,
                           coordinates: (polylines[0] ?? []).map((p) => [p.lng, p.lat]),
                       },
                 properties: {
@@ -146,19 +146,19 @@ function attachTrailHelpers(raw: Omit<TrailResult, "toPolylines" | "resolveAll" 
 }
 
 export class TrailRetriever extends OsmFeatureRetriever<TrailResult, typeof TrailQueryPact> {
-    protected readonly layer = "trails";
+    protected readonly layer = 'trails';
     protected readonly defaultRadiusM = 3000;
     protected readonly maxRadiusM = 15000;
     protected readonly queryPactClass = TrailQueryPact;
     /** Trail nutzt `out geom;` damit Way-Geometrien inline kommen. */
-    protected readonly outStatement = "out geom;";
+    protected readonly outStatement = 'out geom;';
 
     get name(): string {
         return TrailRetriever.name;
     }
 
     get description(): string {
-        return "Finds nearby hiking trails and cycling routes via the Overpass/OpenStreetMap API.";
+        return 'Finds nearby hiking trails and cycling routes via the Overpass/OpenStreetMap API.';
     }
 
     protected parseQuery(season: IHuntingSeason): OsmQueryBase {
@@ -169,41 +169,38 @@ export class TrailRetriever extends OsmFeatureRetriever<TrailResult, typeof Trai
         // Drei Facets: hiking (enge Wander-Wege), bicycle (Radwege),
         // walkable (alle begehbaren Wege — breiter als hiking).
         const facets: string[] = [];
-        if (trailType === "walkable") facets.push("walkable");
-        if (trailType === "hiking" || trailType === "both") facets.push("hiking");
-        if (trailType === "bicycle" || trailType === "both") facets.push("bicycle");
+        if (trailType === 'walkable') facets.push('walkable');
+        if (trailType === 'hiking' || trailType === 'both') facets.push('hiking');
+        if (trailType === 'bicycle' || trailType === 'both') facets.push('bicycle');
 
         return {
             lat: parseFloat(query.lat),
             lng: parseFloat(query.lng),
-            radiusM: this.clampRadius(parseFloat(query.radius ?? "")),
+            radiusM: this.clampRadius(parseFloat(query.radius ?? '')),
             facets,
             postFilter: { trailType },
         };
     }
 
-    protected buildOverpassBodyForTile(
-        bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number },
-        facets: string[],
-    ): string {
+    protected buildOverpassBodyForTile(bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number }, facets: string[]): string {
         const bboxClause = `(${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng})`;
         const lines: string[] = [];
 
-        if (facets.includes("hiking")) {
+        if (facets.includes('hiking')) {
             lines.push(`  relation["route"="hiking"]${bboxClause};`);
             lines.push(`  relation["route"="foot"]${bboxClause};`);
             lines.push(`  way["highway"="path"]["foot"!="no"]${bboxClause};`);
             lines.push(`  way["highway"="footway"]${bboxClause};`);
         }
 
-        if (facets.includes("bicycle")) {
+        if (facets.includes('bicycle')) {
             lines.push(`  relation["route"="bicycle"]${bboxClause};`);
             lines.push(`  way["highway"="cycleway"]${bboxClause};`);
             lines.push(`  way["highway"="path"]["bicycle"="yes"]${bboxClause};`);
             lines.push(`  way["highway"="track"]["bicycle"="yes"]${bboxClause};`);
         }
 
-        if (facets.includes("walkable")) {
+        if (facets.includes('walkable')) {
             // Alles wo Menschen gehen duerfen. Breiter Scope:
             // markierte Wanderwege + Fuss/Fahrrad-Typen + Stadt-Wege ohne foot=no.
             lines.push(`  relation["route"="hiking"]${bboxClause};`);
@@ -220,14 +217,14 @@ export class TrailRetriever extends OsmFeatureRetriever<TrailResult, typeof Trai
             lines.push(`  way["highway"="cycleway"]["foot"!="no"]${bboxClause};`);
         }
 
-        return lines.join("\n");
+        return lines.join('\n');
     }
 
     protected classifyElementFacets(el: OverpassRawElement, fetchedFacets: string[]): string[] {
         const tags = el.tags ?? {};
         const matches: string[] = [];
-        if (fetchedFacets.includes("walkable") && isWalkable(tags)) {
-            matches.push("walkable");
+        if (fetchedFacets.includes('walkable') && isWalkable(tags)) {
+            matches.push('walkable');
         }
         const category = classifyTrailType(tags);
         if (fetchedFacets.includes(category)) matches.push(category);
@@ -239,22 +236,22 @@ export class TrailRetriever extends OsmFeatureRetriever<TrailResult, typeof Trai
         const trails: TrailElement[] = [];
 
         for (const el of elements) {
-            if (el.type !== "way" && el.type !== "relation") continue;
+            if (el.type !== 'way' && el.type !== 'relation') continue;
             if (!el.tags || Object.keys(el.tags).length === 0) continue;
             const dedupKey = `${el.type}/${el.id}`;
             if (seen.has(dedupKey)) continue;
             seen.add(dedupKey);
 
             const segments: TrailPoint[][] = [];
-            if (el.type === "way" && Array.isArray(el.geometry)) {
+            if (el.type === 'way' && Array.isArray(el.geometry)) {
                 if (el.geometry.length >= 2) {
-                    segments.push(el.geometry.map(p => ({ lat: p.lat, lng: p.lon })));
+                    segments.push(el.geometry.map((p) => ({ lat: p.lat, lng: p.lon })));
                 }
-            } else if (el.type === "relation" && Array.isArray(el.members)) {
+            } else if (el.type === 'relation' && Array.isArray(el.members)) {
                 for (const member of el.members) {
-                    if (member.type !== "way" || !Array.isArray(member.geometry)) continue;
+                    if (member.type !== 'way' || !Array.isArray(member.geometry)) continue;
                     if (member.geometry.length >= 2) {
-                        segments.push(member.geometry.map(p => ({ lat: p.lat, lng: p.lon })));
+                        segments.push(member.geometry.map((p) => ({ lat: p.lat, lng: p.lon })));
                     }
                 }
             }
@@ -263,18 +260,18 @@ export class TrailRetriever extends OsmFeatureRetriever<TrailResult, typeof Trai
 
             trails.push({
                 id: el.id,
-                type: el.type as "way" | "relation",
-                name: el.tags["name"],
+                type: el.type as 'way' | 'relation',
+                name: el.tags['name'],
                 trailType: classifyTrailType(el.tags),
-                distance: el.tags["distance"],
-                surface: el.tags["surface"],
+                distance: el.tags['distance'],
+                surface: el.tags['surface'],
                 coordinates,
                 segments,
                 tags: el.tags,
             });
         }
 
-        const trailType = (q.postFilter?.trailType ?? "both") as TrailType;
+        const trailType = (q.postFilter?.trailType ?? 'both') as TrailType;
         return attachTrailHelpers({
             center: { lat: q.lat, lng: q.lng },
             radiusM: q.radiusM,
@@ -289,7 +286,7 @@ export class TrailRetriever extends OsmFeatureRetriever<TrailResult, typeof Trai
      * bauen sie sonst aus den trails-Arrays neu auf. Idempotent.
      */
     protected postProcess(result: TrailResult, _q: OsmQueryBase): TrailResult {
-        if (typeof result.toPolylines === "function" && typeof result.resolveAll === "function") {
+        if (typeof result.toPolylines === 'function' && typeof result.resolveAll === 'function') {
             return result;
         }
         return attachTrailHelpers({
@@ -299,5 +296,4 @@ export class TrailRetriever extends OsmFeatureRetriever<TrailResult, typeof Trai
             trails: result.trails ?? [],
         });
     }
-
 }

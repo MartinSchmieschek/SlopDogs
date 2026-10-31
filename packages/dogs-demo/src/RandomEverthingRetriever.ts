@@ -12,7 +12,7 @@
  * ============================================================
  */
 
-import { Dog, IHuntingSeason } from "@slopdogs/core";
+import { Dog, IHuntingSeason } from '@slopdogs/core';
 
 /**
  * Arr, the RandomEveryThingRetriever -- a mad vessel that sails every cursed
@@ -22,15 +22,14 @@ import { Dog, IHuntingSeason } from "@slopdogs/core";
  * forms, it stuffs all plundered data into one accursed cargo hold for the crew.
  */
 export class RandomEveryThingRetriever extends Dog<any> {
-
     /** Arr, no required crew -- this mad vessel needs no escort into the abyss */
-    get required(){
-        return []
+    get required() {
+        return [];
     }
 
     /** No optional hands on deck, matey -- the void cares not for company */
     get optional() {
-        return []
+        return [];
     }
 
     /**
@@ -38,8 +37,8 @@ export class RandomEveryThingRetriever extends Dog<any> {
      * To cosmic madness laws submit, though stalwart minds entreat.
      */
     protected yieldCollectorFactory: (season: IHuntingSeason) => Promise<any> = (season: IHuntingSeason) => {
-        return this.request(season)
-    }
+        return this.request(season);
+    };
 
     /**
      * Arr, here we plunder multiple APIs in one fell voyage, matey!
@@ -51,7 +50,6 @@ export class RandomEveryThingRetriever extends Dog<any> {
      * @returns A cargo hold of plundered data from the void, its shape as formless as the eldritch deep itself
      */
     public async request(season: IHuntingSeason): Promise<any> {
-
         // Arr, the cargo hold for all plundered data from the void
         let all: any = {};
 
@@ -59,25 +57,24 @@ export class RandomEveryThingRetriever extends Dog<any> {
         let apis: Map<string, { url: string }> = new Map();
 
         // The Ice and Fire API -- characters from a realm where suns and love retreat
-        apis.set("characters", {
-            url: "https://anapioficeandfire.com/api/characters/" + Math.floor(Math.random() * 501)
-        })
+        apis.set('characters', {
+            url: 'https://anapioficeandfire.com/api/characters/' + Math.floor(Math.random() * 501),
+        });
 
         // Random dog images -- even the hounds of the deep answer our call
-        apis.set("woof", {
-            url: "https://random.dog/woof.json"
-        })
+        apis.set('woof', {
+            url: 'https://random.dog/woof.json',
+        });
 
         // Arr, sail to each port and plunder what the abyss offers
         for await (const api of apis) {
             try {
                 const reciepResponse = await fetch(api[1].url);
-                const json = await reciepResponse.json()
-                all[api[0]] = json
-
+                const json = await reciepResponse.json();
+                all[api[0]] = json;
             } catch (e) {
                 // Arr, the void swallowed our request -- log the horror but sail on, matey
-                console.warn(e)
+                console.warn(e);
             }
         }
 
@@ -86,7 +83,7 @@ export class RandomEveryThingRetriever extends Dog<any> {
 
     /** The name of this eldritch retriever, whispered by carrion hordes in the deep */
     get name() {
-        return RandomEveryThingRetriever.name
+        return RandomEveryThingRetriever.name;
     }
 
     get description(): string {
@@ -95,7 +92,6 @@ export class RandomEveryThingRetriever extends Dog<any> {
 
     /** The icon -- its heralds are the stars it fells, the sky and Earth aflame */
     get icon(): string | undefined {
-        return "\uD83C\uDFB2";
+        return '\uD83C\uDFB2';
     }
-
 }

@@ -1,4 +1,4 @@
-import { createPact } from "@slopdogs/core";
+import { createPact } from '@slopdogs/core';
 
 export interface MealQuery {
     /** Modus: search, lookup, random, filter */
@@ -9,7 +9,4 @@ export interface MealQuery {
     filterBy?: string;
 }
 
-export const MealQueryPact = createPact<MealQuery>(
-    "MealQueryProvider",
-    { fromSourceType: "MealQuery" }
-);
+export const MealQueryPact = createPact<MealQuery>('MealQueryProvider', { fromSourceType: 'MealQuery' });

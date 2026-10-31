@@ -45,13 +45,7 @@ export function defaultGeoBucketM(radiusM: number): number {
  *   geoBucketKey("trails", 47.3769, 8.5417, 3000, { type: "both" })
  *   → "trails:47.376700:8.539867:r3000:type=both"
  */
-export function geoBucketKey(
-    prefix: string,
-    lat: number,
-    lng: number,
-    radiusM: number,
-    options?: GeoBucketOptions,
-): string {
+export function geoBucketKey(prefix: string, lat: number, lng: number, radiusM: number, options?: GeoBucketOptions): string {
     const bucketM = options?.bucketM ?? defaultGeoBucketM(radiusM);
     const bucketDegLat = bucketM / METRES_PER_DEG_LAT;
     // Snap latitude first, then derive the longitude cell from the *snapped*
