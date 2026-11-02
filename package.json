@@ -58,7 +58,7 @@
   "license": "MIT",
   "private": true,
   "dependencies": {
-    "@martinschmieschek/slopdogs-core": "git+https://github.com/MartinSchmieschek/slopdogs-core.git#v0.3.3",
+    "@martinschmieschek/slopdogs-core": "https://github.com/MartinSchmieschek/slopdogs-core/releases/download/v0.3.3/martinschmieschek-slopdogs-core-0.3.3.tgz",
     "@martinschmieschek/slopdogs-dogs-air-quality": "https://github.com/MartinSchmieschek/slopdogs-base-dogs/releases/download/%40martinschmieschek%2Fslopdogs-dogs-air-quality%400.3.0/martinschmieschek-slopdogs-dogs-air-quality-0.3.0.tgz",
     "@martinschmieschek/slopdogs-dogs-animals-random": "https://github.com/MartinSchmieschek/slopdogs-base-dogs/releases/download/%40martinschmieschek%2Fslopdogs-dogs-animals-random%400.3.0/martinschmieschek-slopdogs-dogs-animals-random-0.3.0.tgz",
     "@martinschmieschek/slopdogs-dogs-astronomy": "https://github.com/MartinSchmieschek/slopdogs-base-dogs/releases/download/%40martinschmieschek%2Fslopdogs-dogs-astronomy%400.3.0/martinschmieschek-slopdogs-dogs-astronomy-0.3.0.tgz",

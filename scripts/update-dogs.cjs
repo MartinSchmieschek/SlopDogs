@@ -1,8 +1,8 @@
 /**
  * `npm run update:dogs` — hebt die gepinnten SlopDogs-Pakete auf das jeweils neueste stabile Release.
  *
- * core per Git-Tag (`git+https://…/slopdogs-core.git#v<version>`), typedefs und Dog-Pakete per Release-Tarball
- * (`…/releases/download/<tag>/<datei>.tgz`). Die Tags kommen per `git ls-remote` — kein Token, kein API-Kontingent.
+ * core, typedefs und Dog-Pakete per Release-Tarball (`…/releases/download/<tag>/<datei>.tgz`); die Git-Tag-Form
+ * (`git+https://…/slopdogs-core.git#v<version>`) hebt er ebenso an. Die Tags kommen per `git ls-remote` — kein Token, kein API-Kontingent.
  * Gepinnt bleibt es (E2): der Befehl schreibt exakte Versionen in die package.json und erneuert danach die Lockdatei
  * per `npm install`.
  *
