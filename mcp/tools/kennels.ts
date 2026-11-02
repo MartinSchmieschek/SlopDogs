@@ -706,13 +706,21 @@ export function getKennelTools(): ToolDef[] {
         {
             name: 'delete_kennel',
             description:
-                'Deletes a kennel and ALL its versions. The owner or an editor can delete; not while frozen, never a landing kennel (LANDING_KENNEL_IDS, "locked_landing"). Irreversible — every dog dies forever.',
+                'Deletes a kennel and ALL its versions — irreversible. The owner or an editor can delete; not while frozen. ' +
+                'A maintained kennel (LANDING_KENNEL_IDS, the seeded slopdogs-landing and slopdogs-kennels) only a maintainer (SLOPDOGS_MAINTAINER_EMAILS) may delete; anyone else gets "locked_landing". ' +
+                'The dogs of a kennel stay saved — except for the seeded kennels slopdogs-landing and slopdogs-kennels: there every ownerless dog of the kennel (dogIds and parents) that no other kennel or outside dog uses is deleted with it, the used ones stay; ' +
+                'the answer is {deleted, dogsDeleted:[{lineageId, displayName}], dogsKept:[{lineageId, displayName, usedBy}], reseed:"at next restart"} — the next restart seeds the kennel again from the repo, on the same dog lineages. ' +
+                'Pass dryRun:true to get that answer without deleting anything.',
             inputSchema: {
                 type: 'object',
                 required: ['id'],
                 additionalProperties: false,
                 properties: {
                     id: { type: 'string', description: 'lineageId or version GUID' },
+                    dryRun: {
+                        type: 'boolean',
+                        description: 'Seeded kennels only: report which dogs would go and which stay (and why), delete nothing.',
+                    },
                 },
             },
             handler: async (args, ctx, deps) => {
@@ -720,6 +728,19 @@ export function getKennelTools(): ToolDef[] {
                 const existing = await deps.kennelsController.getById(id);
                 if (!existing.ok || !existing.data) return fail(`Kennel ${id} not found`);
                 if (!canMutate(existing.data as any, ctx)) return fail(kennelMutationRefusal(existing.data, ctx, id));
+                const lineageId = String((existing.data as { lineageId?: unknown }).lineageId ?? '');
+                const seeded = deps.seededKennelDelete?.applies(lineageId, id) ? deps.seededKennelDelete : null;
+                if (args.dryRun === true) {
+                    if (!seeded) return fail(`dryRun: only the seeded kennels have a delete preview — ${id} is not one`);
+                    const plan = await seeded.plan(lineageId);
+                    return plan ? ok({ dryRun: true, ...plan }) : fail(`Kennel ${id} not found`);
+                }
+                if (seeded) {
+                    const report = await seeded.delete(lineageId);
+                    if (!report) return fail(`Kennel ${id} not found`);
+                    const { kennelId, ...rest } = report;
+                    return ok({ deleted: kennelId, ...rest });
+                }
                 const result = await deps.kennelsController.delete(id);
                 if (!result.ok) return fail(result.error ?? 'delete failed');
                 return ok({ deleted: id });

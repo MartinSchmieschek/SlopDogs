@@ -40,6 +40,7 @@ import { DogStatsService } from './services/DogStatsService';
 import { EXPRESS_APP_ROUTES, FRONTEND_ROUTES, LEGACY_ROUTE } from './api/routes/routeTable';
 import { KeyStoreService, type KeyStorePrisma } from './services/KeyStoreService';
 import { PackageCandidateTests } from './test/startup/packageCandidates';
+import { SeededKennelTests } from './test/startup/seededKennelTests';
 import { LocalMode } from './server-app/LocalMode';
 import { authModeBootError } from './mcp/auth/middleware';
 import { AllowedHosts, NetworkBoundary } from './server-app/NetworkBoundary';
@@ -146,6 +147,15 @@ export class StartupTest {
             this.testLocalModeBootGuard();
             this.testLocalNetworkBoundary(app);
             await this.testKennelHardening(nodesStore, kennelsStore);
+            // Spur K: Seed-Kennels nur wenn fehlend, Loeschen mit Nutzungspruefung, Reset = Loeschen + Neustart.
+            await new SeededKennelTests(
+                (name, passed, error) => this.addResult(name, passed, error),
+                nodesStore,
+                kennelsStore,
+                nodesController,
+                kennelsController as KennelController,
+                baseDogsMap,
+            ).run();
 
             // Block 2 — Paket-Kandidaten: wandern in P4 als Paket-Tests nach slopdogs-core bzw. slopdogs-base-dogs.
             await new PackageCandidateTests((name, passed, error) => this.addResult(name, passed, error)).run(baseDogsMap);

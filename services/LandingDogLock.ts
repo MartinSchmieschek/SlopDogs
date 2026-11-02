@@ -26,6 +26,12 @@ export interface LandingDogLockDeps {
     lineageOf(ref: string): Promise<string | null>;
     /** Kopfversionen dieser Lineages (SerializedDog und MimicDog). */
     dogHeads(lineageIds: string[]): Promise<LandingDogHead[]>;
+    /**
+     * Lineages, die immer gepflegt sind, auch wenn ihr Kennel gerade fehlt: die festen Seed-Lineages
+     * (seed-data/kennels/maintainedSeedLineages.ts) und die beim Loeschen behaltenen Dogs (SeedKeptDogs); ihre Parents
+     * zaehlen wie sonst.
+     */
+    fixedLineages?(): Iterable<string> | Promise<Iterable<string>>;
     /** Abhaengige melden Aenderungen (DogReferenceIndex.onChange). */
     onChange?(listener: () => void): void;
 }
@@ -130,6 +136,7 @@ export class LandingDogLock {
             const dogIds = await this.deps.kennelDogIds(kennelId);
             if (dogIds) frontier.push(...dogIds);
         }
+        frontier.push(...((await this.deps.fixedLineages?.()) ?? []));
         while (frontier.length > 0 && seen.size < maxDogs) {
             const next: string[] = [];
             for (const ref of frontier) {

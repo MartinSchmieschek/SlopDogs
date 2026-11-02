@@ -13,6 +13,7 @@ import type { KennelStatsService } from '../../services/KennelStatsService';
 import type { KennelCallCounter } from '../../services/KennelCallCounter';
 import type { DogStatsService } from '../../services/DogStatsService';
 import type { KeyStoreService } from '../../services/KeyStoreService';
+import type { SeededKennelDelete } from '../../services/SeededKennelDelete';
 import type { PendingAdmission, RunGates } from '../../server-app/runAdmission';
 
 export interface BaseDogInfo {
@@ -75,6 +76,8 @@ export interface ToolDeps {
      * jeder Lauf ist sofort zugelassen.
      */
     runGates?: RunGates;
+    /** Spur K: delete_kennel auf einem Seed-Kennel prueft die Nutzung seiner Dogs (Vorschau mit dryRun). Ohne: wie jeder Kennel. */
+    seededKennelDelete?: SeededKennelDelete;
 }
 
 export interface ToolResult {

@@ -124,7 +124,7 @@ export class KennelListPage {
         if (!this.enabled || !this.runner || !this.deps) return { active: false, kennelId: this.kennelId };
         await this.checkFingerprint();
         const memo = this.memo;
-        const active = memo ? !!memo.html || this.now() - memo.at >= this.memoMs : true;
+        const active = memo ? !!memo.html || (memo.fingerprint !== null && this.now() - memo.at >= this.memoMs) : true;
         return { active, kennelId: this.kennelId };
     }
 
@@ -182,7 +182,9 @@ export class KennelListPage {
         this.dirty = false;
         try {
             const fingerprint = await this.fingerprint();
-            if (this.memo && this.memo.fingerprint !== fingerprint) this.memo = null;
+            // Kennel weg (geloescht): gleich als "aus" merken — /kennels und /api/kennel-list fallen ohne Lauf zurueck.
+            if (this.memo && this.memo.fingerprint !== fingerprint)
+                this.memo = fingerprint === null ? { html: null, at: this.now(), fingerprint: null } : null;
         } catch (err) {
             console.warn('[KennelListPage] Fingerabdruck gescheitert — Memo verworfen:', (err as Error)?.message ?? err);
             this.memo = null;

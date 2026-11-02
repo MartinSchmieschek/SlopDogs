@@ -47,8 +47,9 @@ export async function runSeeds(nodesStore: IStore, kennelsStore: IStore): Promis
     await seedVoidStormsKennel(nodesStore, kennelsStore);
     await seedElevationKennel(nodesStore, kennelsStore);
     await seedTrailScoutKennel(nodesStore, kennelsStore);
+    // Landing und Kennel-Liste (Spur K): nur wenn sie fehlen, nie ueberschrieben (Live-Aenderungen der Maintainer).
+    // Zuruecksetzen = Kennel loeschen und neu starten.
     await seedSlopdogsLandingKennel(nodesStore, kennelsStore);
-    // Die Kennel-Liste (Spur K): nur beim ersten Boot, danach nie ueberschrieben (Live-Aenderungen der Maintainer).
     await seedSlopdogsKennelsKennel(nodesStore, kennelsStore);
 }
 

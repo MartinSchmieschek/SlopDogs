@@ -55,6 +55,10 @@ import type { TestResult } from '../StartupTest';
 import { SecurityHeaders } from './SecurityHeaders';
 import { SameOriginGuard } from '../mcp/auth/sameOriginGuard';
 import { LandingDogLock } from '../services/LandingDogLock';
+import { SeededKennelDelete } from '../services/SeededKennelDelete';
+import { maintainedSeedLineages } from '../seed-data/kennels/maintainedSeedLineages';
+import { SeedKeptDogs } from '../seed-data/kennels/seedKeptDogs';
+import { LandingKennels } from '../mcp/auth/landingKennels';
 
 export type CreateHttpApplicationInput = {
     nodeEnv: string;
@@ -347,7 +351,8 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
 
     // Besitzerlose Dogs der Landing-Kennels: fuer alle gesperrt (isLandingLocked). Die Menge rechnet LandingDogLock im
     // Hintergrund; bis zur ersten Berechnung gelten besitzerlose Dogs als gesperrt. Neu nach jeder Index-Aenderung.
-    new LandingDogLock({
+    const seedKeptDogs = new SeedKeptDogs(kennelsStore);
+    const landingDogLock = new LandingDogLock({
         kennelDogIds: async (kennelId) => {
             const head = await kennelsController.getById(kennelId);
             return head.ok && head.data ? (head.data.dogIds ?? []) : null;
@@ -357,6 +362,8 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
             return normalized.toKey.startsWith(BASE_DOG_PREFIX) ? null : normalized.toKey;
         },
         dogHeads: listDogsOf,
+        // Die Seed-Dogs bleiben gesperrt, auch zwischen dem Loeschen ihres Kennels und dem Neustart.
+        fixedLineages: async () => [...maintainedSeedLineages(), ...(await seedKeptDogs.list()).map((entry) => entry.lineageId)],
         onChange: (listener) => input.refIndex.onChange(listener),
     }).start();
     input.callCounter.setOnFlushed(() => {
@@ -452,6 +459,32 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     });
     // Jede neue Dog- oder Kennel-Version: die naechste Anfrage an /kennels prueft den Fingerabdruck (live anpassbar).
     input.refIndex.onChange(() => kennelListPage.markChanged());
+    // Spur K: ein Maintainer loescht einen Seed-Kennel samt der Dogs, die sonst niemand nutzt (Quelle: Referenzindex);
+    // der naechste Start seedet ihn neu. Danach faellt sein Memo sofort: / zeigt den Fallback, /kennels die Angular-Liste.
+    const seededKennelDelete = new SeededKennelDelete(
+        {
+            kennelDogIds: async (kennelId) => {
+                const head = await kennelsController.getById(kennelId);
+                return head.ok && head.data ? (head.data.dogIds ?? []) : null;
+            },
+            lineageOf: async (ref) => {
+                const normalized = await input.refIndex.normalize(ref);
+                return normalized.toKey.startsWith(BASE_DOG_PREFIX) ? null : normalized.toKey;
+            },
+            dogHeads: listDogsOf,
+            referencesTo: async (lineageIds) => (input.refIndex.isRebuilding ? null : input.refIndex.referencesTo(lineageIds)),
+            deleteKennel: async (kennelId) => (await kennelsController.deleteRef(kennelId)).ok,
+            deleteDog: async (lineageId) => (await nodesController.deleteRef(lineageId)).ok,
+            rememberKept: (kennelId, dogs) => seedKeptDogs.remember(kennelId, dogs),
+            afterDelete: (kennelId) => {
+                landingPage.forget(kennelId);
+                kennelListPage.markChanged();
+                void landingDogLock.refresh();
+            },
+        },
+        (kennelId) => LandingKennels.isSeeded(kennelId),
+    );
+    routeHandler.useSeededKennelDelete(seededKennelDelete);
     const kennelSwaggerHandler = new KennelSwaggerHandler(kennelRunHandler, nodesStore);
     const kennelBundleHandler = new KennelBundleHandler(kennelRunHandler, kennelsController, nodesStore, baseDogsMap);
 
@@ -534,6 +567,7 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
         dogStats,
         keyStore,
         runGates,
+        seededKennelDelete,
     };
     app.use('/mcp', createMcpRouter(toolDeps));
     app.use('/actions', createActionsRouter(toolDeps));

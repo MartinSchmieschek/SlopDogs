@@ -50,6 +50,8 @@ export const API_ROUTE = {
     kennelRating: '/api/kennels/:id/rating',
     /** Favoriten je Nutzer (Spur U): PUT/DELETE. */
     kennelFavorite: '/api/kennels/:id/favorite',
+    /** Spur K: Trockenlauf des Loeschens eines Seed-Kennels — welche Dogs mitfallen, welche bleiben (Maintainer). */
+    kennelDeletePreview: '/api/kennels/:id/delete-preview',
     /** Ranglisten fuer die Landing (P4), vor ConfigRouteHandler registriert. */
     landing: '/api/landing',
     /** Spur K: liefert `/kennels` gerade den Kennel `slopdogs-kennels`? Das Signal fuer die Angular-Links. */
@@ -90,6 +92,7 @@ export const API_ROUTES = [
     '/api/kennels/:id/execute',
     '/api/kennels/:id/rating',
     '/api/kennels/:id/favorite',
+    '/api/kennels/:id/delete-preview',
     '/api/nodes',
     '/api/nodes/:id',
     '/api/nodes/:id/versions',
@@ -163,6 +166,7 @@ export const EXPRESS_APP_ROUTES = [
     API_ROUTE.kennelExecute,
     API_ROUTE.kennelRating,
     API_ROUTE.kennelFavorite,
+    API_ROUTE.kennelDeletePreview,
     API_ROUTE.kennelExport,
     API_ROUTE.kennelImport,
     API_ROUTE.nodesList,

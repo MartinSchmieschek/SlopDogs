@@ -66,6 +66,21 @@ export class LandingKennels {
         return out;
     }
 
+    /**
+     * Die Kennels, die der Boot aus dem Repo seedet, wenn sie fehlen (Standard und Seed-Pflege-Kennels). Nur sie loescht
+     * ein Maintainer samt ihrer unbenutzten Dogs (SeededKennelDelete); Kennels aus LANDING_KENNEL_IDS zaehlen nicht dazu.
+     */
+    static seededIds(): string[] {
+        return [LandingKennels.DEFAULT_KENNEL_ID, ...LandingKennels.SEED_CURATED_IDS];
+    }
+
+    /** Ein Seed-Kennel (seededIds), ohne Gross-/Kleinschreibung? */
+    static isSeeded(kennelId: unknown): boolean {
+        if (typeof kennelId !== 'string' || !kennelId) return false;
+        const wanted = kennelId.toLowerCase();
+        return LandingKennels.seededIds().some((id) => id.toLowerCase() === wanted);
+    }
+
     /** Ein gepflegter Kennel (Liste, Standard oder Seed-Pflege-Kennel)? */
     static isProtected(kennelId: unknown): boolean {
         if (typeof kennelId !== 'string' || !kennelId) return false;

@@ -110,6 +110,12 @@ export class LandingPage {
         this.runner = runner;
     }
 
+    /** Der Kennel wurde geloescht: sein Memo faellt sofort, der naechste Besuch nimmt den naechsten Kandidaten. */
+    forget(kennelId: string): void {
+        const wanted = kennelId.toLowerCase();
+        for (const id of [...this.memo.keys()]) if (id.toLowerCase() === wanted) this.memo.delete(id);
+    }
+
     /** Wie viele Kennel-Laeufe die Landing ausgeloest hat — Messpunkt fuer "kein Lauf je Besuch". */
     get runs(): number {
         return this.runCount;

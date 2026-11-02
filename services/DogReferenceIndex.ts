@@ -134,6 +134,12 @@ export class DogReferenceIndex {
         await this.replace('dog', lineageId, rows);
     }
 
+    /** Wer diese Ziele referenziert (Kennel-Crew und Dog-Parents der Kopfversionen), aus der Tabelle des Index. */
+    async referencesTo(toKeys: ReadonlySet<string>): Promise<DogReferenceRow[]> {
+        if (toKeys.size === 0) return [];
+        return (await this.store.readAllReferences()).filter((row) => toKeys.has(row.toKey));
+    }
+
     /** Ursprung geloescht: seine Zeilen fallen. Referenzen AUF ihn bleiben (dangling, wie geschrieben). */
     async removeFrom(kind: DogReferenceFromKind, key: string): Promise<void> {
         await this.store.removeReferences(kind, key);

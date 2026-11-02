@@ -26,6 +26,8 @@ import { firstRefusedDogRef, refusedDogRefMessage, type RefusedDogRef } from '..
 import type { KennelStatsService } from '../../services/KennelStatsService';
 import type { KennelFavoriteService } from '../../services/KennelFavoriteService';
 import type { DogStatsService } from '../../services/DogStatsService';
+import type { SeededKennelDelete } from '../../services/SeededKennelDelete';
+import { API_ROUTE } from './routeTable';
 
 /**
  * Returns true when the request has a logged-in user OR is in super-user dev mode.
@@ -99,6 +101,9 @@ export class ConfigRouteHandler {
     /** Spur U: haengt `favorite` des Aufrufers an jeden Listeneintrag. */
     private kennelFavorites?: KennelFavoriteService;
 
+    /** Spur K: Seed-Kennels loeschen samt ihrer unbenutzten Dogs, mit Vorschau. Ohne: wie jeder Kennel. */
+    private seededDelete?: SeededKennelDelete;
+
     constructor(
         registry: ControllerRegistry,
         kennelStore?: IStore,
@@ -111,6 +116,11 @@ export class ConfigRouteHandler {
         this.kennelStats = kennelStats;
         this.dogStats = dogStats;
         this.kennelFavorites = kennelFavorites;
+    }
+
+    /** Spur K: nach dem Montieren der Seiten (createHttpApplication) — Loeschen der Seed-Kennels mit Nutzungspruefung. */
+    useSeededKennelDelete(seededDelete: SeededKennelDelete): void {
+        this.seededDelete = seededDelete;
     }
 
     /** True if subpath==='nodes' and the user can mutate this node (owner / editor / community / super). */
@@ -205,6 +215,11 @@ export class ConfigRouteHandler {
         // PATCH /api/:subpath/:id/rename — change the spirit's displayName across all incarnations.
         app.patch(`${basePath}/:subpath/:id/rename`, async (req: Request, res: Response) => {
             await this.handleRename(req, res);
+        });
+
+        // GET /api/kennels/:id/delete-preview — Spur K: was das Loeschen eines Seed-Kennels mitnimmt (Trockenlauf).
+        app.get(API_ROUTE.kennelDeletePreview, async (req: Request, res: Response) => {
+            await this.handleDeletePreview(req, res);
         });
 
         // DELETE /api/:subpath/:id — cast the entity into the void, never to return.
@@ -551,6 +566,18 @@ export class ConfigRouteHandler {
                 return;
             }
 
+            const kennelLineage = String((existing.data as { lineageId?: unknown }).lineageId ?? '');
+            if (subpath === 'kennels' && this.seededDelete?.applies(kennelLineage, id)) {
+                const report = await this.seededDelete.delete(kennelLineage);
+                if (!report) {
+                    res.status(404).json({ error: 'not_found' });
+                    return;
+                }
+                const { kennelId, ...rest } = report;
+                res.status(200).json({ ok: true, scope: 'lineage', lineageId: kennelId, deleted: kennelId, ...rest });
+                return;
+            }
+
             const outcome = await controller.deleteRef(id);
             if (outcome.ok) {
                 res.status(200).json({ ok: true, scope: outcome.scope, lineageId: outcome.lineageId, deleted: outcome.deleted });
@@ -565,6 +592,41 @@ export class ConfigRouteHandler {
         } catch (e) {
             console.error(`[ConfigRouteHandler.handleDelete] Fehler:`, e);
             res.status(500).json({ error: 'delete_failed' });
+        }
+    }
+
+    /**
+     * GET /api/kennels/:id/delete-preview (Spur K): nur fuer Seed-Kennels und nur fuer den, der loeschen darf — dieselbe
+     * Rueckmeldung wie DELETE ({ dogsDeleted, dogsKept, reseed }), ohne etwas zu loeschen.
+     */
+    private async handleDeletePreview(req: Request, res: Response): Promise<void> {
+        try {
+            const id = paramString(req.params.id);
+            const controller = this.registry.get('kennels');
+            const existing = controller ? await controller.getById(id) : null;
+            if (!existing?.ok || !existing.data) {
+                res.status(404).json({ error: 'not_found' });
+                return;
+            }
+            if (!canMutate(existing.data, req.ctx)) {
+                ConfigRouteHandler.sendDeleteRefused(res, existing.data, req, 'kennels');
+                return;
+            }
+            const lineageId = String((existing.data as { lineageId?: unknown }).lineageId ?? '');
+            if (!this.seededDelete?.applies(lineageId, id)) {
+                res.status(400).json({ error: 'not_seeded', error_description: 'Only the seeded kennels have a delete preview.' });
+                return;
+            }
+            const report = await this.seededDelete.plan(lineageId);
+            if (!report) {
+                res.status(404).json({ error: 'not_found' });
+                return;
+            }
+            res.setHeader('Cache-Control', 'no-store');
+            res.status(200).json({ ok: true, dryRun: true, ...report });
+        } catch (e) {
+            console.error(`[ConfigRouteHandler.handleDeletePreview] Fehler:`, e);
+            res.status(500).json({ error: 'preview_failed' });
         }
     }
 

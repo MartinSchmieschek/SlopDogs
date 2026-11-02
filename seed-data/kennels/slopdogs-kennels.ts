@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import { IStore } from '../../store/IStore';
-import { SerializedDog } from '@martinschmieschek/slopdogs-core/runtime';
+import { MaintainedSeedDogs, type MaintainedSeedSource } from './maintainedSeed';
+import { SeedKeptDogs } from './seedKeptDogs';
 import { kennelExists } from '../seed-helpers';
 
 /** Die Kennel-Liste als Kennel (Spur K): `/kennels` liefert die Lead-Ausgabe, solange sie laeuft (KennelListPage). */
@@ -294,7 +295,7 @@ const DOGS: KennelListDogSource[] = [
 ];
 
 /** Die Quellen: ts-node liest neben dieser Datei, dist/ (tsc kopiert keine .js-Quellen) liest im Repo. */
-export class SlopdogsKennelsSource {
+export class SlopdogsKennelsSource implements MaintainedSeedSource {
     static readonly DOGS: readonly KennelListDogSource[] = DOGS;
 
     private constructor(private readonly dir: string) {}
@@ -314,52 +315,27 @@ export class SlopdogsKennelsSource {
     }
 }
 
-/** Ein oeffentlicher Dog ohne Besitzer in seiner ersten Version — gepflegt (LandingDogLock): nur Maintainer aendern ihn. */
-async function saveKennelListDog(store: IStore, dog: KennelListDogSource, theRun: string, parentsRequired: string[]): Promise<string> {
-    const versionId = randomUUID();
-    const lineageId = randomUUID();
-    await store.save({
-        id: versionId,
-        type: SerializedDog.name,
-        lineageId,
-        parentId: null,
-        displayName: dog.displayName,
-        serializedDogConfig: JSON.stringify({
-            id: versionId,
-            lineageId,
-            parentId: null,
-            displayName: dog.displayName,
-            description: dog.description,
-            icon: dog.icon,
-            parentsRequired,
-            parentsOptional: [],
-            theRun,
-        }),
-        visibility: 'public',
-        createdAt: new Date(),
-    });
-    return lineageId;
-}
-
 /**
- * Die Kennel-Liste als Kennel (Spur K). Anders als die Landing NICHT selbstheilend: steht der Kennel schon, bleibt
- * er unberuehrt — Kennel und Dogs aendern Maintainer live (neue Versionen derselben Lineages), ein Boot darf das
- * nie ueberschreiben. Geseedet wird nur, wenn es den Kennel unter dieser ID noch nicht gibt.
- * `kennelId` nur fuer Tests.
+ * Die Kennel-Liste als Kennel (Spur K). Wie die Landing nur geseedet, wenn es den Kennel unter dieser ID noch nicht
+ * gibt: steht er, bleibt er unberuehrt — Kennel und Dogs aendern Maintainer live (neue Versionen derselben
+ * Lineages), ein Boot darf das nie ueberschreiben. Zuruecksetzen = Kennel loeschen (Maintainer) und neu starten;
+ * die Dogs (oeffentlich, ohne Besitzer, gepflegt per LandingDogLock) tragen feste Lineages (MaintainedSeedDogs).
+ * `kennelId` und `source` nur fuer Tests.
  */
 export async function seedSlopdogsKennelsKennel(
     nodesStore: IStore,
     kennelsStore: IStore,
     kennelId: string = SLOPDOGS_KENNELS_KENNEL_ID,
+    source: MaintainedSeedSource | null = SlopdogsKennelsSource.locate(),
 ): Promise<'seeded' | 'kept' | 'missing-source'> {
     if (await kennelExists(kennelsStore, kennelId)) return 'kept';
-    const source = SlopdogsKennelsSource.locate();
     if (!source) {
         console.warn(
             `[seed] ${kennelId}: Quellen (seed-data/kennels/slopdogs-kennels/) nicht gefunden — /kennels bleibt die Angular-Liste.`,
         );
         return 'missing-source';
     }
+    const dogs = new MaintainedSeedDogs(nodesStore, kennelId, new SeedKeptDogs(kennelsStore));
     const lineageOf = new Map<string, string>();
     for (const dog of DOGS) {
         const parents = (dog.parents ?? []).map((name) => {
@@ -367,7 +343,14 @@ export async function seedSlopdogsKennelsKennel(
             if (!id) throw new Error(`[seed] ${kennelId}: Parent ${name} von ${dog.displayName} steht nicht davor.`);
             return id;
         });
-        lineageOf.set(dog.displayName, await saveKennelListDog(nodesStore, dog, source.read(dog.file), parents));
+        const { lineageId } = await dogs.put({
+            displayName: dog.displayName,
+            theRun: source.read(dog.file),
+            parentsRequired: parents,
+            icon: dog.icon,
+            description: dog.description,
+        });
+        lineageOf.set(dog.displayName, lineageId);
     }
     const lead = lineageOf.get('SlopdogsKennelsLead')!;
     const dogIds = [lead, ...DOGS.filter((d) => d.displayName !== 'SlopdogsKennelsLead').map((d) => lineageOf.get(d.displayName)!)];
@@ -385,11 +368,12 @@ export async function seedSlopdogsKennelsKennel(
         nodes: JSON.stringify(DOGS.map((d) => ({ id: lineageOf.get(d.displayName), comment: d.description }))),
         task:
             '## Wunsch\nDie Kennel-Liste ist selbst ein Kennel: dieselben Funktionen wie die Angular-Liste, aus kleinen Dogs.\n\n' +
-            '## Quelle\nseed-data/kennels/slopdogs-kennels/ (Seed, nur beim ersten Boot); danach leben Aenderungen als neue Dog-Versionen.\n\n' +
+            '## Quelle\nseed-data/kennels/slopdogs-kennels/ (Seed nur, wenn der Kennel fehlt; Zuruecksetzen = Loeschen + Neustart); sonst leben Aenderungen als neue Dog-Versionen.\n\n' +
             '## Betrieb\nGET /kennels liefert die Lead-Ausgabe aus einem Memo (KennelListPage); faellt der Lauf aus, die Angular-Liste.',
         createdAt: now,
         updatedAt: now,
     });
+    await dogs.settle();
     console.log(`✅ Seeded SlopDogs Kennel List Kennel (kennelId: ${kennelId}, ${DOGS.length} Dogs)`);
     return 'seeded';
 }
