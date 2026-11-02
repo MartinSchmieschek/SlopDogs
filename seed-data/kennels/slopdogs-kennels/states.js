@@ -1,6 +1,6 @@
 // SlopDogs kennel list · states. HTML of the sign-in hint, the error banner (its text opens the void cinema, as
 // sd-banner does), and the stage: the list, the skeleton slot, the veil with the tape deck (the left hub is the
-// iris), the empty slot, the sentinel for paging and the status line.
+// iris), the empty slot, the sentinel for paging, the status line and the version line (SlopdogsKennelsScriptVersion).
 var deck =
     '<svg viewBox="0 0 96 56" width="96" height="56" aria-hidden="true">' +
     '<rect x="1" y="1" width="94" height="54" fill="var(--paper-2)" stroke="var(--ink)" stroke-width="2"/>' +
@@ -34,5 +34,6 @@ return [
     '<p class="verse" id="veil-verse"></p></div>',
     '<div id="empty"></div><div id="sentinel" aria-hidden="true"></div>',
     '<p class="status sd-small" id="status" aria-live="polite"></p>',
+    '<p class="status sd-small" id="ver" style="padding-top:0" hidden></p>',
     '</div>',
 ].join('');

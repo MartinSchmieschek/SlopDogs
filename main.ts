@@ -31,6 +31,7 @@ import { PrismaStore } from './store/PrismaStore';
 import { JsonStorageService } from './services/JsonStorageService';
 import path from 'path';
 import { runSeeds } from './seed-data/seed';
+import { SeedReseed } from './services/SeedReseed';
 import { TypeDefBuilder } from './services/TypeDefBuilder';
 import { CompilerCache } from './services/CompilerCache';
 import { createHttpApplication } from './server-app/createHttpApplication';
@@ -338,6 +339,7 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
         disconnect: disconnectHttpApplication,
         keyStore,
         networkBoundary,
+        reseed,
     } = await createHttpApplication({
         nodeEnv,
         localMode,
@@ -355,6 +357,15 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
         dogStatsStore: store,
         channelTickets,
     });
+
+    // Spur K: Landing und Kennel-Liste auf den Repo-Stand, wenn `--reseed` oder eine neue SLOPDOGS_RESEED-Marke es
+    // verlangt — derselbe Loeschweg wie ein Maintainer, danach der normale Seed. Scheitert er, startet der Dienst trotzdem;
+    // die Marke bleibt dann unvermerkt, der naechste Start versucht es wieder.
+    try {
+        await reseed(SeedReseed.triggerOf(process.argv, process.env));
+    } catch (err) {
+        console.error('[seed] reseed gescheitert -- der Dienst startet mit dem Stand davor:', err);
+    }
 
     // Nur mit Netzgrenze (dev, lokal): dort weist sie `Origin: null` ohne Ticket ab. Deployed bleibt die wsUrl wie bisher.
     WebSocketChannelRetriever.useTicketIssuer(networkBoundary ? channelTickets : undefined);

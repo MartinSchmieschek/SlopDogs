@@ -21,6 +21,7 @@ import { IKennelConfig } from '../../models/kennel-config.model';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { ConfirmService } from '../../services/confirm.service';
+import { ServerVersionService } from '../../services/server-version.service';
 import { apiAbsoluteUrl } from '../../config/api-base';
 import { publicKennelDocsPath } from '../../config/public-paths';
 import { isSeededKennel, seededDeleteSummary } from '../../data/seeded-kennels';
@@ -130,6 +131,7 @@ function dedupeKennelsById(list: IKennelConfig[]): IKennelConfig[] {
     .fab { display: none; }
     .stage { position: relative; min-height: 240px; }
     .status { padding: var(--s4) 0; text-align: center; color: var(--ink-2); }
+    .status.version { padding-top: 0; }
     .empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s3); padding: var(--s7) 0 var(--s5); max-width: 84ch; }
     .empty h2 { font-family: var(--font-display); font-weight: 400; font-size: 28px; line-height: 28px; letter-spacing: .03em; }
     .empty sd-url-chip { align-self: stretch; }
@@ -151,6 +153,8 @@ export class KennelListComponent {
   private readonly confirm = inject(ConfirmService);
 
   readonly authUser = this.auth.user;
+  /** The running version under the list (`GET /api/health`); empty when the request fails. */
+  readonly versionLine = signal('');
   readonly sortOptions = SORT_OPTIONS;
   readonly origin = typeof window !== 'undefined' ? window.location.origin : '';
   readonly mcpCommand = `claude mcp add --transport http slopdogs ${this.origin}/mcp`;
@@ -207,6 +211,7 @@ export class KennelListComponent {
   private firstParams = true;
 
   constructor() {
+    void inject(ServerVersionService).line().then((line) => this.versionLine.set(line));
     const persisted = readPersistedSort();
     this.sortKey.set(persisted.sortKey);
     this.sortDir.set(persisted.sortDir);

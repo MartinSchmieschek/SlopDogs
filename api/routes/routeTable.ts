@@ -62,6 +62,8 @@ export const API_ROUTE = {
     /** Wo ein Dog laeuft (P4b): Kennels, Abhaengige, Abhaengigkeiten — vor ConfigRouteHandler registriert. */
     nodeUsage: '/api/nodes/:id/usage',
     readme: '/api/readme',
+    /** Lebt der Dienst, welcher Stand laeuft (Version, Commit, Pakete) — oeffentlich, vor ConfigRouteHandler registriert. */
+    health: '/api/health',
     /** Key-Store (P4c): GET (maskiert) und POST — vor ConfigRouteHandler registriert. */
     keys: '/api/keys',
     /** Key-Store (P4c): DELETE; kein GET mit Wert. */
@@ -103,6 +105,7 @@ export const API_ROUTES = [
     '/api/nodes/:id/unfreeze',
     '/api/nodes/:id/usage',
     '/api/readme',
+    '/api/health',
     '/api/landing',
     '/api/keys',
     '/api/keys/:alias',
@@ -172,6 +175,7 @@ export const EXPRESS_APP_ROUTES = [
     API_ROUTE.nodesList,
     API_ROUTE.nodeUsage,
     API_ROUTE.readme,
+    API_ROUTE.health,
     API_ROUTE.landing,
     API_ROUTE.kennelListStatus,
     API_ROUTE.keys,

@@ -77,6 +77,9 @@
       }
     }
   </div>
+  @if (versionLine()) {
+    <p class="status sd-small version">{{ versionLine() }}</p>
+  }
 </main>
 
 <button type="button" class="sd-btn sd-btn--primary sd-btn--icon fab" aria-label="New kennel" (click)="openCreate()">+</button>

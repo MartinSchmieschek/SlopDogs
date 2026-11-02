@@ -182,7 +182,7 @@ The net effect: **the first run teaches the kennel what it needs**, and every su
 
 The fresh placeholder's `theRun` is literally `throw new Error("MimicDog for '<PactName>' needs user code")`. It **does throw** on every run -- this is intentional, not a sleeping clause. Two things keep the rest of the pack alive:
 
-1. **The SeasonRunner brands, it does not abort.** [`harverster.ts → letOut`](packages/core/src/harverster.ts) wraps every dog in a `try/catch`. On throw, the dog is marked with `__error`, pushed into `season.exhausted` like any other returnee, and `dog.collected` stays `undefined`. The pack carries on.
+1. **The SeasonRunner brands, it does not abort.** [`harverster.ts → letOut`](https://github.com/MartinSchmieschek/slopdogs-core/blob/main/src/harverster.ts) wraps every dog in a `try/catch`. On throw, the dog is marked with `__error`, pushed into `season.exhausted` like any other returnee, and `dog.collected` stays `undefined`. The pack carries on.
 2. **The downstream BaseDog still sees the Pact as "fulfilled".** `matchesParent` checks `imitatesClasses` -- and the placeholder Mimic carries the Pact class regardless of whether `theRun` threw or returned. So `areRequiredParentsReady` flips `true`, the BaseDog runs in the next wave, calls `season.exhausted.find(d => matchesParent(<Pact>, d))`, reads `queryDog?.collected` -- gets `undefined` -- and falls back to whatever default its `yieldCollectorFactory` defines (typically `?? ({} as <PactType>)`).
 
 What happens after that fallback is the BaseDog's own contract. Some BaseDogs survive cleanly on an empty query (e.g. they have sensible defaults); others throw immediately ("Missing required query params"). Either way, the **placeholder Mimic itself shows up in snapshots as `hasError: true`** with the placeholder error message -- a clear TODO marker, not a runtime catastrophe.
@@ -533,6 +533,7 @@ Login required. Keys are AES-256-GCM encrypted in the auth database and never re
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | `GET` | `/api/readme` | Project README as rendered HTML |
+| `GET` | `/api/health` | Liveness and the running version, public, `Cache-Control: no-store`, no database: `{ok, name, version, commit, core, typedefs, dogs: {packages, versions}, stage, mode, uptimeSec}` — `commit` is the short SHA (`RENDER_GIT_COMMIT`, else written to `dist/build-info.json` at build, else null), `dogs` counts the loaded dog and pact packages per version, `mode` is `local`, `dev` or `deployed`. No users, memory or addresses (those stay in the MCP tool `health_check`, which carries the same `version` block) |
 | `GET` | `/api/landing` | The landing's two rankings `{generatedAt, windowDays, topByCalls30d, topByRating}` plus `provenDogs` (dogs with the proven badge, by score) — only what an anonymous visitor may run; `?limit=` (default 10, max 50); 60 s memo, `ETag` |
 
 Calls: every kennel run is counted once, per day (UTC) and source; `stats.calls.ranked`/`ranked30d` count only real use (`/k/:id`, `/api/kennels/:id/execute`, MCP `execute_kennel`), `leadFailed` the runs whose lead errored (`leadFailed30d` in the last 30 days); a dog run fails when it ends in error, timeout or oom (`stats.calls.failures`, `failures30d`). Usage filter (`?usage=`, MCP `list_kennels`/`list_nodes` `usage`), applied after the rights filter and combinable with `q`/`search` and `sort`: `top` = called at least once, most calls first unless `sort` is given; `never_used` = 0 calls; `never_worked` = called, every run failed; `failing` = a failed run in the last 30 days; `dormant` = called before, 0 calls in the last 30 days. Counts live in memory and are flushed every `KENNEL_CALL_FLUSH_MS` (30 s) in one transaction. Stars: 1-5 per user and kennel; `score` is a Bayes average `(5·m + sum) / (5 + count)` with `m` the mean over all ratings — it ranks; `avg` is the raw mean. Favourites: one per user and kennel lineage (table `KennelFavorite`, user id without a foreign key like the ratings), only for kennels, never for dogs; `?favorites=1` keeps yours after the rights filter, before search, sort and paging; deleting a kennel drops its favourites. In super-user mode (no `MCP_AUTH_REQUIRED`) there is no user, so favourites answer 403 `no_identity`.
@@ -545,14 +546,15 @@ Calls: every kennel run is counted once, per day (UTC) and source; `stats.calls.
 
 - **Rotation:** each visit picks one listed kennel uniformly at random; `?landing=<id>` forces one **from the list** (other ids are ignored). A listed kennel that is missing, not public, throws or yields no HTML is skipped for the memo window. `slopdogs-landing` takes over when the list is empty or none of the listed kennels runs. The old single `LANDING_KENNEL_ID` is still read as a one-entry alias (with a log line).
 - **Locked while listed:** every kennel in `LANDING_KENNEL_IDS` is read-only for everyone — owner and super-user included — as long as it is listed: `myRights {edit: false, own: false, locked: 'landing'}`; `PUT`, rename, `DELETE`, `/acl`, `/freeze`, `/unfreeze` and the MCP mutations answer `403 {"error":"locked_landing"}`. Runs, stars, reading and copying keep working. `slopdogs-landing` is only locked when it is listed itself.
-- **Source:** `seed-data/kennels/slopdogs-landing/` (content, skin C, lead) — seeded at boot when the kennel is missing (public, community-owned). Changes in the repo reach an existing instance only after the kennel is removed (the seed never overwrites). The former skins a, b and d are archived under `docs/slopdogs/landing/archive/`.
+- **Source:** `seed-data/kennels/slopdogs-landing/` (content, skin C, lead) — seeded at boot when the kennel is missing (public, community-owned). The seed never overwrites: changes in the repo reach an existing instance only after a maintainer deletes the kennel and the server restarts, or with a **reseed start** — `npm run start:local:reseed` / `npm run dev:reseed` (every time), deployed `SLOPDOGS_RESEED=<marker>` (any text, e.g. a date; applied once per new marker, the last one is kept in the database, so a forgotten variable does not wipe live changes on each restart). A reseed takes the maintainer's delete path for `slopdogs-landing` and `slopdogs-kennels` (unused dogs go, dogs used elsewhere stay) and seeds both fresh; the log says `[seed] reseed <marker>: landing 3 Dogs geloescht, 0 behalten; kennels …`. The former skins a, b and d are archived under `docs/slopdogs/landing/archive/`.
+- **Version:** the footer shows `v<version> · core <core> · <commit>` from `GET /api/health`; when the request fails, the line stays empty. `/kennels` (the kennel and the Angular list) shows the same line under the list.
 - **No run per visit:** `GET /` serves the lead output from an HTML memo per kennel (`LANDING_HTML_MEMO_MS`, default 300000). When the window is over, the visitor gets the remembered page at once and the kennel runs again in the background. The run counts with source `landing` — in `total`, never in `ranked`/`ranked30d`. `HEAD /` never runs the kennel.
 - **Fallback:** if the kennel is missing or its run fails, `/` serves `public/landing/index.html` — the Mixtape page rendered from the same sources at build time (`node scripts/build-landing.cjs`, part of `npm run build`). The page is never empty, not even on a cold start.
 - **Host:** the page shows `‹host›` where the address goes; `/` puts in the host of `MCP_BASE_URL` (else the request's host), the page script does the same from `location` on any other address.
 - **Headers:** `Content-Type: text/html; charset=utf-8`, `Cache-Control: public, max-age=300` (`no-cache` while more than one kennel rotates), `X-Landing-Source: kennel|fallback`, `X-Landing-Kennel: <id>`, no cookie. Like every text response, the page goes out brotli- or gzip-compressed when the client accepts it (`HTTP_COMPRESSION=0` turns that off). `/robots.txt` lives in `public/landing/`.
 - **Fonts:** self-hosted Latin subsets under `/static/landing/*.woff2` (OFL, `public/landing/OFL.txt`); no font CDN.
 
-"Already out there" loads `GET /api/landing?limit=6` — the only request of the page — and renders `topByCalls30d`, `topByRating` and `provenDogs` (links: kennel `url`, dogs to `/kennels?q=<name>`; numbers en-US, `ranked30d` shown, total in the tooltip, no stars when `avg` is null). States on `#sd-live[data-state]`:
+"Already out there" loads `GET /api/landing?limit=6` — the page's one data request, next to `GET /api/health` for the footer line — and renders `topByCalls30d`, `topByRating` and `provenDogs` (links: kennel `url`, dogs to `/kennels?q=<name>`; numbers en-US, `ranked30d` shown, total in the tooltip, no stars when `avg` is null). States on `#sd-live[data-state]`:
 
 | State | When | Page |
 |---|---|---|
@@ -585,7 +587,7 @@ The running dev server still runs the same suite after the reference index rebui
 | Databases | **Four** physically-separate Prisma schemas, each with its own `*_DATABASE_URL`: `DATABASE_URL` (kennels + nodes), `CACHE_DATABASE_URL` (run-cache), `JSON_STORAGE_DATABASE_URL` (fachliche JSON-Ablage), `AUTH_DATABASE_URL` (User, OAuthClient, AccessToken, RefreshToken, AuthorizationCode). SQLite for local dev; PostgreSQL for **integration** and production. |
 | Auth | Google SSO via `openid-client`, OAuth 2.1 AS via `jose` (HS256 JWTs), browser session via `express-session` |
 | Frontend | Angular 18, Monaco Editor, vis-network |
-| Core | `slopdogs` package (local, in `packages/core`) |
+| Core | `@martinschmieschek/slopdogs-core` (with `/runtime` and `/swaggrid`) from [slopdogs-core](https://github.com/MartinSchmieschek/slopdogs-core); BaseDogs from [slopdogs-base-dogs](https://github.com/MartinSchmieschek/slopdogs-base-dogs) — see [Core and Dog packages](#core-and-dog-packages) |
 
 ---
 
@@ -649,16 +651,15 @@ The real build runs through dedicated configs that write into `dist/` only:
 
 | Script | Config | Output |
 |--------|--------|--------|
-| `npm run build` | root [`tsconfig.emit.json`](tsconfig.emit.json) (= `tsconfig.build.json` without the `packages/*/src` paths, so no `dist/packages`) | `./dist` (main.ts + api/services/store/mcp) |
-| `npm run build:packages` | [`tsconfig.packages.json`](tsconfig.packages.json) (`tsc -b` over all `packages/*/tsconfig.json`, each extends [`tsconfig.base.json`](tsconfig.base.json) and lists its `references`; incremental) | `packages/<x>/dist` |
+| `npm run build` | root [`tsconfig.emit.json`](tsconfig.emit.json) (= `tsconfig.build.json` without the startup-test runner) | `./dist` (main.ts + api/services/store/mcp) |
 
-If you ever see a `.js` file inside `packages/*/src/`, `api/`, `mcp/`, `services/`, or `store/` -- delete it. `.gitignore` blocks them from being committed; the root `noEmit: true` prevents new ones from being created. Build output lives in `dist/` and `packages/*/dist/` only.
+If you ever see a `.js` file inside `api/`, `mcp/`, `services/`, or `store/` -- delete it. `.gitignore` blocks them from being committed; the root `noEmit: true` prevents new ones from being created. Build output lives in `dist/` only; core and the Dog packages arrive built (see [Core and Dog packages](#core-and-dog-packages)).
 
 ### Integration mode (pre-release staging)
 
 **Integration mode** (`NODE_ENV=integration`) is a **staging profile** added for the stretch between local dev and a full production deploy: exercise the app against **external databases** (PostgreSQL for the main store and the HTTP cache — see [`.env.integration.example`](.env.integration.example)) and run with the **built Angular UI only** (no `ng serve`; Express serves `ui-app/dist/.../browser` from the same port as the API).
 
-Typical flow: configure `.env.integration` with your hosted URLs, run `npm run prisma:sync:integration` to align schemas, build the backend with **`npm run build:prod`**, the frontend with **`npm run ui:build:integration`** (injects `PUBLIC_API_BASE_URL` using `NODE_ENV=integration`), then start locally with **`npm run start:integration`** (runs `main.ts` via ts-node). On a host that serves **compiled** output only (e.g. **Render**), use **Build Command** **`npm run render:integration:build`** (runs `npm ci` — whose postinstall builds the packages once —, then `build:prod`, then `ui:build:integration`) and **Start Command** **`npm run start:integration:dist`** — it runs `dist/main.js` with `NODE_ENV=integration`. Use this as a **pre-release** checkpoint before going fully online.
+Typical flow: configure `.env.integration` with your hosted URLs, run `npm run prisma:sync:integration` to align schemas, build the backend with **`npm run build:prod`**, the frontend with **`npm run ui:build:integration`** (injects `PUBLIC_API_BASE_URL` using `NODE_ENV=integration`), then start locally with **`npm run start:integration`** (runs `main.ts` via ts-node). On a host that serves **compiled** output only (e.g. **Render**), use **Build Command** **`npm run render:integration:build`** (runs `npm ci`, then `build:prod`, then `ui:build:integration`) and **Start Command** **`npm run start:integration:dist`** — it runs `dist/main.js` with `NODE_ENV=integration`. Use this as a **pre-release** checkpoint before going fully online.
 
 **Production** and **integration** both load the **reduced Base-Dog registry** (`server-registries/slimDeployRegistry.ts`); only **`NODE_ENV=development`** and the local mode on the Pi (`SLOPDOGS_MODE=local`) use the full set (`fullRegistry.ts`). On slim profiles, startup **fails fast** if any **latest** Kennel row in the DB references a `base:…` dog that is not registered — so RAM stays minimal without silently breaking existing kennels. After adding seed kennels that reference new `BASE_DOG_PREFIX + '…'` names, extend that slim registry (or keep **`npm run check:integration-dogs`** green — it scans `seed-data/**/*.ts` against `SLIM_DEPLOY_BASE_DOG_NAMES`).
 
@@ -743,184 +744,24 @@ systemctl start slopdogs
 
 ---
 
-## Creating a new BaseDog Package
+## Core and Dog packages
 
-Every BaseDog lives in its own package under `packages/`. Follow these steps to add a new one.
+This repository holds the server and the UI only. The engine and the BaseDogs live in two repositories of their own:
 
-### 1. Scaffold the package
+- [**slopdogs-core**](https://github.com/MartinSchmieschek/slopdogs-core) — `@martinschmieschek/slopdogs-core` (Dog, Kennel, waves, Pacts, cache, lobbies; `/runtime`: sandbox, gate, kennel run; `/swaggrid`: OpenAPI generation) and the type tool `@martinschmieschek/slopdogs-typedefs`. One tag `v<version>` for both.
+- [**slopdogs-base-dogs**](https://github.com/MartinSchmieschek/slopdogs-base-dogs) — one package per BaseDog domain (`dogs-*`, plus `geo-pact` and `dogs-demo`), one tag `<package>@<version>` each.
 
-```bash
-mkdir -p packages/dogs-mydog/src
-```
+**How they get here.** `package.json` pins every package exactly: core by Git tag (`git+https://github.com/MartinSchmieschek/slopdogs-core.git#v<version>`), typedefs and the Dog packages by release tarball (`…/releases/download/<tag>/<file>.tgz`). Both repositories are public — no registry, no `.npmrc`, no token. The packages arrive built (`dist/` with `type-defs.json` and `surface.json`; core builds itself on install via `prepare`), so `npm ci` compiles none of them, and `npm run build:prod` merges their `type-defs.json` into `dist/type-defs.json`.
 
-Create four files (copy them from a similar package, e.g. `dogs-weather`):
+**New releases.** `npm run update:dogs` looks up the newest stable tags (`git ls-remote`), raises the pins in `package.json` and refreshes the lockfile (`npm install`). `npm run update:dogs -- --dry-run` only lists what would change; `-- --no-install` writes `package.json` without installing.
 
-**`packages/dogs-mydog/package.json`**
-```json
-{
-  "name": "@martinschmieschek/slopdogs-dogs-mydog",
-  "version": "0.2.0-beta.0",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./package.json": "./package.json"
-  },
-  "files": ["dist", "!dist/tsconfig.tsbuildinfo"],
-  "slopdogs": { "typeDefs": "dist/type-defs.json", "surface": "dist/surface.json" },
-  "private": true,
-  "scripts": {
-    "build": "tsc -p tsconfig.json && slopdogs-typedefs build",
-    "prepare": "node -e \"let p=require('path'),d=process.cwd();while(d!==(d=p.dirname(d)))try{if(require(p.join(d,'package.json')).workspaces)process.exit(0)}catch{}process.exit(1)\" || npm run build"
-  },
-  "peerDependencies": { "@martinschmieschek/slopdogs-core": "^0.2.0-beta.0" },
-  "devDependencies": {
-    "@martinschmieschek/slopdogs-core": "file:../core",
-    "@martinschmieschek/slopdogs-typedefs": "file:../typedefs",
-    "@types/node": "^20.0.0",
-    "typescript": "^5.0.0"
-  }
-}
-```
+**Changing core or a Dog** happens in its repository and ships as a release there (changeset, tag, release workflow — see its README); afterwards `npm run update:dogs` here. A new BaseDog package is created in slopdogs-base-dogs the same way; once released, add its pin to `package.json` here, register its classes and Pacts in [`server-registries/fullRegistry.ts`](server-registries/fullRegistry.ts) (and in [`slimDeployRegistry.ts`](server-registries/slimDeployRegistry.ts) if production and integration need it), and optionally seed a Kennel in `seed.ts`.
 
-- **core is a peerDependency, never a dependency** (same for `geo-pact` and `dogs-demo` if you use them): the server must hold exactly one copy. Parents are matched by class identity (`instanceof`), and core keeps singletons (slot gate, capability registry) — a second copy would match no parent and double the slot cap without a word. The devDependency `file:../core` is only there so the package builds by itself.
-- `build` compiles and then writes `dist/type-defs.json` (pact and class types — the server merges them at build time, it reads no `.d.ts`) and `dist/surface.json` (exports, classes, pact-type hashes) with `slopdogs-typedefs`. `slopdogs-typedefs surface --check <old surface.json>` exits 1 when something was removed, renamed or a pact type changed without a major version bump.
-- `prepare` builds when the package lies on its own (installed from git, fresh clone, packed alone); inside an npm workspace (this monorepo, later `slopdogs-base-dogs`) it does nothing, because npm starts `prepare` of all workspaces in parallel and in no order — the root build (`npm run build:packages`) builds all packages in order instead. It detects the workspace by looking for a `package.json` with `workspaces` in any parent folder.
-- Import only `@martinschmieschek/slopdogs-core`, never `@martinschmieschek/slopdogs-core/runtime` (sandbox, gate, kennel run — the server's side); ESLint refuses it in `packages/`.
+**One copy of core, `geo-pact` and `dogs-demo` (F1).** Parents are matched by class identity (`instanceof`), and core keeps singletons (slot gate, capability registry): a second copy matches no parent and doubles the slot cap without a word. The Dog packages declare these as `peerDependencies`, so they resolve to the server's copy. `npm ls @martinschmieschek/slopdogs-core` must list one version, deduped everywhere else.
 
-**`packages/dogs-mydog/tsconfig.json`** — stands alone (no `../` in it), so the package builds without this repo:
-```json
-{
-  "extends": "@martinschmieschek/slopdogs-typedefs/tsconfig.base.json",
-  "compilerOptions": { "outDir": "./dist", "rootDir": "./src", "tsBuildInfoFile": "./dist/tsconfig.tsbuildinfo" },
-  "include": ["src/**/*"]
-}
-```
+### Working on a Dog package
 
-**`packages/dogs-mydog/tsconfig.monorepo.json`** — only for `tsc -b` in this repo:
-```json
-{ "extends": "./tsconfig.json", "references": [{ "path": "../core/tsconfig.monorepo.json" }] }
-```
-
-**`packages/dogs-mydog/src/index.ts`** — barrel export for all public symbols.
-
-If the package reads environment variables, list them in **`packages/dogs-mydog/src/env.ts`** (`export const envVars: readonly DogEnvVar[] = [...]`, same fields as the server's `ENV_CATALOG`), add `"./env": { "types": "./dist/env.d.ts", "default": "./dist/env.js" }` to `exports` and a path for `@martinschmieschek/slopdogs-dogs-mydog/env` to the root `tsconfig.json`. The server reads them into its catalog (start-up warning, `.env` examples); `npm run check:env-catalog` fails if the package reads a variable it does not list, or lists one it does not read.
-
-### 2. Define a Pact (if the Dog needs input)
-
-A Pact declares _what data shape_ the Dog requires, without specifying _who provides it_. At runtime, a MimicDog or another Dog fulfills it.
-
-```typescript
-import { createPact } from "@martinschmieschek/slopdogs-core";
-
-export interface MyDogQuery {
-    someParam: string;
-}
-
-export const MyDogQueryPact = createPact<MyDogQuery>(
-    "MyDogQueryProvider",
-    { fromSourceType: "MyDogQuery" }
-);
-```
-
-### 3. Write the Dog class
-
-Extend `Dog<YieldType>` and implement:
-
-| Member | Purpose |
-|---|---|
-| `get name()` | Return `MyRetriever.name` (the class name) |
-| `get icon()` | Return a **string** (usually one emoji) for the UI — same pattern as other `packages/dogs-*` retrievers; there is no central icon map. |
-| `get required()` | Pact/Dog classes that must run before this Dog |
-| `get optional()` | Pact/Dog classes that are used if present |
-| `yieldCollectorFactory` | Async function that does the actual work |
-
-```typescript
-import { Dog, IHuntingDog, IHuntingSeason } from "@martinschmieschek/slopdogs-core";
-import { MyDogQueryPact, type MyDogQuery } from "./pacts";
-
-export class MyRetriever extends Dog<MyResult> {
-    get name() { return MyRetriever.name; }
-    get icon() { return "🔮"; }
-    get required() { return [MyDogQueryPact]; }
-    get optional(): (new (...args: any[]) => IHuntingDog<unknown>)[] { return []; }
-
-    protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<MyResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(MyDogQueryPact, d));
-        const query = (queryDog?.collected as MyDogQuery | undefined) ?? ({} as MyDogQuery);
-        // ... fetch data, transform, return
-    };
-}
-```
-
-### 4. Register in the platform
-
-**`main.ts`** — two touches: register the class and any Pacts it introduces (same pattern as existing dogs at the bottom of the file):
-```typescript
-import { MyRetriever, MyDogQueryPact } from '@martinschmieschek/slopdogs-dogs-mydog';
-// add to allBaseDogClasses array:
-const allBaseDogClasses = [ ..., MyRetriever ];
-// add Pact to allPacts array:
-const allPacts = [ ..., MyDogQueryPact ];
-```
-
-*(Geo-related dogs that use shared coordinate types also wire `GeoPointPact` from `@martinschmieschek/slopdogs-geo-pact` in `allPacts` if your package needs it — copy a similar dog from `dogs-geo`.)*
-
-### 5. Wire up the build
-
-**Root `tsconfig.json`** — add path mapping:
-```json
-"@martinschmieschek/slopdogs-dogs-mydog": ["packages/dogs-mydog/src/index.ts"]
-```
-
-**Root `package.json`** — add the dependency:
-```json
-"dependencies": { "@martinschmieschek/slopdogs-dogs-mydog": "file:packages/dogs-mydog" }
-```
-
-**Root `tsconfig.packages.json`** — add the package to `references` (`{ "path": "./packages/dogs-mydog/tsconfig.monorepo.json" }`); `npm run build:packages` then builds it with the others and writes its `type-defs.json`/`surface.json`.
-
-The package's own `package.json` declares everything it needs to build (core and the type tool as devDependencies, `typescript`, `@types/node`), so it also builds alone: copy the folder, point the `file:` devDependencies at `npm pack` tarballs of core and typedefs, `npm install`, `npm run build`, `npm pack`.
-
-Then run `npm install` so the symlink in `node_modules/@martinschmieschek/slopdogs-dogs-mydog` is created.
-
-### 6. Seed a Kennel (optional)
-
-In `seed.ts`, create a MimicDog that maps `QueryRetriever` params to your Pact, then a `KennelConfig` with `dogIds`:
-
-```typescript
-dogIds: [
-    BASE_DOG_PREFIX + 'MyRetriever',       // lead dog (1st = public response)
-    BASE_DOG_PREFIX + 'QueryRetriever',     // captures ?param=value from URL
-    mimicDogId,                              // MimicDog that fulfills MyDogQueryPact
-],
-defaultQuery: { someParam: 'defaultValue' },
-```
-
-The MimicDog's `theRun` maps QueryRetriever fields to your Pact interface:
-```typescript
-theRun: `return { someParam: QueryRetriever.someparam }`
-// Note: QueryRetriever lowercases all keys
-```
-
-### 7. Verify
-
-```bash
-npm run build:packages            # compiles all packages (incremental, tsc -b)
-npx tsc --noEmit -p tsconfig.build.json  # typechecks the whole project
-npm start                         # server starts, seed runs, kennel is callable
-curl http://localhost:3000/k/my-kennel?someParam=test
-```
-
----
-
-## Working on a Dog package
-
-> **Prepared — applies from PLAN-DOG-PAKETE P4 on**, once `packages/core`, `packages/typedefs`, `packages/geo-pact`, `packages/dogs-demo` and `packages/dogs-*` have left this repository for [`slopdogs-core`](https://github.com/MartinSchmieschek/slopdogs-core) and [`slopdogs-base-dogs`](https://github.com/MartinSchmieschek/slopdogs-base-dogs). Until then the packages live under `packages/` and the section above (*Creating a new BaseDog Package*) is the way. `scripts/split-repos.cjs` performs the cut; `repo-templates/` holds what the two package repositories carry beyond the cut sources (CI, release workflow, Changesets, ESLint/Prettier copies, package tests, README).
-
-After P4 the server installs every SlopDogs package with an **exact** version from GitHub Packages (`.npmrc` with `@martinschmieschek:registry=https://npm.pkg.github.com` and `//npm.pkg.github.com/:_authToken=${NPM_TOKEN}`, token with `read:packages`), pinned by the lockfile. Only `packages/swaggrid` stays here.
-
-To change a Dog and try it in the server:
+To try a change before releasing it:
 
 ```bash
 # in slopdogs-base-dogs: build, then pack the changed package
@@ -932,20 +773,9 @@ npm install --no-save ../tarballs/martinschmieschek-slopdogs-dogs-weather-<versi
 npm run build:prod          # merges the package's dist/type-defs.json
 ```
 
-- Repeat both steps after each change; the server loads the package's `dist/`, not its sources. `tsconfig.json` here no longer maps the moved packages to `packages/*/src` — in dev they also resolve from `node_modules`.
-- **One copy of core, `geo-pact` and `dogs-demo` (F1).** A tarball is installed like a release: its peers resolve to the server's copy. `npm link` (`cd packages/dogs-weather && npm link` there, `npm link @martinschmieschek/slopdogs-dogs-weather` here) saves the repacking, but the linked folder resolves its peers from *its own* repository: `slopdogs-base-dogs/node_modules/@martinschmieschek/slopdogs-core` becomes a second copy, and parents stop matching without an error (`instanceof`, slot gate, capability registry). Measured on the probe of 31.10.: resolving core from `slopdogs-base-dogs/packages/dogs-weather` lands in `slopdogs-base-dogs/node_modules`. Link only together with core (`npm link @martinschmieschek/slopdogs-core` in the package repo, pointing at the server's copy), and check before starting that `node -p "require.resolve('@martinschmieschek/slopdogs-core', { paths: [require('fs').realpathSync('node_modules/@martinschmieschek/slopdogs-dogs-weather')] })"` prints a path in this repository's `node_modules`.
-- The same holds for every way of installing from Git or tarballs: name core, `geo-pact` and `dogs-demo` with the **identical specification** everywhere. `npm ls @martinschmieschek/slopdogs-core` must list one version, deduped everywhere else.
-- `npm unlink` and `npm ci` return to the pinned versions. A change ships through a changeset and a release of the package repo; Renovate (P5) then opens the version bump here.
-
-### Deploying from packages (Render)
-
-Also from P4 on; nothing of this is active yet — this repository has **no** `.npmrc` with a token today (npm aborts when `${NPM_TOKEN}` is referenced but not set).
-
-1. A GitHub token with `read:packages` only (classic personal access token; GitHub Packages' npm registry takes no other kind for reading), from the account that owns the packages.
-2. Render → service → Environment: `NPM_TOKEN` = that token (secret). Nothing else changes in the environment.
-3. The cut (`node scripts/split-repos.cjs server . --registry --in-place` on a branch) writes `.npmrc` with `@martinschmieschek:registry=https://npm.pkg.github.com` and `//npm.pkg.github.com/:_authToken=${NPM_TOKEN}`, pins every package exactly and refreshes the lockfile with `npm install`.
-4. The build command stays `npm ci && npm run build:prod`; `npm ci` reads `.npmrc` and pulls the pinned tarballs.
-5. First deploy: the boot guard passes, `GET /api/nodes` lists the same names as before with `packageVersion` of the new release. Rotating the token = new token, update `NPM_TOKEN`, redeploy.
+- Repeat both steps after each change; the server loads the package's `dist/`, not its sources.
+- A tarball is installed like a release: its peers resolve to the server's core. `npm link` saves the repacking, but the linked folder resolves its peers from *its own* repository (`slopdogs-base-dogs/node_modules/@martinschmieschek/slopdogs-core` becomes a second copy). Link only together with core, and check before starting that `node -p "require.resolve('@martinschmieschek/slopdogs-core', { paths: [require('fs').realpathSync('node_modules/@martinschmieschek/slopdogs-dogs-weather')] })"` prints a path in this repository's `node_modules`.
+- `npm unlink` and `npm ci` return to the pinned versions.
 
 ---
 
@@ -957,7 +787,7 @@ The app runs a test suite on every boot -- store ops, controller CRUD, BaseDog a
 
 ### Seeds
 
-See [Default Kennel seed](#default-kennel-seed-server-run-and-ui) under *Getting Started*. Example Kennels and SerializedDogs are inserted when the DB has no matching seed rows yet.
+See [Default Kennel seed](#default-kennel-seed-server-run-and-ui) under *Getting Started*. Example Kennels and SerializedDogs are inserted when the DB has no matching seed rows yet. Landing and kennel list back to the repo state: `npm run start:local:reseed`, `npm run dev:reseed`, or `SLOPDOGS_RESEED=<marker>` deployed (see [Landing](#landing)).
 
 ### Project Structure
 
@@ -983,15 +813,10 @@ services/
   WavesConverter.ts           Converts execution results to Wave format
   TypeDefBuilder.ts           Generates TypeScript definitions for VM context
   CompilerCache.ts            Caches compiled TypeScript
-  swaggridAdapter.ts          Maps Kennel runs to @martinschmieschek/slopdogs-swaggrid
+  swaggridAdapter.ts          Maps Kennel runs to @martinschmieschek/slopdogs-core/swaggrid
   CacheHandler.ts             KV cache with TTL and in-flight deduplication
   AreaCacheStrategy.ts        Geographic area cache (Haversine containment)
-packages/
-  core/                       slopdogs library (Dog, Kennel, Wave engine, Pacts, cache, WebSocket channel retrievers, JSON storage, kennel import helpers)
-  geo-pact/                   Shared GeoPoint pact for coordinate-shaped inputs
-  swaggrid/                   OpenAPI generation (castGrimoire) — no domain deps
-  dogs-*/                     One npm package per BaseDog domain (many — see `tsconfig.packages.json`)
-  ...                         (demo, geo, weather, warframe, etc. — same pattern: retriever + optional pacts + `get icon()`)
+server-registries/            Which BaseDog classes and Pacts the server registers (full / slim)
 ui-app/                       Angular frontend (see ui-app/README.md)
 ```
 

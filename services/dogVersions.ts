@@ -11,11 +11,26 @@ import type { DogPackage } from './BaseDogPacks';
 export type DogVersions = Record<string, string>;
 
 const byDogName = new Map<string, DogPackage>();
+/** Pakete ohne Base-Dog (nur Pacts, z. B. geo-pact) — sie zaehlen im Versionsblock mit, nicht in dogVersions. */
+const pactPackages = new Map<string, DogPackage>();
 
 /** Beim Boot: die Pakete aller Base-Dogs nach Dog-Namen (Klassenname). */
 export function registerBaseDogPackages(entries: Iterable<[dogName: string, pkg: DogPackage | null]>): void {
     byDogName.clear();
     for (const [name, pkg] of entries) if (pkg) byDogName.set(name, pkg);
+}
+
+/** Beim Boot: die Pakete der Pacts. */
+export function registerPactPackages(packages: Iterable<DogPackage | null>): void {
+    pactPackages.clear();
+    for (const pkg of packages) if (pkg) pactPackages.set(pkg.name, pkg);
+}
+
+/** Alle geladenen SlopDogs-Pakete mit Base-Dogs oder Pacts, je npm-Name einmal (core eingeschlossen). */
+export function loadedDogPackages(): DogPackage[] {
+    const byName = new Map<string, DogPackage>(pactPackages);
+    for (const pkg of byDogName.values()) byName.set(pkg.name, pkg);
+    return [...byName.values()];
 }
 
 /** Das Paket eines Base-Dogs nach seinem Namen, oder null. */

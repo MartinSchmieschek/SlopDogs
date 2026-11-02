@@ -14,6 +14,7 @@ import type { KennelCallCounter } from '../../services/KennelCallCounter';
 import type { DogStatsService } from '../../services/DogStatsService';
 import type { KeyStoreService } from '../../services/KeyStoreService';
 import type { SeededKennelDelete } from '../../services/SeededKennelDelete';
+import type { ServerVersion } from '../../services/ServerVersion';
 import type { PendingAdmission, RunGates } from '../../server-app/runAdmission';
 
 export interface BaseDogInfo {
@@ -78,6 +79,8 @@ export interface ToolDeps {
     runGates?: RunGates;
     /** Spur K: delete_kennel auf einem Seed-Kennel prueft die Nutzung seiner Dogs (Vorschau mit dryRun). Ohne: wie jeder Kennel. */
     seededKennelDelete?: SeededKennelDelete;
+    /** health_check: derselbe Versionsblock wie GET /api/health. Ohne (Tests): `version: null`. */
+    serverVersion?: ServerVersion;
 }
 
 export interface ToolResult {

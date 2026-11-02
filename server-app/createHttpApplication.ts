@@ -13,6 +13,8 @@ import { KennelBundleHandler } from '../api/routes/KennelBundleHandler';
 import { KennelRatingHandler } from '../api/routes/KennelRatingHandler';
 import { KennelFavoriteHandler } from '../api/routes/KennelFavoriteHandler';
 import { LandingRouteHandler } from '../api/routes/LandingRouteHandler';
+import { HealthRouteHandler } from '../api/routes/HealthRouteHandler';
+import { ServerVersion } from '../services/ServerVersion';
 import { API_ROUTE } from '../api/routes/routeTable';
 import { KeysRouteHandler } from '../api/routes/KeysRouteHandler';
 import { BetaRouteHandler } from '../api/routes/BetaRouteHandler';
@@ -42,7 +44,7 @@ import type { DogReferenceIndex } from '../services/DogReferenceIndex';
 import { DogStatsService } from '../services/DogStatsService';
 import { startMemoryHeartbeat } from '../api/utils/memoryLog';
 import { BaseDogPacks, type DogPackage } from '../services/BaseDogPacks';
-import { registerBaseDogPackages } from '../services/dogVersions';
+import { registerBaseDogPackages, registerPactPackages } from '../services/dogVersions';
 import type { BaseDogInfo } from '../mcp/tools/types';
 import type { HttpFrontEndBinder, HttpFrontEndContext } from './httpFrontEndTypes';
 import { LandingPage } from './LandingPage';
@@ -56,6 +58,9 @@ import { SecurityHeaders } from './SecurityHeaders';
 import { SameOriginGuard } from '../mcp/auth/sameOriginGuard';
 import { LandingDogLock } from '../services/LandingDogLock';
 import { SeededKennelDelete } from '../services/SeededKennelDelete';
+import { SeedReseed, SeedReseedMarks, type ReseedOutcome, type ReseedTrigger } from '../services/SeedReseed';
+import { SLOPDOGS_LANDING_KENNEL_ID, seedSlopdogsLandingKennel } from '../seed-data/kennels/slopdogs-landing';
+import { SLOPDOGS_KENNELS_KENNEL_ID, seedSlopdogsKennelsKennel } from '../seed-data/kennels/slopdogs-kennels';
 import { maintainedSeedLineages } from '../seed-data/kennels/maintainedSeedLineages';
 import { SeedKeptDogs } from '../seed-data/kennels/seedKeptDogs';
 import { LandingKennels } from '../mcp/auth/landingKennels';
@@ -113,6 +118,11 @@ export type CreateHttpApplicationResult = {
     keyStore: KeyStoreService;
     /** Netzgrenze (Spur L2) fuer den WebSocket-Upgrade; null in integration/production ohne lokalen Modus. */
     networkBoundary: NetworkBoundary | null;
+    /**
+     * Spur K: setzt Landing und Kennel-Liste auf den Repo-Stand (SeedReseed) — main.ts ruft es vor listen() mit dem
+     * Ausloeser aus `--reseed` bzw. SLOPDOGS_RESEED; ohne Ausloeser tut es nichts.
+     */
+    reseed: (trigger: ReseedTrigger | null) => Promise<ReseedOutcome>;
 };
 
 /**
@@ -399,6 +409,9 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     nodesRouteHandler.registerRoutes(app);
     const readmeRouteHandler = new ReadmeRouteHandler(serverRootDir);
     readmeRouteHandler.registerRoutes(app);
+    // Version und Lebenszeichen (oeffentlich, ohne DB) VOR /api/:subpath; derselbe Versionsblock steht in health_check.
+    const serverVersion = new ServerVersion(serverRootDir);
+    new HealthRouteHandler(serverVersion, ServerVersion.modeOf(nodeEnv, input.localMode === true)).registerRoutes(app);
 
     // Landing-Daten (P4) VOR /api/:subpath — sonst antwortet dort der Controller-404. Keine Bremse.
     // P4b: provenDogs aus denselben Kopfversionen und demselben Dog-Memo wie list_nodes.
@@ -485,6 +498,20 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
         (kennelId) => LandingKennels.isSeeded(kennelId),
     );
     routeHandler.useSeededKennelDelete(seededKennelDelete);
+    // Spur K: Reseed beim Start (--reseed, neue SLOPDOGS_RESEED-Marke) — derselbe Loeschweg, danach der normale Seed.
+    const seedReseed = new SeedReseed({
+        targets: [
+            { kennelId: SLOPDOGS_LANDING_KENNEL_ID, label: 'landing', seed: () => seedSlopdogsLandingKennel(nodesStore, kennelsStore) },
+            { kennelId: SLOPDOGS_KENNELS_KENNEL_ID, label: 'kennels', seed: () => seedSlopdogsKennelsKennel(nodesStore, kennelsStore) },
+        ],
+        deleteSeeded: (kennelId) => seededKennelDelete.delete(kennelId),
+        marks: new SeedReseedMarks(kennelsStore),
+        afterReseed: () => {
+            landingPage.forget(SLOPDOGS_LANDING_KENNEL_ID);
+            kennelListPage.markChanged();
+            void landingDogLock.refresh();
+        },
+    });
     const kennelSwaggerHandler = new KennelSwaggerHandler(kennelRunHandler, nodesStore);
     const kennelBundleHandler = new KennelBundleHandler(kennelRunHandler, kennelsController, nodesStore, baseDogsMap);
 
@@ -533,12 +560,14 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     // erkennen, welcher Vertrag hinter einem parentsRequired-Eintrag steckt und wie er zu
     // erfuellen ist. Deshalb wandern sie hier mit in die Entdeckungs-Liste.
     const knownBaseDogNames = new Set(baseDogsList.map((b) => b.name));
+    const pactPackages: Array<DogPackage | null> = [];
     for (const [dogName, DogClass] of baseDogsMap.entries()) {
         if (knownBaseDogNames.has(dogName)) continue;
         if ((DogClass as any)?.__isPact !== true) continue;
         const typeDef = (DogClass as any).__pactReturnTypeDef ?? (DogClass as any).__pactSourceTypeName;
         const shape = typeof typeDef === 'string' && typeDef ? ` Expected shape: ${typeDef}` : '';
         const pactPkg = packs.packageOf(DogClass);
+        pactPackages.push(pactPkg);
         baseDogsList.push({
             id: 'base:' + dogName,
             name: dogName,
@@ -551,6 +580,7 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
             ...(pactPkg ? { packageName: pactPkg.name, packageVersion: pactPkg.version } : {}),
         });
     }
+    registerPactPackages(pactPackages);
     const snapshotCache = new KennelSnapshotCache();
     const toolDeps = {
         kennelsController,
@@ -568,6 +598,7 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
         keyStore,
         runGates,
         seededKennelDelete,
+        serverVersion,
     };
     app.use('/mcp', createMcpRouter(toolDeps));
     app.use('/actions', createActionsRouter(toolDeps));
@@ -591,7 +622,9 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
         await Promise.allSettled([prismaCacheHandler.disconnect(), authLease.release()]);
     };
 
-    return { app, serveBuiltAngular, runStartupTests, runStartupSuite, disconnect, keyStore, networkBoundary };
+    const reseed = (trigger: ReseedTrigger | null): Promise<ReseedOutcome> => seedReseed.run(trigger);
+
+    return { app, serveBuiltAngular, runStartupTests, runStartupSuite, disconnect, keyStore, networkBoundary, reseed };
 }
 
 async function upsertLocalUser(

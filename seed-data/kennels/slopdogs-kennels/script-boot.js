@@ -1,6 +1,7 @@
 // SlopDogs kennel list · script: boot. Wires the search (debounced 250 ms; Esc clears, then closes), the phone sort
 // select, the document click and key handlers (SlopdogsKennelsScriptEvents) and the paging sentinel (240 px
-// ahead); then reads the URL, asks /auth/me, loads the first page and opens the sheet for ?new=1.
+// ahead); then reads the URL, asks /api/health for the version line and /auth/me, loads the first page and opens
+// the sheet for ?new=1.
 function kennelsBoot(K) {
     var S = K.S,
         CFG = K.CFG,
@@ -49,6 +50,7 @@ function kennelsBoot(K) {
             ).observe($('#sentinel'));
         }
         var wantsNew = K.readUrl();
+        K.showVersion();
         S.loading = true;
         S.startedAt = Date.now();
         K.render();

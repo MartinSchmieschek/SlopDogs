@@ -22,6 +22,7 @@ var parts = [
     ['SlopdogsKennelsScriptEmpty', SlopdogsKennelsScriptEmpty],
     ['SlopdogsKennelsScriptRender', SlopdogsKennelsScriptRender],
     ['SlopdogsKennelsScriptEvents', SlopdogsKennelsScriptEvents],
+    ['SlopdogsKennelsScriptVersion', SlopdogsKennelsScriptVersion],
     ['SlopdogsKennelsScriptBoot', SlopdogsKennelsScriptBoot],
 ];
 var data = JSON.stringify({ COPY: SlopdogsKennelsCopy, CFG: SlopdogsKennelsConfig, VERSES: SlopdogsKennelsVerses }).replace(

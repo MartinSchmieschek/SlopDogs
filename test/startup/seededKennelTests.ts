@@ -11,6 +11,8 @@
  * 4. Reseed nach dem Loeschen: dieselben Lineages, behaltene Dogs unveraendert ohne neue Version, geloeschte neu;
  *    unveraenderter Repo-Code -> keine neue Version, geaenderter -> genau eine neue Kopfversion (parentId = alter
  *    Kopf), die Sperre gilt auch fuer sie.
+ * 5. Reseed beim Start (SeedReseed): Flag und Marke werden erkannt; neue Marke -> Live-Aenderung weg (Repo-Stand),
+ *    dieselbe Marke -> uebersprungen, Live-Aenderung bleibt; das Flag setzt immer zurueck und vermerkt keine Marke.
  */
 import type { IStore } from '../../store/IStore';
 import type { Controller } from '../../api/Controller';
@@ -32,6 +34,7 @@ import { SlopdogsLandingSource, seedSlopdogsLandingKennel } from '../../seed-dat
 import { maintainedSeedLineages } from '../../seed-data/kennels/maintainedSeedLineages';
 import { SlopdogsKennelsSource, seedSlopdogsKennelsKennel } from '../../seed-data/kennels/slopdogs-kennels';
 import { SeedKeptDogs } from '../../seed-data/kennels/seedKeptDogs';
+import { SeedReseed, SeedReseedMarks } from '../../services/SeedReseed';
 import { randomUUID } from 'crypto';
 import type { TestResultSink } from './packageCandidates';
 
@@ -64,6 +67,8 @@ export class SeededKennelTests {
     static readonly LIST = 'startup-seed-kennels';
     static readonly PROBE = 'startup-seed-probe';
     static readonly PROBE_LEGACY = 'startup-seed-probe-legacy';
+    static readonly RESEED = 'startup-seed-reseed';
+    static readonly RESEED_MARK = 'seed-reseed:startup-test';
 
     private readonly maintainer: AuthCtx = { user: { id: 'UM', email: 'um@test.invalid', name: null }, isSuperUser: false };
     private readonly stranger: AuthCtx = { user: { id: 'U9', email: 'u9@test.invalid', name: null }, isSuperUser: false };
@@ -91,6 +96,13 @@ export class SeededKennelTests {
             this.addResult(testName, true);
         } catch (error) {
             this.addResult(testName, false, String(error));
+        }
+        const reseedName = 'Spur K: Reseed beim Start (--reseed immer, SLOPDOGS_RESEED einmal je Marke)';
+        try {
+            await this.reseedCases();
+            this.addResult(reseedName, true);
+        } catch (error) {
+            this.addResult(reseedName, false, String(error));
         } finally {
             await this.cleanup();
             LandingKennels.setLockedDogs(lockedBefore);
@@ -121,7 +133,7 @@ export class SeededKennelTests {
             throw new Error(`${LIST} nicht geseedet`);
         await this.expectKennelDogs(LANDING, landingLineages);
         await this.expectKennelDogs(LIST, listLineages);
-        if (listLineages.length !== 44) throw new Error(`Kennel-Liste hat ${listLineages.length} Dogs statt 44`);
+        if (listLineages.length !== 45) throw new Error(`Kennel-Liste hat ${listLineages.length} Dogs statt 45`);
         const before = await this.versionCounts([...landingLineages, ...listLineages]);
         if ([...before.values()].some((n) => n !== 1)) throw new Error('frischer Seed: nicht genau eine Version je Dog');
         if ((await seedSlopdogsLandingKennel(this.nodesStore, this.kennelsStore, LANDING)) !== 'kept')
@@ -308,6 +320,76 @@ export class SeededKennelTests {
         if ((await this.kept.list(LANDING)).length !== 0) throw new Error('Bestand: Merker nach dem Reseed nicht entfernt');
     }
 
+    /** 5. Reseed beim Start an einer eigenen Kennel-ID und einer eigenen Marken-Zeile. */
+    private async reseedCases(): Promise<void> {
+        const { RESEED } = SeededKennelTests;
+        const landingSource = SlopdogsLandingSource.locate();
+        if (!landingSource) throw new Error('Seed-Quellen nicht gefunden');
+        const trigger = (argv: string[], env: NodeJS.ProcessEnv) => JSON.stringify(SeedReseed.triggerOf(argv, env));
+        if (trigger([], {}) !== 'null' || trigger([], { SLOPDOGS_RESEED: '  ' }) !== 'null')
+            throw new Error('ohne Flag und Marke ein Ausloeser');
+        if (trigger(['--reseed'], { SLOPDOGS_RESEED: 'm' }) !== '{"kind":"flag"}') throw new Error('Flag nicht erkannt');
+        const messy = trigger([], { SLOPDOGS_RESEED: ' 2026-11-02 \n b ' });
+        if (messy !== '{"kind":"marker","marker":"2026-11-02 b"}') throw new Error(`Marke nicht bereinigt: ${messy}`);
+
+        const marks = new SeedReseedMarks(this.kennelsStore, SeededKennelTests.RESEED_MARK);
+        await marks.forget();
+        const refIndex = new DogReferenceIndex(this.nodesStore as unknown as IDogStatsStore, this.nodesStore, this.baseDogsMap);
+        const lines: string[] = [];
+        let afterReseed = 0;
+        const reseed = new SeedReseed({
+            targets: [
+                { kennelId: RESEED, label: 'landing', seed: () => seedSlopdogsLandingKennel(this.nodesStore, this.kennelsStore, RESEED) },
+            ],
+            deleteSeeded: (kennelId) => this.seededDelete(refIndex, [RESEED]).delete(kennelId),
+            marks,
+            afterReseed: () => {
+                afterReseed += 1;
+            },
+            log: (line) => lines.push(line),
+        });
+        if ((await reseed.run(null)).status !== 'none' || lines.length !== 0) throw new Error('ohne Ausloeser nicht still');
+
+        if ((await seedSlopdogsLandingKennel(this.nodesStore, this.kennelsStore, RESEED)) !== 'seeded')
+            throw new Error(`${RESEED} nicht geseedet`);
+        const landingLineages = ['SlopdogsLandingContent', 'SlopdogsLandingSkinC', 'SlopdogsLandingLead'].map((n) =>
+            MaintainedSeedDogs.lineageId(RESEED, n),
+        );
+        const content = landingLineages[0];
+        const repoCode = landingSource.read('content.js');
+        const headCode = async (): Promise<string> =>
+            JSON.parse((await this.nodesStore.findAllVersions('SerializedDog', content))[0].serializedDogConfig).theRun;
+        const liveChange = async (tag: string) => {
+            const saved = await this.nodesController.save({ id: content, theRun: `${repoCode}\n// ${tag}\n` });
+            if (!saved.ok) throw new Error(`Live-Aenderung ${tag}: ${saved.error}`);
+        };
+
+        // Neue Marke: Live-Aenderung weg, alle drei Dogs geloescht und frisch geseedet, Marke vermerkt.
+        await liveChange('live-1');
+        const first = await reseed.run({ kind: 'marker', marker: 'startup-m1' });
+        const t = first.status === 'reseeded' ? first.targets[0] : null;
+        if (!t || t.deleted !== 3 || t.kept !== 0 || t.seed !== 'seeded') throw new Error(`neue Marke: ${JSON.stringify(first)}`);
+        if ((await headCode()) !== repoCode) throw new Error('neue Marke: Live-Aenderung nicht zurueckgesetzt');
+        if ((await this.nodesStore.findAllVersions('SerializedDog', content)).length !== 1)
+            throw new Error('neue Marke: Content-Dog nicht frisch (alte Versionen stehen)');
+        if ((await marks.last()) !== 'startup-m1') throw new Error('neue Marke nicht vermerkt');
+        if (lines[0] !== '[seed] reseed startup-m1: landing 3 Dogs geloescht, 0 behalten') throw new Error(`Log: ${lines[0]}`);
+        await this.expectKennelDogs(RESEED, landingLineages);
+
+        // Dieselbe Marke: nichts passiert, die Live-Aenderung danach bleibt.
+        await liveChange('live-2');
+        const second = await reseed.run({ kind: 'marker', marker: 'startup-m1' });
+        if (second.status !== 'skipped') throw new Error(`gleiche Marke: ${JSON.stringify(second)}`);
+        if (!(await headCode()).includes('live-2')) throw new Error('gleiche Marke: Live-Aenderung verloren');
+        if (lines[1] !== '[seed] reseed startup-m1 schon angewandt -- uebersprungen') throw new Error(`Log: ${lines[1]}`);
+
+        // Das Flag setzt immer zurueck und laesst die vermerkte Marke stehen.
+        const flagged = await reseed.run({ kind: 'flag' });
+        if (flagged.status !== 'reseeded' || (await headCode()) !== repoCode) throw new Error(`Flag: ${JSON.stringify(flagged)}`);
+        if ((await marks.last()) !== 'startup-m1') throw new Error('Flag hat die Marke ueberschrieben');
+        if (afterReseed !== 2) throw new Error(`afterReseed ${afterReseed}x statt 2x`);
+    }
+
     /** Nicht-Maintainer: REST PUT, save_node, delete_node -> locked_landing; Maintainer: REST PUT und save_node ok. */
     private async expectDogLocked(lineageId: string): Promise<void> {
         const versionsBefore = await this.nodesStore.findAllVersions('SerializedDog', lineageId);
@@ -390,7 +472,10 @@ export class SeededKennelTests {
         );
     }
 
-    private seededDelete(refIndex: DogReferenceIndex): SeededKennelDelete {
+    private seededDelete(
+        refIndex: DogReferenceIndex,
+        seededIds: string[] = [SeededKennelTests.LANDING, SeededKennelTests.LIST],
+    ): SeededKennelDelete {
         return new SeededKennelDelete(
             {
                 kennelDogIds: async (kennelId) => {
@@ -404,7 +489,7 @@ export class SeededKennelTests {
                 deleteDog: async (lineageId) => (await this.nodesController.deleteRef(lineageId)).ok,
                 rememberKept: (kennelId, dogs) => this.kept.remember(kennelId, dogs),
             },
-            (kennelId) => [SeededKennelTests.LANDING, SeededKennelTests.LIST].includes(kennelId),
+            (kennelId) => seededIds.includes(kennelId),
         );
     }
 
@@ -453,10 +538,14 @@ export class SeededKennelTests {
                 MaintainedSeedDogs.lineageId(LANDING, n),
             ),
             ...SlopdogsKennelsSource.DOGS.map((d) => MaintainedSeedDogs.lineageId(LIST, d.displayName)),
+            ...['SlopdogsLandingContent', 'SlopdogsLandingSkinC', 'SlopdogsLandingLead'].map((n) =>
+                MaintainedSeedDogs.lineageId(SeededKennelTests.RESEED, n),
+            ),
             ...(this.foreignDog ? [this.foreignDog] : []),
             ...(this.legacyDog ? [this.legacyDog] : []),
         ];
-        for (const kennelId of [LANDING, LIST, PROBE, SeededKennelTests.PROBE_LEGACY])
+        await new SeedReseedMarks(this.kennelsStore, SeededKennelTests.RESEED_MARK).forget();
+        for (const kennelId of [LANDING, LIST, PROBE, SeededKennelTests.PROBE_LEGACY, SeededKennelTests.RESEED])
             await this.kennelsController.deleteRef(kennelId).catch(() => undefined);
         for (const entry of [...(await this.kept.list(LANDING)), ...(await this.kept.list(LIST))])
             await this.kept.forget(entry.kennelId, entry.displayName);

@@ -252,6 +252,15 @@ const SERVER_ENV_CATALOG: readonly EnvVarSpec[] = [
         consequence: 'Default nach NODE_ENV',
     },
     {
+        name: 'SLOPDOGS_RESEED',
+        section: 'operations',
+        since: 'Spur K',
+        purpose:
+            'Marke (beliebiger Text, z. B. ein Datum): ist sie neu, setzt der Start Landing und Kennel-Liste auf den Repo-Stand (Loeschen wie ein Maintainer, dann frischer Seed); die angewandte Marke steht in der DB, ein zweiter Start mit derselben Marke tut nichts',
+        defaultValue: 'leer = kein Reseed',
+        consequence: 'Live-Aenderungen bleiben, Repo-Aenderungen erreichen eine bestehende DB nicht',
+    },
+    {
         name: 'SLOPDOGS_MODE',
         section: 'operations',
         since: 'Spur L',
@@ -901,6 +910,14 @@ const SERVER_ENV_CATALOG: readonly EnvVarSpec[] = [
         consequence: '—',
     },
     {
+        name: 'RENDER_GIT_COMMIT',
+        section: 'internal',
+        since: 'Spur K',
+        purpose: 'Setzt Render selbst; Build und GET /api/health nehmen daraus den kurzen Commit (sonst git beim Build)',
+        defaultValue: '—',
+        consequence: '—',
+    },
+    {
         name: 'PRISMA_SYNC_PUSH_ONLY',
         section: 'internal',
         since: 'Spur L',
@@ -920,7 +937,7 @@ export interface DogPackageEnv {
  * Liest die Env-Metadaten aller installierten SlopDogs-Pakete: jede Abhaengigkeit `@martinschmieschek/slopdogs-*`
  * aus der package.json des Servers, die einen Einstieg `./env` anbietet, wird mit `require('<paket>/env')` geladen.
  * Nur diese kleine Datei — die Dogs des Pakets laedt das nicht (der slim-Registry bleibt schlank). Aufgeloest wie zur
- * Laufzeit (Workspace-Link, node_modules), nicht ueber einen Ordner packages/.
+ * Laufzeit (node_modules).
  */
 export function loadDogPackageEnv(rootDir: string = serverRootDir()): DogPackageEnv[] {
     const manifest = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8')) as { dependencies?: Record<string, string> };

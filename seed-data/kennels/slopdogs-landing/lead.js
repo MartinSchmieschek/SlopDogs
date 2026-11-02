@@ -1,7 +1,8 @@
 // SlopDogs landing · lead. Takes SlopdogsLandingSkinC (Mixtape, the only look, PLAN 8.19) as the page and
-// wires the live part: the host of the page and the rankings from /api/landing with the states
-// loading/waking/data/empty/error (PLAN P5). The skin only brings its markup: #sd-live with a card <template>.
-// The page script is live() below, shipped as its own source text (ES5, no framework, one request).
+// wires the live part: the host of the page, the version line in the footer from /api/health and the rankings
+// from /api/landing with the states loading/waking/data/empty/error (PLAN P5). The skin only brings its markup:
+// #sd-live with a card <template>, #sd-version in the footer. The page script is live() below, shipped as its own
+// source text (ES5, no framework, one request per part).
 var html = typeof SlopdogsLandingSkinC !== 'undefined' ? SlopdogsLandingSkinC : null;
 if (!html || typeof html !== 'string') {
     throw new Error('SlopdogsLanding: kein Skin C geliefert.');
@@ -38,6 +39,23 @@ function live() {
             if (a.value.indexOf(MARK) >= 0) el.setAttribute(a.name, withHost(a.value));
         });
     });
+
+    /* The version line in the footer (#sd-version) from /api/health; stays hidden when the request fails. */
+    var ver = d.getElementById('sd-version');
+    if (ver && window.fetch) {
+        fetch('/api/health', { headers: { Accept: 'application/json' }, cache: 'no-store' })
+            .then(function (r) {
+                return r.ok ? r.json() : null;
+            })
+            .then(
+                function (j) {
+                    if (!j || !j.version) return;
+                    ver.textContent = ['v' + j.version, j.core ? 'core ' + j.core : '', j.commit || ''].filter(Boolean).join(' · ');
+                    ver.hidden = false;
+                },
+                function () {},
+            );
+    }
 
     var root = d.getElementById('sd-live');
     var tpl = root && root.querySelector('template[data-tpl="card"]');

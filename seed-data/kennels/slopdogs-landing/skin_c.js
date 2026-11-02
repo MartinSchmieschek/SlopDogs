@@ -130,7 +130,7 @@ var CSS =
     '.covers>li:nth-child(4n+1)>.cv{--r:-1.5deg}.covers>li:nth-child(4n+2)>.cv{--r:1deg}.covers>li:nth-child(4n+3)>.cv{--r:-.5deg}.covers>li:nth-child(4n)>.cv{--r:1.5deg}' +
     '.cv .id{font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;gap:8px}.cv h3{font-size:1.5rem;letter-spacing:.02em}.cv p{color:var(--muted);font-size:.84rem;line-height:1.45;flex:1 1 auto}' +
     '.cv .badge{position:absolute;right:-10px;top:-12px;width:56px;height:56px;border-radius:50%;background:var(--org);border:3px solid var(--ink);display:grid;place-items:center;font-size:1.5rem;transform:rotate(12deg);text-align:center;line-height:1.1}.cv .stars{font-size:.72rem;font-weight:700;letter-spacing:.12em;color:var(--teal)}' +
-    '.foot{padding:30px 0 56px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:14px 28px;font-size:.74rem;color:var(--muted);border-top:3px solid var(--ink)}.foot .vers{margin:0}';
+    '.foot{padding:30px 0 56px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:14px 28px;font-size:.74rem;color:var(--muted);border-top:3px solid var(--ink)}.foot .vers{margin:0}.foot .ver{flex-basis:100%;font-size:.66rem;letter-spacing:.08em}';
 
 /* ---------- sections ---------- */
 /* the promo sticker: only shown under <html data-stage="beta"> (CSS), markup always there */
@@ -601,7 +601,7 @@ function footer() {
         esc(F.tag) +
         '</span>' +
         verse(F.verse) +
-        '</footer>'
+        '<span class="ver" id="sd-version" hidden></span></footer>'
     );
 }
 

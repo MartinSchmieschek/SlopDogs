@@ -52,6 +52,7 @@ const SCRIPT_DOGS = [
     'SlopdogsKennelsScriptEmpty',
     'SlopdogsKennelsScriptRender',
     'SlopdogsKennelsScriptEvents',
+    'SlopdogsKennelsScriptVersion',
     'SlopdogsKennelsScriptBoot',
 ];
 
@@ -256,6 +257,12 @@ const DOGS: KennelListDogSource[] = [
         description: 'Draws the state: rows and status line.',
     },
     { displayName: 'SlopdogsKennelsScriptEvents', file: 'script-events.js', icon: '📜', description: 'What a click or a key does.' },
+    {
+        displayName: 'SlopdogsKennelsScriptVersion',
+        file: 'script-version.js',
+        icon: '📜',
+        description: 'The version line under the list, from /api/health.',
+    },
     {
         displayName: 'SlopdogsKennelsScriptBoot',
         file: 'script-boot.js',

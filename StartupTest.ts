@@ -41,6 +41,7 @@ import { EXPRESS_APP_ROUTES, FRONTEND_ROUTES, LEGACY_ROUTE } from './api/routes/
 import { KeyStoreService, type KeyStorePrisma } from './services/KeyStoreService';
 import { PackageCandidateTests } from './test/startup/packageCandidates';
 import { SeededKennelTests } from './test/startup/seededKennelTests';
+import { HealthRouteTests } from './test/startup/healthTests';
 import { LocalMode } from './server-app/LocalMode';
 import { authModeBootError } from './mcp/auth/middleware';
 import { AllowedHosts, NetworkBoundary } from './server-app/NetworkBoundary';
@@ -132,6 +133,7 @@ export class StartupTest {
             // kaputte Zugriffspruefung. Kein listen, kein Kindprozess, kein externes Netz.
             await this.testBaseDogsAvailability(baseDogsMap);
             await this.testRouteTableMatchesExpressStack(app);
+            new HealthRouteTests((name, passed, error) => this.addResult(name, passed, error)).run(app);
             // P3.5 Rechte v2: NONE < RUN < READ < EDIT < OWN
             await this.testRightsMatrix();
             await this.testPrivateKennelHiddenFromAnon(nodesStore, kennelsController as KennelController, baseDogsMap);
