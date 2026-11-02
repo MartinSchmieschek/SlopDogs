@@ -1,7 +1,8 @@
 /**
  * Kennel-Pfade und die Namensregel fuer Kennel-IDs (lineageId).
  *
- * Muss mit packages/core/src/kennelPaths.ts uebereinstimmen (Vite kann keine Core-Subpfade laden).
+ * Muss mit src/kennelPaths.ts im Repo slopdogs-core (https://github.com/MartinSchmieschek/slopdogs-core) uebereinstimmen
+ * (Vite kann keine Core-Subpfade laden).
  */
 
 /** Praefix der oeffentlichen Kennel-Seiten ("Ware"). */

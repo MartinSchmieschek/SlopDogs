@@ -3,7 +3,7 @@
  * (dieselbe Datei wie unter NODE_ENV=production | integration).
  * Exit 1 bei Lücken — nach neuen Seed-Kennels `server-registries/slimDeployRegistry.ts` erweitern.
  *
- * Aufruf (Repo-Root): node -r ts-node/register -r tsconfig-paths/register scripts/check-integration-dog-coverage.cjs
+ * Aufruf (Repo-Root): node -r ts-node/register scripts/check-integration-dog-coverage.cjs
  */
 const fs = require('fs');
 const path = require('path');
@@ -15,7 +15,6 @@ require('ts-node').register({
     transpileOnly: true,
     project: path.join(root, 'tsconfig.json'),
 });
-require('tsconfig-paths/register');
 
 const { SLIM_DEPLOY_BASE_DOG_NAMES } = require(path.join(root, 'server-registries', 'slimDeployRegistry.ts'));
 

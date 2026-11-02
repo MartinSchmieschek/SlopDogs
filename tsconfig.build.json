@@ -17,5 +17,5 @@
     "mcp/**/*.ts",
     "test/**/*.ts"
   ],
-  "exclude": ["node_modules", "ui-app", "dist", "packages"]
+  "exclude": ["node_modules", "ui-app", "dist"]
 }

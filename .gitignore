@@ -33,14 +33,12 @@ dist/
 # Welle 10 -- Stale TypeScript compile artifacts must never live next to .ts sources.
 # A stray `npx tsc` (ohne -p tsconfig.build.json) wuerde sonst .js neben .ts legen
 # und ts-node/Node-Modul-Resolution wuerden die alten .js gegenueber den frischen
-# .ts bevorzugen -- Geister-Debugging garantiert. packages/*/dist/**/*.js bleibt
-# erlaubt, das ist die echte Build-Ausgabe.
+# .ts bevorzugen -- Geister-Debugging garantiert.
 /*.js
 /api/**/*.js
 /mcp/**/*.js
 /services/**/*.js
 /store/**/*.js
-/packages/*/src/**/*.js
 
 # Prisma client
 node_modules/@prisma/

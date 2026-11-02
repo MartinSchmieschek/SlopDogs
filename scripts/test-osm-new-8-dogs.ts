@@ -4,7 +4,7 @@
  *   PublicTransitStops, Shops, SportsRecreation
  *
  * Direkter Klassen-Aufruf ohne Kennel — kleine Radien um Overpass nicht zu reizen.
- * Run: npx ts-node -r tsconfig-paths/register scripts/test-osm-new-8-dogs.ts
+ * Run: npx ts-node scripts/test-osm-new-8-dogs.ts
  */
 export {};
 

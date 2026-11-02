@@ -1,5 +1,0 @@
-// Nur im Monorepo (PLAN-DOG-PAKETE P2.8): Projekt-Referenzen fuer `tsc -b tsconfig.packages.json`.
-// tsconfig.json selbst kennt keine Nachbarordner, damit das Paket allein baut (npm run build).
-{
-  "extends": "./tsconfig.json"
-}

@@ -90,7 +90,7 @@ function resolveInstanceId(instance: any): string {
 }
 
 /**
- * Lead-Knoten aus den Waves — gleiche Semantik wie @martinschmieschek/slopdogs-swaggrid (Herald) / öffentliche API:
+ * Lead-Knoten aus den Waves — gleiche Semantik wie @martinschmieschek/slopdogs-core/swaggrid (Herald) / öffentliche API:
  * erster `dogIds`-Eintrag; `base:`-Prefix optional; Versions-Suffix optional;
  * bei SerializedDogs oft `lineageId` in der Kennel-Charter, `id` in den Waves = `storageId`.
  */

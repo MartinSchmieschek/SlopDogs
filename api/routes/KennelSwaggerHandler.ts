@@ -1,6 +1,6 @@
 // The KennelSwaggerHandler — Xata's herald, forging truth from the hunt into OpenAPI scrolls.
 // Its heralds are the stars it fells, the sky and Earth aflame.
-import { castGrimoire } from '@martinschmieschek/slopdogs-swaggrid';
+import { castGrimoire } from '@martinschmieschek/slopdogs-core/swaggrid';
 import { publicKennelDocsPath, publicKennelOpenApiPath } from '@martinschmieschek/slopdogs-core/runtime';
 import { toSwaggridCast } from '../../services/swaggridAdapter';
 import { KennelRunHandler } from './KennelRunHandler';

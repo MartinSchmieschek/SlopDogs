@@ -59,11 +59,11 @@ function pushSchemas(env) {
 }
 
 function runSuite(env) {
-    const result = spawnSync(
-        process.execPath,
-        ['--max-old-space-size=4096', '-r', 'ts-node/register', '-r', 'tsconfig-paths/register', 'test/startup/runStartupTests.ts'],
-        { cwd: root, env, stdio: 'inherit' },
-    );
+    const result = spawnSync(process.execPath, ['--max-old-space-size=4096', '-r', 'ts-node/register', 'test/startup/runStartupTests.ts'], {
+        cwd: root,
+        env,
+        stdio: 'inherit',
+    });
     if (result.error) throw result.error;
     return result.status === null ? 1 : result.status;
 }

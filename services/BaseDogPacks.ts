@@ -6,8 +6,8 @@
 // list of classes. The package is not written anywhere else, and a second hand-kept table would rot. So it is
 // read from the module graph the registry has just loaded: every module whose nearest package.json names a
 // SlopDogs package and whose exports hold the class. The defining file wins over an index that only re-exports it.
-// Name and version come from that package.json — not from a `packages/<name>/` path, so it works the same
-// under `node_modules/@martinschmieschek/slopdogs-<name>/dist/...` (installed package) as in this monorepo.
+// Name and version come from that package.json — not from the path, so it works for any install location
+// (`node_modules/@martinschmieschek/slopdogs-<name>/dist/...`).
 
 import * as fs from 'fs';
 import * as path from 'path';

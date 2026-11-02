@@ -5,7 +5,7 @@
  * Ruft jeden Hund mit kleiner Radius-Query auf Frankfurt-Innenstadt auf,
  * ohne Kennel-Infrastruktur (kein TileFeatureCache, direkter Overpass-Fetch).
  *
- * Run: npx ts-node -r tsconfig-paths/register scripts/test-osm-geometry-dogs.ts
+ * Run: npx ts-node scripts/test-osm-geometry-dogs.ts
  */
 export {};
 

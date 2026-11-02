@@ -9,8 +9,9 @@
  *        - Helfer, die einen Namen als Parameter bekommen und env[param] lesen (positiveFromEnv, envFirst,
  *          parseEnvPositiveInt, …): sie werden im Code selbst erkannt, ihre Aufrufe liefern die Namen.
  *      Schreibzugriffe (env.X = …, delete env.X) zaehlen nicht als Lesung.
- *   a') je Dog-Paket (P2.7): was packages/<x>/ liest, steht in den envVars von <x> (src/env.ts, Einstieg ./env),
- *      und jede dort genannte Variable liest <x> auch — die Paket-Eintraege koennen nicht still verrotten.
+ *      Mitgelesen wird das installierte core (gebaute Quelle in node_modules): es laeuft im Server und liest
+ *      dieselbe Umgebung. Die envVars der Dog-Pakete (<paket>/env) prueft das Repo slopdogs-base-dogs gegen
+ *      seine Quellen; hier zaehlen sie nur als Katalog-Eintraege.
  *   b) Katalog -> Beispiele: jeder Katalog-Name steht in .env.example und .env.integration.example, in seinem
  *      Abschnitt (Ueberschriften aus ENV_SECTIONS, in Katalog-Reihenfolge) und in Katalog-Reihenfolge — die
  *      Regeln des frueheren StartupTest testEnvCatalogWarnings (bis ef9f8af).
@@ -26,7 +27,10 @@ const ROOT = path.join(__dirname, '..');
 const TAG = '[check-env-catalog]';
 
 /** Server-Code: Wurzeln relativ zum Repo. Verzeichnisse rekursiv, Dateien einzeln. */
-const SCAN_ROOTS = ['main.ts', 'api', 'mcp', 'server-app', 'services', 'store', 'server-registries', 'seed-data', 'scripts', 'packages'];
+const SCAN_ROOTS = ['main.ts', 'api', 'mcp', 'server-app', 'services', 'store', 'server-registries', 'seed-data', 'scripts'];
+
+/** Installierte Pakete, die zur Server-Laufzeit gehoeren: ihr gebautes dist/ wird mitgelesen. */
+const SERVER_SIDE_PACKAGES = ['@martinschmieschek/slopdogs-core'];
 
 /** Nie durchsuchen: generierter Code, Bauergebnisse, Tests. */
 const SKIP_DIRS = new Set(['node_modules', 'dist', 'generated', 'test', '__tests__']);
@@ -39,7 +43,6 @@ const SKIP_FILES = new Set([
     'scripts/check-env-catalog.cjs',
     'scripts/check-integration-dog-coverage.cjs',
     'scripts/check-doc-paths.cjs',
-    'scripts/typecheck-packages.cjs',
     'scripts/run-startup-tests.cjs',
     'scripts/compare-registry-heap.cjs',
     'scripts/registry-heap-child.cjs',
@@ -67,6 +70,9 @@ class SourceFiles {
     static list() {
         const out = [];
         for (const rel of SCAN_ROOTS) SourceFiles.walk(path.join(ROOT, rel), out);
+        for (const name of SERVER_SIDE_PACKAGES) {
+            SourceFiles.walk(path.join(path.dirname(require.resolve(`${name}/package.json`, { paths: [ROOT] })), 'dist'), out);
+        }
         return out
             .map((abs) => path.relative(ROOT, abs).split(path.sep).join('/'))
             .filter((rel) => !SKIP_FILES.has(rel))
@@ -234,9 +240,16 @@ class EnvReadScanner {
         return out.length === e.elements.length ? out : null;
     }
 
+    /** Name der gerufenen Funktion; auch `(0, modul_1.helfer)(…)`, wie tsc Importe im gebauten CommonJS ruft. */
+    static calleeName(callee) {
+        while (ts.isParenthesizedExpression(callee)) callee = callee.expression;
+        if (ts.isBinaryExpression(callee) && callee.operatorToken.kind === ts.SyntaxKind.CommaToken) callee = callee.right;
+        if (ts.isIdentifier(callee)) return callee.text;
+        return ts.isPropertyAccessExpression(callee) ? callee.name.text : null;
+    }
+
     collectHelperCall(node, sf) {
-        const callee = node.expression;
-        const name = ts.isIdentifier(callee) ? callee.text : ts.isPropertyAccessExpression(callee) ? callee.name.text : null;
+        const name = EnvReadScanner.calleeName(node.expression);
         const indices = name ? this.helpers.get(name) : null;
         if (!indices) return;
         for (const i of indices) {
@@ -302,11 +315,7 @@ class EnvCatalogCheck {
     static run(argv) {
         process.chdir(ROOT);
         require('ts-node').register({ transpileOnly: true, project: path.join(ROOT, 'tsconfig.json') });
-        require('tsconfig-paths').register({
-            baseUrl: ROOT,
-            paths: ts.readConfigFile(path.join(ROOT, 'tsconfig.json'), ts.sys.readFile).config.compilerOptions.paths,
-        });
-        const { ENV_CATALOG, ENV_SECTIONS, DOG_PACKAGE_ENV } = require(path.join(ROOT, 'server-app', 'startupEnvCheck.ts'));
+        const { ENV_CATALOG, ENV_SECTIONS } = require(path.join(ROOT, 'server-app', 'startupEnvCheck.ts'));
 
         const known = new Set(ENV_CATALOG.flatMap((s) => [s.name, ...(s.anyOf ?? []), ...(s.aliases ?? [])]));
         const scanner = new EnvReadScanner(SourceFiles.list()).scan();
@@ -319,38 +328,6 @@ class EnvCatalogCheck {
         for (const name of NOT_CATALOGED.keys()) {
             if (known.has(name)) problems.push(`Ausnahme ${name} steht auch im Katalog — aus NOT_CATALOGED nehmen`);
             else if (!scanner.reads.has(name)) problems.push(`Ausnahme ${name} liest niemand mehr — aus NOT_CATALOGED nehmen`);
-        }
-
-        // P2.7: Dog-Pakete liefern ihre Variablen selbst (<paket>/env). Auch je Paket in beide Richtungen:
-        // was packages/<x>/ liest, steht in den envVars von <x>; was dort steht, liest <x> auch.
-        const SERVER_SIDE_PACKAGES = new Set(['core', 'typedefs', 'swaggrid']);
-        const declared = new Map(DOG_PACKAGE_ENV.map((p) => [p.packageName.replace(/^@martinschmieschek\/slopdogs-/, ''), p.envVars]));
-        const readsByPackage = new Map();
-        for (const [name, where] of scanner.reads) {
-            for (const w of where) {
-                const m = /^packages\/([^/]+)\//.exec(w);
-                if (!m || SERVER_SIDE_PACKAGES.has(m[1])) continue;
-                if (!readsByPackage.has(m[1])) readsByPackage.set(m[1], new Map());
-                readsByPackage.get(m[1]).set(name, w);
-            }
-        }
-        for (const [pack, reads] of readsByPackage) {
-            const own = new Set((declared.get(pack) || []).flatMap((s) => [s.name, ...(s.anyOf ?? []), ...(s.aliases ?? [])]));
-            for (const [name, w] of reads) {
-                if (!own.has(name))
-                    problems.push(`packages/${pack} liest ${name}, seine envVars (src/env.ts, Einstieg ./env) nennen es nicht: ${w}`);
-            }
-        }
-        // Ein installiertes Paket (Paket-Betrieb nach P4: node_modules statt packages/<x>/src) liest der Scanner nicht;
-        // seine Liste prueft das Paket-Repo selbst (slopdogs-base-dogs, Paket-Test). Hier zaehlt nur, was als Quelle da ist.
-        const hasLocalSource = (pack) => fs.existsSync(path.join(ROOT, 'packages', pack, 'src'));
-        for (const [pack, vars] of declared) {
-            if (!hasLocalSource(pack)) continue;
-            const reads = readsByPackage.get(pack) || new Map();
-            for (const spec of vars) {
-                if (![spec.name, ...(spec.anyOf ?? []), ...(spec.aliases ?? [])].some((n) => reads.has(n)))
-                    problems.push(`packages/${pack}: envVars nennt ${spec.name}, das Paket liest es nicht`);
-            }
         }
 
         const examples = new ExampleFileCheck(ENV_CATALOG, ENV_SECTIONS);

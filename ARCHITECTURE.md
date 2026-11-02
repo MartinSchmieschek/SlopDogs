@@ -391,7 +391,7 @@ flowchart LR
 1. **Memory** — [`KennelRunHandler.createMimicAdopter`](api/routes/KennelRunHandler.ts) pulls **every historical version** of the kennel via `kennelsController.getVersions(lineageId)` and collects every non-base `dogId` they ever carried into a `remembered` set. Even lineages a later PUT dropped from `dogIds` survive here — the kennel never forgets.
 2. **Scan** — for each unmet Pact, the adopter queries `findLatestVersionsByType(MimicDog.name)` and keeps rows whose `serializedDogConfig.imitates` matches the Pact name.
 3. **Winner** — candidates whose `lineageId` is in `remembered` win first; tie-break by newest `createdAt`. If nothing is remembered, the newest overall match wins. If there are no candidates at all, adoption returns `null`.
-4. **Conjure** — only when adoption yields `null` does [`KennelRun.autoMimic`](packages/core/src/KennelRun.ts) forge a fresh `auto-mimic-<PactName>` placeholder with throwing `theRun`.
+4. **Conjure** — only when adoption yields `null` does [`KennelRun.autoMimic`](https://github.com/MartinSchmieschek/slopdogs-core/blob/main/src/KennelRun.ts) forge a fresh `auto-mimic-<PactName>` placeholder with throwing `theRun`.
 
 After the season runs, **`persistNewMimics`** closes the loop: fresh mimics (no `lineageId`) are saved to the store with a new version + lineage GUID; adopted mimics keep their existing lineage. **In both cases**, the mimic's `lineageId` is healed into `config.dogIds` via `kennelsController.heal(...)` — and the in-memory config is mutated on the spot so the same `/run` response already reflects the heal. On subsequent runs, the mimics load directly through `createSerializedDogFactory` by lineage; no adoption, no conjuring.
 
@@ -695,31 +695,30 @@ flowchart LR
 ### Core engine
 - **[main.ts](main.ts)** — Express gate, dog + pact registration, startup tests  
 - **[seed.ts](seed.ts)** — Database seeds (SerializedDogs, MimicDogs, KennelConfigs)  
-- **[packages/core/src/KennelRun.ts](packages/core/src/KennelRun.ts)** — fillKennel, autoMimic, orchestration, `MimicAdopter` type  
+- **[slopdogs-core/src/KennelRun.ts](https://github.com/MartinSchmieschek/slopdogs-core/blob/main/src/KennelRun.ts)** — fillKennel, autoMimic, orchestration, `MimicAdopter` type  
 - **[api/routes/KennelRunHandler.ts](api/routes/KennelRunHandler.ts)** — `createMimicAdopter` (lineage-aware adoption), `persistNewMimics` (heal dogIds), `createSerializedDogFactory` (lineage dedup)  
-- **[packages/core/src/harverster.ts](packages/core/src/harverster.ts)** — SeasonRunner, waves  
-- **[packages/core/src/dogs/SerializedDog.ts](packages/core/src/dogs/SerializedDog.ts)** — VM, context, yield  
-- **[packages/core/src/dogs/createPact.ts](packages/core/src/dogs/createPact.ts)** — Pact factory  
-- **[packages/core/src/dogs/MimicDog.ts](packages/core/src/dogs/MimicDog.ts)** — Shapeshifter dogs  
-- **[packages/core/src/core/entities/abstractHuntingDog.ts](packages/core/src/core/entities/abstractHuntingDog.ts)** — Dog base, dependencies, read tracking  
-- **Base dog icons** — no central file: each `Dog` in `packages/dogs-*` implements `get icon()` (usually one emoji). See the README.
+- **[slopdogs-core/src/harverster.ts](https://github.com/MartinSchmieschek/slopdogs-core/blob/main/src/harverster.ts)** — SeasonRunner, waves  
+- **[slopdogs-core/src/dogs/SerializedDog.ts](https://github.com/MartinSchmieschek/slopdogs-core/blob/main/src/dogs/SerializedDog.ts)** — VM, context, yield  
+- **[slopdogs-core/src/dogs/createPact.ts](https://github.com/MartinSchmieschek/slopdogs-core/blob/main/src/dogs/createPact.ts)** — Pact factory  
+- **[slopdogs-core/src/dogs/MimicDog.ts](https://github.com/MartinSchmieschek/slopdogs-core/blob/main/src/dogs/MimicDog.ts)** — Shapeshifter dogs  
+- **[slopdogs-core/src/core/entities/abstractHuntingDog.ts](https://github.com/MartinSchmieschek/slopdogs-core/blob/main/src/core/entities/abstractHuntingDog.ts)** — Dog base, dependencies, read tracking  
+- **Base dog icons** — no central file: each `Dog` in the [slopdogs-base-dogs](https://github.com/MartinSchmieschek/slopdogs-base-dogs) packages implements `get icon()` (usually one emoji). See the README.
 - **[store/PrismaStore.ts](store/PrismaStore.ts)** — persistence, versions  
 - **[api/routes/KennelBundleHandler.ts](api/routes/KennelBundleHandler.ts)** — kennel `bundleVersion: 2` export/import, `importTarget` remapping, `suggestKennelImportTarget`  
-- **[packages/core/src/kennelImportTarget.ts](packages/core/src/kennelImportTarget.ts)** — suggested id/name for import when collisions exist  
-- **[packages/core/src/socket/WebSocketChannelRetriever.ts](packages/core/src/socket/WebSocketChannelRetriever.ts)** + **[IChannelHub](packages/core/src/socket/IChannelHub.ts)** — WebSocket lobbies (optional)  
-- **[packages/core/src/storage/JsonStorageRetriever.ts](packages/core/src/storage/JsonStorageRetriever.ts)** — per-lobby JSON key/value store  
+- **[slopdogs-core/src/kennelImportTarget.ts](https://github.com/MartinSchmieschek/slopdogs-core/blob/main/src/kennelImportTarget.ts)** — suggested id/name for import when collisions exist  
+- **[slopdogs-core/src/socket/WebSocketChannelRetriever.ts](https://github.com/MartinSchmieschek/slopdogs-core/blob/main/src/socket/WebSocketChannelRetriever.ts)** + **[IChannelHub](https://github.com/MartinSchmieschek/slopdogs-core/blob/main/src/socket/IChannelHub.ts)** — WebSocket lobbies (optional)  
 
 ### Dog packages
-- **[packages/dogs-demo/](packages/dogs-demo/)** — RandomRecipesRetriever, CountryFlagBlackLab, DishFlagBlackLab, RandomEveryThingRetriever  
-- **[packages/dogs-geo/](packages/dogs-geo/)** — BloodhoundRouteRetriever, BloodhoundIsochroneRetriever, OsmLandmarksRetriever  
-- **[packages/dogs-public-transport/](packages/dogs-public-transport/)** — PublicTransportRetriever (nearby stops + departures via MOTIS)  
-- **[packages/dogs-hue/](packages/dogs-hue/)** — HuePlaygroundRetriever, HueBridgeEnvRetriever  
-- **[packages/dogs-talking/](packages/dogs-talking/)** — TalkingDog (HTML rendering)  
-- **[packages/dogs-warframe/](packages/dogs-warframe/)** — WarframeAlertsRetriever  
+- **[slopdogs-base-dogs/packages/dogs-demo/](https://github.com/MartinSchmieschek/slopdogs-base-dogs/tree/main/packages/dogs-demo)** — RandomRecipesRetriever, CountryFlagBlackLab, DishFlagBlackLab, RandomEveryThingRetriever  
+- **[slopdogs-base-dogs/packages/dogs-geo/](https://github.com/MartinSchmieschek/slopdogs-base-dogs/tree/main/packages/dogs-geo)** — BloodhoundRouteRetriever, BloodhoundIsochroneRetriever, OsmLandmarksRetriever  
+- **[slopdogs-base-dogs/packages/dogs-public-transport/](https://github.com/MartinSchmieschek/slopdogs-base-dogs/tree/main/packages/dogs-public-transport)** — PublicTransportRetriever (nearby stops + departures via MOTIS)  
+- **[slopdogs-base-dogs/packages/dogs-hue/](https://github.com/MartinSchmieschek/slopdogs-base-dogs/tree/main/packages/dogs-hue)** — HuePlaygroundRetriever, HueBridgeEnvRetriever  
+- **[slopdogs-base-dogs/packages/dogs-talking/](https://github.com/MartinSchmieschek/slopdogs-base-dogs/tree/main/packages/dogs-talking)** — TalkingDog (HTML rendering)  
+- **[slopdogs-base-dogs/packages/dogs-warframe/](https://github.com/MartinSchmieschek/slopdogs-base-dogs/tree/main/packages/dogs-warframe)** — WarframeAlertsRetriever  
 
 ### Adding a new BaseDog package
 
-See [Creating a new BaseDog Package](README.md#creating-a-new-basedog-package) in the README. In short: scaffold under `packages/`, extend `Dog<T>`, implement `get icon()`, define a Pact if needed, register the class in `allBaseDogClasses` and the Pact in `allPacts` in `main.ts`, wire the build in root `package.json` + `tsconfig.json`, run `npm install`, optionally seed in `seed.ts`.  
+See [Core and Dog packages](README.md#core-and-dog-packages) in the README. In short: create and release the package in [slopdogs-base-dogs](https://github.com/MartinSchmieschek/slopdogs-base-dogs) (extend `Dog<T>`, implement `get icon()`, define a Pact if needed), then pin it in `package.json` here, register its classes and Pacts in `server-registries/fullRegistry.ts` (and `slimDeployRegistry.ts`), run `npm install`, optionally seed in `seed.ts`.  
 
 ---
 

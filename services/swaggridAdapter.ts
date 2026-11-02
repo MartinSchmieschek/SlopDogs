@@ -1,5 +1,5 @@
 import { publicKennelPath, type IKennelConfig } from '@martinschmieschek/slopdogs-core/runtime';
-import type { Rune, SwaggridCast } from '@martinschmieschek/slopdogs-swaggrid';
+import type { Rune, SwaggridCast } from '@martinschmieschek/slopdogs-core/swaggrid';
 import type { Waves } from './WavesConverter';
 import { findLeadNodeEntry } from './WavesConverter';
 

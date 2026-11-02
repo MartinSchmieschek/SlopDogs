@@ -5,15 +5,9 @@ const { prismaVariantFor } = require('./dbEnv.cjs');
 const { storeSchema, cacheSuffix } = prismaVariantFor(process.env);
 const nodeEnv = process.env.NODE_ENV || 'development';
 
-/**
- * Die Pakete baut `tsc -b tsconfig.packages.json` (Projekt-Referenzen, P1.2): es uebersetzt nur Pakete, deren
- * Quellen oder Abhaengigkeiten sich seit dem letzten Lauf geaendert haben, und ist sonst nach ~1-2 s fertig.
- * Die Installation (postinstall, `npm ci`) baut sie schon — im Render-Build (`npm ci && npm run build:prod`)
- * ist der zweite Aufruf hier deshalb nur die Pruefung "alles aktuell", kein zweiter Bau.
- */
-// tsconfig.emit.json: wie tsconfig.build.json, aber ohne Pfade auf packages/*/src — kein dist/packages.
+// core und die Dog-Pakete liegen gebaut in node_modules (Git-Tag bzw. Release-Tarball); uebersetzt wird nur der Server.
 execSync(
-    `npm run build:packages && npx prisma generate --schema ${storeSchema} && node scripts/prisma-cache.cjs generate${cacheSuffix} && node scripts/prisma-json-storage.cjs generate${cacheSuffix} && tsc -p tsconfig.emit.json && node scripts/build-landing.cjs`,
+    `npx prisma generate --schema ${storeSchema} && node scripts/prisma-cache.cjs generate${cacheSuffix} && node scripts/prisma-json-storage.cjs generate${cacheSuffix} && tsc -p tsconfig.emit.json && node scripts/build-landing.cjs`,
     {
         stdio: 'inherit',
         env: process.env,

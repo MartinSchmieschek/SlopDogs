@@ -1,16 +1,15 @@
 /**
  * `npm run update:dogs` — hebt die gepinnten SlopDogs-Pakete auf das jeweils neueste stabile Release.
  *
- * Gilt fuer den Paket-Betrieb (nach P4.4): core per Git-Tag (`git+https://…/slopdogs-core.git#v<version>`),
- * typedefs und Dog-Pakete per Release-Tarball (`…/releases/download/<tag>/<datei>.tgz`). Die Tags kommen per
- * `git ls-remote` — kein Token, kein API-Kontingent. Gepinnt bleibt es (E2): der Befehl schreibt exakte Versionen
- * in die package.json-Dateien (Wurzel und packages/*) und erneuert danach die Lockdatei per `npm install`.
+ * core per Git-Tag (`git+https://…/slopdogs-core.git#v<version>`), typedefs und Dog-Pakete per Release-Tarball
+ * (`…/releases/download/<tag>/<datei>.tgz`). Die Tags kommen per `git ls-remote` — kein Token, kein API-Kontingent.
+ * Gepinnt bleibt es (E2): der Befehl schreibt exakte Versionen in die package.json und erneuert danach die Lockdatei
+ * per `npm install`.
  *
  *   npm run update:dogs                 anheben und npm install
  *   npm run update:dogs -- --dry-run    nur zeigen, was sich aendern wuerde
  *   npm run update:dogs -- --no-install anheben ohne npm install
  *
- * Im Monorepo (Abhaengigkeiten per file:packages/…) gibt es nichts anzuheben; der Befehl sagt das und endet mit 0.
  * Vorabversionen (z. B. 0.4.0-rc.0) zaehlen nicht als neuestes Release.
  */
 
@@ -91,34 +90,53 @@ function pinnedVersion(spec) {
     return m ? m[1] : null;
 }
 
-function manifestFiles() {
-    const files = [path.join(ROOT, 'package.json')];
-    const packagesDir = path.join(ROOT, 'packages');
-    if (fs.existsSync(packagesDir)) {
-        for (const d of fs.readdirSync(packagesDir)) {
-            const file = path.join(packagesDir, d, 'package.json');
-            if (fs.existsSync(file)) files.push(file);
-        }
+const LOCK_FILE = path.join(ROOT, 'package-lock.json');
+
+function readLock() {
+    return fs.existsSync(LOCK_FILE) ? JSON.parse(fs.readFileSync(LOCK_FILE, 'utf8')) : null;
+}
+
+/** Gepinnte Pakete, deren Lock-Eintrag auf eine andere Version zeigt als die package.json. */
+function staleLockEntries(lock, pinned) {
+    const stale = [];
+    for (const p of pinned) {
+        const version = pinnedVersion(p.spec);
+        const entry = lock.packages?.[`node_modules/${p.name}`];
+        if (version && entry?.version && entry.version !== version) stale.push({ ...p, locked: entry.version, pinned: version });
     }
-    return files;
+    return stale;
+}
+
+/**
+ * npm install loest eine Git-Abhaengigkeit nicht neu auf, solange der Lock-Eintrag existiert — auch wenn sich der Tag
+ * in der package.json geaendert hat. Der Eintrag fliegt deshalb raus; der naechste npm install loest den neuen Tag auf.
+ */
+function dropGitLockEntries(lock, entries) {
+    let dropped = 0;
+    for (const e of entries) {
+        if (!String(e.next ?? e.spec).startsWith('git+')) continue;
+        const key = `node_modules/${e.name}`;
+        if (!lock.packages?.[key]) continue;
+        delete lock.packages[key];
+        dropped++;
+    }
+    if (!dropped) return;
+    fs.writeFileSync(
+        LOCK_FILE,
+        `${JSON.stringify(lock, null, 2)}
+`,
+    );
+    console.log(`[update:dogs] ${dropped} Git-Eintraege aus der Lockdatei entfernt (werden beim npm install neu aufgeloest).`);
 }
 
 function main() {
-    const files = manifestFiles();
-    const manifests = files.map((file) => ({ file, text: fs.readFileSync(file, 'utf8') }));
-    const rootDeps = JSON.parse(manifests[0].text).dependencies || {};
-    if (String(rootDeps[`${SCOPE}core`] || '').startsWith('file:')) {
-        console.log('[update:dogs] Monorepo: core und Dogs kommen aus packages/ (file:), nichts anzuheben.');
-        return;
-    }
+    const file = path.join(ROOT, 'package.json');
+    const m = { file, text: fs.readFileSync(file, 'utf8') };
+    const json = JSON.parse(m.text);
     const pinned = [];
-    for (const m of manifests) {
-        const json = JSON.parse(m.text);
-        for (const field of FIELDS) {
-            for (const [name, spec] of Object.entries(json[field] || {})) {
-                if (name.startsWith(SCOPE) && !/^(file:|workspace:|[~^])/.test(String(spec)))
-                    pinned.push({ m, field, name, spec: String(spec) });
-            }
+    for (const field of FIELDS) {
+        for (const [name, spec] of Object.entries(json[field] || {})) {
+            if (name.startsWith(SCOPE) && !/^(file:|workspace:|[~^])/.test(String(spec))) pinned.push({ field, name, spec: String(spec) });
         }
     }
     if (!pinned.length) {
@@ -146,15 +164,20 @@ function main() {
     }
 
     for (const c of changes) {
-        console.log(`  ${c.name}: ${c.from ?? '?'} -> ${c.to}  (${path.relative(ROOT, c.m.file)}, ${c.field})`);
+        console.log(`  ${c.name}: ${c.from ?? '?'} -> ${c.to}  (${c.field})`);
     }
     for (const u of unknown) console.warn(`  uebersprungen: ${u}`);
-    if (!changes.length) {
+    const lock = readLock();
+    const stale = lock ? staleLockEntries(lock, pinned) : [];
+    for (const s of stale) console.warn(`  Lockdatei veraltet: ${s.name} steht dort auf ${s.locked}, package.json auf ${s.pinned}`);
+    if (!changes.length && !stale.length) {
         console.log(`[update:dogs] alles aktuell (${pinned.length} gepinnte Eintraege geprueft).`);
         return;
     }
     if (dryRun) {
-        console.log(`[update:dogs] --dry-run: ${changes.length} Eintraege wuerden angehoben, nichts geschrieben.`);
+        console.log(
+            `[update:dogs] --dry-run: ${changes.length} Eintraege wuerden angehoben, ${stale.length} Lock-Eintraege erneuert, nichts geschrieben.`,
+        );
         return;
     }
 
@@ -162,11 +185,12 @@ function main() {
     for (const c of changes) {
         const quoted = (s) => JSON.stringify(s);
         const before = `${quoted(c.name)}: ${quoted(c.spec)}`;
-        if (!c.m.text.includes(before)) throw new Error(`${c.name} in ${c.m.file} nicht in der erwarteten Form gefunden`);
-        c.m.text = c.m.text.replace(before, `${quoted(c.name)}: ${quoted(c.next)}`);
+        if (!m.text.includes(before)) throw new Error(`${c.name} in package.json nicht in der erwarteten Form gefunden`);
+        m.text = m.text.replace(before, `${quoted(c.name)}: ${quoted(c.next)}`);
     }
-    for (const m of manifests) fs.writeFileSync(m.file, m.text);
+    fs.writeFileSync(file, m.text);
     console.log(`[update:dogs] ${changes.length} Eintraege angehoben.`);
+    if (lock) dropGitLockEntries(lock, [...changes, ...stale]);
 
     if (install) {
         console.log('[update:dogs] npm install (Lockdatei) ...');

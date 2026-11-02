@@ -1,7 +1,7 @@
 /**
  * Smoke-Test fuer alle neuen Hunde.
  * Ruft die low-level API-Clients direkt auf — keine Kennel-Infrastruktur noetig.
- * Run: npx ts-node -r tsconfig-paths/register scripts/test-new-dogs.ts
+ * Run: npx ts-node scripts/test-new-dogs.ts
  */
 export {};
 

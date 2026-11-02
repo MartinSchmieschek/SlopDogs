@@ -1,6 +1,6 @@
 /**
  * Smoke-Test fuer Runde-3-Hunde.
- * Run: npx ts-node -r tsconfig-paths/register scripts/test-round3-dogs.ts
+ * Run: npx ts-node scripts/test-round3-dogs.ts
  */
 export {};
 

@@ -20,7 +20,7 @@ Prioritized technical debt and release topics (as of: code review / release chec
 - [ ] **UI — SerializedDog Default-Tab:** Im Edit-Fenster (Node-Side-Panel) soll bei **SerializedDogs** die **Code-Ansicht** standardmäktiv aktiv sein *(bereits umgesetzt: `getDefaultPanelSection` → `code`, wenn `codeTs` gesetzt; bei Bedarf noch speziell für reinen Node-Viewer testen/verdichten).*
 - [ ] **Mimics — default parameters:** Mimics need sensible **defaults** for parameters; ideally these come from the **Pact** (contract as single source of truth: define defaults there or generate from it).
 - [ ] **OpenAPI/Swagger — GET vs. POST:** **GET and POST** often appear side by side; **POST** is redundant when the default body is effectively **`{}`** and adds no semantics — adjust generation/annotations so only the needed method is documented (or POST only when the body is actually used).
-- [ ] **OpenAPI/Swagger — nur Lead-Dog:** Die generierte Spec gibt **mehr** her, als für den **öffentlichen Kennel-Vertrag** nötig — maßgeblich ist nur der **Lead** (erster Eintrag in `dogIds`); Pfade/Schemas aus **Nicht-Lead-Dogs** sollten die Swagger-Ausgabe nicht unnötig aufblähen (Spec auf Lead-Yield bzw. dokumentierte öffentliche Oberfläche fokussieren; siehe [`@martinschmieschek/slopdogs-swaggrid`](packages/swaggrid/src/grimoire.ts)).
+- [ ] **OpenAPI/Swagger — nur Lead-Dog:** Die generierte Spec gibt **mehr** her, als für den **öffentlichen Kennel-Vertrag** nötig — maßgeblich ist nur der **Lead** (erster Eintrag in `dogIds`); Pfade/Schemas aus **Nicht-Lead-Dogs** sollten die Swagger-Ausgabe nicht unnötig aufblähen (Spec auf Lead-Yield bzw. dokumentierte öffentliche Oberfläche fokussieren; siehe [`@martinschmieschek/slopdogs-core/swaggrid`](https://github.com/MartinSchmieschek/slopdogs-core/blob/main/src/swaggrid/grimoire.ts)).
 - [ ] **Kennel versioning:** Same versioning model as **Serialized Dogs** for **Kennels** too (versions per save, history, load older states — analogous to dog versions).
 - [ ] **Serialized Dog — rename:** A serialized dog must support **renaming** (display name / identifier as needed) without breaking references where the model allows — UI + persistence + contract updates as required.
 - [ ] **History — parent / branch from past:** Version history should be modeled with an explicit **parent** (or equivalent lineage) so users can **navigate backward** in time and **start a new line** from any historical version (fork-style continuation, not only linear “latest”).
@@ -53,10 +53,10 @@ Findings from a full code review against current standards.
 
 ### Critical
 
-- [ ] **Security — replace `vm2`:** `vm2` is deprecated with known sandbox escapes. [`SerializedDog.ts`](packages/core/src/dogs/SerializedDog.ts) executes user code with access to `fetch`/`console` — exfiltration possible. Replace with `isolated-vm` or Node.js Worker Threads.
+- [ ] **Security — replace `vm2`:** `vm2` is deprecated with known sandbox escapes. [`SerializedDog.ts`](https://github.com/MartinSchmieschek/slopdogs-core/blob/main/src/dogs/SerializedDog.ts) executes user code with access to `fetch`/`console` — exfiltration possible. Replace with `isolated-vm` or Node.js Worker Threads.
 - [ ] **Testing — from 0 % to meaningful coverage:** No unit or integration tests in the project. `angular.json` has `skipTests: true`. Set up test framework (Vitest/Jest), cover critical paths first (SeasonRunner, Store, API routes).
-- [ ] **Bug — `throw Error` instead of `throw this.result`:** [`abstractHuntingDog.ts:307`](packages/core/src/core/entities/abstractHuntingDog.ts) — throws the Error constructor, not the stored error.
-- [ ] **Bug — loop escape in SeasonRunner:** [`harverster.ts:155`](packages/core/src/harverster.ts) — `i = this.maxWaves` inside an `async` callback does not break the `for` loop as intended.
+- [ ] **Bug — `throw Error` instead of `throw this.result`:** [`abstractHuntingDog.ts:307`](https://github.com/MartinSchmieschek/slopdogs-core/blob/main/src/core/entities/abstractHuntingDog.ts) — throws the Error constructor, not the stored error.
+- [ ] **Bug — loop escape in SeasonRunner:** [`harverster.ts:155`](https://github.com/MartinSchmieschek/slopdogs-core/blob/main/src/harverster.ts) — `i = this.maxWaves` inside an `async` callback does not break the `for` loop as intended.
 - [ ] **API — no authentication:** All endpoints are publicly accessible — no API key, JWT, or session protection.
 
 ### High
@@ -70,15 +70,15 @@ Findings from a full code review against current standards.
 
 ### Medium
 
-- [ ] **Fix filename typo:** [`harverster.ts`](packages/core/src/harverster.ts) → `harvester.ts`.
+- [ ] **Fix filename typo:** [`harverster.ts`](https://github.com/MartinSchmieschek/slopdogs-core/blob/main/src/harverster.ts) → `harvester.ts`.
 - [ ] **Dependency injection:** Hardcoded singletons in `main.ts`. Introduce a DI container (`tsyringe`, `inversify`) for better testability.
-- [ ] **Performance — O(n²) dependency lookups:** [`SerializedDog.ts`](packages/core/src/dogs/SerializedDog.ts) linearly searches `season.exhausted` per dependency. Use a Map-based lookup or cache.
-- [ ] **Simplify proxy tracking:** 117 lines of nested Proxy factories in [`abstractHuntingDog.ts:179–294`](packages/core/src/core/entities/abstractHuntingDog.ts). Array mutations (`.push()`, `.splice()`) bypass tracking.
+- [ ] **Performance — O(n²) dependency lookups:** [`SerializedDog.ts`](https://github.com/MartinSchmieschek/slopdogs-core/blob/main/src/dogs/SerializedDog.ts) linearly searches `season.exhausted` per dependency. Use a Map-based lookup or cache.
+- [ ] **Simplify proxy tracking:** 117 lines of nested Proxy factories in [`abstractHuntingDog.ts:179–294`](https://github.com/MartinSchmieschek/slopdogs-core/blob/main/src/core/entities/abstractHuntingDog.ts). Array mutations (`.push()`, `.splice()`) bypass tracking.
 - [ ] **Abstract JSON serialization:** Manual `JSON.parse`/`JSON.stringify` scattered everywhere — introduce a central transformer/serializer layer.
 - [ ] **Store — double DB hit per save:** Version calculation + subsequent fetch in [`Controller.ts`](api/Controller.ts) — merge into a single transaction.
 - [ ] **Angular — feature modules & lazy loading:** All components in one folder, no module separation, no lazy loading. Type `declare const monaco: any`.
 - [ ] **Variable naming:** Replace creative names like `dogsWithBeesInthePants` with domain-clear identifiers.
-- [ ] **Error casting in SerializedDog:** [`SerializedDog.ts`](packages/core/src/dogs/SerializedDog.ts) returns `"Error: " + err.message` cast as type `T` — type violation. Introduce proper error handling.
+- [ ] **Error casting in SerializedDog:** [`SerializedDog.ts`](https://github.com/MartinSchmieschek/slopdogs-core/blob/main/src/dogs/SerializedDog.ts) returns `"Error: " + err.message` cast as type `T` — type violation. Introduce proper error handling.
 - [ ] **Remove legacy `/save` route:** Duplicate functionality with `/api/nodes`. Define deprecation path or remove directly.
 - [ ] **Harden CORS:** Dev mode allows all `localhost` origins. No rate limiting configured.
 

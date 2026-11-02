@@ -1,6 +1,6 @@
 {
   // Server, ts-node und Editor. Die Compiler-Basis (target, strict, Module) kommt aus dem Typ-Werkzeug
-  // (packages/typedefs/tsconfig.base.json) — dieselbe wie fuer die Pakete unter packages/.
+  // (@martinschmieschek/slopdogs-typedefs, Repo slopdogs-core) — dieselbe wie fuer core und die Dog-Pakete.
   "extends": "@martinschmieschek/slopdogs-typedefs/tsconfig.base.json",
   "compilerOptions": {
     // Der Server ist kein Projekt fuer tsc -b: er wird mit tsc -p tsconfig.emit.json gebaut (scripts/run-build.cjs).
@@ -19,82 +19,6 @@
      * Resolution wuerden diese .js sonst gegenueber dem aktuellen .ts-Source
      * bevorzugen -- Geister-Debugging garantiert.
      */
-    "noEmit": true,
-    // dev und Typecheck loesen die Pakete auf ihre Quellen auf; der Emit (tsconfig.emit.json) leert die Pfade.
-    "baseUrl": ".",
-    "paths": {
-      "@martinschmieschek/slopdogs-core": ["packages/core/src/index.ts"],
-      "@martinschmieschek/slopdogs-core/runtime": ["packages/core/src/runtime.ts"],
-      // P2.7: Env-Metadaten der Dog-Pakete (<paket>/env), in dev aus der Quelle wie alles andere. Einzeln, nicht als
-      // "slopdogs-*/env": tsconfig-paths 4.2 schneidet bei einem Muster mit Text nach dem * falsch ("dogs-crypto/e").
-      "@martinschmieschek/slopdogs-dogs-birds/env": ["packages/dogs-birds/src/env.ts"],
-      "@martinschmieschek/slopdogs-dogs-crypto/env": ["packages/dogs-crypto/src/env.ts"],
-      "@martinschmieschek/slopdogs-dogs-demo/env": ["packages/dogs-demo/src/env.ts"],
-      "@martinschmieschek/slopdogs-dogs-geo/env": ["packages/dogs-geo/src/env.ts"],
-      "@martinschmieschek/slopdogs-dogs-hue/env": ["packages/dogs-hue/src/env.ts"],
-      "@martinschmieschek/slopdogs-dogs-images/env": ["packages/dogs-images/src/env.ts"],
-      "@martinschmieschek/slopdogs-dogs-transit-trips/env": ["packages/dogs-transit-trips/src/env.ts"],
-      "@martinschmieschek/slopdogs-dogs-translate/env": ["packages/dogs-translate/src/env.ts"],
-      "@martinschmieschek/slopdogs-dogs-travel/env": ["packages/dogs-travel/src/env.ts"],
-      "@martinschmieschek/slopdogs-dogs-webcams/env": ["packages/dogs-webcams/src/env.ts"],
-      "@martinschmieschek/slopdogs-swaggrid": ["packages/swaggrid/src/index.ts"],
-      "@martinschmieschek/slopdogs-typedefs": ["packages/typedefs/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-demo": ["packages/dogs-demo/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-geo": ["packages/dogs-geo/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-warframe": ["packages/dogs-warframe/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-hue": ["packages/dogs-hue/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-talking": ["packages/dogs-talking/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-public-transport": ["packages/dogs-public-transport/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-weather": ["packages/dogs-weather/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-air-quality": ["packages/dogs-air-quality/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-geocoding": ["packages/dogs-geocoding/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-wikipedia": ["packages/dogs-wikipedia/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-sun": ["packages/dogs-sun/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-biodiversity": ["packages/dogs-biodiversity/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-birds": ["packages/dogs-birds/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-phenology": ["packages/dogs-phenology/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-webcams": ["packages/dogs-webcams/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-regional-news": ["packages/dogs-regional-news/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-transit-trips": ["packages/dogs-transit-trips/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-astronomy": ["packages/dogs-astronomy/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-water": ["packages/dogs-water/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-historical-weather": ["packages/dogs-historical-weather/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-charging": ["packages/dogs-charging/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-currency": ["packages/dogs-currency/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-holidays": ["packages/dogs-holidays/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-wiki-search": ["packages/dogs-wiki-search/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-season": ["packages/dogs-season/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-ip-geo": ["packages/dogs-ip-geo/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-random-fact": ["packages/dogs-random-fact/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-space": ["packages/dogs-space/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-open-library": ["packages/dogs-open-library/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-github-trending": ["packages/dogs-github-trending/src/index.ts"],
-      "@martinschmieschek/slopdogs-geo-pact": ["packages/geo-pact/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-humor": ["packages/dogs-humor/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-animals-random": ["packages/dogs-animals-random/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-dictionary": ["packages/dogs-dictionary/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-knowledge": ["packages/dogs-knowledge/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-pop-culture": ["packages/dogs-pop-culture/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-music": ["packages/dogs-music/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-sports": ["packages/dogs-sports/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-dev": ["packages/dogs-dev/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-travel": ["packages/dogs-travel/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-quiz": ["packages/dogs-quiz/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-religion": ["packages/dogs-religion/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-health": ["packages/dogs-health/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-cuisine": ["packages/dogs-cuisine/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-web-archive": ["packages/dogs-web-archive/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-images": ["packages/dogs-images/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-name-insights": ["packages/dogs-name-insights/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-gaming": ["packages/dogs-gaming/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-translate": ["packages/dogs-translate/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-tv": ["packages/dogs-tv/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-social": ["packages/dogs-social/src/index.ts"],
-      "@martinschmieschek/slopdogs-dogs-crypto": ["packages/dogs-crypto/src/index.ts"]
-    }
-  },
-  // Ohne "include" gilt jede .ts unter der Wurzel. repo-templates/ (PLAN-DOG-PAKETE P3) sind Dateien fuer die
-  // Paket-Repos: sie gehoeren nicht ins Server-Programm (CompilerCache-Typen, Editor). Die ersten drei Eintraege
-  // sind die Vorgaben von TypeScript, die ein eigenes "exclude" sonst aufhebt.
-  "exclude": ["node_modules", "bower_components", "jspm_packages", "repo-templates"]
+    "noEmit": true
+  }
 }
