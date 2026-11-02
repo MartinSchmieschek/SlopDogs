@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, type ParamMap } from '@angular/router';
-import { Subject, of } from 'rxjs';
+import { Subject, firstValueFrom, of } from 'rxjs';
 import { catchError, debounceTime, map, switchMap, tap } from 'rxjs/operators';
 import {
   KennelService,
@@ -23,6 +23,7 @@ import { ToastService } from '../../services/toast.service';
 import { ConfirmService } from '../../services/confirm.service';
 import { apiAbsoluteUrl } from '../../config/api-base';
 import { publicKennelDocsPath } from '../../config/public-paths';
+import { isSeededKennel, seededDeleteSummary } from '../../data/seeded-kennels';
 import {
   publicKennelPathWithDefaults,
   readLastOpenedKennel,
@@ -622,15 +623,32 @@ export class KennelListComponent {
 
   private async deleteKennel(kennel: IKennelConfig): Promise<void> {
     const ref = this.kennelRef(kennel);
+    const seeded = isSeededKennel(ref);
+    let message = `Every version goes with it, and /k/${ref} stops answering. The dogs stay saved.`;
+    if (seeded) {
+      try {
+        message = `Every version goes with it. ${seededDeleteSummary(await firstValueFrom(this.kennelService.deletePreview(ref)), false)}`;
+      } catch (err: any) {
+        this.error.set(err?.error?.error_description ?? err?.error?.error ?? `Delete preview failed (${err?.status ?? 'network'}).`);
+        return;
+      }
+    }
     const ok = await this.confirm.ask({
       title: `Delete ${kennel.name || ref}?`,
-      message: `Every version goes with it, and /k/${ref} stops answering. The dogs stay saved.`,
+      message,
       confirmLabel: 'Delete kennel',
       variant: 'danger',
     });
     if (!ok) return;
     this.kennelService.delete(ref).subscribe({
-      next: (res) => (res.ok ? this.reload() : this.error.set(res.error ?? 'Delete failed.')),
+      next: (res) => {
+        if (!res.ok) {
+          this.error.set(res.error ?? 'Delete failed.');
+          return;
+        }
+        if (seeded) this.toast.show(seededDeleteSummary(res, true));
+        this.reload();
+      },
       error: (err) => this.error.set(err?.error?.error_description ?? err?.error?.error ?? `Delete failed (${err?.status ?? 'network'}).`),
     });
   }

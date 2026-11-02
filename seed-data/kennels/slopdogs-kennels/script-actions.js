@@ -1,6 +1,6 @@
 // SlopDogs kennel list · script: row actions. "Opened last" per browser, the favorite flag (anonymous signs in;
 // otherwise optimistic, one request per row, a late answer after a reload is dropped, failure turns it back with
-// a toast) and Delete behind a danger dialog, then a reload.
+// a toast) and Delete behind a danger dialog, then a reload. A seeded kennel shows first which dogs go with it.
 function kennelsActions(K) {
     var S = K.S,
         CFG = K.CFG,
@@ -58,18 +58,41 @@ function kennelsActions(K) {
             },
         );
     };
+    function summary(r, text) {
+        var kept = r.dogsKept || [],
+            out = [K.t(text, { n: (r.dogsDeleted || []).length })];
+        if (kept.length) {
+            var names = kept.map(function (d) {
+                return d.displayName + ' (' + d.usedBy.join(', ') + ')';
+            });
+            out.push(K.t(COPY.delKept, { m: kept.length, names: names.join('; ') }));
+        }
+        return out.concat(COPY.delReseed).join(' ');
+    }
     K.askDelete = function (k) {
         var ref = K.refOf(k);
+        if (K.seeded(k) && !k.preview) {
+            K.API.deletePreview(ref).then(
+                function (r) {
+                    K.askDelete(Object.assign({}, k, { preview: r }));
+                },
+                function (e) {
+                    S.error = e.error_description || K.t(COPY.delFail, { s: e.status || 'network' });
+                    K.render();
+                },
+            );
+            return;
+        }
         K.dialog({
             title: K.t(COPY.delTitle, { name: k.name || ref }),
-            message: K.t(COPY.delMsg, { ref: ref }),
+            message: k.preview ? summary(k.preview, COPY.delGone) : K.t(COPY.delMsg, { ref: ref }),
             ok: COPY.delOk,
             tone: 'danger',
             onOk: function (close) {
                 K.API.remove(ref).then(
-                    function () {
+                    function (r) {
                         close();
-                        K.toast(K.t(COPY.deleted, { ref: ref }));
+                        K.toast(k.preview ? summary(r, COPY.deletedSeeded) : K.t(COPY.deleted, { ref: ref }));
                         K.load(true);
                     },
                     function (e) {

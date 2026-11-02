@@ -24,6 +24,7 @@ return {
     lastOpenedStore: 'slopdogs.kennelList.lastOpened.v1',
     verseStore: 'jsonAggregator.lastVoidTongue.v2',
     idPattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$',
+    seeded: ['slopdogs-landing', 'slopdogs-kennels'],
     emojis: [
         '🐕',
         '🐶',

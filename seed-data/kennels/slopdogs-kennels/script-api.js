@@ -77,6 +77,9 @@ function kennelsApi(K) {
         remove: function (ref) {
             return call(kennel(ref), { method: 'DELETE' });
         },
+        deletePreview: function (ref) {
+            return call(kennel(ref) + '/delete-preview');
+        },
         exportBundle: function (ref) {
             return call(kennel(ref) + '/export');
         },

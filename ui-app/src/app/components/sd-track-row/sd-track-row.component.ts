@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { escapeLayerWhile } from '../../utils/escape-layers';
 import type { IKennelConfig } from '../../models/kennel-config.model';
+import { isSeededKennel } from '../../data/seeded-kennels';
 import { SdPlaqueComponent } from '../sd-plaque/sd-plaque.component';
 import { SdStarsComponent } from '../sd-stars/sd-stars.component';
 
@@ -100,12 +101,14 @@ export class SdTrackRowComponent {
   readonly canEdit = computed(() => this.kennel().myRights?.edit ?? true);
   /**
    * Owner or editor — the server deletes for both (canMutate). Not on a community kennel (no owner: every signed-in
-   * user may edit it, but the list does not offer to delete it), not maintained, not frozen.
+   * user may edit it, but the list does not offer to delete it), not frozen. Maintained: only a seeded kennel, only
+   * for a maintainer — the next restart seeds it again.
    */
   readonly canDelete = computed(() => {
     const k = this.kennel();
     const r = k.myRights;
-    if (this.frozen() || this.maintained()) return false;
+    if (this.frozen()) return false;
+    if (this.maintained()) return !!r?.edit && isSeededKennel(this.ref());
     if (!r) return true;
     return r.own || (r.edit && !!k.ownerId);
   });

@@ -6,6 +6,7 @@ import { IKennelConfig, KennelVersionEntry, type KennelVisibility } from '../mod
 import { Waves } from '../models/dog-entry.model';
 import { apiAbsoluteUrl } from '../config/api-base';
 import { publicKennelPath } from '../config/public-paths';
+import type { SeededKennelDeleteReport } from '../data/seeded-kennels';
 
 export interface ApiResponse<T = any> {
   ok: boolean;
@@ -162,8 +163,13 @@ export class KennelService {
     return this.http.put<ApiResponse<IKennelConfig>>(`${this.baseUrl}/${encodeURIComponent(id)}`, data);
   }
 
-  delete(id: string): Observable<ApiResponse> {
-    return this.http.delete<ApiResponse>(`${this.baseUrl}/${encodeURIComponent(id)}`);
+  delete(id: string): Observable<ApiResponse & SeededKennelDeleteReport> {
+    return this.http.delete<ApiResponse & SeededKennelDeleteReport>(`${this.baseUrl}/${encodeURIComponent(id)}`);
+  }
+
+  /** Seeded kennels only (Spur K): which dogs a delete takes along and which stay, without deleting. */
+  deletePreview(id: string): Observable<SeededKennelDeleteReport> {
+    return this.http.get<SeededKennelDeleteReport>(`${this.baseUrl}/${encodeURIComponent(id)}/delete-preview`);
   }
 
   /**
