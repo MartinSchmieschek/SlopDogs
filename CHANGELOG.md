@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.0 (2026-11-03)
+
+Server cut: core and the base dogs live in their own repos (slopdogs-core, slopdogs-base-dogs) and are installed from their GitHub releases.
+
+### Breaking
+- `create_kennel` / `build_kennel` / import with an ID that already exists answer 409 `id_taken`; new versions go through `update_kennel`.
+- Landing and maintained kennels (`slopdogs-landing`, `slopdogs-kennels`) and their ownerless dogs can only be changed by `SLOPDOGS_MAINTAINER_EMAILS`; without the variable nobody can.
+- No `packages/` workspace any more: core (`@martinschmieschek/slopdogs-core`, entries `.`, `/runtime`, `/swaggrid`), typedefs and the 52 dog packages come as release tarballs.
+
+### Added
+- `GET /api/health`: version, commit, core/typedefs/dog versions, mode; same block in the MCP `health_check`. Landing, kennel list and Angular list show a version line.
+- Kennel list as its own kennel `slopdogs-kennels` (served on `/kennels`, ETag, Angular list as fallback).
+- Seed kennels are created only when missing; reseed via `--reseed`, `npm run start:local:reseed` / `dev:reseed` or `SLOPDOGS_RESEED=<mark>` (once per mark).
+- Deleting a seed kennel checks dog usage: unused dogs go with it, used ones stay; preview `GET /api/kennels/:id/delete-preview`, `delete_kennel` with `dryRun`.
+- `npm run update:dogs` lifts pinned core/dog releases to the newest.
+- Favorites per user; row click opens `/k/`, edit only via the row menu.
+- Auth-free local mode for a home network (`build:local`, `start:local`, systemd example).
+- Lobby ticket for WebSocket channels in dev/local.
+- CI: GitHub Actions with `npm ci`, `npm test`, `test:startup`; ESLint and Prettier.
+
+### Changed
+- Kennel pages under `/k/` run sandboxed with stricter headers.
+- One Prisma client when the parts share the store database.
+- StartupTests reduced to a minimal set; dog packages test themselves.
+- express 5.3.0, dependencies updated (`npm audit --omit=dev`: 0), `@xmldom/xmldom` pinned to 0.8.15 via overrides.
+
 ## 0.2.0-beta.0 (2026-05-16)
 
 Major refactor: MCP snapshot cache, sandboxed SerializedDog VM, jsonStore as VM capability.

@@ -10,7 +10,7 @@ interface HealthVersion {
 }
 
 /**
- * The running version as one footer line (`v0.2.0-beta.1 · core 0.3.3 · a1b2c3d`), the same line the landing and the
+ * The running version as one footer line (`v0.3.0 · core 0.3.3 · a1b2c3d`), the same line the landing and the
  * kennel list kennel show. Asked once per page load; an empty string when the request fails.
  */
 @Injectable({ providedIn: 'root' })
