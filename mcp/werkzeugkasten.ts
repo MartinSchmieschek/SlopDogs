@@ -48,6 +48,20 @@ export function buildWerkzeugkasten(baseDogsList: BaseDogInfo[]): string {
         '',
     );
     lines.push(
+        '### Kosten: Base-Dogs vor eigenen Dogs, ein Kennel statt vieler',
+        '- **Base-Dogs sind guenstig.** Sie laufen direkt im Dienst und cachen ihre Quelle serverseitig fuer alle Nutzer ' +
+            '(z. B. Open-Meteo je 1-km-Zelle, Regenradar je Kachel und Radarlauf). Eigene Dogs laufen in der Sandbox: jeder kostet ' +
+            'je Welle spuerbar Laufzeit und Speicher und hat keinen Zugang zu diesem Cache.',
+        '- **Jeder Kennel-Lauf zaehlt** gegen das Laufkontingent des Aufrufers, auch wenn alle Daten darunter schon gecacht sind. ' +
+            'Zehn kleine Kennels nacheinander abzufragen kostet zehn Laeufe.',
+        '- **Orchestrierung ist deshalb die Kernaufgabe:** Buendle, was ein Abnehmer zusammen braucht, in EINEN Kennel aus Base-Dogs, ' +
+            'Pact-Mimics und einem schlanken Lead. Eigene Dogs nur als Klebstoff (Parameter pruefen, zusammensetzen, darstellen), ' +
+            'nie fuer Daten, die ein Base-Dog schon liefert, und kein eigenes `fetch` auf eine Quelle, die ein Base-Dog abdeckt.',
+        '- **Breit statt tief:** Unabhaengige Base-Dogs stehen in derselben Welle und laufen parallel. Jedes Glied einer Kette ' +
+            'aus eigenen Dogs verlaengert den Lauf um eine Welle.',
+        '',
+    );
+    lines.push(
         'Alles Weitere: `list_nodes` fragen — dort steht zu jedem Eintrag die `description`, ' +
             'der Vertrag `parentsRequired`/`parentsOptional` (blanke Klassennamen, genau die Syntax von `build_kennel`) ' +
             'und bei Pacts (`isPact: true`) die geforderte Form. Suche dort nach Stichworten statt zu raten; ' +

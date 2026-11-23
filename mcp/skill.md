@@ -170,6 +170,13 @@ You see only what you may see. If a kennel is missing from `list_kennels` and th
 - **Pacts** are typed contracts between dogs. **Mimics** fulfill them by mapping source spoils into the right shape. Mimics are summoned automatically when a Pact has no fulfiller — they need code (give it via `save_node`).
 - **lineageId** is stable identity across versions; **id** is one specific incarnation (use `id` to pin to an exact version).
 
+## Cost — base dogs before own dogs, one kennel instead of many
+
+- **Base dogs are cheap.** They run inside the service and cache their upstream server-side, for everyone (Open-Meteo per 1 km cell, rain radar per tile and radar run). Your own dogs run in the sandbox. Each one costs noticeable time and memory per wave, and none of them can reach that cache.
+- **Every kennel run counts** against the caller's run quota, even when all data underneath is already cached. Ten small kennels called one after another cost ten runs.
+- **So orchestration is the core job.** Bundle what a consumer needs together into ONE kennel made of base dogs, pact mimics and a lean lead. Use your own dogs only as glue (validate parameters, compose, render). Never use them for data a base dog already delivers, and never write your own `fetch` to a source a base dog covers.
+- **Wide, not deep.** Independent base dogs share one wave and run in parallel. Every link in a chain of your own dogs adds a wave.
+
 ## The lead is a compositor — not a worker
 
 The single most important rule for non-trivial pens: **when 2+ sources enter, the lead does NOT fetch and does NOT normalize**. Its only job is composition.
