@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.3 (2026-11-23)
+
+### Added
+- `RainRadarRetriever` (dogs-rain-radar 0.4.0): DWD precipitation radar (RV composite via Bright Sky) as a 1 km grid around a point, analysis to +120 min in 5-min steps, mm/h. Fixed tiles are fetched once per radar run and shared by all callers. Registered in both registries.
+- MCP instructions and skill: a cost section. Base dogs are cheap and cache for everyone, own dogs cost a sandbox per wave, every kennel run counts against the caller's quota, so bundle what a consumer needs into one kennel of base dogs, mimics and a lean lead.
+
+### Changed
+- `slopdogs-openmeteo` 0.4.1: the budget weight follows the Open-Meteo server formula (`max(1, …)` applies to the product, per location).
+
 ## 0.3.2 (2026-11-23)
 
 ### Changed
