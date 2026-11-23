@@ -48,6 +48,7 @@ import {
     EvapotranspirationQueryPact,
 } from '@martinschmieschek/slopdogs-dogs-soil';
 import { SnowRetriever, SnowQueryPact } from '@martinschmieschek/slopdogs-dogs-snow';
+import { HumidityRetriever, HumidityQueryPact } from '@martinschmieschek/slopdogs-dogs-humidity';
 import { ThunderstormRetriever, ThunderstormQueryPact } from '@martinschmieschek/slopdogs-dogs-storm';
 import { SpeciesRetriever, BiodiversityQueryPact } from '@martinschmieschek/slopdogs-dogs-biodiversity';
 import { BirdRetriever, BirdQueryPact } from '@martinschmieschek/slopdogs-dogs-birds';
@@ -80,6 +81,7 @@ export const allBaseDogClasses = [
     SoilRetriever,
     EvapotranspirationRetriever,
     SnowRetriever,
+    HumidityRetriever,
     ThunderstormRetriever,
     SpeciesRetriever,
     BirdRetriever,
@@ -110,6 +112,7 @@ export const allPacts = [
     SoilQueryPact,
     EvapotranspirationQueryPact,
     SnowQueryPact,
+    HumidityQueryPact,
     ThunderstormQueryPact,
     BiodiversityQueryPact,
     BirdQueryPact,

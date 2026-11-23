@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1 (2026-11-23)
+
+### Added
+- `HumidityRetriever` (dogs-humidity 0.3.0): hourly temperature, relative humidity, dew point, wet-bulb temperature and vapour pressure deficit with daily means; Open-Meteo, cached 30 min per 1 km cell. Registered in both registries.
+
 ## 0.3.0 (2026-11-23)
 
 Server cut: core and the base dogs live in their own repos (slopdogs-core, slopdogs-base-dogs) and are installed from their GitHub releases.
