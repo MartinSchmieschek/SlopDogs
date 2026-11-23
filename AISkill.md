@@ -73,7 +73,7 @@ Every Kennel is a **reusable API endpoint**. The same pack hunts different game 
 **When the assistant is NOT working against `localhost:3000`** (i.e. the base URL is a remote host), the current working directory's project files are **NOT** guaranteed to match what's running on the API. The local repo may be an older, newer, or entirely unrelated branch.
 
 **Rules in this mode:**
-- **The SlopDogs API is the source of truth.** Never diagnose behavior by reading `packages/core/src/**`, `api/routes/**`, or any local TypeScript/JS file to understand how the server works. The runtime may differ in silent ways.
+- **The SlopDogs API is the source of truth.** Never diagnose behavior by reading the slopdogs-core sources, `api/routes/**`, or any local TypeScript/JS file to understand how the server works. The runtime may differ in silent ways.
 - **Never grep or read project sources** to understand mimic semantics, kennel resolution, Pact handling, save logic, or any server-side mechanics. It will mislead you.
 - **Debug empirically through the API only.** Use existing working kennels as reference patterns — list them (`GET /api/kennels`), inspect their `dogIds`, read their nodes (`GET /api/nodes` and version endpoints), and copy the shapes that work.
 - **If you hit an unexplained API behavior**, ask the user instead of digging through local files.
@@ -245,6 +245,9 @@ POST   /save?id=:versionId             — save code (new version)
 GET    /api/nodes/:id/versions         — version history
 
 GET    /api/readme                     — current README (always read first)
+
+GET    /api/my-pages                   — your own landing (/) and kennel list (/kennels): { landing, list }, null = default
+PUT    /api/my-pages                   — set them: { landing?, list? } — kennel id or version GUID, null resets
 ```
 
 ## Workflow: Summoning a Kennel

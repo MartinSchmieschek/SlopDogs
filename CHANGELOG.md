@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.3.0 (2026-11-23)
+
+Server cut: core and the base dogs live in their own repos (slopdogs-core, slopdogs-base-dogs) and are installed from their GitHub releases.
+
+### Breaking
+- `create_kennel` / `build_kennel` / import with an ID that already exists answer 409 `id_taken`; new versions go through `update_kennel`.
+- Landing and maintained kennels (`slopdogs-landing`, `slopdogs-kennels`) and their ownerless dogs can only be changed by `SLOPDOGS_MAINTAINER_EMAILS`, and only they create a kennel under one of these ids; without the variable nobody can.
+- No `packages/` workspace any more: core (`@martinschmieschek/slopdogs-core`, entries `.`, `/runtime`, `/swaggrid`), typedefs and the 58 dog packages come as release tarballs.
+
+### Added
+- `GET /api/health`: version, commit, core/typedefs/dog versions, mode; same block in the MCP `health_check`. Landing, kennel list and Angular list show a version line.
+- Kennel list as its own kennel `slopdogs-kennels` (served on `/kennels`, ETag, Angular list as fallback).
+- Seed kennels are created only when missing; reseed via `--reseed`, `npm run start:local:reseed` / `dev:reseed` or `SLOPDOGS_RESEED=<mark>` (once per mark).
+- Deleting a seed kennel checks dog usage: unused dogs go with it, used ones stay; preview `GET /api/kennels/:id/delete-preview`, `delete_kennel` with `dryRun`.
+- `npm run update:dogs` lifts pinned core/dog releases to the newest.
+- Favorites per user; row click opens `/k/`, edit only via the row menu.
+- Auth-free local mode for a home network (`build:local`, `start:local`, systemd example).
+- Lobby ticket for WebSocket channels in dev/local.
+- CI: GitHub Actions with `npm ci`, `npm test`, `test:startup`; ESLint and Prettier.
+- Own pages per user: signed in, any kennel you can see becomes your landing (`/`) and your kennel list (`/kennels`) — in `/account` (profile), via `GET`/`PUT /api/my-pages` or the MCP tools `get_my_pages`/`set_my_pages`. `/` and `/kennels` redirect you to `/k/<id>`; `GET /api/kennel-list` says `source: user|default`. New store table `UserPage` (needs the schema push; without the table the feature stays off and everything else runs).
+- Open-Meteo dogs from slopdogs-base-dogs 0.3.0: `SolarRadiationRetriever`, `SolarRadiationHistoryRetriever`, `SatelliteRadiationRetriever` (dogs-solar), `WindProfileRetriever` (dogs-wind), `SoilRetriever`, `EvapotranspirationRetriever` (dogs-soil), `SnowRetriever` (dogs-snow), `ThunderstormRetriever` (dogs-storm), each with its query pact. They share the helper package `openmeteo`, cache per 1 km cell and name their source "Open-Meteo.com (CC BY 4.0)".
+
+### Changed
+- `/` and `/kennels` send `Vary: Cookie`; answers to signed-in visitors go out with `Cache-Control: private, no-cache`.
+- Kennel pages under `/k/` run sandboxed with stricter headers.
+- Base dogs sun, weather, water and air-quality 0.3.1: sun caches its Open-Meteo request (1 h); weather, water and air-quality share cache cells of 1 km instead of 200 m.
+- One Prisma client when the parts share the store database.
+- StartupTests reduced to a minimal set; dog packages test themselves.
+- express 5.3.0, dependencies updated (`npm audit --omit=dev`: 0), `@xmldom/xmldom` pinned to 0.8.15 via overrides.
+
 ## 0.2.0-beta.0 (2026-05-16)
 
 Major refactor: MCP snapshot cache, sandboxed SerializedDog VM, jsonStore as VM capability.

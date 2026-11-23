@@ -11,10 +11,12 @@ export function accountTabOf(raw: string | null | undefined): AccountTab {
 /**
  * The tabs someone sees: signed in, the three plus `beta` for admins; signed out, only `beta` — for the local
  * super-user, who manages beta keys without an account of its own — or nothing (then: to the login).
+ * In the server's local mode there are no personal tokens (/auth/tokens isn't there), so no `tokens` tab.
  */
-export function visibleAccountTabs(signedIn: boolean, betaAdmin: boolean): AccountTab[] {
+export function visibleAccountTabs(signedIn: boolean, betaAdmin: boolean, localMode = false): AccountTab[] {
   if (!signedIn) return betaAdmin ? ['beta'] : [];
-  return betaAdmin ? [...ACCOUNT_TABS, 'beta'] : [...ACCOUNT_TABS];
+  const tabs = localMode ? ACCOUNT_TABS.filter((t) => t !== 'tokens') : [...ACCOUNT_TABS];
+  return betaAdmin ? [...tabs, 'beta'] : tabs;
 }
 
 /**

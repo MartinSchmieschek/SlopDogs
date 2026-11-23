@@ -12,8 +12,14 @@ import { ProcessMemory } from '../../services/ProcessMemory';
 import { Watchpost } from '../../services/Watchpost';
 
 const C = {
-    reset: '\x1b[0m', bold: '\x1b[1m',
-    gray: '\x1b[90m', green: '\x1b[32m', yellow: '\x1b[33m', red: '\x1b[31m', cyan: '\x1b[36m', magenta: '\x1b[35m',
+    reset: '\x1b[0m',
+    bold: '\x1b[1m',
+    gray: '\x1b[90m',
+    green: '\x1b[32m',
+    yellow: '\x1b[33m',
+    red: '\x1b[31m',
+    cyan: '\x1b[36m',
+    magenta: '\x1b[35m',
 };
 
 const MB = (bytes: number): number => Math.round(bytes / 1048576);
@@ -37,10 +43,16 @@ export function memLogEnabled(): boolean {
 
 function rssColor(rssMb: number): string {
     const p = rssMb / limitMb();
-    return p >= 0.88 ? C.red : p >= 0.70 ? C.yellow : C.green;
+    return p >= 0.88 ? C.red : p >= 0.7 ? C.yellow : C.green;
 }
 
-export interface MemSnap { rss: number; heapUsed: number; heapTotal: number; external: number; arrayBuffers: number; }
+export interface MemSnap {
+    rss: number;
+    heapUsed: number;
+    heapTotal: number;
+    external: number;
+    arrayBuffers: number;
+}
 
 export function memSnapshot(): MemSnap {
     const m = process.memoryUsage();
@@ -60,7 +72,8 @@ function peakTail(): string {
     const parts = [`max ${Math.round(ProcessMemory.maxRssMb())}`];
     if (linux?.smapsAnonymousMb != null) parts.push(`anon ${Math.round(linux.smapsAnonymousMb)}`);
     if (linux?.threads != null) parts.push(`thr ${linux.threads}`);
-    if (cgroup?.currentMb != null) parts.push(`cg ${Math.round(cgroup.currentMb)}${cgroup.peakMb != null ? `/${Math.round(cgroup.peakMb)}` : ''}`);
+    if (cgroup?.currentMb != null)
+        parts.push(`cg ${Math.round(cgroup.currentMb)}${cgroup.peakMb != null ? `/${Math.round(cgroup.peakMb)}` : ''}`);
     return ` ${dot} ${C.gray}${parts.join(' ')}${C.reset}`;
 }
 
@@ -73,8 +86,13 @@ export function kennelRunsSinceBoot(): number {
 
 /** Ein Kennel-Lauf: eine farbige Zeile mit allem, was zum Speicher-Verhalten zaehlt. */
 export function logKennelRun(opts: {
-    kennelId: string; source?: string; dogCount?: number; waveCount?: number;
-    durationMs: number; before: MemSnap; after: MemSnap;
+    kennelId: string;
+    source?: string;
+    dogCount?: number;
+    waveCount?: number;
+    durationMs: number;
+    before: MemSnap;
+    after: MemSnap;
 }): void {
     kennelRuns += 1;
     if (!memLogEnabled()) return;
@@ -84,15 +102,15 @@ export function logKennelRun(opts: {
     const dCol = dRss >= 50 ? C.red : dRss >= 20 ? C.yellow : C.green;
     const dStr = `${dRss >= 0 ? '+' : ''}${dRss}`;
     console.log(
-        `${C.cyan}[mem]${C.reset} ${C.bold}▶${C.reset} ${opts.kennelId}`
-        + (opts.source ? ` ${C.gray}(${opts.source})${C.reset}` : '')
-        + ` ${dot} ${opts.dogCount ?? '?'} dogs`
-        + (opts.waveCount != null ? `, ${opts.waveCount} waves` : '')
-        + ` ${dot} ${opts.durationMs}ms`
-        + ` ${dot} rss ${C.gray}${beforeRss}→${C.reset}${rssTag(afterRss)} ${dCol}(Δ${dStr})${C.reset}`
-        + ` ${dot} heap ${MB(opts.after.heapUsed)}/${MB(opts.after.heapTotal)}`
-        + ` ${dot} ext ${MB(opts.after.external)} MB`
-        + peakTail(),
+        `${C.cyan}[mem]${C.reset} ${C.bold}▶${C.reset} ${opts.kennelId}` +
+            (opts.source ? ` ${C.gray}(${opts.source})${C.reset}` : '') +
+            ` ${dot} ${opts.dogCount ?? '?'} dogs` +
+            (opts.waveCount != null ? `, ${opts.waveCount} waves` : '') +
+            ` ${dot} ${opts.durationMs}ms` +
+            ` ${dot} rss ${C.gray}${beforeRss}→${C.reset}${rssTag(afterRss)} ${dCol}(Δ${dStr})${C.reset}` +
+            ` ${dot} heap ${MB(opts.after.heapUsed)}/${MB(opts.after.heapTotal)}` +
+            ` ${dot} ext ${MB(opts.after.external)} MB` +
+            peakTail(),
     );
 }
 
@@ -103,9 +121,9 @@ export function logBootMemory(phase: string): void {
     if (!memLogEnabled()) return;
     const s = memSnapshot();
     console.log(
-        `${C.magenta}[mem]${C.reset} ${C.bold}boot${C.reset} ${phase} ${dot} rss ${rssTag(MB(s.rss))}`
-        + ` ${dot} heap ${MB(s.heapUsed)}/${MB(s.heapTotal)} ${dot} ext ${MB(s.external)} MB`
-        + peakTail(),
+        `${C.magenta}[mem]${C.reset} ${C.bold}boot${C.reset} ${phase} ${dot} rss ${rssTag(MB(s.rss))}` +
+            ` ${dot} heap ${MB(s.heapUsed)}/${MB(s.heapTotal)} ${dot} ext ${MB(s.external)} MB` +
+            peakTail(),
     );
 }
 
@@ -133,10 +151,10 @@ export function startMemoryHeartbeat(): void {
         lastRssMb = rssMb;
         lastAt = now;
         console.log(
-            `${C.magenta}[mem]${C.reset} ${C.gray}♥${C.reset} rss ${rssTag(rssMb)} ${C.gray}/ ${limitMb()} MB${C.reset}`
-            + ` ${dot} heap ${MB(s.heapUsed)}/${MB(s.heapTotal)} ${dot} ext ${MB(s.external)} ${dot} ab ${MB(s.arrayBuffers)} MB`
-            + peakTail()
-            + eventLoopTail(),
+            `${C.magenta}[mem]${C.reset} ${C.gray}♥${C.reset} rss ${rssTag(rssMb)} ${C.gray}/ ${limitMb()} MB${C.reset}` +
+                ` ${dot} heap ${MB(s.heapUsed)}/${MB(s.heapTotal)} ${dot} ext ${MB(s.external)} ${dot} ab ${MB(s.arrayBuffers)} MB` +
+                peakTail() +
+                eventLoopTail(),
         );
     }, intervalMs);
     // Darf den Prozess nicht am Leben halten.

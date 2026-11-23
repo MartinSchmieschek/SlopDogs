@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, type ParamMap } from '@angular/router';
-import { Subject, of } from 'rxjs';
+import { Subject, firstValueFrom, of } from 'rxjs';
 import { catchError, debounceTime, map, switchMap, tap } from 'rxjs/operators';
 import {
   KennelService,
@@ -21,8 +21,10 @@ import { IKennelConfig } from '../../models/kennel-config.model';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { ConfirmService } from '../../services/confirm.service';
+import { ServerVersionService } from '../../services/server-version.service';
 import { apiAbsoluteUrl } from '../../config/api-base';
 import { publicKennelDocsPath } from '../../config/public-paths';
+import { isSeededKennel, seededDeleteSummary } from '../../data/seeded-kennels';
 import {
   publicKennelPathWithDefaults,
   readLastOpenedKennel,
@@ -98,8 +100,10 @@ function dedupeKennelsById(list: IKennelConfig[]): IKennelConfig[] {
 
 /**
  * S1 Kennels, side A (P6 U2, 6.4): chapter card, tracklist rows, sort chips, search in `?q=`, plaque,
- * stars, skeleton, veil after 3 s, the create sheet on `?new=1`. Paging and the server contract are
- * unchanged: `GET /api/kennels?limit&offset&q&mine&sort&dir`.
+ * stars, skeleton, veil after 3 s, the create sheet on `?new=1`. A click on a row loads the kennel
+ * (`/k/:id`, new tab). Favorites: the row flag toggles optimistically (`PUT`/`DELETE
+ * /api/kennels/:id/favorite`, anonymous → sign in), the `favorites` chip filters (`?favorites=1`).
+ * Server contract: `GET /api/kennels?limit&offset&q&mine&favorites&sort&dir`.
  */
 @Component({
   selector: 'app-kennel-list',
@@ -127,6 +131,7 @@ function dedupeKennelsById(list: IKennelConfig[]): IKennelConfig[] {
     .fab { display: none; }
     .stage { position: relative; min-height: 240px; }
     .status { padding: var(--s4) 0; text-align: center; color: var(--ink-2); }
+    .status.version { padding-top: 0; }
     .empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s3); padding: var(--s7) 0 var(--s5); max-width: 84ch; }
     .empty h2 { font-family: var(--font-display); font-weight: 400; font-size: 28px; line-height: 28px; letter-spacing: .03em; }
     .empty sd-url-chip { align-self: stretch; }
@@ -148,13 +153,15 @@ export class KennelListComponent {
   private readonly confirm = inject(ConfirmService);
 
   readonly authUser = this.auth.user;
+  /** The running version under the list (`GET /api/health`); empty when the request fails. */
+  readonly versionLine = signal('');
   readonly sortOptions = SORT_OPTIONS;
   readonly origin = typeof window !== 'undefined' ? window.location.origin : '';
   readonly mcpCommand = `claude mcp add --transport http slopdogs ${this.origin}/mcp`;
 
   /** The pages loaded so far, in server order. */
   readonly kennels = signal<IKennelConfig[]>([]);
-  /** Matches in total (after `q`/`mine`, before paging). */
+  /** Matches in total (after `q`/`mine`/`favorites`, before paging). */
   readonly total = signal(0);
   private readonly nextOffset = signal(0);
   readonly loading = signal(true);
@@ -167,6 +174,9 @@ export class KennelListComponent {
   readonly searchQuery = signal('');
   readonly appliedQuery = signal('');
   readonly onlyMine = signal(false);
+  readonly onlyFavorites = signal(false);
+  /** Kennel ids (list entry `id`) with a favorite request under way — further clicks wait for it. */
+  readonly favoritePending = signal<ReadonlySet<string>>(new Set());
   readonly sortKey = signal<KennelSortKey>('name');
   readonly sortDir = signal<KennelSortDir>('asc');
 
@@ -179,7 +189,7 @@ export class KennelListComponent {
 
   readonly showSkeleton = computed(() => this.loading() && this.kennels().length === 0);
   readonly hasMore = computed(() => this.nextOffset() < this.total());
-  readonly isFiltered = computed(() => this.appliedQuery().length > 0 || this.onlyMine());
+  readonly isFiltered = computed(() => this.appliedQuery().length > 0 || this.onlyMine() || this.onlyFavorites());
   readonly sortLabel = computed(() => SORT_LABELS[this.sortKey()] ?? this.sortKey());
   /** Owned rows count only once every row is loaded — a partial count would lie. */
   readonly yoursCount = computed(() =>
@@ -201,6 +211,7 @@ export class KennelListComponent {
   private firstParams = true;
 
   constructor() {
+    void inject(ServerVersionService).line().then((line) => this.versionLine.set(line));
     const persisted = readPersistedSort();
     this.sortKey.set(persisted.sortKey);
     this.sortDir.set(persisted.sortDir);
@@ -223,9 +234,10 @@ export class KennelListComponent {
         authSeen = true;
         return;
       }
-      if (!user && this.onlyMine()) {
+      if (!user && (this.onlyMine() || this.onlyFavorites())) {
         this.onlyMine.set(false);
-        this.writeParams({ mine: null });
+        this.onlyFavorites.set(false);
+        this.writeParams({ mine: null, favorites: null });
       }
       this.reload();
     }, { allowSignalWrites: true });
@@ -275,6 +287,7 @@ export class KennelListComponent {
               offset: req.offset,
               q: this.appliedQuery(),
               mine: this.onlyMine(),
+              favorites: this.onlyFavorites(),
               sort: this.sortKey(),
               dir: this.sortDir(),
             })
@@ -293,7 +306,7 @@ export class KennelListComponent {
       )
       .subscribe(({ req, res, failure }) => this.applyPage(req, res, failure));
 
-    // The URL is the state: `?q=`, `?sort=`, `?dir=`, `?mine=1`, `?new=1`. Subscribed last — the first
+    // The URL is the state: `?q=`, `?sort=`, `?dir=`, `?mine=1`, `?favorites=1`, `?new=1`. Subscribed last — the first
     // emission is synchronous and its reload needs the page pipeline above.
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((params) => this.applyParams(params));
   }
@@ -325,7 +338,8 @@ export class KennelListComponent {
     this.searchQuery.set('');
     this.appliedQuery.set('');
     this.onlyMine.set(false);
-    this.writeParams({ q: null, mine: null });
+    this.onlyFavorites.set(false);
+    this.writeParams({ q: null, mine: null, favorites: null });
     this.reload();
   }
 
@@ -351,6 +365,50 @@ export class KennelListComponent {
     this.onlyMine.update((v) => !v);
     this.writeParams({ mine: this.onlyMine() ? '1' : null });
     this.reload();
+  }
+
+  toggleFavoritesFilter(): void {
+    this.onlyFavorites.update((v) => !v);
+    this.writeParams({ favorites: this.onlyFavorites() ? '1' : null });
+    this.reload();
+  }
+
+  /**
+   * The row flag: anonymous → sign in and come back to this list; signed in → flip at once, then PUT/DELETE,
+   * and flip back on failure. Under the favorites filter a removed row stays until the next load.
+   */
+  toggleFavorite(kennel: IKennelConfig): void {
+    if (!this.auth.isReady()) return;
+    if (!this.auth.user()) {
+      this.auth.login('/kennels' + window.location.search);
+      return;
+    }
+    const id = kennel.id;
+    if (this.favoritePending().has(id)) return;
+    const next = !kennel.favorite;
+    this.setFavoriteLocal(id, next);
+    this.setFavoritePending(id, true);
+    const ref = this.kennelRef(kennel);
+    // A reload (filter, sort, logout) while the request runs brings the server's state — a late answer
+    // must not paint over it.
+    const epoch = this.listEpoch();
+    const request = next ? this.kennelService.setFavorite(ref) : this.kennelService.clearFavorite(ref);
+    request.subscribe({
+      next: (res) => {
+        this.setFavoritePending(id, false);
+        if (epoch !== this.listEpoch()) return;
+        if (typeof res?.favorite === 'boolean' && res.favorite !== next) this.setFavoriteLocal(id, res.favorite);
+      },
+      error: (err) => {
+        this.setFavoritePending(id, false);
+        if (epoch === this.listEpoch()) this.setFavoriteLocal(id, !next);
+        this.toast.show(
+          err?.status === 403 && err?.error?.error === 'no_identity'
+            ? 'Favorites need a signed-in user.'
+            : `Couldn't update favorites (${err?.status || 'network'}).`,
+        );
+      },
+    });
   }
 
   openCreate(): void {
@@ -405,7 +463,7 @@ export class KennelListComponent {
     return apiAbsoluteUrl(this.publicPathWithDefaults(kennel));
   }
 
-  /** Name (public page) or row (kennel page) was opened: this kennel is now the marked one. */
+  /** The row (public page) was opened: this kennel is now the marked one. */
   markOpened(kennel: IKennelConfig): void {
     const ref = this.kennelRef(kennel);
     this.lastOpened.set(ref);
@@ -427,7 +485,8 @@ export class KennelListComponent {
         this.copyText(apiAbsoluteUrl(this.publicPathWithDefaults(kennel)), 'Link copied.');
         return;
       case 'edit':
-        void this.router.navigate(['/kennels', ref, 'edit']);
+        // The kennel page is run + editor; its settings stay one step away in the head menu.
+        void this.router.navigate(['/kennels', ref]);
         return;
       case 'export':
         this.exportBundle(ref);
@@ -462,6 +521,7 @@ export class KennelListComponent {
     const sort = params.get('sort');
     const dir = params.get('dir');
     const mine = params.get('mine') === '1';
+    const favorites = params.get('favorites') === '1';
     let changed = this.firstParams;
     if (q !== this.appliedQuery()) {
       this.searchQuery.set(q);
@@ -478,6 +538,10 @@ export class KennelListComponent {
     }
     if (mine !== this.onlyMine()) {
       this.onlyMine.set(mine);
+      changed = true;
+    }
+    if (favorites !== this.onlyFavorites()) {
+      this.onlyFavorites.set(favorites);
       changed = true;
     }
     if (params.get('new') === '1' && !this.sheetOpen()) this.pendingNew.set(true);
@@ -522,6 +586,20 @@ export class KennelListComponent {
     }
   }
 
+  /** A new object for the changed row — the OnPush row only sees a new input. */
+  private setFavoriteLocal(id: string, favorite: boolean): void {
+    this.kennels.update((list) => list.map((k) => (k.id === id ? { ...k, favorite } : k)));
+  }
+
+  private setFavoritePending(id: string, pending: boolean): void {
+    this.favoritePending.update((set) => {
+      const next = new Set(set);
+      if (pending) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
   kennelRef(kennel: IKennelConfig): string {
     return kennel.lineageId || kennel.id;
   }
@@ -550,15 +628,32 @@ export class KennelListComponent {
 
   private async deleteKennel(kennel: IKennelConfig): Promise<void> {
     const ref = this.kennelRef(kennel);
+    const seeded = isSeededKennel(ref);
+    let message = `Every version goes with it, and /k/${ref} stops answering. The dogs stay saved.`;
+    if (seeded) {
+      try {
+        message = `Every version goes with it. ${seededDeleteSummary(await firstValueFrom(this.kennelService.deletePreview(ref)), false)}`;
+      } catch (err: any) {
+        this.error.set(err?.error?.error_description ?? err?.error?.error ?? `Delete preview failed (${err?.status ?? 'network'}).`);
+        return;
+      }
+    }
     const ok = await this.confirm.ask({
       title: `Delete ${kennel.name || ref}?`,
-      message: `Every version goes with it, and /k/${ref} stops answering. The dogs stay saved.`,
+      message,
       confirmLabel: 'Delete kennel',
       variant: 'danger',
     });
     if (!ok) return;
     this.kennelService.delete(ref).subscribe({
-      next: (res) => (res.ok ? this.reload() : this.error.set(res.error ?? 'Delete failed.')),
+      next: (res) => {
+        if (!res.ok) {
+          this.error.set(res.error ?? 'Delete failed.');
+          return;
+        }
+        if (seeded) this.toast.show(seededDeleteSummary(res, true));
+        this.reload();
+      },
       error: (err) => this.error.set(err?.error?.error_description ?? err?.error?.error ?? `Delete failed (${err?.status ?? 'network'}).`),
     });
   }

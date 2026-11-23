@@ -59,6 +59,14 @@
     --danger-soft: rgba(179, 38, 30, .12);
     --focus: var(--accent);
     --scrim: rgba(27, 23, 18, .35);
+    /* Measured contrast fixes (Spur K, Follie spec 2.2; the kennel list kennel carries the same tokens):
+       the `yours` chip (paper-2 on live was 4.22:1, now 5.93:1 light / 7.06:1 dark) and the chapter band
+       (in the tape shell the band turns cream; ink-soft on it was 1.64:1, #5a5142 is 6.27:1). */
+    --chip-live-bg: var(--live-ink);
+    --chip-live-fg: var(--paper-2);
+    --band-bg: var(--ink);
+    --band-fg: var(--paper);
+    --band-muted: var(--ink-soft);
 
     --font-display: 'Bebas Neue', Impact, 'Arial Narrow', sans-serif;
     --font-mono: 'Courier Prime', ui-monospace, monospace;
@@ -111,6 +119,8 @@
     --live-ink: #4fc1b8;
     --warn-ink: #e0a53a;
     --danger-ink: #ff7a70;
+    --chip-live-fg: var(--paper);
+    --band-muted: #5a5142;
   }
 }
 
@@ -164,9 +174,11 @@
     color: inherit;
   }
 
+  /* Tape orange alone is 2.30:1 on paper (under 3:1 for non-text); the inner ink ring carries the contrast. */
   :focus-visible {
     outline: 3px solid var(--focus);
     outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--ink);
   }
 
   ::selection {
@@ -449,8 +461,8 @@
     vertical-align: middle;
 
     &--live {
-      background: var(--live);
-      color: var(--paper-2);
+      background: var(--chip-live-bg);
+      color: var(--chip-live-fg);
       font-size: 12px;
     }
 

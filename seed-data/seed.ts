@@ -9,11 +9,20 @@ import { seedCompareKennel } from './kennels/compare';
 import { seedSmartGuideKennel } from './kennels/smart-guide';
 import { seedAddressLookupKennel } from './kennels/address-lookup';
 import { seedLocationDashboardKennel } from './kennels/location-dashboard';
-import { seedSunKennel, seedWikiNearbyKennel, seedGeocodingKennel, seedIsochroneKennel, seedAirQualityKennel, seedWeatherKennel, seedWindMapKennel } from './kennels/geo-weather';
+import {
+    seedSunKennel,
+    seedWikiNearbyKennel,
+    seedGeocodingKennel,
+    seedIsochroneKennel,
+    seedAirQualityKennel,
+    seedWeatherKennel,
+    seedWindMapKennel,
+} from './kennels/geo-weather';
 import { seedNaturkundlerKennel, seedElevationKennel, seedTrailScoutKennel } from './kennels/nature-trails';
 import { seedEarthPulseKennel } from './kennels/earth-pulse';
 import { seedVoidStormsKennel } from './kennels/void-storms';
 import { seedSlopdogsLandingKennel } from './kennels/slopdogs-landing';
+import { seedSlopdogsKennelsKennel } from './kennels/slopdogs-kennels';
 
 export async function runSeeds(nodesStore: IStore, kennelsStore: IStore): Promise<void> {
     const seedLineageId = await seedSerializedDog(nodesStore);
@@ -38,7 +47,10 @@ export async function runSeeds(nodesStore: IStore, kennelsStore: IStore): Promis
     await seedVoidStormsKennel(nodesStore, kennelsStore);
     await seedElevationKennel(nodesStore, kennelsStore);
     await seedTrailScoutKennel(nodesStore, kennelsStore);
+    // Landing und Kennel-Liste (Spur K): nur wenn sie fehlen, nie ueberschrieben (Live-Aenderungen der Maintainer).
+    // Zuruecksetzen = Kennel loeschen und neu starten, oder ein Start mit Reseed (services/SeedReseed.ts).
     await seedSlopdogsLandingKennel(nodesStore, kennelsStore);
+    await seedSlopdogsKennelsKennel(nodesStore, kennelsStore);
 }
 
 async function prismaSeedMain(): Promise<void> {

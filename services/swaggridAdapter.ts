@@ -1,5 +1,5 @@
-import { publicKennelPath, type IKennelConfig } from '@slopdogs/core';
-import type { Rune, SwaggridCast } from '@slopdogs/swaggrid';
+import { publicKennelPath, type IKennelConfig } from '@martinschmieschek/slopdogs-core/runtime';
+import type { Rune, SwaggridCast } from '@martinschmieschek/slopdogs-core/swaggrid';
 import type { Waves } from './WavesConverter';
 import { findLeadNodeEntry } from './WavesConverter';
 
@@ -19,19 +19,19 @@ export function toSwaggridCast(
     options: { includeDefaults: boolean; leadOnly?: boolean } = { includeDefaults: true },
 ): SwaggridCast {
     const lead = findLeadNodeEntry(waves, config);
-    const heraldId = options.leadOnly ? LEAD_ONLY_HERALD : lead?.id ?? (config.dogIds?.[0] ?? '');
+    const heraldId = options.leadOnly ? LEAD_ONLY_HERALD : (lead?.id ?? config.dogIds?.[0] ?? '');
     const strata: Rune[][] = options.leadOnly
         ? [[{ id: LEAD_ONLY_HERALD, name: LEAD_ONLY_HERALD, essence: lead?.result, bound: false }]]
         : waves.map((wave) =>
-            wave.map((n) => ({
-                id: n.id,
-                lineageId: n.lineageId,
-                name: n.name,
-                essence: n.result,
-                sigil: n.icon,
-                bound: Boolean(n.codeTs),
-            })),
-        );
+              wave.map((n) => ({
+                  id: n.id,
+                  lineageId: n.lineageId,
+                  name: n.name,
+                  essence: n.result,
+                  sigil: n.icon,
+                  bound: Boolean(n.codeTs),
+              })),
+          );
     return {
         rift: config.id,
         publicPath: publicKennelPath((config as { lineageId?: string }).lineageId ?? config.id),

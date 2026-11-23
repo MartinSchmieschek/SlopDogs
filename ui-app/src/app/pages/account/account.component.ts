@@ -8,6 +8,11 @@ import { UserKeyService } from '../../services/user-key.service';
 import type { IUserKey } from '../../models/user-key.model';
 import { accountTabOf, visibleAccountTabs, type AccountTab } from '../../utils/account';
 import { BetaService, type IBetaKey } from '../../services/beta.service';
+import { MyPagesService, type IMyPages, type MyPageKind } from '../../services/my-pages.service';
+import { KennelListPageService } from '../../services/kennel-list-page.service';
+import { KennelService } from '../../services/kennel.service';
+import { apiAbsoluteUrl } from '../../config/api-base';
+import { publicKennelPath } from '../../config/public-paths';
 import { KEYS_NOTICE, KEYSTORE_OFF, keyErrorText } from '../../utils/user-keys';
 import { SdTopBarComponent } from '../../components/sd-top-bar/sd-top-bar.component';
 import { SdChapterCardComponent } from '../../components/sd-chapter-card/sd-chapter-card.component';
@@ -20,14 +25,22 @@ import { SdTrackSkeletonComponent } from '../../components/sd-track-skeleton/sd-
 
 type ListState = 'idle' | 'loading' | 'ready' | 'error' | 'disabled';
 
+/** One row of "Your pages": the kind, its label and the path it takes over. */
+interface PageRow {
+  kind: MyPageKind;
+  label: string;
+  path: string;
+}
+
 /**
  * S9 Account (P6 U7, 6.4): chapter card `ACCOUNT`, tabs profile · tokens · keys (`?tab=`), max 720.
- * profile: who you are, sign out, the `claude mcp add` box. tokens: personal access tokens over the
- * JSON face of `/auth/tokens` — a new one shows its value once in an ink box. keys: the key store
+ * profile: who you are, sign out, the `claude mcp add` box, your pages (your own `/` and `/kennels`: a kennel
+ * id each, suggestions from your kennels, save and reset; in local mode they apply to every device).
+ * tokens: personal access tokens over the JSON face of `/auth/tokens` — a new one shows its value once in an ink box. keys: the key store
  * (P4c) — masked rows, the add sheet, delete with a question, the notice that a database reset takes
  * them, and `The key store is off on this server.` without a master key. beta (admins only): closed-beta keys —
  * one key unlocks one Google account, once, no expiry; a new key shows its value once. Signed out: `/login?returnTo=`, except the local
- * super-user, who sees only the beta tab.
+ * super-user, who sees only the beta tab. Server in local mode: no sign out, no tokens tab.
  */
 @Component({
   selector: 'app-account',
@@ -47,9 +60,14 @@ export class AccountComponent {
   private readonly keysApi = inject(UserKeyService);
   readonly auth = inject(AuthService);
   private readonly betaApi = inject(BetaService);
+  private readonly pagesApi = inject(MyPagesService);
+  private readonly kennelsApi = inject(KennelService);
+  private readonly kennelListPage = inject(KennelListPageService);
 
   readonly beta = this.betaApi.status;
-  readonly tabs = computed(() => visibleAccountTabs(!!this.user(), !!this.beta()?.admin));
+  /** Server in local mode: no sign-out, no personal tokens. */
+  readonly localMode = this.auth.localMode;
+  readonly tabs = computed(() => visibleAccountTabs(!!this.user(), !!this.beta()?.admin, this.localMode()));
   readonly keysNotice = KEYS_NOTICE;
   readonly keystoreOff = KEYSTORE_OFF;
   readonly tab = signal<AccountTab>('profile');
@@ -81,6 +99,18 @@ export class AccountComponent {
   readonly freshBetaKey = signal<string | null>(null);
   readonly betaNote = signal('');
 
+  readonly pageRows: readonly PageRow[] = [
+    { kind: 'landing', label: 'Landing', path: '/' },
+    { kind: 'list', label: 'List', path: '/kennels' },
+  ];
+  readonly myPages = signal<IMyPages | null>(null);
+  readonly pagesState = signal<ListState>('idle');
+  readonly pagesError = signal<string | null>(null);
+  readonly pageDraft = signal<Record<MyPageKind, string>>({ landing: '', list: '' });
+  readonly pageBusy = signal<MyPageKind | null>(null);
+  readonly pageError = signal<Partial<Record<MyPageKind, string>>>({});
+  readonly pageSuggestions = signal<Array<{ id: string; name: string }>>([]);
+
   constructor() {
     this.route.queryParamMap.pipe(takeUntilDestroyed(inject(DestroyRef))).subscribe((q) => {
       this.tab.set(accountTabOf(q.get('tab')));
@@ -102,6 +132,7 @@ export class AccountComponent {
           this.tab.set(tabs[0]);
           return;
         }
+        if (user && tab === 'profile' && this.pagesState() === 'idle') this.loadPages();
         if (user && tab === 'tokens' && this.tokensState() === 'idle') this.loadTokens();
         if (user && tab === 'keys' && this.keysState() === 'idle') this.loadKeys();
         if (tab === 'beta' && this.betaState() === 'idle') this.loadBetaKeys();
@@ -116,7 +147,81 @@ export class AccountComponent {
 
   async signOut(): Promise<void> {
     await this.auth.logout();
+    // Signed out, /kennels is the default again — the cached answer may still say "your list".
+    this.kennelListPage.reset();
     void this.router.navigate(['/kennels']);
+  }
+
+  // === Your pages ===
+
+  loadPages(): void {
+    this.pagesState.set('loading');
+    this.pagesError.set(null);
+    this.pagesApi.get().subscribe({
+      next: (r) => {
+        this.myPages.set({ landing: r.landing, list: r.list });
+        this.pagesState.set('ready');
+      },
+      error: (err: HttpErrorResponse) => {
+        if (err.status === 401) {
+          void this.router.navigate(['/login'], { queryParams: { returnTo: '/account?tab=profile' } });
+          return;
+        }
+        this.pagesError.set(err.error?.error_description ?? `Couldn't load your pages (${err.status || 'network'}).`);
+        this.pagesState.set('error');
+      },
+    });
+    // Suggestions are your own kennels; without them the field still takes any id you can see.
+    this.kennelsApi.getPage({ limit: 200, mine: true }).subscribe({
+      next: (r) => this.pageSuggestions.set((r.data ?? []).map((k) => ({ id: k.lineageId ?? k.id, name: k.name ?? '' }))),
+      error: () => this.pageSuggestions.set([]),
+    });
+  }
+
+  /** The kennel's public page, absolute like every link that leaves the app. */
+  pageLink(id: string): string {
+    return apiAbsoluteUrl(publicKennelPath(id));
+  }
+
+  setPageDraft(kind: MyPageKind, value: string): void {
+    this.pageDraft.update((draft) => ({ ...draft, [kind]: value }));
+  }
+
+  savePage(kind: MyPageKind): void {
+    const id = this.pageDraft()[kind].trim();
+    if (id) this.writePage(kind, id);
+  }
+
+  resetPage(kind: MyPageKind): void {
+    this.writePage(kind, null);
+  }
+
+  private writePage(kind: MyPageKind, id: string | null): void {
+    if (this.pageBusy()) return;
+    this.pageBusy.set(kind);
+    this.pageError.update((errors) => ({ ...errors, [kind]: undefined }));
+    const changes: Partial<IMyPages> = kind === 'landing' ? { landing: id } : { list: id };
+    const path = this.pageRows.find((row) => row.kind === kind)?.path ?? '/';
+    this.pagesApi.set(changes).subscribe({
+      next: (r) => {
+        this.pageBusy.set(null);
+        this.myPages.set({ landing: r.landing, list: r.list });
+        this.pageDraft.update((draft) => ({ ...draft, [kind]: '' }));
+        // /kennels may now be yours (or the default again): the next link asks the server.
+        this.kennelListPage.reset();
+        const now = r[kind];
+        this.status.set(now ? `Saved. Signed in, ${path} takes you to /k/${now}.` : `${path} shows the default again.`);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.pageBusy.set(null);
+        if (err.status === 401) {
+          void this.router.navigate(['/login'], { queryParams: { returnTo: '/account?tab=profile' } });
+          return;
+        }
+        const message: string = err.error?.error_description ?? `Couldn't save (${err.status || 'network'}).`;
+        this.pageError.update((errors) => ({ ...errors, [kind]: message }));
+      },
+    });
   }
 
   // === Tokens ===

@@ -29,12 +29,60 @@
               <h2 class="sd-h1">{{ user()!.name || 'Signed in' }}</h2>
               <p class="sd-data sd-muted">{{ user()!.email }}</p>
             </div>
-            <button type="button" class="sd-btn" (click)="signOut()">Sign out</button>
+            @if (!localMode()) {
+              <button type="button" class="sd-btn" (click)="signOut()">Sign out</button>
+            }
           </div>
           <h3 class="sd-h2">Connect your AI</h3>
-          <p class="sd-small sd-muted">Claude and other MCP clients sign in on their own with this address.</p>
-          <sd-url-chip [text]="mcpCommand" />
-          <p class="sd-small sd-muted">Scripts and GPTs use a personal token instead: see <button type="button" class="lnk" (click)="select('tokens')">tokens</button>.</p>
+          @if (localMode()) {
+            <p class="sd-small sd-muted">This server runs locally: Claude and other MCP clients connect with this address, no sign-in.</p>
+            <sd-url-chip [text]="mcpCommand" />
+          } @else {
+            <p class="sd-small sd-muted">Claude and other MCP clients sign in on their own with this address.</p>
+            <sd-url-chip [text]="mcpCommand" />
+            <p class="sd-small sd-muted">Scripts and GPTs use a personal token instead: see <button type="button" class="lnk" (click)="select('tokens')">tokens</button>.</p>
+          }
+
+          <h3 class="sd-h2">Your pages</h3>
+          <p class="sd-small sd-muted">Make any kennel you can see your own start page and kennel list. Signed out, everyone sees the default.</p>
+          @if (localMode()) {
+            <p class="sd-small sd-muted">This server runs locally: your pages apply to every device on this network.</p>
+          }
+          @switch (pagesState()) {
+            @case ('loading') { <sd-track-skeleton [count]="2" /> }
+            @case ('error') {
+              <sd-banner [text]="pagesError()!"><button type="button" class="sd-btn sd-btn--sm" (click)="loadPages()">Retry</button></sd-banner>
+            }
+            @default {
+              <datalist id="my-pages-kennels">
+                @for (k of pageSuggestions(); track k.id) { <option [value]="k.id">{{ k.name }}</option> }
+              </datalist>
+              @for (row of pageRows; track row.kind) {
+                <div class="my-page">
+                  <p class="my-page__now">
+                    <span class="sd-label">{{ row.label }} <span class="sd-data">{{ row.path }}</span></span>
+                    @if (myPages()?.[row.kind]; as id) {
+                      <a class="sd-data" [href]="pageLink(id)" target="_blank" rel="noopener">/k/{{ id }}</a>
+                    } @else {
+                      <span class="sd-data sd-muted">Default</span>
+                    }
+                  </p>
+                  <form class="my-page__set" (submit)="$event.preventDefault(); savePage(row.kind)">
+                    <input class="sd-field" type="text" list="my-pages-kennels" maxlength="64" autocomplete="off" placeholder="kennel id"
+                      [attr.aria-label]="row.label + ' kennel id'" [value]="pageDraft()[row.kind]"
+                      (input)="setPageDraft(row.kind, $any($event.target).value)" [disabled]="pageBusy() === row.kind" />
+                    <button type="submit" class="sd-btn sd-btn--sm sd-btn--primary" [disabled]="pageBusy() === row.kind || !pageDraft()[row.kind].trim()"
+                      [attr.aria-busy]="pageBusy() === row.kind">Save</button>
+                    <button type="button" class="sd-btn sd-btn--sm" [disabled]="pageBusy() === row.kind || !myPages()?.[row.kind]"
+                      (click)="resetPage(row.kind)">Reset to default</button>
+                  </form>
+                  @if (pageError()[row.kind]; as message) {
+                    <p class="my-page__error sd-small" role="alert">{{ message }}</p>
+                  }
+                </div>
+              }
+            }
+          }
         </section>
       }
 

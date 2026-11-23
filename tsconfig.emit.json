@@ -1,0 +1,6 @@
+{
+  // Der Emit des Servers nach ./dist (scripts/run-build.cjs); der Typecheck (`npm test`) laeuft ueber tsconfig.build.json.
+  "extends": "./tsconfig.build.json",
+  // Der Runner von `npm run test:startup` gehoert nicht in den Produktions-dist (er startet beim Laden).
+  "exclude": ["node_modules", "ui-app", "dist", "test/startup/runStartupTests.ts"]
+}

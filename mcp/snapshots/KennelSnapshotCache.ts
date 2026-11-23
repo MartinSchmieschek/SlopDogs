@@ -13,7 +13,7 @@
 // Daten dieses Nutzers. Ein Snapshot gehoert deshalb dem, der ihn ausgeloest hat, und nur
 // der liest ihn; jeder andere loest seinen eigenen aus und sieht, was /run IHM zeigen wuerde.
 
-import type { IKennelConfig } from '@slopdogs/core';
+import type { IKennelConfig } from '@martinschmieschek/slopdogs-core/runtime';
 import type { AuthCtx } from '../auth/middleware';
 import type { Waves } from '../../services/WavesConverter';
 import type { KennelSnapshotEntry } from './types';
@@ -209,8 +209,10 @@ export class KennelSnapshotCache {
     }
 
     private tooLargeMessage(bytes: number): string {
-        return `Snapshot too large to keep in memory (~${formatMb(bytes)} MB, limit ${formatMb(this.maxBytes)} MB). `
-            + 'Use execute_kennel or run_kennel, or raise SNAPSHOT_CACHE_MAX_MB.';
+        return (
+            `Snapshot too large to keep in memory (~${formatMb(bytes)} MB, limit ${formatMb(this.maxBytes)} MB). ` +
+            'Use execute_kennel or run_kennel, or raise SNAPSHOT_CACHE_MAX_MB.'
+        );
     }
 
     private setBytes(key: string, bytes: number): void {
@@ -245,8 +247,9 @@ export class KennelSnapshotCache {
         }
 
         if (this.entries.size <= this.maxEntries && this.totalBytes <= this.maxBytes) return;
-        const oldestFirst = Array.from(this.entries.entries())
-            .sort((a, b) => a[1].lastAccessedAt.getTime() - b[1].lastAccessedAt.getTime());
+        const oldestFirst = Array.from(this.entries.entries()).sort(
+            (a, b) => a[1].lastAccessedAt.getTime() - b[1].lastAccessedAt.getTime(),
+        );
 
         // 2. Ueberlauf der Anzahl.
         let i = 0;

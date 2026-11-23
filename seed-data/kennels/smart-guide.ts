@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { IStore } from '../../store/IStore';
-import { SerializedDog, IKennelConfig, BASE_DOG_PREFIX, type IMimicDogConfig } from '@slopdogs/core';
+import { SerializedDog, IKennelConfig, BASE_DOG_PREFIX, type IMimicDogConfig } from '@martinschmieschek/slopdogs-core/runtime';
 import { kennelExists, saveKennelSeed, saveMimic } from '../seed-helpers';
 export async function seedSmartGuideKennel(nodesStore: IStore, kennelsStore: IStore): Promise<void> {
     const kennelId = 'smart-guide';
@@ -212,12 +212,7 @@ return {
         lineageId: leadDogId,
         parentId: null,
         displayName: 'Smart Guide',
-        parentsRequired: [
-            'GeocodingRetriever',
-            recommenderDogId,
-            highlightDogId,
-            'PublicTransportRetriever',
-        ],
+        parentsRequired: ['GeocodingRetriever', recommenderDogId, highlightDogId, 'PublicTransportRetriever'],
         parentsOptional: [],
         theRun: `
 const geo = GeocodingRetriever.results[0];

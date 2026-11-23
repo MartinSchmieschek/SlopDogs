@@ -1,7 +1,7 @@
 // The ConfigRouteHandler — the ship's navigator, mapping all HTTP requests to their captains.
 // In luminous space, blackened stars: each subpath is a star, each controller its light.
 import { Request, Response } from 'express';
-import { isRuntimeLogVerbose, sanitizeLineDocs } from '@slopdogs/core';
+import { isRuntimeLogVerbose, sanitizeLineDocs } from '@martinschmieschek/slopdogs-core/runtime';
 import { AbstractController, IControllerResponse, IEntity } from '../AbstractController';
 import {
     accessOf,
@@ -9,7 +9,8 @@ import {
     canRead,
     canMutate,
     isFrozen,
-    isLandingLocked,
+    landingRefuses,
+    landingRefusesCreate,
     normalizeVisibility,
     filterRunnable,
     applyCreateDefaults,
@@ -20,10 +21,14 @@ import { LandingKennels } from '../../mcp/auth/landingKennels';
 import { canMutateNode } from '../../mcp/auth/permissions';
 import { IStore } from '../../store/IStore';
 import { paramString } from '../utils/routeParams';
+import { KennelController } from '../KennelController';
 import { ListQuery } from './ListQuery';
 import { firstRefusedDogRef, refusedDogRefMessage, type RefusedDogRef } from '../../services/dogAccess';
 import type { KennelStatsService } from '../../services/KennelStatsService';
+import type { KennelFavoriteService } from '../../services/KennelFavoriteService';
 import type { DogStatsService } from '../../services/DogStatsService';
+import type { SeededKennelDelete } from '../../services/SeededKennelDelete';
+import { API_ROUTE } from './routeTable';
 
 /**
  * Returns true when the request has a logged-in user OR is in super-user dev mode.
@@ -40,10 +45,7 @@ export function sendLoginRequired(req: Request, res: Response, description = 'Lo
     const proto = (req.get('x-forwarded-proto') || req.protocol || 'http').split(',')[0].trim();
     const host = (req.get('x-forwarded-host') || req.get('host') || 'localhost:3000').split(',')[0].trim();
     const base = process.env.MCP_BASE_URL?.replace(/\/$/, '') || `${proto}://${host}`;
-    res.setHeader(
-        'WWW-Authenticate',
-        `Bearer realm="SlopDogs", resource_metadata="${base}/.well-known/oauth-protected-resource"`,
-    );
+    res.setHeader('WWW-Authenticate', `Bearer realm="SlopDogs", resource_metadata="${base}/.well-known/oauth-protected-resource"`);
     res.status(401).json({ error: 'unauthorized', error_description: description });
 }
 
@@ -97,19 +99,33 @@ export class ConfigRouteHandler {
     /** P4b: haengt `stats` an den Einzelabruf eines Dogs (die Liste bedient NodesRouteHandler). */
     private dogStats?: DogStatsService;
 
-    constructor(registry: ControllerRegistry, kennelStore?: IStore, kennelStats?: KennelStatsService, dogStats?: DogStatsService) {
+    /** Spur U: haengt `favorite` des Aufrufers an jeden Listeneintrag. */
+    private kennelFavorites?: KennelFavoriteService;
+
+    /** Spur K: Seed-Kennels loeschen samt ihrer unbenutzten Dogs, mit Vorschau. Ohne: wie jeder Kennel. */
+    private seededDelete?: SeededKennelDelete;
+
+    constructor(
+        registry: ControllerRegistry,
+        kennelStore?: IStore,
+        kennelStats?: KennelStatsService,
+        dogStats?: DogStatsService,
+        kennelFavorites?: KennelFavoriteService,
+    ) {
         this.registry = registry;
         this.kennelStore = kennelStore;
         this.kennelStats = kennelStats;
         this.dogStats = dogStats;
+        this.kennelFavorites = kennelFavorites;
+    }
+
+    /** Spur K: nach dem Montieren der Seiten (createHttpApplication) — Loeschen der Seed-Kennels mit Nutzungspruefung. */
+    useSeededKennelDelete(seededDelete: SeededKennelDelete): void {
+        this.seededDelete = seededDelete;
     }
 
     /** True if subpath==='nodes' and the user can mutate this node (owner / editor / community / super). */
-    private async canMutateForSubpath(
-        subpath: string,
-        entity: any,
-        req: Request,
-    ): Promise<boolean> {
+    private async canMutateForSubpath(subpath: string, entity: any, req: Request): Promise<boolean> {
         if (subpath === 'nodes' && this.kennelStore) {
             return await canMutateNode(entity, req.ctx, this.kennelStore);
         }
@@ -139,10 +155,10 @@ export class ConfigRouteHandler {
         });
     }
 
-    /** 403 locked_landing fuer einen Kennel aus LANDING_KENNEL_IDS — true, wenn geantwortet wurde. */
-    private static sendLandingLocked(res: Response, entity: any): boolean {
-        if (!isLandingLocked(entity)) return false;
-        res.status(403).json({ error: LandingKennels.LOCK_CODE, error_description: LandingKennels.LOCK_MESSAGE });
+    /** 403 locked_landing fuer gepflegte Kennels und ihre besitzerlosen Dogs (ausser Maintainer) — true, wenn geantwortet wurde. */
+    private static sendLandingLocked(res: Response, entity: any, req: Request): boolean {
+        if (!landingRefuses(entity, req.ctx)) return false;
+        res.status(403).json({ error: LandingKennels.LOCK_CODE, error_description: LandingKennels.lockMessageFor(entity) });
         return true;
     }
 
@@ -152,7 +168,7 @@ export class ConfigRouteHandler {
             res.status(404).json({ error: `Entity mit ID ${id} nicht gefunden` });
             return;
         }
-        if (ConfigRouteHandler.sendLandingLocked(res, entity)) return;
+        if (ConfigRouteHandler.sendLandingLocked(res, entity, req)) return;
         if (isFrozen(entity)) {
             res.status(409).json({ error: 'frozen', error_description: 'Frozen. Unfreeze it first.' });
             return;
@@ -202,6 +218,11 @@ export class ConfigRouteHandler {
             await this.handleRename(req, res);
         });
 
+        // GET /api/kennels/:id/delete-preview — Spur K: was das Loeschen eines Seed-Kennels mitnimmt (Trockenlauf).
+        app.get(API_ROUTE.kennelDeletePreview, async (req: Request, res: Response) => {
+            await this.handleDeletePreview(req, res);
+        });
+
         // DELETE /api/:subpath/:id — cast the entity into the void, never to return.
         app.delete(`${basePath}/:subpath/:id`, async (req: Request, res: Response) => {
             await this.handleDelete(req, res);
@@ -244,6 +265,8 @@ export class ConfigRouteHandler {
                 // P4: stats haengen VOR ListQuery.apply — sortiert und gefiltert wird nach ihnen, und
                 // nur an dem, was der Rechtefilter schon durchgelassen hat.
                 if (subpath === 'kennels' && this.kennelStats) await this.kennelStats.attach(visible as any[]);
+                // Spur U: `favorite` des Aufrufers ebenso VOR apply — `favorites=1` filtert danach.
+                if (subpath === 'kennels' && this.kennelFavorites) await this.kennelFavorites.attach(visible as any[], req.ctx);
                 const listQuery = ListQuery.from(req.query);
                 res.status(200).json(listQuery.envelope(listQuery.apply(visible, req.ctx)));
             } else {
@@ -330,6 +353,11 @@ export class ConfigRouteHandler {
                 res.status(401).json({ error: `Login required to create ${subpath}` });
                 return;
             }
+            // Gepflegte Kennel-IDs (Landing, Seed-Pflege-Kennels) legt nur ein Maintainer an, wie er sie auch allein aendert.
+            if (subpath === 'kennels' && landingRefusesCreate(input?.id, req.ctx)) {
+                res.status(403).json({ error: LandingKennels.LOCK_CODE, error_description: LandingKennels.LOCK_MESSAGE });
+                return;
+            }
             // Kennels: reject references to dogs the caller can't run; pin run-only foreign dogs.
             if (subpath === 'kennels') {
                 const refused = await this.firstRefusedDogRef(input?.dogIds, req);
@@ -343,6 +371,9 @@ export class ConfigRouteHandler {
             const result = await controller.create(input);
             if (result.ok) {
                 res.status(200).json({ ok: true, id: result.id, data: result.data });
+            } else if (result.code === KennelController.ID_TAKEN) {
+                // Doppelte Kennel-ID ist ein Konflikt, kein Serverfehler — Liste und Kennel zeigen den Text am Feld.
+                res.status(409).json({ error: KennelController.ID_TAKEN, error_description: 'That ID is taken.' });
             } else {
                 res.status(500).json({ error: result.error });
             }
@@ -409,9 +440,7 @@ export class ConfigRouteHandler {
                 theRun: tsCode,
                 parentsRequired: req.body.parentsRequired ?? existingConfig.parentsRequired ?? [],
                 parentsOptional: req.body.parentsOptional ?? existingConfig.parentsOptional ?? [],
-                ...(req.body.icon !== undefined
-                    ? { icon: req.body.icon === '' ? undefined : req.body.icon }
-                    : {}),
+                ...(req.body.icon !== undefined ? { icon: req.body.icon === '' ? undefined : req.body.icon } : {}),
                 ...(typeof req.body.description === 'string' ? { description: req.body.description } : {}),
                 ...(req.body.lineDocs !== undefined ? { lineDocs: sanitizeLineDocs(req.body.lineDocs) } : {}),
             };
@@ -465,7 +494,11 @@ export class ConfigRouteHandler {
             const allowed = await this.canMutateForSubpath(subpath, existing.data, req);
             if (!allowed) {
                 ConfigRouteHandler.sendMutationRefused(
-                    res, existing.data, req, id, `Nicht berechtigt, diese ${subpath === 'kennels' ? 'Kennel' : 'Node'} zu ändern`,
+                    res,
+                    existing.data,
+                    req,
+                    id,
+                    `Nicht berechtigt, diese ${subpath === 'kennels' ? 'Kennel' : 'Node'} zu ändern`,
                 );
                 return;
             }
@@ -539,17 +572,67 @@ export class ConfigRouteHandler {
                 return;
             }
 
+            const kennelLineage = String((existing.data as { lineageId?: unknown }).lineageId ?? '');
+            if (subpath === 'kennels' && this.seededDelete?.applies(kennelLineage, id)) {
+                const report = await this.seededDelete.delete(kennelLineage);
+                if (!report) {
+                    res.status(404).json({ error: 'not_found' });
+                    return;
+                }
+                const { kennelId, ...rest } = report;
+                res.status(200).json({ ok: true, scope: 'lineage', lineageId: kennelId, deleted: kennelId, ...rest });
+                return;
+            }
+
             const outcome = await controller.deleteRef(id);
             if (outcome.ok) {
                 res.status(200).json({ ok: true, scope: outcome.scope, lineageId: outcome.lineageId, deleted: outcome.deleted });
             } else if (outcome.code === 'not_found') {
                 res.status(404).json({ error: 'not_found' });
             } else {
-                res.status(400).json({ error: outcome.code, error_description: 'Delete failed. Nothing or only part of it may be gone — reload and try again.' });
+                res.status(400).json({
+                    error: outcome.code,
+                    error_description: 'Delete failed. Nothing or only part of it may be gone — reload and try again.',
+                });
             }
         } catch (e) {
             console.error(`[ConfigRouteHandler.handleDelete] Fehler:`, e);
             res.status(500).json({ error: 'delete_failed' });
+        }
+    }
+
+    /**
+     * GET /api/kennels/:id/delete-preview (Spur K): nur fuer Seed-Kennels und nur fuer den, der loeschen darf — dieselbe
+     * Rueckmeldung wie DELETE ({ dogsDeleted, dogsKept, reseed }), ohne etwas zu loeschen.
+     */
+    private async handleDeletePreview(req: Request, res: Response): Promise<void> {
+        try {
+            const id = paramString(req.params.id);
+            const controller = this.registry.get('kennels');
+            const existing = controller ? await controller.getById(id) : null;
+            if (!existing?.ok || !existing.data) {
+                res.status(404).json({ error: 'not_found' });
+                return;
+            }
+            if (!canMutate(existing.data, req.ctx)) {
+                ConfigRouteHandler.sendDeleteRefused(res, existing.data, req, 'kennels');
+                return;
+            }
+            const lineageId = String((existing.data as { lineageId?: unknown }).lineageId ?? '');
+            if (!this.seededDelete?.applies(lineageId, id)) {
+                res.status(400).json({ error: 'not_seeded', error_description: 'Only the seeded kennels have a delete preview.' });
+                return;
+            }
+            const report = await this.seededDelete.plan(lineageId);
+            if (!report) {
+                res.status(404).json({ error: 'not_found' });
+                return;
+            }
+            res.setHeader('Cache-Control', 'no-store');
+            res.status(200).json({ ok: true, dryRun: true, ...report });
+        } catch (e) {
+            console.error(`[ConfigRouteHandler.handleDeletePreview] Fehler:`, e);
+            res.status(500).json({ error: 'preview_failed' });
         }
     }
 
@@ -559,12 +642,15 @@ export class ConfigRouteHandler {
             res.status(404).json({ error: 'not_found' });
             return;
         }
-        if (ConfigRouteHandler.sendLandingLocked(res, entity)) return;
+        if (ConfigRouteHandler.sendLandingLocked(res, entity, req)) return;
         if (isFrozen(entity)) {
             res.status(409).json({ error: 'frozen', error_description: 'Frozen. Unfreeze it first.' });
             return;
         }
-        res.status(403).json({ error: 'forbidden', error_description: `Not allowed to delete this ${subpath === 'kennels' ? 'kennel' : 'dog'}.` });
+        res.status(403).json({
+            error: 'forbidden',
+            error_description: `Not allowed to delete this ${subpath === 'kennels' ? 'kennel' : 'dog'}.`,
+        });
     }
 
     /**
@@ -596,7 +682,11 @@ export class ConfigRouteHandler {
             const allowed = await this.canMutateForSubpath(subpath, existing.data, req);
             if (!allowed) {
                 ConfigRouteHandler.sendMutationRefused(
-                    res, existing.data, req, id, `Nicht berechtigt, diese ${subpath === 'kennels' ? 'Kennel' : 'Node'} umzubenennen`,
+                    res,
+                    existing.data,
+                    req,
+                    id,
+                    `Nicht berechtigt, diese ${subpath === 'kennels' ? 'Kennel' : 'Node'} umzubenennen`,
                 );
                 return;
             }
@@ -647,4 +737,3 @@ export class ConfigRouteHandler {
         }
     }
 }
-

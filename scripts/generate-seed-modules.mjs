@@ -23,7 +23,7 @@ function write(p, content) {
 
 const kennelHeader = `import { randomUUID } from 'crypto';
 import { IStore } from '../../store/IStore';
-import { SerializedDog, IKennelConfig, BASE_DOG_PREFIX, type IMimicDogConfig } from '@slopdogs/core';
+import { SerializedDog, IKennelConfig, BASE_DOG_PREFIX, type IMimicDogConfig } from '@martinschmieschek/slopdogs-core/runtime';
 import { kennelExists, saveKennelSeed, saveMimic } from '../seed-helpers';
 `;
 
@@ -38,12 +38,12 @@ write(
     path.join(root, 'seed-data', 'seed-helpers.ts'),
     `import { randomUUID } from 'crypto';
 import { IStore } from '../store/IStore';
-import { SerializedDog, type IMimicDogConfig } from '@slopdogs/core';
+import { SerializedDog, type IMimicDogConfig } from '@martinschmieschek/slopdogs-core/runtime';
 
 ${helpersCore}
 
 ${saveMimicBlock}
-`
+`,
 );
 
 // --- earth-pulse-code.ts ---
@@ -54,7 +54,7 @@ epStrings = epStrings
 write(
     path.join(root, 'seed-data', 'earth-pulse-code.ts'),
     `/** Earth Pulse — PulsData / PulsRenderer VM strings (split from seed). */
-${epStrings}`
+${epStrings}`,
 );
 
 // --- seed-default.ts ---
@@ -62,13 +62,13 @@ write(
     path.join(root, 'seed-data', 'seed-default.ts'),
     `import { randomUUID } from 'crypto';
 import { IStore } from '../store/IStore';
-import { SerializedDog, IKennelConfig, BASE_DOG_PREFIX, type IMimicDogConfig } from '@slopdogs/core';
-import { TalkingDog } from '@slopdogs/dogs-talking';
-import { RandomRecipesRetriever, CountryFlagBlackLab, DishFlagBlackLab, RandomEveryThingRetriever } from '@slopdogs/dogs-demo';
+import { SerializedDog, IKennelConfig, BASE_DOG_PREFIX, type IMimicDogConfig } from '@martinschmieschek/slopdogs-core/runtime';
+import { TalkingDog } from '@martinschmieschek/slopdogs-dogs-talking';
+import { RandomRecipesRetriever, CountryFlagBlackLab, DishFlagBlackLab, RandomEveryThingRetriever } from '@martinschmieschek/slopdogs-dogs-demo';
 import { saveKennelSeed } from './seed-helpers';
 
 ${slice(46, 144)}
-`
+`,
 );
 
 function kennel(rel, start, end, extraImport = '') {
@@ -82,7 +82,7 @@ write(
 ${slice(1789, 1881)}
 
 ${slice(1882, 2026)}
-`
+`,
 );
 
 kennel('markdown.ts', 221, 311);
@@ -98,7 +98,7 @@ write(
     `${kennelHeader}import { EARTH_PULSE_DATA_CODE, EARTH_PULSE_RENDERER_CODE } from '../earth-pulse-code';
 
 ${slice(2588, 2704)}
-`
+`,
 );
 
 kennel(
@@ -107,7 +107,7 @@ kennel(
     2767,
     `import { VoidHuntDataCode } from '../VoidHuntData';
 import { VoidHuntGalleryCode } from '../VoidHuntGallery';
-`
+`,
 );
 
 const newSeedTs = `// Arr, this be the seeding rite — split across seed-data (see kennels/).

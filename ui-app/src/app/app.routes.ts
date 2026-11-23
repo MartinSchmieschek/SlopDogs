@@ -1,5 +1,6 @@
 import { Routes, UrlSegment, UrlMatchResult } from '@angular/router';
 import { unsavedChangesGuard } from './guards/unsaved-changes.guard';
+import { kennelListPageGuard } from './guards/kennel-list-page.guard';
 
 /**
  * `/kennels/:id` and `/kennels/:id/edit` are one route (P6 U6): the edit segment opens the settings
@@ -22,6 +23,9 @@ export const routes: Routes = [
   },
   {
     path: 'kennels',
+    // Spur K: while the server serves `/kennels` as a kennel, in-app navigation there becomes a full page load;
+    // this list stays the fallback (the server answers `/kennels` with it when the kennel does not run).
+    canActivate: [kennelListPageGuard],
     loadComponent: () => import('./pages/kennel-list/kennel-list.component')
       .then(m => m.KennelListComponent),
   },

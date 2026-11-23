@@ -47,9 +47,42 @@ export interface ReuseHint {
 
 /** Woerter, die in Namen und Beschreibungen nichts unterscheiden. */
 const STOP_WORDS = new Set([
-    'the', 'and', 'for', 'with', 'from', 'into', 'this', 'that', 'one', 'its', 'are', 'was', 'per', 'via', 'als',
-    'der', 'die', 'das', 'und', 'mit', 'fuer', 'von', 'aus', 'ein', 'eine', 'einen', 'dem', 'den', 'des',
-    'dog', 'returns', 'return', 'yields', 'yield', 'data', 'liefert',
+    'the',
+    'and',
+    'for',
+    'with',
+    'from',
+    'into',
+    'this',
+    'that',
+    'one',
+    'its',
+    'are',
+    'was',
+    'per',
+    'via',
+    'als',
+    'der',
+    'die',
+    'das',
+    'und',
+    'mit',
+    'fuer',
+    'von',
+    'aus',
+    'ein',
+    'eine',
+    'einen',
+    'dem',
+    'den',
+    'des',
+    'dog',
+    'returns',
+    'return',
+    'yields',
+    'yield',
+    'data',
+    'liefert',
 ]);
 
 export class DogReuseAdvisor {
@@ -93,7 +126,9 @@ export class DogReuseAdvisor {
         const db = DogReuseAdvisor.words(candidate.description ?? '', true);
         if (Math.min(da.length, db.length) < DogReuseAdvisor.MIN_DESCRIPTION_WORDS) return null;
         const texts = DogReuseAdvisor.jaccard(da, db);
-        return texts >= DogReuseAdvisor.DESCRIPTION_SIMILARITY ? { reason: 'similar-description', similarity: DogReuseAdvisor.round(texts) } : null;
+        return texts >= DogReuseAdvisor.DESCRIPTION_SIMILARITY
+            ? { reason: 'similar-description', similarity: DogReuseAdvisor.round(texts) }
+            : null;
     }
 
     /**
@@ -137,8 +172,12 @@ export class DogReuseAdvisor {
         const lineageId = DogReuseAdvisor.keyOf(candidate);
         const displayName = DogReuseAdvisor.nameOf(candidate);
         const proven = candidate.stats!.proven;
-        const why = reason === 'same-name' ? 'has the same name as'
-            : reason === 'similar-name' ? 'has a name very close to' : 'describes itself like';
+        const why =
+            reason === 'same-name'
+                ? 'has the same name as'
+                : reason === 'similar-name'
+                  ? 'has a name very close to'
+                  : 'describes itself like';
         const ref = candidate.runOnly ? candidate.id : lineageId;
         const how = candidate.runOnly
             ? `reference its version ${candidate.id} (run-only: you may run it, not read it) in parentsRequired or extraDogIds`
@@ -155,8 +194,9 @@ export class DogReuseAdvisor {
                 description: candidate.description ?? null,
                 proven: { score: proven.score, badge: proven.badge, reliability: proven.reliability },
             },
-            message: `"${dog.displayName}" ${why} the proven dog "${displayName}" (${ref}, proven ${proven.score}, reliability ${proven.reliability}). `
-                + `If it does the same job, reuse it — ${how} — and write only what is missing. Nothing was blocked.`,
+            message:
+                `"${dog.displayName}" ${why} the proven dog "${displayName}" (${ref}, proven ${proven.score}, reliability ${proven.reliability}). ` +
+                `If it does the same job, reuse it — ${how} — and write only what is missing. Nothing was blocked.`,
         };
     }
 

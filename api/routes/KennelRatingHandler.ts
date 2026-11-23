@@ -13,7 +13,7 @@ export class KennelRatingHandler {
     constructor(
         private readonly kennelsController: KennelController,
         private readonly stats: KennelStatsService,
-    ) { }
+    ) {}
 
     registerRoutes(app: any): void {
         app.get(API_ROUTE.kennelRating, (req: Request, res: Response) => this.handleGet(req, res));
@@ -38,11 +38,7 @@ export class KennelRatingHandler {
     }
 
     /** Regel 1 (Kennel aufloesbar), dann die Aktion; RatingError wird zur Fehlerform des Bestands. */
-    private async respond(
-        req: Request,
-        res: Response,
-        action: (kennel: RatableKennel) => Promise<object>,
-    ): Promise<void> {
+    private async respond(req: Request, res: Response, action: (kennel: RatableKennel) => Promise<object>): Promise<void> {
         try {
             const found = await this.kennelsController.getById(paramString(req.params.id));
             if (!found.ok || !found.data) throw new RatingError(404, 'not_found', 'Kennel not found');

@@ -6,6 +6,9 @@
 .nira/
 amarsDumps/
 
+# Lokale Notizdateien aus Pruefungen (frueher getrackt: .tmp-check.json, .tmp-mimic.json)
+.tmp-*.json
+
 # Node modules
 node_modules/
 
@@ -14,6 +17,10 @@ dev.db
 auth.db
 store/prisma/*.db
 store/prisma-auth/*.db
+
+# Startup-Suite (npm run test:startup): eigene SQLite-Dateien neben den Schemas
+test-startup*.db
+test-startup*.db-journal
 
 # Cache DB (SQLite)
 cache.db
@@ -26,14 +33,12 @@ dist/
 # Welle 10 -- Stale TypeScript compile artifacts must never live next to .ts sources.
 # A stray `npx tsc` (ohne -p tsconfig.build.json) wuerde sonst .js neben .ts legen
 # und ts-node/Node-Modul-Resolution wuerden die alten .js gegenueber den frischen
-# .ts bevorzugen -- Geister-Debugging garantiert. packages/*/dist/**/*.js bleibt
-# erlaubt, das ist die echte Build-Ausgabe.
+# .ts bevorzugen -- Geister-Debugging garantiert.
 /*.js
 /api/**/*.js
 /mcp/**/*.js
 /services/**/*.js
 /store/**/*.js
-/packages/*/src/**/*.js
 
 # Prisma client
 node_modules/@prisma/
@@ -51,3 +56,4 @@ store/prisma-auth/auth.db
 
 # Cursor IDE local config — not part of the repo
 .cursor/
+*.db-journal

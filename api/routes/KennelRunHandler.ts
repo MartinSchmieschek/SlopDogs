@@ -1,5 +1,6 @@
 // The KennelRunHandler — the huntmaster who unleashes the hounds.
 // Vome speaks: to cosmic madness laws submit — the waves obey the dependency graph.
+import { type ICacheHandler } from '@martinschmieschek/slopdogs-core';
 import {
     SerializedDog,
     MimicDog,
@@ -7,11 +8,10 @@ import {
     IKennelConfig,
     KennelRun,
     type MimicAdopter,
-    type ICacheHandler,
     type VmGlobalCapabilityContext,
     isRuntimeLogVerbose,
     publicKennelPath,
-} from '@slopdogs/core';
+} from '@martinschmieschek/slopdogs-core/runtime';
 import { FIXED_TOP_LEVEL } from './spaRouteConstants';
 import { API_ROUTE, LEGACY_ROUTE, PUBLIC_ROUTE } from './routeTable';
 import { IStore, type MimicHeadRow } from '../../store/IStore';
@@ -46,6 +46,9 @@ function clientWantsJson(req: any): boolean {
 import { generateVersionId, generateLineageId } from '../utils/versioning';
 import { memSnapshot, logKennelRun } from '../utils/memoryLog';
 import { Watchpost } from '../../services/Watchpost';
+import { dogVersionsOf } from '../../services/dogVersions';
+import { TrustedKennels } from '../../mcp/auth/trustedKennels';
+import { SecurityHeaders } from '../../server-app/SecurityHeaders';
 
 /**
  * Ein adoptierbarer MimicDog, aus einer schmalen Kopfzeile geschaelt: der Pact, den er imitiert, steht
@@ -117,16 +120,18 @@ export class KennelRunHandler {
     public async loadKennelConfig(id: string, versionOverride?: string): Promise<IKennelConfig | null> {
         const lookupId = versionOverride || id;
         const result = await this.deps.kennelsController.getById(lookupId);
-        return (result.ok && result.data) ? result.data : null;
+        return result.ok && result.data ? result.data : null;
     }
 
     /** Merge default + request query params (all lowercased). */
     public mergeQueryParams(defaults: Record<string, string> | undefined, reqQuery: Record<string, any>): Record<string, string> {
         const result: Record<string, string> = {};
         if (defaults) {
-            Object.entries(defaults).forEach(([k, v]) => { result[k.toLowerCase()] = String(v).toLowerCase(); });
+            Object.entries(defaults).forEach(([k, v]) => {
+                result[k.toLowerCase()] = String(v).toLowerCase();
+            });
         }
-        Object.keys(reqQuery).forEach(key => {
+        Object.keys(reqQuery).forEach((key) => {
             const val = typeof reqQuery[key] === 'string' ? reqQuery[key] : String(reqQuery[key]);
             result[key.toLowerCase()] = val.toLowerCase();
         });
@@ -139,12 +144,23 @@ export class KennelRunHandler {
      * (`landing` rankt nicht). `null`, wenn der Kennel fehlt, fuer Anonyme nicht ausfuehrbar ist oder der
      * Lead kein Ergebnis traegt; ein abgebrochener Lauf wirft wie bei runKennel.
      */
-    public async runLeadAsAnonymous(kennelId: string, query: Record<string, string>, attribution: KennelRunAttribution): Promise<unknown | null> {
+    public async runLeadAsAnonymous(
+        kennelId: string,
+        query: Record<string, string>,
+        attribution: KennelRunAttribution,
+    ): Promise<unknown | null> {
         const config = await this.loadKennelConfig(kennelId);
         if (!config || accessOf(config as any, ANONYMOUS) === 'none') return null;
         const leadRef = config.dogIds?.[0];
         if (!leadRef) return null;
-        const waves = await this.runKennel(config, this.mergeQueryParams(config.defaultQuery, query), config.defaultBody, undefined, undefined, attribution);
+        const waves = await this.runKennel(
+            config,
+            this.mergeQueryParams(config.defaultQuery, query),
+            config.defaultBody,
+            undefined,
+            undefined,
+            attribution,
+        );
         const outcome = LeadOutcome.of(waves, leadRef);
         if (outcome.status !== 'ok') return null;
         return KeyRunState.forResult(waves).scrubValue(outcome.result);
@@ -169,7 +185,7 @@ export class KennelRunHandler {
         vmTimeoutMs?: number,
         attribution?: KennelRunAttribution,
     ): Promise<Waves> {
-        const lineageId = (config as any).lineageId || config.id;          // dieselbe Regel wie createMimicAdopter
+        const lineageId = (config as any).lineageId || config.id; // dieselbe Regel wie createMimicAdopter
         const source: KennelCallSource = attribution?.source ?? 'unknown';
         if (source === 'unknown' && isRuntimeLogVerbose()) {
             console.warn(`[KennelRunHandler] Lauf ohne Quelle (${lineageId}) — zaehlt als unknown`, new Error('attribution').stack);
@@ -201,7 +217,7 @@ export class KennelRunHandler {
                 body,
                 [],
                 this.deps.cacheHandler,
-                mimicAdopter
+                mimicAdopter,
             );
             kennelRun.setCapabilityContext(runCtx);
             if (typeof vmTimeoutMs === 'number' && vmTimeoutMs > 0) {
@@ -215,9 +231,14 @@ export class KennelRunHandler {
                     const dogKey = dogStatsKeyOf(r.dog);
                     if (!dogKey) return;
                     callCounter.recordDog({
-                        dogKey, kennelLineageId: lineageId, source, outcome: r.outcome,
+                        dogKey,
+                        kennelLineageId: lineageId,
+                        source,
+                        outcome: r.outcome,
                         cached: r.outcome === 'ok' && r.cacheHits > 0 && r.cacheMisses === 0,
-                        cacheHits: r.cacheHits, cacheMisses: r.cacheMisses, durationMs: r.durationMs,
+                        cacheHits: r.cacheHits,
+                        cacheMisses: r.cacheMisses,
+                        durationMs: r.durationMs,
                     });
                 },
             });
@@ -237,14 +258,19 @@ export class KennelRunHandler {
             leadFailed = outcome.failed;
             return waves;
         } catch (err) {
-            leadFailed = true;                                               // "Nothing to harvest" oder Infrastruktur
-            throw keyRun.scrubError(err);                                    // P4c: kein Wert in Text oder Stack
+            leadFailed = true; // "Nothing to harvest" oder Infrastruktur
+            throw keyRun.scrubError(err); // P4c: kein Wert in Text oder Stack
         } finally {
             Watchpost.shared?.runEnded(watchToken);
-            this.deps.callCounter.record(lineageId, source, leadFailed);     // genau ein record je begonnenem Lauf
+            this.deps.callCounter.record(lineageId, source, leadFailed); // genau ein record je begonnenem Lauf
             logKennelRun({
-                kennelId: lineageId, source, dogCount: config.dogIds?.length, waveCount,
-                durationMs: Date.now() - startedAt, before: memBefore, after: memSnapshot(),
+                kennelId: lineageId,
+                source,
+                dogCount: config.dogIds?.length,
+                waveCount,
+                durationMs: Date.now() - startedAt,
+                before: memBefore,
+                after: memSnapshot(),
             });
         }
     }
@@ -308,18 +334,18 @@ export class KennelRunHandler {
         return async (pactName, preferredLineageIds) => {
             // Union the kennel's own memory with any hint the core passed in.
             const memory = new Set<string>(remembered);
-            preferredLineageIds.forEach(id => memory.add(id));
+            preferredLineageIds.forEach((id) => memory.add(id));
 
             // Keep only the mimics that imitate this pact — and that this kennel may run at all
             // (P3.5: a foreign private mimic is no more adoptable than a foreign private dog).
             // `.filter` liefert eine eigene Liste — die gemerkte Ladung darf vom sort() weiter
             // unten nicht umsortiert werden.
-            const candidates = (await loadMimicCandidates()).filter(c => c.imitates === pactName && policy.mayRun(c.acl));
+            const candidates = (await loadMimicCandidates()).filter((c) => c.imitates === pactName && policy.mayRun(c.acl));
             if (candidates.length === 0) return null;
 
             // Option (c): remembered lineages win; tie-break by newest createdAt.
             // If nothing is remembered, fall back to the newest match overall.
-            const rememberedCands = candidates.filter(c => memory.has(c.lineageId));
+            const rememberedCands = candidates.filter((c) => memory.has(c.lineageId));
             const pool = rememberedCands.length > 0 ? rememberedCands : candidates;
             pool.sort((a, b) => b.createdAt - a.createdAt);
             // Die Konfig nur fuer den Sieger; verschwand seine Zeile seit der Kopfwahl, ist der naechste dran.
@@ -362,7 +388,11 @@ export class KennelRunHandler {
                 acl: aclOf(row),
                 loadCfg: async () => {
                     const [full] = await store.findRowsByIds([row.id]);
-                    try { return full?.serializedDogConfig ? JSON.parse(full.serializedDogConfig) as IMimicDogConfig : null; } catch { return null; }
+                    try {
+                        return full?.serializedDogConfig ? (JSON.parse(full.serializedDogConfig) as IMimicDogConfig) : null;
+                    } catch {
+                        return null;
+                    }
                 },
             }));
     }
@@ -372,9 +402,16 @@ export class KennelRunHandler {
         const rows = await this.deps.nodesStore.findLatestVersionsByType(MimicDog.name);
         const candidates: MimicCandidate[] = [];
         for (const row of rows as any[]) {
-            const raw = typeof row.serializedDogConfig === 'string'
-                ? (() => { try { return JSON.parse(row.serializedDogConfig); } catch { return null; } })()
-                : row.serializedDogConfig;
+            const raw =
+                typeof row.serializedDogConfig === 'string'
+                    ? (() => {
+                          try {
+                              return JSON.parse(row.serializedDogConfig);
+                          } catch {
+                              return null;
+                          }
+                      })()
+                    : row.serializedDogConfig;
             if (!raw) continue;
             const lineageId = raw.lineageId || row.lineageId || row.id;
             if (!lineageId) continue;
@@ -425,8 +462,7 @@ export class KennelRunHandler {
             const byLineage = new Map<string, any>();
             for (const sd of [...serialized, ...mimics]) {
                 const row = sd as any;
-                const cfg = typeof row.serializedDogConfig === 'string'
-                    ? JSON.parse(row.serializedDogConfig) : row.serializedDogConfig;
+                const cfg = typeof row.serializedDogConfig === 'string' ? JSON.parse(row.serializedDogConfig) : row.serializedDogConfig;
                 const lid = cfg.lineageId || row.lineageId || row.id;
                 const existing = byLineage.get(lid);
                 if (!existing || new Date(row.createdAt) > new Date(existing.createdAt)) {
@@ -434,7 +470,10 @@ export class KennelRunHandler {
                 }
             }
             const rows = Array.from(byLineage.entries());
-            const acl = await DogAclIndex.load(nodesStore, rows.map(([lineageId, sd]) => ({ id: sd.id, lineageId })));
+            const acl = await DogAclIndex.load(
+                nodesStore,
+                rows.map(([lineageId, sd]) => ({ id: sd.id, lineageId })),
+            );
             const dogs: Array<SerializedDog<unknown>> = [];
             for (const [lineageId, sd] of rows) {
                 const dogAcl = acl.aclOf({ id: sd.id, lineageId });
@@ -442,9 +481,7 @@ export class KennelRunHandler {
                     if (isRuntimeLogVerbose()) console.log(`[KennelRunHandler] Dog ${lineageId} darf in diesem Kennel nicht laufen (P3.5)`);
                     continue;
                 }
-                const config = typeof sd.serializedDogConfig === 'string'
-                    ? JSON.parse(sd.serializedDogConfig)
-                    : sd.serializedDogConfig;
+                const config = typeof sd.serializedDogConfig === 'string' ? JSON.parse(sd.serializedDogConfig) : sd.serializedDogConfig;
                 dogs.push(policy.instantiate(config, sd.id, dogAcl!, lineageId));
             }
             return dogs;
@@ -530,6 +567,8 @@ export class KennelRunHandler {
      */
     private sendResult(res: any, rawResult: any, req: any, waves: Waves) {
         const result = KeyRunState.forResult(waves).scrubValue(rawResult);
+        // Kennel-Ausgabe ist Inhalt des Kennel-Besitzers: Sandbox, wo immer sie ausgeliefert wird (SecurityHeaders).
+        SecurityHeaders.markKennelOutput(res);
         // Lobby-Shape { snapshot, live }: Browser bekommt das HTML, API-Clients den Snapshot.
         if (isLobbyLeadShape(result)) {
             const wantsJson = clientWantsJson(req);
@@ -584,10 +623,7 @@ export class KennelRunHandler {
             }
 
             const query = this.mergeQueryParams(config.defaultQuery, req.query);
-            const body =
-                req.method === 'POST' && req.body !== undefined && req.body !== null
-                    ? req.body
-                    : config.defaultBody;
+            const body = req.method === 'POST' && req.body !== undefined && req.body !== null ? req.body : config.defaultBody;
 
             const startedAt = Date.now();
             try {
@@ -603,14 +639,16 @@ export class KennelRunHandler {
                     lead: { status: lead.status, ...(lead.error !== undefined ? { error: lead.error } : {}) },
                     waves: safeWaves,
                     kennelConfig: withMyRights(config as any, req.ctx),
+                    // P2.5: welche Paket-Version jeder Base-Dog dieses Laufs hatte (`base:<Klasse>` -> `<paket>@<version>`).
+                    dogVersions: dogVersionsOf(waves),
                 });
             } catch (runError: any) {
                 const msg = KennelRunHandler.errorText(runError, access);
                 const kennelConfig = access === 'read' ? { kennelConfig: withMyRights(config as any, req.ctx) } : {};
-                if (String(runError?.message ?? runError).includes("Nothing to harvest")) {
+                if (String(runError?.message ?? runError).includes('Nothing to harvest')) {
                     res.json({ ok: false, error: msg, ...kennelConfig });
                 } else {
-                    console.error("[KennelRunHandler.handleRun] runKennel", runError);
+                    console.error('[KennelRunHandler.handleRun] runKennel', runError);
                     res.status(500).json({ ok: false, error: msg, ...kennelConfig });
                 }
             }
@@ -641,11 +679,10 @@ export class KennelRunHandler {
             }
 
             const queryData = this.mergeQueryParams(config.defaultQuery, req.query);
-            const body =
-                req.method === 'POST' && req.body !== undefined && req.body !== null
-                    ? req.body
-                    : config.defaultBody;
-            const waves = await this.runKennel(config, queryData, body, this.toCapabilityCtx(req.ctx), undefined, { source: 'api-execute' });
+            const body = req.method === 'POST' && req.body !== undefined && req.body !== null ? req.body : config.defaultBody;
+            const waves = await this.runKennel(config, queryData, body, this.toCapabilityCtx(req.ctx), undefined, {
+                source: 'api-execute',
+            });
             this.sendLeadOutcome(req, res, waves, dogIds[0], access);
         } catch (err) {
             console.error('[KennelRunHandler.handleExecute]', err);
@@ -677,15 +714,19 @@ export class KennelRunHandler {
             res.status(200).send('null');
             return;
         }
-        const detail = access === 'read'
-            ? {
-                dog: leadRef,
-                detail: outcome.status === 'not_run'
-                    ? `Dog ${leadRef} did not run (its parents were not ready, or it may not run in this kennel).`
-                    : outcome.error,
-            }
-            : {};
-        console.warn(`[KennelRunHandler] ${req?.method ?? ''} ${req?.path ?? ''}: lead ${outcome.status}${outcome.memoryPressure ? ' (memory guard)' : ''}`);
+        const detail =
+            access === 'read'
+                ? {
+                      dog: leadRef,
+                      detail:
+                          outcome.status === 'not_run'
+                              ? `Dog ${leadRef} did not run (its parents were not ready, or it may not run in this kennel).`
+                              : outcome.error,
+                  }
+                : {};
+        console.warn(
+            `[KennelRunHandler] ${req?.method ?? ''} ${req?.path ?? ''}: lead ${outcome.status}${outcome.memoryPressure ? ' (memory guard)' : ''}`,
+        );
         if (outcome.memoryPressure) {
             res.setHeader('Retry-After', String(KennelRunHandler.MEMORY_PRESSURE_RETRY_AFTER_S));
             res.status(503).json({
@@ -698,9 +739,7 @@ export class KennelRunHandler {
         }
         res.status(502).json({
             error: 'lead_failed',
-            message: outcome.status === 'not_run'
-                ? 'The lead dog of this kennel did not run.'
-                : 'The lead dog of this kennel failed.',
+            message: outcome.status === 'not_run' ? 'The lead dog of this kennel did not run.' : 'The lead dog of this kennel failed.',
             ...detail,
         });
     }
@@ -720,6 +759,16 @@ export class KennelRunHandler {
         const queryStart = originalUrl.indexOf('?');
         const query = queryStart >= 0 ? originalUrl.slice(queryStart) : '';
         res.redirect(308, publicKennelPath(name) + query);
+    }
+
+    /**
+     * `/k/:id` eines vertrauten Kennels (TrustedKennels: Landing) laeuft ohne Sandbox, wenn die ausgelieferte Version
+     * die Kopfversion ihrer Lineage ist — gleich, ob per lineageId, per Versions-GUID im Pfad oder per `?version=`
+     * adressiert. Jede aeltere Version laeuft mit Sandbox.
+     */
+    private async trustIfTrustedKennel(res: Parameters<typeof SecurityHeaders.trustKennelPage>[0], config: IKennelConfig): Promise<void> {
+        if (!TrustedKennels.isTrusted(config)) return;
+        if (await this.deps.kennelsController.isHeadVersion(config)) SecurityHeaders.trustKennelPage(res);
     }
 
     /** Ein unbekannter oder unlesbarer Kennel sieht von aussen gleich aus: 404 JSON. */
@@ -773,6 +822,7 @@ export class KennelRunHandler {
                 this.sendKennelGateOrNotFound(req, res);
                 return;
             }
+            await this.trustIfTrustedKennel(res, config);
 
             const dogIds = config.dogIds || [];
             if (dogIds.length === 0) {
@@ -782,7 +832,9 @@ export class KennelRunHandler {
 
             const queryData = this.mergeQueryParams(config.defaultQuery, req.query);
             // Wie GET /api/…/run: ohne Request-Body die gespeicherte defaultBody-Konfiguration nutzen.
-            const waves = await this.runKennel(config, queryData, config.defaultBody, this.toCapabilityCtx(req.ctx), undefined, { source: 'public' });
+            const waves = await this.runKennel(config, queryData, config.defaultBody, this.toCapabilityCtx(req.ctx), undefined, {
+                source: 'public',
+            });
             this.sendLeadOutcome(req, res, waves, dogIds[0], access);
         } catch (err) {
             console.error(err);
@@ -800,6 +852,7 @@ export class KennelRunHandler {
                 this.sendKennelNotFound(res);
                 return;
             }
+            await this.trustIfTrustedKennel(res, config);
 
             const dogIds = config.dogIds || [];
             if (dogIds.length === 0) {
@@ -808,8 +861,7 @@ export class KennelRunHandler {
             }
 
             const queryData = this.mergeQueryParams(config.defaultQuery, req.query);
-            const bodyData =
-                req.body !== undefined && req.body !== null ? req.body : config.defaultBody;
+            const bodyData = req.body !== undefined && req.body !== null ? req.body : config.defaultBody;
 
             const waves = await this.runKennel(config, queryData, bodyData, this.toCapabilityCtx(req.ctx), undefined, { source: 'public' });
             this.sendLeadOutcome(req, res, waves, dogIds[0], access);

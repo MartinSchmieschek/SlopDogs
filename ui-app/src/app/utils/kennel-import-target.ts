@@ -1,6 +1,6 @@
 /**
- * Must stay in sync with `packages/core/src/kennelImportTarget.ts`
- * (UI import so Vite does not resolve @slopdogs/core/… subpaths in the browser bundle).
+ * Must stay in sync with `src/kennelImportTarget.ts` in slopdogs-core (https://github.com/MartinSchmieschek/slopdogs-core)
+ * (UI import so Vite does not resolve @martinschmieschek/slopdogs-core/… subpaths in the browser bundle).
  */
 
 export type KennelIdNameListEntry = {

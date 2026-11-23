@@ -1,11 +1,13 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
+import { KennelListPageService } from '../../services/kennel-list-page.service';
 import { escapeLayerWhile } from '../../utils/escape-layers';
 
 /**
  * Top-right badge (6.5 `sd-auth-badge`): signed out a quiet `Sign in` that goes to `/login` with the
- * way back; signed in the avatar and a menu — Account, Keys, Sign out (P6 U7).
+ * way back; signed in the avatar and a menu — Account, Keys, Sign out (P6 U7). Server in local mode: the local
+ * user's avatar and menu, never `Sign in` or `Sign out`.
  */
 @Component({
     selector: 'app-auth-badge',
@@ -17,9 +19,11 @@ import { escapeLayerWhile } from '../../utils/escape-layers';
 export class AuthBadgeComponent implements OnInit {
     private auth = inject(AuthService);
     private router = inject(Router);
+    private kennelListPage = inject(KennelListPageService);
 
     readonly user = this.auth.user;
     readonly isReady = this.auth.isReady;
+    readonly localMode = this.auth.localMode;
     readonly menuOpen = signal(false);
 
     readonly initial = computed(() => {
@@ -49,6 +53,8 @@ export class AuthBadgeComponent implements OnInit {
 
     async onLogout(): Promise<void> {
         await this.auth.logout();
+        // Signed out, /kennels is the default again — the cached answer may still say "your list".
+        this.kennelListPage.reset();
         this.menuOpen.set(false);
         if (this.router.url.startsWith('/account')) void this.router.navigate(['/kennels']);
     }

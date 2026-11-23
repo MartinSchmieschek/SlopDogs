@@ -41,7 +41,7 @@ And around it:
 ## Run it locally
     npm install
     npm run dev
-API on `:3000`, UI on `:4300`.
+API on `:3000`, UI on `:4300`. On a Raspberry Pi in your home network, without login: [SlopDogs auf dem Pi](#slopdogs-auf-dem-pi).
 ---
 *What follows is the lore, then the full reference.*
 
@@ -182,7 +182,7 @@ The net effect: **the first run teaches the kennel what it needs**, and every su
 
 The fresh placeholder's `theRun` is literally `throw new Error("MimicDog for '<PactName>' needs user code")`. It **does throw** on every run -- this is intentional, not a sleeping clause. Two things keep the rest of the pack alive:
 
-1. **The SeasonRunner brands, it does not abort.** [`harverster.ts → letOut`](packages/core/src/harverster.ts) wraps every dog in a `try/catch`. On throw, the dog is marked with `__error`, pushed into `season.exhausted` like any other returnee, and `dog.collected` stays `undefined`. The pack carries on.
+1. **The SeasonRunner brands, it does not abort.** [`harverster.ts → letOut`](https://github.com/MartinSchmieschek/slopdogs-core/blob/main/src/harverster.ts) wraps every dog in a `try/catch`. On throw, the dog is marked with `__error`, pushed into `season.exhausted` like any other returnee, and `dog.collected` stays `undefined`. The pack carries on.
 2. **The downstream BaseDog still sees the Pact as "fulfilled".** `matchesParent` checks `imitatesClasses` -- and the placeholder Mimic carries the Pact class regardless of whether `theRun` threw or returned. So `areRequiredParentsReady` flips `true`, the BaseDog runs in the next wave, calls `season.exhausted.find(d => matchesParent(<Pact>, d))`, reads `queryDog?.collected` -- gets `undefined` -- and falls back to whatever default its `yieldCollectorFactory` defines (typically `?? ({} as <PactType>)`).
 
 What happens after that fallback is the BaseDog's own contract. Some BaseDogs survive cleanly on an empty query (e.g. they have sensible defaults); others throw immediately ("Missing required query params"). Either way, the **placeholder Mimic itself shows up in snapshots as `hasError: true`** with the placeholder error message -- a clear TODO marker, not a runtime catastrophe.
@@ -329,7 +329,7 @@ In `dogIds`, BaseDogs are prefixed (`base:QueryRetriever`), SerializedDogs are r
 
 **Kennel versioning** -- Every Kennel carries a stable **lineageId** (the name you chose) and a chain of **versionIds** (GUIDs). Each save creates a new version with a `parentId` pointing back. The full history is navigable -- branch off, revert, compare. The Kennel remembers its past lives.
 
-**Kennel export & import** -- `GET /api/kennels/:id/export` returns a **bundle** (format `bundleVersion: 2`): current Kennel config plus transitively collected SerializedDogs and MimicDogs; `base:` dog IDs stay as references. `POST /api/kennels/import` mints **new** GUIDs for serialized dogs and creates a **single** fresh Kennel version (no version history from the source). **Optional body field** `importTarget: { "kennelId": string, "name": string }` — when both strings are set, the imported Kennel uses that id and display name. If you omit it, the server **suggests** an id and name (collision-safe; see `suggestKennelImportTarget` in `@slopdogs/core`). All `base:` refs in the bundle must exist on the target server or import fails with 400. **In the browser UI** (Kennel list on `:4300`), the same workflow is copy-and-paste: **Export** in a row's `⋯` menu copies that bundle JSON to the clipboard; the **Import** button pastes bundle JSON from the clipboard and imports it. See [Kennel list copy and paste](#kennel-list-copy-and-paste). Copy and paste across instances or between UI, terminal, and other tools.
+**Kennel export & import** -- `GET /api/kennels/:id/export` returns a **bundle** (format `bundleVersion: 2`): current Kennel config plus transitively collected SerializedDogs and MimicDogs; `base:` dog IDs stay as references. `POST /api/kennels/import` mints **new** GUIDs for serialized dogs and creates a **single** fresh Kennel version (no version history from the source). **Optional body field** `importTarget: { "kennelId": string, "name": string }` — when both strings are set, the imported Kennel uses that id and display name. If you omit it, the server **suggests** an id and name (collision-safe; see `suggestKennelImportTarget` in `@martinschmieschek/slopdogs-core/runtime`). All `base:` refs in the bundle must exist on the target server or import fails with 400. **In the browser UI** (Kennel list on `:4300`), the same workflow is copy-and-paste: **Export** in a row's `⋯` menu copies that bundle JSON to the clipboard; the **Import** button pastes bundle JSON from the clipboard and imports it. See [Kennel list copy and paste](#kennel-list-copy-and-paste). Copy and paste across instances or between UI, terminal, and other tools.
 
 **Caching** -- Two-tier memory so dogs don't repeat themselves:
 - **KV cache** (`CacheHandler`) -- TTL-based key-value store with in-flight request deduplication plus negative-caching for 429/504 to break provider retry storms.
@@ -465,7 +465,7 @@ The MCP server returns **Spuren rules + a pointer to the full guide** as the `in
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| `GET` | `/api/kennels` | Survey all Kennels — every entry carries `stats` {calls, rating}; `?q=`, `?mine=1`, `?sort=name|createdAt|updatedAt|calls|calls30d|rating|failures30d&dir=desc`, `?minStars=4`, `?minCalls=20`, `?usage=top|never_used|never_worked|failing|dormant`, `?limit=&offset=` |
+| `GET` | `/api/kennels` | Survey all Kennels — every entry carries `stats` {calls, rating} and `favorite` (yours; always false when anonymous); `?q=`, `?mine=1`, `?favorites=1`, `?sort=name|createdAt|updatedAt|calls|calls30d|rating|failures30d&dir=desc`, `?minStars=4`, `?minCalls=20`, `?usage=top|never_used|never_worked|failing|dormant`, `?limit=&offset=` |
 | `GET` | `/api/kennels/:id` | Load a Kennel's covenant |
 | `POST` | `/api/kennels` | Forge a new Kennel |
 | `PUT` | `/api/kennels/:id` | Rewrite the covenant |
@@ -476,6 +476,8 @@ The MCP server returns **Spuren rules + a pointer to the full guide** as the `in
 | `GET` | `/api/kennels/:id/rating` | Stars: `{avg, count, score, histogram, mine}` (run right needed; `mine` null when anonymous or unrated) |
 | `PUT` | `/api/kennels/:id/rating` | Rate 1-5 (`{ "stars": 4 }`) — logged in, not the owner, not an editor |
 | `DELETE` | `/api/kennels/:id/rating` | Take your rating back (idempotent) |
+| `PUT` | `/api/kennels/:id/favorite` | Mark the kennel as one of your favourites: `{ok, lineageId, favorite}` — logged in (401), run right needed (404), idempotent; owners and editors may favourite their own, frozen and landing kennels too |
+| `DELETE` | `/api/kennels/:id/favorite` | Drop the favourite (idempotent) |
 | `GET` | `/api/kennels/:id/acl` | Read visibility, owner, editors/viewers/runners, `myRights` (owner/editor only) |
 | `PUT` | `/api/kennels/:id/acl` | Set visibility and editors/viewers/runners (owner only) |
 | `POST` | `/api/kennels/:id/acl/transfer` | Transfer ownership (owner only) |
@@ -520,6 +522,15 @@ The MCP server returns **Spuren rules + a pointer to the full guide** as the `in
 
 Login required. Keys are AES-256-GCM encrypted in the auth database and never returned; dogs use them through `keys.fetch(url, opts)` with `{{key:<alias>}}` — substituted on the server, only to the key's `allowedDomains` (https, no private networks, no redirects), with the keys of whoever runs the kennel. `kennelGrants` (opt-in, needs `quotaPerDay`) lets runs of your own listed kennels use the key for any runner. A database reset deletes the key store. MCP: `set_key`, `list_keys`, `delete_key` — no `get_key`. The `/account?tab=keys` screen manages these.
 
+### Your pages
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `GET` | `/api/my-pages` | Your own landing and kennel list: `{ok, landing, list}` — kennel ids, `null` where the default shows |
+| `PUT` | `/api/my-pages` | Set them `{landing?, list?}` — a kennel id or version GUID (the kennel id is stored), `null` or `""` resets; only the keys you send change. `400 kennel_has_no_dogs\|invalid_request`, `403 no_identity` (super-user without user), `404 kennel_not_found` (missing and not visible to you answer the same), `503 my_pages_unavailable`. With the browser session only from SlopDogs pages (`403 cross_origin_refused`, the rule of `/auth/tokens`); bearer tokens and local mode as for `/api/keys` |
+
+Login required, `Cache-Control: no-store`. Any kennel you can see qualifies — yours, shared with you or public — as long as it has a dog. One row per user and page in the store table `UserPage` (user id without a foreign key, like the favourites); deleting a kennel drops the rows that point to it. Signed in with a page set, `/` and `/kennels` redirect you to `/k/<id>` (see [Landing](#landing)). MCP: `get_my_pages`, `set_my_pages`; in the app the profile tab of `/account`.
+
 ### Public
 
 | Method | Endpoint | Purpose |
@@ -531,9 +542,10 @@ Login required. Keys are AES-256-GCM encrypted in the auth database and never re
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | `GET` | `/api/readme` | Project README as rendered HTML |
+| `GET` | `/api/health` | Liveness and the running version, public, `Cache-Control: no-store`, no database: `{ok, name, version, commit, core, typedefs, dogs: {packages, versions}, stage, mode, uptimeSec}` — `commit` is the short SHA (`RENDER_GIT_COMMIT`, else written to `dist/build-info.json` at build, else null), `dogs` counts the loaded dog and pact packages per version, `mode` is `local`, `dev` or `deployed`. No users, memory or addresses (those stay in the MCP tool `health_check`, which carries the same `version` block) |
 | `GET` | `/api/landing` | The landing's two rankings `{generatedAt, windowDays, topByCalls30d, topByRating}` plus `provenDogs` (dogs with the proven badge, by score) — only what an anonymous visitor may run; `?limit=` (default 10, max 50); 60 s memo, `ETag` |
 
-Calls: every kennel run is counted once, per day (UTC) and source; `stats.calls.ranked`/`ranked30d` count only real use (`/k/:id`, `/api/kennels/:id/execute`, MCP `execute_kennel`), `leadFailed` the runs whose lead errored (`leadFailed30d` in the last 30 days); a dog run fails when it ends in error, timeout or oom (`stats.calls.failures`, `failures30d`). Usage filter (`?usage=`, MCP `list_kennels`/`list_nodes` `usage`), applied after the rights filter and combinable with `q`/`search` and `sort`: `top` = called at least once, most calls first unless `sort` is given; `never_used` = 0 calls; `never_worked` = called, every run failed; `failing` = a failed run in the last 30 days; `dormant` = called before, 0 calls in the last 30 days. Counts live in memory and are flushed every `KENNEL_CALL_FLUSH_MS` (30 s) in one transaction. Stars: 1-5 per user and kennel; `score` is a Bayes average `(5·m + sum) / (5 + count)` with `m` the mean over all ratings — it ranks; `avg` is the raw mean.
+Calls: every kennel run is counted once, per day (UTC) and source; `stats.calls.ranked`/`ranked30d` count only real use (`/k/:id`, `/api/kennels/:id/execute`, MCP `execute_kennel`), `leadFailed` the runs whose lead errored (`leadFailed30d` in the last 30 days); a dog run fails when it ends in error, timeout or oom (`stats.calls.failures`, `failures30d`). Usage filter (`?usage=`, MCP `list_kennels`/`list_nodes` `usage`), applied after the rights filter and combinable with `q`/`search` and `sort`: `top` = called at least once, most calls first unless `sort` is given; `never_used` = 0 calls; `never_worked` = called, every run failed; `failing` = a failed run in the last 30 days; `dormant` = called before, 0 calls in the last 30 days. Counts live in memory and are flushed every `KENNEL_CALL_FLUSH_MS` (30 s) in one transaction. Stars: 1-5 per user and kennel; `score` is a Bayes average `(5·m + sum) / (5 + count)` with `m` the mean over all ratings — it ranks; `avg` is the raw mean. Favourites: one per user and kennel lineage (table `KennelFavorite`, user id without a foreign key like the ratings), only for kennels, never for dogs; `?favorites=1` keeps yours after the rights filter, before search, sort and paging; deleting a kennel drops its favourites. In super-user mode (no `MCP_AUTH_REQUIRED`) there is no user, so favourites answer 403 `no_identity`.
 
 ---
 
@@ -542,15 +554,17 @@ Calls: every kennel run is counted once, per day (UTC) and source; `stats.calls.
 `/` is a kennel: the lead output of one of the kennels listed in `LANDING_KENNEL_IDS` (comma-separated), or, behind them, of the seeded `slopdogs-landing` — one content dog, the Mixtape skin and a lead, no look switcher. The same page is reachable as a kennel at `/k/slopdogs-landing`.
 
 - **Rotation:** each visit picks one listed kennel uniformly at random; `?landing=<id>` forces one **from the list** (other ids are ignored). A listed kennel that is missing, not public, throws or yields no HTML is skipped for the memo window. `slopdogs-landing` takes over when the list is empty or none of the listed kennels runs. The old single `LANDING_KENNEL_ID` is still read as a one-entry alias (with a log line).
+- **Your own pages:** signed in, a user can make any kennel they can see their own landing and their own kennel list (`/account`, profile tab; `PUT /api/my-pages`; MCP `set_my_pages`). `/` and `/kennels` then answer them with `302` to `/k/<id>`, the query rides along; the page runs there like any kennel page. Before every redirect the server checks again, without a run: kennel there, visible to the user, with a dog — otherwise the default page shows, silently. `?landing=<id>` from the rotation still wins. Signed out, or signed in without a setting, everyone sees the default. In local mode the one local user is everyone on the network, so the setting holds for every device there; in super-user mode (no `MCP_AUTH_REQUIRED`) there is no user and no own page.
 - **Locked while listed:** every kennel in `LANDING_KENNEL_IDS` is read-only for everyone — owner and super-user included — as long as it is listed: `myRights {edit: false, own: false, locked: 'landing'}`; `PUT`, rename, `DELETE`, `/acl`, `/freeze`, `/unfreeze` and the MCP mutations answer `403 {"error":"locked_landing"}`. Runs, stars, reading and copying keep working. `slopdogs-landing` is only locked when it is listed itself.
-- **Source:** `seed-data/kennels/slopdogs-landing/` (content, skin C, lead) — seeded at boot when the kennel is missing (public, community-owned). Changes in the repo reach an existing instance only after the kennel is removed (the seed never overwrites). The former skins a, b and d are archived under `docs/slopdogs/landing/archive/`.
+- **Source:** `seed-data/kennels/slopdogs-landing/` (content, skin C, lead) — seeded at boot when the kennel is missing (public, community-owned). The seed never overwrites: changes in the repo reach an existing instance only after a maintainer deletes the kennel and the server restarts, or with a **reseed start** — `npm run start:local:reseed` / `npm run dev:reseed` (every time), deployed `SLOPDOGS_RESEED=<marker>` (any text, e.g. a date; applied once per new marker, the last one is kept in the database, so a forgotten variable does not wipe live changes on each restart). A reseed takes the maintainer's delete path for `slopdogs-landing` and `slopdogs-kennels` (unused dogs go, dogs used elsewhere stay) and seeds both fresh; the log says `[seed] reseed <marker>: landing 3 Dogs geloescht, 0 behalten; kennels …`. The former skins a, b and d are archived under `docs/slopdogs/landing/archive/`.
+- **Version:** the footer shows `v<version> · core <core> · <commit>` from `GET /api/health`; when the request fails, the line stays empty. `/kennels` (the kennel and the Angular list) shows the same line under the list.
 - **No run per visit:** `GET /` serves the lead output from an HTML memo per kennel (`LANDING_HTML_MEMO_MS`, default 300000). When the window is over, the visitor gets the remembered page at once and the kennel runs again in the background. The run counts with source `landing` — in `total`, never in `ranked`/`ranked30d`. `HEAD /` never runs the kennel.
 - **Fallback:** if the kennel is missing or its run fails, `/` serves `public/landing/index.html` — the Mixtape page rendered from the same sources at build time (`node scripts/build-landing.cjs`, part of `npm run build`). The page is never empty, not even on a cold start.
 - **Host:** the page shows `‹host›` where the address goes; `/` puts in the host of `MCP_BASE_URL` (else the request's host), the page script does the same from `location` on any other address.
-- **Headers:** `Content-Type: text/html; charset=utf-8`, `Cache-Control: public, max-age=300` (`no-cache` while more than one kennel rotates), `X-Landing-Source: kennel|fallback`, `X-Landing-Kennel: <id>`, no cookie. Like every text response, the page goes out brotli- or gzip-compressed when the client accepts it (`HTTP_COMPRESSION=0` turns that off). `/robots.txt` lives in `public/landing/`.
+- **Headers:** `Content-Type: text/html; charset=utf-8`, `Cache-Control: public, max-age=300` (`no-cache` while more than one kennel rotates), `X-Landing-Source: kennel|fallback`, `X-Landing-Kennel: <id>`, no cookie. `/` and `/kennels` always send `Vary: Cookie`; every answer to a signed-in visitor — the redirect to an own page or the default page — goes out with `Cache-Control: private, no-cache`. Like every text response, the page goes out brotli- or gzip-compressed when the client accepts it (`HTTP_COMPRESSION=0` turns that off). `/robots.txt` lives in `public/landing/`.
 - **Fonts:** self-hosted Latin subsets under `/static/landing/*.woff2` (OFL, `public/landing/OFL.txt`); no font CDN.
 
-"Already out there" loads `GET /api/landing?limit=6` — the only request of the page — and renders `topByCalls30d`, `topByRating` and `provenDogs` (links: kennel `url`, dogs to `/kennels?q=<name>`; numbers en-US, `ranked30d` shown, total in the tooltip, no stars when `avg` is null). States on `#sd-live[data-state]`:
+"Already out there" loads `GET /api/landing?limit=6` — the page's one data request, next to `GET /api/health` for the footer line — and renders `topByCalls30d`, `topByRating` and `provenDogs` (links: kennel `url`, dogs to `/kennels?q=<name>`; numbers en-US, `ranked30d` shown, total in the tooltip, no stars when `avg` is null). States on `#sd-live[data-state]`:
 
 | State | When | Page |
 |---|---|---|
@@ -564,18 +578,16 @@ Calls: every kennel run is counted once, per day (UTC) and source; `stats.calls.
 
 ## Startup tests
 
-On every boot, `main.ts` runs [`StartupTest.runAllTests`](StartupTest.ts) — a self-check against the freshly initialised stores, controllers and BaseDogs map. Failures are logged and surface in the boot console; pass lines are summarised at the end. The suite covers Store / Controller plumbing, BaseDog availability, Pact / Mimic resolution, auto-mimic adoption, kennel export / import round-trip, the tile feature cache, and the **Kennel status-tracking contract** for `task`, `nodes` and `edges`:
+`npm run test:startup` boots the server without `listen()` (own SQLite files `test-startup*.db` next to the schemas, created fresh each run; `.env` is not read), runs the boot guard (`assertSlimRegistryCoversKennelDbRefs`), rebuilds the reference index, runs the suite and exits with **1 on any failure**, 0 otherwise. CI runs it after `npm test` (`.github/workflows/ci.yml`).
 
-| Test | What it pins |
-|------|--------------|
-| `KennelConfig: Status-Tracking Persistence` | Create → save with `task` + `nodes` + `edges` → reload — all fields, positions and comments survive verbatim. |
-| `KennelConfig: Status-Tracking Merge` | Partial saves (`{task}` only, `{nodes}` only) leave untouched fields intact — guards the merge semantics in `KennelController.save`. |
-| `KennelConfig: Status-Tracking Text-Aenderungen` | Mutating an existing `task` / `node.comment` / `edge.comment` updates the latest version while older versions keep the old text; clearing `task` with `""` doesn't wipe other fields. |
-| `KennelConfig: Node-Comment Mutationen` | Multi-node arrays: change one comment, drop one (keep position), add a fresh node, remove an old one — verified against current state **and** version history. |
-| `KennelConfig: Edge-Comment Mutationen` | Multi-edge arrays: same shape as node mutations, including removing an edge entirely and adding a feedback edge later. |
-| `KennelConfig: Status-Tracking Versioning` | Three text edits → three new versions, newest-first, each with its own snapshot. Identical no-op save produces **no** phantom version. Historical version-GUID fetches return the frozen text. |
+The suite ([`StartupTest.runAllTests`](StartupTest.ts)) has two blocks:
 
-If a status-tracking save ever stops behaving as documented, the boot console flags exactly which guarantee broke before any kennel work begins.
+| Block | Tests | Detects |
+|------|-------|---------|
+| Minimum set (`StartupTest.ts`) | `testBaseDogsAvailability`, `testRouteTableMatchesExpressStack`, `testRunnerSeesOutputNotCode`, `testLeadFailureIsNot200`, `testPrivateKennelHiddenFromAnon`, `testRightsMatrix` | a broken boot, a broken kennel run, a broken access check |
+| Package candidates ([`test/startup/packageCandidates.ts`](test/startup/packageCandidates.ts)) | core mechanics (Pact, MimicDog, `fillKennel`, `runSeason`, lobby, auto BodyRetriever) and two dog tests | move to `slopdogs-core` / `slopdogs-base-dogs` as package tests (PLAN-DOG-PAKETE P4) |
+
+The running dev server still runs the same suite after the reference index rebuild (`RUN_STARTUP_TESTS`: default on in development, off elsewhere; `1` forces it, `0` disables it). It writes test rows with their own IDs into the configured database and removes them afterwards.
 
 ## Tech Stack
 
@@ -585,7 +597,7 @@ If a status-tracking save ever stops behaving as documented, the boot console fl
 | Databases | **Four** physically-separate Prisma schemas, each with its own `*_DATABASE_URL`: `DATABASE_URL` (kennels + nodes), `CACHE_DATABASE_URL` (run-cache), `JSON_STORAGE_DATABASE_URL` (fachliche JSON-Ablage), `AUTH_DATABASE_URL` (User, OAuthClient, AccessToken, RefreshToken, AuthorizationCode). SQLite for local dev; PostgreSQL for **integration** and production. |
 | Auth | Google SSO via `openid-client`, OAuth 2.1 AS via `jose` (HS256 JWTs), browser session via `express-session` |
 | Frontend | Angular 18, Monaco Editor, vis-network |
-| Core | `slopdogs` package (local, in `packages/core`) |
+| Core | `@martinschmieschek/slopdogs-core` (with `/runtime` and `/swaggrid`) from [slopdogs-core](https://github.com/MartinSchmieschek/slopdogs-core); BaseDogs from [slopdogs-base-dogs](https://github.com/MartinSchmieschek/slopdogs-base-dogs) — see [Core and Dog packages](#core-and-dog-packages) |
 
 ---
 
@@ -606,11 +618,11 @@ The Angular app (`SPA_ROUTES` in `api/routes/routeTable.ts`; Express serves `ind
 
 | Route | Screen |
 |---|---|
-| `/kennels` | Kennel list (side A): `?q=`, `?sort=`, `?dir=`, `?mine=1`, `?new=1` |
+| `/kennels` | Kennel list (side A): `?q=`, `?sort=`, `?dir=`, `?mine=1`, `?favorites=1`, `?new=1`. A click anywhere on a row opens the public page `/k/:id` (with its default query) in a new tab; the flag marks a favourite (signed in; anonymous visitors are sent to the login); `⋯` → Edit opens the kennel page. Signed in with your own list set, the server sends `/kennels` to `/k/<id>` instead |
 | `/kennels/:id` | Kennel page: canvas, inspector (`?panel=brief\|versions\|rating\|stats`), run |
 | `/kennels/:id/edit` | The same page with the settings drawer open — name, access, freeze, dog order, defaults (there is no separate edit page) |
 | `/dogs` | Dog browser (side B): `?q=&sort=&group=&pack=&owner=`; `?dog=<lineageId>` opens the preview — a dog is never a page of its own |
-| `/account` | Profile, personal tokens, keys: `?tab=profile\|tokens\|keys` |
+| `/account` | Profile, personal tokens, keys: `?tab=profile\|tokens\|keys`. The profile tab carries *Your pages*: a kennel id each for your own landing (`/`) and kennel list (`/kennels`), suggestions from your kennels, save and reset to default |
 | `/login` | One button, one verse: `?returnTo=` (a path on this site) |
 
 Keys in the app: `?` shows them all; `/` search; `Esc` closes the top panel; on the kennel page `Ctrl/⌘+Enter` runs and `Ctrl/⌘+S` saves the open editor. Leaving with unsaved changes asks first.
@@ -649,19 +661,17 @@ The real build runs through dedicated configs that write into `dist/` only:
 
 | Script | Config | Output |
 |--------|--------|--------|
-| `npm run build` | root [`tsconfig.build.json`](tsconfig.build.json) | `./dist` (main.ts + api/services/store/mcp) |
-| `npm run build:core` | [`packages/core/tsconfig.json`](packages/core/tsconfig.json) | `packages/core/dist` |
-| `npm run build:dogs-<x>` | `packages/dogs-<x>/tsconfig.json` | `packages/dogs-<x>/dist` |
+| `npm run build` | root [`tsconfig.emit.json`](tsconfig.emit.json) (= `tsconfig.build.json` without the startup-test runner) | `./dist` (main.ts + api/services/store/mcp) |
 
-If you ever see a `.js` file inside `packages/*/src/`, `api/`, `mcp/`, `services/`, or `store/` -- delete it. `.gitignore` blocks them from being committed; the root `noEmit: true` prevents new ones from being created. Build output lives in `dist/` and `packages/*/dist/` only.
+If you ever see a `.js` file inside `api/`, `mcp/`, `services/`, or `store/` -- delete it. `.gitignore` blocks them from being committed; the root `noEmit: true` prevents new ones from being created. Build output lives in `dist/` only; core and the Dog packages arrive built (see [Core and Dog packages](#core-and-dog-packages)).
 
 ### Integration mode (pre-release staging)
 
 **Integration mode** (`NODE_ENV=integration`) is a **staging profile** added for the stretch between local dev and a full production deploy: exercise the app against **external databases** (PostgreSQL for the main store and the HTTP cache — see [`.env.integration.example`](.env.integration.example)) and run with the **built Angular UI only** (no `ng serve`; Express serves `ui-app/dist/.../browser` from the same port as the API).
 
-Typical flow: configure `.env.integration` with your hosted URLs, run `npm run prisma:sync:integration` to align schemas, build the backend with **`npm run build:prod`**, the frontend with **`npm run ui:build:integration`** (injects `PUBLIC_API_BASE_URL` using `NODE_ENV=integration`), then start locally with **`npm run start:integration`** (runs `main.ts` via ts-node). On a host that serves **compiled** output only (e.g. **Render**), use **Build Command** **`npm run render:integration:build`** (runs `npm install`, then `build:prod`, then `ui:build:integration`) and **Start Command** **`npm run start:integration:dist`** — it runs `dist/main.js` with `NODE_ENV=integration`. Use this as a **pre-release** checkpoint before going fully online.
+Typical flow: configure `.env.integration` with your hosted URLs, run `npm run prisma:sync:integration` to align schemas, build the backend with **`npm run build:prod`**, the frontend with **`npm run ui:build:integration`** (injects `PUBLIC_API_BASE_URL` using `NODE_ENV=integration`), then start locally with **`npm run start:integration`** (runs `main.ts` via ts-node). On a host that serves **compiled** output only (e.g. **Render**), use **Build Command** **`npm run render:integration:build`** (runs `npm ci`, then `build:prod`, then `ui:build:integration`) and **Start Command** **`npm run start:integration:dist`** — it runs `dist/main.js` with `NODE_ENV=integration`. Use this as a **pre-release** checkpoint before going fully online.
 
-**Production** and **integration** both load the **reduced Base-Dog registry** (`server-registries/slimDeployRegistry.ts`); only **`NODE_ENV=development`** uses the full set (`fullRegistry.ts`). On slim profiles, startup **fails fast** if any **latest** Kennel row in the DB references a `base:…` dog that is not registered — so RAM stays minimal without silently breaking existing kennels. After adding seed kennels that reference new `BASE_DOG_PREFIX + '…'` names, extend that slim registry (or keep **`npm run check:integration-dogs`** green — it scans `seed-data/**/*.ts` against `SLIM_DEPLOY_BASE_DOG_NAMES`).
+**Production** and **integration** both load the **reduced Base-Dog registry** (`server-registries/slimDeployRegistry.ts`); only **`NODE_ENV=development`** and the local mode on the Pi (`SLOPDOGS_MODE=local`) use the full set (`fullRegistry.ts`). On slim profiles, startup **fails fast** if any **latest** Kennel row in the DB references a `base:…` dog that is not registered — so RAM stays minimal without silently breaking existing kennels. After adding seed kennels that reference new `BASE_DOG_PREFIX + '…'` names, extend that slim registry (or keep **`npm run check:integration-dogs`** green — it scans `seed-data/**/*.ts` against `SLIM_DEPLOY_BASE_DOG_NAMES`).
 
 ### Quick Hunt
 
@@ -679,155 +689,103 @@ Or skip the terminal -- the [UI](ui-app/README.md) does all of this with a few c
 
 ---
 
-## Creating a new BaseDog Package
+## SlopDogs auf dem Pi
 
-Every BaseDog lives in its own package under `packages/`. Follow these steps to add a new one.
+Local mode (`SLOPDOGS_MODE=local`, always together with `NODE_ENV=production`) runs SlopDogs on a Raspberry Pi in your home network, like a Hue bridge: no login, no PAT, no OAuth. Every device in the LAN uses the UI and MCP; all of them share one built-in user (`local`), so a key stored in the key store is usable by everyone on the network. Login routes are not mounted, and MCP needs no token. The full Base-Dog registry is loaded, including `dogs-hue`.
 
-### 1. Scaffold the package
+**The risk you accept.** Dog code is not securely sandboxed. Without auth, **every device on your Wi-Fi — guests, a compromised IoT gadget — can run code on the Pi.** Never expose it to the internet. That includes every forwarder that replaces the client address, because then an internet client looks like a LAN client and passes the boundary below: no router port forwarding to a container, no `ssh -R`, no `socat`/`netsh portproxy`, no frp/rathole or other TCP tunnels, no tunnel services (ngrok, cloudflared, Tailscale Funnel), no reverse proxy, no `docker run -p` (the Docker proxy replaces the source with the gateway address). HTTP tunnels and proxies are refused by their headers; TCP forwarders cannot be detected. Inside a container the start aborts (exit 79) unless `SLOPDOGS_LOCAL_ALLOW_CONTAINER=1` is set, which logs a warning on every start.
 
-```bash
-mkdir -p packages/dogs-mydog/src
-```
+**Network boundary** (instead of auth):
+- Only clients whose *socket* address is private or loopback (10/8, 172.16/12, 192.168/16, 169.254/16, 127/8, ::1, fc00::/7, fe80::/10, plus global IPv6 inside the on-link prefix of the Pi's own interfaces) get in; `X-Forwarded-For` is ignored, `trust proxy` is off. Local mode listens dual-stack (`::`), falling back to `0.0.0.0` without IPv6.
+- The `Host` header must be on an allowlist — the Pi's hostname, `<hostname>.local`, its interface IPs, `localhost`, `127.0.0.1`, `[::1]`, each with `PORT`; extend it with `LOCAL_ALLOWED_HOSTS` (`name` or `name:port`, comma-separated). This stops DNS rebinding: a foreign web page open in a LAN browser cannot reach the Pi through a DNS name it controls.
+- Writes and WebSocket upgrades also check `Origin` against the same list; CORS answers only those origins. Requests carrying proxy/tunnel headers (`X-Forwarded-*`, `Forwarded`, `Via`, `CF-*`, `Tailscale-*`, …) are refused.
+- Browser fetch metadata: `/api`, `/mcp`, `/actions`, `/save`, `/k/…` and `/auth` accept only same-origin requests — no cross-site or same-site request, not even a link click, starts a kennel or reads data. UI pages accept a cross-site request only as a visible top-level navigation (`Sec-Fetch-Dest: document`), never in an iframe, object, embed, image or fetch. Every response carries `Content-Security-Policy: frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN` (also in dev). Consequence: a `/k/<name>` link opened from another website shows 403; typed, bookmarked or opened from a native app it works.
+- **Remaining gap:** browsers that send no `Sec-Fetch-*` headers (very old ones) are judged by Host and Origin alone — there a foreign page can still trigger a GET run (`<img src="http://<pi>/k/…">`) without seeing the result. Writes stay blocked by the Origin check.
+- Start aborts with **exit 79** on a public `PUBLIC_API_BASE_URL`, `MCP_BASE_URL` or `LOCAL_ALLOWED_HOSTS` entry (allowed: loopback, private IPs, `localhost`, `*.local`, dot-less hostnames, `*.home.arpa`), `TRUST_PROXY_HOPS` > 0, `MCP_AUTH_REQUIRED=true`, `RENDER` set, or inside a container (see above).
 
-Create three files:
+**Dogs and the home network.** User code (SerializedDogs) stays blocked from private networks. Only Base-Dogs from packages reach the LAN, e.g. `dogs-hue` with `HUE_BRIDGE_HOST` / `HUE_BRIDGE_USER`.
 
-**`packages/dogs-mydog/package.json`**
-```json
-{
-  "name": "@slopdogs/dogs-mydog",
-  "version": "0.1.0-alpha.1",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
-  "private": true,
-  "dependencies": { "@slopdogs/core": "file:../core" },
-  "peerDependencies": { "@slopdogs/core": "0.1.0-alpha.1" },
-  "scripts": { "build": "tsc" },
-  "devDependencies": { "typescript": "^5.0.0" }
-}
-```
+**Requirements.** Pi 4 or 5 with 64-bit Raspberry Pi OS (arm64). Node from [`.nvmrc`](.nvmrc) (22.16.0), installed system-wide — the unit expects `/usr/local/bin/node`. Prisma (5.22.0) runs `prisma generate` on the Pi itself (inside `build:local`); the default `binaryTargets = native` picks the arm64 engine there, so the schemas stay unchanged. Only if you build for the Pi on another machine, add `binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]` to the generators yourself — not in the repo, because every extra engine would also be downloaded on each generate on dev machines and Render.
 
-**`packages/dogs-mydog/tsconfig.json`**
-```json
-{
-  "compilerOptions": {
-    "target": "es2016", "module": "commonjs", "lib": ["ES2020"],
-    "strict": true, "esModuleInterop": true, "skipLibCheck": true,
-    "moduleResolution": "node", "declaration": true,
-    "outDir": "./dist", "rootDir": "./src"
-  },
-  "include": ["src/**/*"]
-}
-```
+**Two users.** Dog code can break out of its sandbox, so the service must not be able to change its own code or anything the update runs. `slopdogs-deploy` owns `/opt/slopdogs` and runs `git pull` / `npm ci` / `build:local` with its own HOME. `slopdogs` runs the service: it reads `/opt/slopdogs` only and writes only `/var/lib/slopdogs` (SQLite files, `secrets/`). Its HOME `/var/lib/slopdogs` is never read by an update, so a planted `~/.npmrc` or `~/.gitconfig` there only acts inside the sandboxed unit.
 
-**`packages/dogs-mydog/src/index.ts`** — barrel export for all public symbols.
-
-### 2. Define a Pact (if the Dog needs input)
-
-A Pact declares _what data shape_ the Dog requires, without specifying _who provides it_. At runtime, a MimicDog or another Dog fulfills it.
-
-```typescript
-import { createPact } from "@slopdogs/core";
-
-export interface MyDogQuery {
-    someParam: string;
-}
-
-export const MyDogQueryPact = createPact<MyDogQuery>(
-    "MyDogQueryProvider",
-    { fromSourceType: "MyDogQuery" }
-);
-```
-
-### 3. Write the Dog class
-
-Extend `Dog<YieldType>` and implement:
-
-| Member | Purpose |
-|---|---|
-| `get name()` | Return `MyRetriever.name` (the class name) |
-| `get icon()` | Return a **string** (usually one emoji) for the UI — same pattern as other `packages/dogs-*` retrievers; there is no central icon map. |
-| `get required()` | Pact/Dog classes that must run before this Dog |
-| `get optional()` | Pact/Dog classes that are used if present |
-| `yieldCollectorFactory` | Async function that does the actual work |
-
-```typescript
-import { Dog, IHuntingDog, IHuntingSeason } from "@slopdogs/core";
-import { MyDogQueryPact, type MyDogQuery } from "./pacts";
-
-export class MyRetriever extends Dog<MyResult> {
-    get name() { return MyRetriever.name; }
-    get icon() { return "🔮"; }
-    get required() { return [MyDogQueryPact]; }
-    get optional(): (new (...args: any[]) => IHuntingDog<unknown>)[] { return []; }
-
-    protected yieldCollectorFactory = async (season: IHuntingSeason): Promise<MyResult> => {
-        const queryDog = season.exhausted.find(d => this.matchesParent(MyDogQueryPact, d));
-        const query = (queryDog?.collected as MyDogQuery | undefined) ?? ({} as MyDogQuery);
-        // ... fetch data, transform, return
-    };
-}
-```
-
-### 4. Register in the platform
-
-**`main.ts`** — two touches: register the class and any Pacts it introduces (same pattern as existing dogs at the bottom of the file):
-```typescript
-import { MyRetriever, MyDogQueryPact } from '@slopdogs/dogs-mydog';
-// add to allBaseDogClasses array:
-const allBaseDogClasses = [ ..., MyRetriever ];
-// add Pact to allPacts array:
-const allPacts = [ ..., MyDogQueryPact ];
-```
-
-*(Geo-related dogs that use shared coordinate types also wire `GeoPointPact` from `@slopdogs/geo-pact` in `allPacts` if your package needs it — copy a similar dog from `dogs-geo`.)*
-
-### 5. Wire up the build
-
-**Root `tsconfig.json`** — add path mapping:
-```json
-"@slopdogs/dogs-mydog": ["packages/dogs-mydog/src/index.ts"]
-```
-
-**Root `package.json`** — add dependency, build script, and typecheck:
-```json
-"dependencies": { "@slopdogs/dogs-mydog": "file:packages/dogs-mydog" }
-"scripts": {
-  "build:dogs-mydog": "cd packages/dogs-mydog && npx tsc",
-  "build:dogs": "... && npm run build:dogs-mydog",
-  "typecheck:dogs": "... && cd ../dogs-mydog && npx tsc --noEmit"
-}
-```
-
-Then run `npm install` so the symlink in `node_modules/@slopdogs/dogs-mydog` is created.
-
-### 6. Seed a Kennel (optional)
-
-In `seed.ts`, create a MimicDog that maps `QueryRetriever` params to your Pact, then a `KennelConfig` with `dogIds`:
-
-```typescript
-dogIds: [
-    BASE_DOG_PREFIX + 'MyRetriever',       // lead dog (1st = public response)
-    BASE_DOG_PREFIX + 'QueryRetriever',     // captures ?param=value from URL
-    mimicDogId,                              // MimicDog that fulfills MyDogQueryPact
-],
-defaultQuery: { someParam: 'defaultValue' },
-```
-
-The MimicDog's `theRun` maps QueryRetriever fields to your Pact interface:
-```typescript
-theRun: `return { someParam: QueryRetriever.someparam }`
-// Note: QueryRetriever lowercases all keys
-```
-
-### 7. Verify
+**Install** (as root/sudo):
 
 ```bash
-npm run build:dogs-mydog          # compiles the package
-npx tsc --noEmit -p tsconfig.build.json  # typechecks the whole project
-npm start                         # server starts, seed runs, kennel is callable
-curl http://localhost:3000/k/my-kennel?someParam=test
+# Node 22.16.0 (official arm64 build)
+curl -fsSLO https://nodejs.org/dist/v22.16.0/node-v22.16.0-linux-arm64.tar.xz
+tar -xJf node-v22.16.0-linux-arm64.tar.xz -C /usr/local --strip-components=1
+
+useradd --system --create-home --home-dir /home/slopdogs-deploy --shell /bin/bash slopdogs-deploy
+useradd --system --home-dir /var/lib/slopdogs --no-create-home --shell /usr/sbin/nologin slopdogs
+install -d -o slopdogs-deploy -g slopdogs-deploy -m 0755 /opt/slopdogs
+sudo -u slopdogs-deploy -H git clone <repo-url> /opt/slopdogs
+cd /opt/slopdogs
+sudo -u slopdogs-deploy -H cp .env.local.example .env.local   # before npm ci: postinstall needs the DB variables
+sudo -u slopdogs-deploy -H npm ci
+sudo -u slopdogs-deploy -H npm run build:local                # server, packages, UI, Prisma clients — no database
+cp deploy/pi/slopdogs.service /etc/systemd/system/
+systemctl daemon-reload && systemctl enable --now slopdogs     # creates /var/lib/slopdogs, syncs the tables, starts
+journalctl -u slopdogs -f
 ```
+
+`build:local` builds the server (and the packages if stale), the precompiled TypeDefs (`dist/type-defs.json`), the UI (`ui-app/dist`) and the four Prisma clients matching the URLs in `.env.local` — it never touches a database. The tables are synced by the service itself before each start (`ExecStartPre`: `prisma db push --skip-generate`); `npm run start:local` does the same on a dev machine. The unit does not restart on exit 78/79 (configuration errors). Note: `scripts/load-env.cjs` loads the `.env*` files in `/opt/slopdogs` with priority over the unit's `Environment=` lines. Build time and the unit's hardening are unmeasured on the Pi.
+
+**Use it.** Open `http://<hostname>.local:3000` from any device in the LAN. Add it to an AI in the LAN, no token:
+
+```bash
+claude mcp add --transport http slopdogs http://<hostname>.local:3000/mcp
+```
+
+Reaching the Pi under another name (router DNS, `*.home.arpa`, another port) needs that name in `LOCAL_ALLOWED_HOSTS`.
+
+**Keys.** `scripts/local-secrets.cjs` creates `SESSION_SECRET` and `KEYSTORE_MASTER_KEY_V1` on first start (32 random bytes each) in `LOCAL_SECRETS_FILE` — the unit sets `/var/lib/slopdogs/secrets/local-secrets.env`, elsewhere the default is `~/.slopdogs/local-secrets.env` (directory 0700, file 0600, looser permissions are tightened). Values already in the environment win; creation is exclusive (lock file), so two starts never end up with two master keys. A path inside the repo aborts with exit 79, and so does a *new* master key when the auth database already holds stored keys (they would become unreadable — restore the old file instead). The master key lives on the same device as the encrypted key-store rows: that protects a leaked database or backup, not someone with file access on the Pi — so back up the `*.db` files without `secrets/`.
+
+**Update.**
+
+```bash
+systemctl stop slopdogs
+mkdir -p /root/slopdogs-backup && cp -a /var/lib/slopdogs/*.db /root/slopdogs-backup/   # prisma db push runs with --accept-data-loss
+cd /opt/slopdogs && sudo -u slopdogs-deploy -H git pull && sudo -u slopdogs-deploy -H npm ci && sudo -u slopdogs-deploy -H npm run build:local
+systemctl start slopdogs
+```
+
+**Memory.** The code defaults assume a 512 MB container: memory guard on outside development, `MEMORY_LIMIT_MB=512`, soft limit 85 %, `DOG_WORKER_GLOBAL_LIMIT=2`. [`.env.local.example`](.env.local.example) lists higher values for a 4 GB Pi as commented suggestions — **unmeasured on the Pi**; `NODE_OPTIONS` and `MemoryMax=` belong in the unit, not in `.env.local`.
+
+---
+
+## Core and Dog packages
+
+This repository holds the server and the UI only. The engine and the BaseDogs live in two repositories of their own:
+
+- [**slopdogs-core**](https://github.com/MartinSchmieschek/slopdogs-core) — `@martinschmieschek/slopdogs-core` (Dog, Kennel, waves, Pacts, cache, lobbies; `/runtime`: sandbox, gate, kennel run; `/swaggrid`: OpenAPI generation) and the type tool `@martinschmieschek/slopdogs-typedefs`. One tag `v<version>` for both.
+- [**slopdogs-base-dogs**](https://github.com/MartinSchmieschek/slopdogs-base-dogs) — one package per BaseDog domain (`dogs-*`, plus `geo-pact` and `dogs-demo`), one tag `<package>@<version>` each.
+
+**How they get here.** `package.json` pins every package exactly: core, typedefs and the Dog packages by release tarball (`…/releases/download/<tag>/<file>.tgz`), built by the release run of each repo. Installing core from its Git tag (`git+https://github.com/MartinSchmieschek/slopdogs-core.git#v<version>`, builds via `prepare`) still works, but the server does not need it — no `git` in the build image, an https URL with integrity in the lockfile. Both repositories are public — no registry, no `.npmrc`, no token. The packages arrive built (`dist/` with `type-defs.json` and `surface.json`), so `npm ci` compiles none of them, and `npm run build:prod` merges their `type-defs.json` into `dist/type-defs.json`.
+
+**New releases.** `npm run update:dogs` looks up the newest stable tags (`git ls-remote`), raises the pins in `package.json` and refreshes the lockfile (`npm install`). `npm run update:dogs -- --dry-run` only lists what would change; `-- --no-install` writes `package.json` without installing.
+
+**Changing core or a Dog** happens in its repository and ships as a release there (changeset, tag, release workflow — see its README); afterwards `npm run update:dogs` here. A new BaseDog package is created in slopdogs-base-dogs the same way; once released, add its pin to `package.json` here, register its classes and Pacts in [`server-registries/fullRegistry.ts`](server-registries/fullRegistry.ts) (and in [`slimDeployRegistry.ts`](server-registries/slimDeployRegistry.ts) if production and integration need it), and optionally seed a Kennel in `seed.ts`.
+
+**One copy of core, `geo-pact` and `dogs-demo` (F1).** Parents are matched by class identity (`instanceof`), and core keeps singletons (slot gate, capability registry): a second copy matches no parent and doubles the slot cap without a word. The Dog packages declare these as `peerDependencies`, so they resolve to the server's copy. `npm ls @martinschmieschek/slopdogs-core` must list one version, deduped everywhere else.
+
+### Working on a Dog package
+
+To try a change before releasing it:
+
+```bash
+# in slopdogs-base-dogs: build, then pack the changed package
+npm ci
+npm pack --workspace packages/dogs-weather --pack-destination ../tarballs
+
+# in this repository: install the tarball over the pinned version, then build as usual
+npm install --no-save ../tarballs/martinschmieschek-slopdogs-dogs-weather-<version>.tgz
+npm run build:prod          # merges the package's dist/type-defs.json
+```
+
+- Repeat both steps after each change; the server loads the package's `dist/`, not its sources.
+- A tarball is installed like a release: its peers resolve to the server's core. `npm link` saves the repacking, but the linked folder resolves its peers from *its own* repository (`slopdogs-base-dogs/node_modules/@martinschmieschek/slopdogs-core` becomes a second copy). Link only together with core, and check before starting that `node -p "require.resolve('@martinschmieschek/slopdogs-core', { paths: [require('fs').realpathSync('node_modules/@martinschmieschek/slopdogs-dogs-weather')] })"` prints a path in this repository's `node_modules`.
+- `npm unlink` and `npm ci` return to the pinned versions.
 
 ---
 
@@ -839,7 +797,7 @@ The app runs a test suite on every boot -- store ops, controller CRUD, BaseDog a
 
 ### Seeds
 
-See [Default Kennel seed](#default-kennel-seed-server-run-and-ui) under *Getting Started*. Example Kennels and SerializedDogs are inserted when the DB has no matching seed rows yet.
+See [Default Kennel seed](#default-kennel-seed-server-run-and-ui) under *Getting Started*. Example Kennels and SerializedDogs are inserted when the DB has no matching seed rows yet. Landing and kennel list back to the repo state: `npm run start:local:reseed`, `npm run dev:reseed`, or `SLOPDOGS_RESEED=<marker>` deployed (see [Landing](#landing)).
 
 ### Project Structure
 
@@ -865,15 +823,10 @@ services/
   WavesConverter.ts           Converts execution results to Wave format
   TypeDefBuilder.ts           Generates TypeScript definitions for VM context
   CompilerCache.ts            Caches compiled TypeScript
-  swaggridAdapter.ts          Maps Kennel runs to @slopdogs/swaggrid
+  swaggridAdapter.ts          Maps Kennel runs to @martinschmieschek/slopdogs-core/swaggrid
   CacheHandler.ts             KV cache with TTL and in-flight deduplication
   AreaCacheStrategy.ts        Geographic area cache (Haversine containment)
-packages/
-  core/                       slopdogs library (Dog, Kennel, Wave engine, Pacts, cache, WebSocket channel retrievers, JSON storage, kennel import helpers)
-  geo-pact/                   Shared GeoPoint pact for coordinate-shaped inputs
-  swaggrid/                   OpenAPI generation (castGrimoire) — no domain deps
-  dogs-*/                     One npm package per BaseDog domain (many — see root package.json `build:dogs-*` scripts)
-  ...                         (demo, geo, weather, warframe, etc. — same pattern: retriever + optional pacts + `get icon()`)
+server-registries/            Which BaseDog classes and Pacts the server registers (full / slim)
 ui-app/                       Angular frontend (see ui-app/README.md)
 ```
 

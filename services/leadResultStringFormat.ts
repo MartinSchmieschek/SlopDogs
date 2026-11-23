@@ -7,12 +7,7 @@
 /** True, wenn der String als HTML-Lead ausgeliefert werden soll (text/html). */
 export function isHtmlResultString(s: string): boolean {
     const t = s.trim();
-    return (
-        t.startsWith('<html') ||
-        t.startsWith('<!DOCTYPE') ||
-        t.startsWith('<!doctype') ||
-        (t.startsWith('<') && t.includes('</'))
-    );
+    return t.startsWith('<html') || t.startsWith('<!DOCTYPE') || t.startsWith('<!doctype') || (t.startsWith('<') && t.includes('</'));
 }
 
 /**

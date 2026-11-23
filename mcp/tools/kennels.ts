@@ -11,7 +11,8 @@ import {
     normalizeVisibility,
     rightsOf,
     isFrozen,
-    isLandingLocked,
+    landingRefuses,
+    landingRefusesCreate,
     canManageAcl,
     withMyRights,
     VISIBILITIES,
@@ -29,11 +30,12 @@ import {
     publicKennelPath,
     sanitizeLineDocs,
     type ILineDoc,
-} from '@slopdogs/core';
+} from '@martinschmieschek/slopdogs-core/runtime';
 import type { AuthCtx } from '../auth/middleware';
 import { SPUREN_NODES_FIELD_HINT, SPUREN_TASK_FIELD_HINT } from '../spuren-brief';
 import { REDACTED_TEXT, kennelRunView, redactWavesForCtx } from '../../services/wavesRedaction';
 import { KennelSnapshotCache } from '../snapshots/KennelSnapshotCache';
+import { dogVersionsOf } from '../../services/dogVersions';
 import { firstRefusedDogRef, refusedDogRefMessage } from '../../services/dogAccess';
 import { ListQuery, USAGE_FILTERS, USAGE_FILTER_HELP } from '../../api/routes/ListQuery';
 import { DogReuseAdvisor, type BuiltDog, type ReuseCandidate, type ReuseHint } from '../../services/DogReuseAdvisor';
@@ -103,9 +105,7 @@ function spurenReport(task: unknown, nodes: unknown, dogIds: unknown) {
     const hasTask = typeof task === 'string' && task.trim().length > 0;
     const list: any[] = Array.isArray(nodes) ? nodes : [];
     const commented = new Set(
-        list
-            .filter((n) => n && typeof n.comment === 'string' && n.comment.trim().length > 0)
-            .map((n) => String(n.id)),
+        list.filter((n) => n && typeof n.comment === 'string' && n.comment.trim().length > 0).map((n) => String(n.id)),
     );
     const missingComments = ids.filter((id) => !commented.has(id));
     const complete = hasTask && missingComments.length === 0;
@@ -146,9 +146,7 @@ export class PflichtEltern {
         const baseDogs = new Map(baseDogsList.map((b) => [b.name, b]));
         // dogIds kommen ungeprueft aus dem Tool-Aufruf -- Fremdes bleibt stehen, wird aber nicht gedeutet.
         const baseDogOf = (id: unknown) =>
-            typeof id === 'string' && id.startsWith(BASE_DOG_PREFIX)
-                ? baseDogs.get(id.substring(BASE_DOG_PREFIX.length))
-                : undefined;
+            typeof id === 'string' && id.startsWith(BASE_DOG_PREFIX) ? baseDogs.get(id.substring(BASE_DOG_PREFIX.length)) : undefined;
 
         const result = [...dogIds];
         const added: BaseDogInfo[] = [];
@@ -209,8 +207,7 @@ export class PflichtEltern {
  * method (Welle 9 hotfix). Returns undefined for missing ctx so the core's
  * capabilities stay raw, matching the legacy behaviour.
  */
-function authCtxToCapabilityCtx(ctx: AuthCtx | undefined | null):
-    { userId: string | null; isSuperUser: boolean } | undefined {
+function authCtxToCapabilityCtx(ctx: AuthCtx | undefined | null): { userId: string | null; isSuperUser: boolean } | undefined {
     if (!ctx) return undefined;
     return {
         userId: ctx.user?.id ?? null,
@@ -229,11 +226,7 @@ function authCtxToCapabilityCtx(ctx: AuthCtx | undefined | null):
  * (dev/admin) bypass. Unresolved ids (fresh siblings, base names that aren't stored) are
  * left to the runtime.
  */
-async function firstUnreferenceableDog(
-    dogIds: unknown,
-    ctx: AuthCtx,
-    deps: ToolDeps,
-): Promise<string | null> {
+async function firstUnreferenceableDog(dogIds: unknown, ctx: AuthCtx, deps: ToolDeps): Promise<string | null> {
     const refused = await firstRefusedDogRef(dogIds, ctx, async (id) => {
         const res = await deps.nodesController.getById(id);
         return res.ok && res.data ? (res.data as any) : null;
@@ -251,13 +244,16 @@ function visibilityChangeRefused(existing: any, requested: unknown, ctx: AuthCtx
     return canManageAcl(existing, ctx) ? null : 'Only the owner may change visibility';
 }
 
+/** Die Ablehnung der Landing-Sperre als Werkzeug-Text: Code und Grund. */
+const LANDING_LOCKED = `${LandingKennels.LOCK_CODE}: ${LandingKennels.LOCK_MESSAGE}`;
+
 /**
  * Warum eine Kennel-Mutation abgewiesen wird: wer nicht lesen darf, erfaehrt nichts (not found); ein Landing-Kennel
  * (LANDING_KENNEL_IDS) nennt Code und Grund — fuer jeden, auch Owner und Super-User; frozen; sonst keine Rechte.
  */
 function kennelMutationRefusal(kennel: any, ctx: AuthCtx, id: string): string {
     if (!canRead(kennel, ctx)) return `Kennel ${id} not found`;
-    if (isLandingLocked(kennel)) return `${LandingKennels.LOCK_CODE}: ${LandingKennels.LOCK_MESSAGE}`;
+    if (landingRefuses(kennel, ctx)) return LANDING_LOCKED;
     if (isFrozen(kennel)) return `Kennel ${id} is frozen — unfreeze it first`;
     return 'Not authorized';
 }
@@ -293,7 +289,7 @@ function kennelRunHeader(k: any, ctx: AuthCtx) {
 
 /** Ein Lauf-Fehler fuer die Tool-Antwort: Leser sehen die Nachricht, RUN-Leser den Platzhalter (W13). */
 function runErrorText(err: any, access: Access): string {
-    return access === 'read' ? err?.message ?? String(err) : REDACTED_TEXT;
+    return access === 'read' ? (err?.message ?? String(err)) : REDACTED_TEXT;
 }
 
 /** Header projection for get_kennel — payload presence flagged, not dumped. */
@@ -335,17 +331,28 @@ export function getKennelTools(): ToolDef[] {
                     sort: {
                         type: 'string',
                         enum: ['name', 'createdAt', 'updatedAt', 'calls', 'calls30d', 'rating', 'failures30d'],
-                        description: 'calls/calls30d = ranked usage (public + execute paths), rating = Bayes score, failures30d = runs whose lead failed in the last 30 days (stats.calls.leadFailed30d). Default name (with usage "top": most calls first).',
+                        description:
+                            'calls/calls30d = ranked usage (public + execute paths), rating = Bayes score, failures30d = runs whose lead failed in the last 30 days (stats.calls.leadFailed30d). Default name (with usage "top": most calls first).',
                     },
                     usage: { type: 'string', enum: [...USAGE_FILTERS], description: USAGE_FILTER_HELP },
-                    dir: { type: 'string', enum: ['asc', 'desc'], description: 'default: desc for the number sorts (calls, calls30d, rating, failures30d), asc for name and dates' },
-                    minStars: { type: 'number', minimum: 1, maximum: 5, description: 'keep kennels whose raw average rating is >= minStars' },
+                    dir: {
+                        type: 'string',
+                        enum: ['asc', 'desc'],
+                        description: 'default: desc for the number sorts (calls, calls30d, rating, failures30d), asc for name and dates',
+                    },
+                    minStars: {
+                        type: 'number',
+                        minimum: 1,
+                        maximum: 5,
+                        description: 'keep kennels whose raw average rating is >= minStars',
+                    },
                     minCalls: { type: 'number', minimum: 0, description: 'keep kennels with at least this many ranked calls' },
                     limit: {
                         type: 'number',
                         minimum: 1,
                         maximum: 200,
-                        description: 'page size. WITHOUT limit the result is a bare array (legacy shape); WITH limit an envelope {kennels,total,offset,limit,hasMore}.',
+                        description:
+                            'page size. WITHOUT limit the result is a bare array (legacy shape); WITH limit an envelope {kennels,total,offset,limit,hasMore}.',
                     },
                     offset: { type: 'number', minimum: 0 },
                 },
@@ -403,7 +410,7 @@ export function getKennelTools(): ToolDef[] {
         },
         {
             name: 'get_kennel_default_body',
-            description: 'Returns the kennel\'s defaultBody JSON.',
+            description: "Returns the kennel's defaultBody JSON.",
             inputSchema: {
                 type: 'object',
                 required: ['id'],
@@ -419,7 +426,7 @@ export function getKennelTools(): ToolDef[] {
         },
         {
             name: 'get_kennel_default_query',
-            description: 'Returns the kennel\'s defaultQuery map.',
+            description: "Returns the kennel's defaultQuery map.",
             inputSchema: {
                 type: 'object',
                 required: ['id'],
@@ -435,7 +442,7 @@ export function getKennelTools(): ToolDef[] {
         },
         {
             name: 'get_kennel_task',
-            description: 'Returns the kennel\'s task markdown (mission briefing). null if unset.',
+            description: "Returns the kennel's task markdown (mission briefing). null if unset.",
             inputSchema: {
                 type: 'object',
                 required: ['id'],
@@ -451,8 +458,7 @@ export function getKennelTools(): ToolDef[] {
         },
         {
             name: 'get_kennel_layout',
-            description:
-                'Returns layout annotations (nodes positions + edges comments) for the kennel\'s wave-view canvas.',
+            description: "Returns layout annotations (nodes positions + edges comments) for the kennel's wave-view canvas.",
             inputSchema: {
                 type: 'object',
                 required: ['id'],
@@ -472,7 +478,7 @@ export function getKennelTools(): ToolDef[] {
         {
             name: 'get_kennel_versions',
             description:
-                'Lists every version of a kennel\'s lineage. Returns slim version refs (id, parentId, createdAt, displayName) — fetch a specific version\'s details via get_kennel(versionId).',
+                "Lists every version of a kennel's lineage. Returns slim version refs (id, parentId, createdAt, displayName) — fetch a specific version's details via get_kennel(versionId).",
             inputSchema: {
                 type: 'object',
                 required: ['id'],
@@ -517,13 +523,11 @@ export function getKennelTools(): ToolDef[] {
             },
             handler: async (args, ctx, deps) => {
                 if (!canMutate(null, ctx)) return fail('Login required to create kennels');
+                if (landingRefusesCreate(args.id, ctx)) return fail(LANDING_LOCKED);
                 const offending = await firstUnreferenceableDog(args.dogIds, ctx, deps);
                 if (offending) return fail(offending);
                 const pflicht = new PflichtEltern(Array.isArray(args.dogIds) ? args.dogIds : [], deps.baseDogsList);
-                const input = applyCreateDefaults(
-                    { ...args, dogIds: pflicht.dogIds, nodes: pflicht.kommentiere(args.nodes) },
-                    ctx,
-                );
+                const input = applyCreateDefaults({ ...args, dogIds: pflicht.dogIds, nodes: pflicht.kommentiere(args.nodes) }, ctx);
                 const result = await deps.kennelsController.create(input);
                 if (!result.ok) return fail(result.error ?? 'create failed');
                 const d = result.data as any;
@@ -541,8 +545,8 @@ export function getKennelTools(): ToolDef[] {
         {
             name: 'build_kennel',
             description:
-                'Composed one-shot kennel build. Creates a fresh set of Breeds (SerializedDogs / Mimics) AND assembles a kennel that uses them — atomic, with rollback on failure. **Reuse before you write:** first `list_nodes {search: "<keyword>", sort: "proven"}` for every part you need; a fitting, reliable dog (proven badge, reliability >= 0.8) goes in by its lineageId (parentsRequired / extraDogIds) — write only what is missing. If a new dog in `dogs[]` has the same or a very similar name or description as a proven dog you may run, the response carries `hints[]` {dog, lineageId, reason, similarity, suggestion {lineageId, displayName, proven}, message} — advice only, nothing is blocked. **Keep each dog small** — one dog does one nameable thing. Do not put a whole page into a single dog: HTML fragments, the script block, data preparation and composition each get their own entry in `dogs[]`, and the lead composes them. The response reports any dog that has grown too large. **Lead convention:** by default the **LAST** dog in `dogs[]` becomes the lead (renderers / finalizers typically sit at the end of a pipeline). Pass `lead: "<displayName>"` to override. **Spuren:** `task` + `nodes[]` beim Create (Wunsch, kein Vertrag — mcp/skill.md § Spuren & Rechtfertigung). Sibling dogs reference each other by displayName via "@DisplayName" in parentsRequired/Optional; BaseDogs are referenced as bare class names ("QueryRetriever"), and raw lineageId GUIDs pass through unchanged. If `refresh` is true (default), the kennel is hunted once and the lead\'s spoils are previewed in the response. Rollback semantics: any failure during the build deletes every node already created in this call and the kennel row (if any) — no orphans left in the deep. **firstRun.status values:** `ok` (every dog clean), `lead-ok-with-side-errors` (lead returned cleanly but some upstream/side dog errored — public endpoint still serves), `lead-failed` (the lead itself errored — public endpoint is broken), `failed` (the run could not even be observed: worker crash, kennel vanished). `firstRun.leadOk` is a bool shortcut: true means the public endpoint serves the lead\'s payload. '
-                + `The public address is \`${KENNEL_PUBLIC_PREFIX}/<kennelId>\` (returned as publicUrl); docs at \`${KENNEL_PUBLIC_PREFIX}/<kennelId>/docs\` (docsUrl), spec at \`${KENNEL_PUBLIC_PREFIX}/<kennelId>/openapi.json\` (openapiUrl).`,
+                'Composed one-shot kennel build. Creates a fresh set of Breeds (SerializedDogs / Mimics) AND assembles a kennel that uses them — atomic, with rollback on failure. **Reuse before you write:** first `list_nodes {search: "<keyword>", sort: "proven"}` for every part you need; a fitting, reliable dog (proven badge, reliability >= 0.8) goes in by its lineageId (parentsRequired / extraDogIds) — write only what is missing. If a new dog in `dogs[]` has the same or a very similar name or description as a proven dog you may run, the response carries `hints[]` {dog, lineageId, reason, similarity, suggestion {lineageId, displayName, proven}, message} — advice only, nothing is blocked. **Keep each dog small** — one dog does one nameable thing. Do not put a whole page into a single dog: HTML fragments, the script block, data preparation and composition each get their own entry in `dogs[]`, and the lead composes them. The response reports any dog that has grown too large. **Lead convention:** by default the **LAST** dog in `dogs[]` becomes the lead (renderers / finalizers typically sit at the end of a pipeline). Pass `lead: "<displayName>"` to override. **Spuren:** `task` + `nodes[]` beim Create (Wunsch, kein Vertrag — mcp/skill.md § Spuren & Rechtfertigung). Sibling dogs reference each other by displayName via "@DisplayName" in parentsRequired/Optional; BaseDogs are referenced as bare class names ("QueryRetriever"), and raw lineageId GUIDs pass through unchanged. If `refresh` is true (default), the kennel is hunted once and the lead\'s spoils are previewed in the response. Rollback semantics: any failure during the build deletes every node already created in this call and the kennel row (if any) — no orphans left in the deep. **firstRun.status values:** `ok` (every dog clean), `lead-ok-with-side-errors` (lead returned cleanly but some upstream/side dog errored — public endpoint still serves), `lead-failed` (the lead itself errored — public endpoint is broken), `failed` (the run could not even be observed: worker crash, kennel vanished). `firstRun.leadOk` is a bool shortcut: true means the public endpoint serves the lead\'s payload. ' +
+                `The public address is \`${KENNEL_PUBLIC_PREFIX}/<kennelId>\` (returned as publicUrl); docs at \`${KENNEL_PUBLIC_PREFIX}/<kennelId>/docs\` (docsUrl), spec at \`${KENNEL_PUBLIC_PREFIX}/<kennelId>/openapi.json\` (openapiUrl).`,
             inputSchema: {
                 type: 'object',
                 required: ['id', 'dogs'],
@@ -555,7 +559,8 @@ export function getKennelTools(): ToolDef[] {
                     vmTimeoutMs: {
                         type: 'number',
                         minimum: 1,
-                        description: 'Per-run VM timeout in ms for the first hunt (run-time-only, NOT persisted). Overrides SLOPDOGS_VM_TIMEOUT_MS (default 10000).',
+                        description:
+                            'Per-run VM timeout in ms for the first hunt (run-time-only, NOT persisted). Overrides SLOPDOGS_VM_TIMEOUT_MS (default 10000).',
                     },
                     visibility: { type: 'string', enum: [...VISIBILITIES] },
                     defaultQuery: { type: 'object', additionalProperties: { type: 'string' } },
@@ -571,16 +576,25 @@ export function getKennelTools(): ToolDef[] {
                             additionalProperties: false,
                             properties: {
                                 displayName: { type: 'string' },
-                                tsCode: { type: 'string', description: 'TypeScript body (return yields the spoils). Mutually exclusive with tsCodeBase64.' },
-                                tsCodeBase64: { type: 'string', description: 'utf8-encoded base64 of the TypeScript body — use to avoid JSON-escape hell. Mutually exclusive with tsCode.' },
+                                tsCode: {
+                                    type: 'string',
+                                    description: 'TypeScript body (return yields the spoils). Mutually exclusive with tsCodeBase64.',
+                                },
+                                tsCodeBase64: {
+                                    type: 'string',
+                                    description:
+                                        'utf8-encoded base64 of the TypeScript body — use to avoid JSON-escape hell. Mutually exclusive with tsCode.',
+                                },
                                 icon: { type: 'string' },
                                 description: {
                                     type: 'string',
-                                    description: 'One short sentence: what this dog yields. Searchable via list_nodes {search}, returned by get_node.',
+                                    description:
+                                        'One short sentence: what this dog yields. Searchable via list_nodes {search}, returned by get_node.',
                                 },
                                 lineDocs: {
                                     type: 'array',
-                                    description: 'Optional line-range annotations over this dog\'s tsCode (1-based, inclusive). Each {von, bis, text}; retrieve by id + line via get_node_lines.',
+                                    description:
+                                        "Optional line-range annotations over this dog's tsCode (1-based, inclusive). Each {von, bis, text}; retrieve by id + line via get_node_lines.",
                                     items: {
                                         type: 'object',
                                         required: ['von', 'bis', 'text'],
@@ -605,8 +619,7 @@ export function getKennelTools(): ToolDef[] {
                                 },
                                 imitates: {
                                     type: 'string',
-                                    description:
-                                        'PactProviderName, e.g. "WeatherQueryProvider" — makes this a MimicDog.',
+                                    description: 'PactProviderName, e.g. "WeatherQueryProvider" — makes this a MimicDog.',
                                 },
                             },
                         },
@@ -620,7 +633,8 @@ export function getKennelTools(): ToolDef[] {
                     lead: {
                         type: 'string',
                         description:
-                            `displayName of the Lead dog (the one whose result is served at ${KENNEL_PUBLIC_PREFIX}/<kennelId>).` + ' Must match one of the entries in `dogs[].displayName`. Default: the LAST dog in `dogs[]` becomes lead, since in a pipeline the renderer/finalizer typically sits at the end of the chain.',
+                            `displayName of the Lead dog (the one whose result is served at ${KENNEL_PUBLIC_PREFIX}/<kennelId>).` +
+                            ' Must match one of the entries in `dogs[].displayName`. Default: the LAST dog in `dogs[]` becomes lead, since in a pipeline the renderer/finalizer typically sits at the end of the chain.',
                     },
                     refresh: {
                         type: 'boolean',
@@ -633,6 +647,7 @@ export function getKennelTools(): ToolDef[] {
             argHints: { dogIds: 'extraDogIds' },
             handler: async (args, ctx, deps) => {
                 if (!canMutate(null, ctx)) return fail('Login required to build kennels');
+                if (landingRefusesCreate(args.id, ctx)) return fail(LANDING_LOCKED);
                 return await buildKennel(args, ctx, deps);
             },
         },
@@ -676,7 +691,7 @@ export function getKennelTools(): ToolDef[] {
                 // bekommen fehlende Pflicht-Eltern, damit ein alter Kennel beim naechsten Update heilt.
                 // Fuer nodes gilt dasselbe: mitgeschickte oder gespeicherte bleiben, der Auto-Kommentar kommt dazu.
                 const pflicht = new PflichtEltern(
-                    Array.isArray(args.dogIds) ? args.dogIds : existing.data.dogIds ?? [],
+                    Array.isArray(args.dogIds) ? args.dogIds : (existing.data.dogIds ?? []),
                     deps.baseDogsList,
                 );
                 const nodes = pflicht.kommentiere(args.nodes !== undefined ? args.nodes : existing.data.nodes);
@@ -697,13 +712,21 @@ export function getKennelTools(): ToolDef[] {
         {
             name: 'delete_kennel',
             description:
-                'Deletes a kennel and ALL its versions. The owner or an editor can delete; not while frozen, never a landing kennel (LANDING_KENNEL_IDS, "locked_landing"). Irreversible — every dog dies forever.',
+                'Deletes a kennel and ALL its versions — irreversible. The owner or an editor can delete; not while frozen. ' +
+                'A maintained kennel (LANDING_KENNEL_IDS, the seeded slopdogs-landing and slopdogs-kennels) only a maintainer (SLOPDOGS_MAINTAINER_EMAILS) may delete; anyone else gets "locked_landing". ' +
+                'The dogs of a kennel stay saved — except for the seeded kennels slopdogs-landing and slopdogs-kennels: there every ownerless dog of the kennel (dogIds and parents) that no other kennel or outside dog uses is deleted with it, the used ones stay; ' +
+                'the answer is {deleted, dogsDeleted:[{lineageId, displayName}], dogsKept:[{lineageId, displayName, usedBy}], reseed:"at next restart"} — the next restart seeds the kennel again from the repo, on the same dog lineages. ' +
+                'Pass dryRun:true to get that answer without deleting anything.',
             inputSchema: {
                 type: 'object',
                 required: ['id'],
                 additionalProperties: false,
                 properties: {
                     id: { type: 'string', description: 'lineageId or version GUID' },
+                    dryRun: {
+                        type: 'boolean',
+                        description: 'Seeded kennels only: report which dogs would go and which stay (and why), delete nothing.',
+                    },
                 },
             },
             handler: async (args, ctx, deps) => {
@@ -711,6 +734,19 @@ export function getKennelTools(): ToolDef[] {
                 const existing = await deps.kennelsController.getById(id);
                 if (!existing.ok || !existing.data) return fail(`Kennel ${id} not found`);
                 if (!canMutate(existing.data as any, ctx)) return fail(kennelMutationRefusal(existing.data, ctx, id));
+                const lineageId = String((existing.data as { lineageId?: unknown }).lineageId ?? '');
+                const seeded = deps.seededKennelDelete?.applies(lineageId, id) ? deps.seededKennelDelete : null;
+                if (args.dryRun === true) {
+                    if (!seeded) return fail(`dryRun: only the seeded kennels have a delete preview — ${id} is not one`);
+                    const plan = await seeded.plan(lineageId);
+                    return plan ? ok({ dryRun: true, ...plan }) : fail(`Kennel ${id} not found`);
+                }
+                if (seeded) {
+                    const report = await seeded.delete(lineageId);
+                    if (!report) return fail(`Kennel ${id} not found`);
+                    const { kennelId, ...rest } = report;
+                    return ok({ deleted: kennelId, ...rest });
+                }
                 const result = await deps.kennelsController.delete(id);
                 if (!result.ok) return fail(result.error ?? 'delete failed');
                 return ok({ deleted: id });
@@ -719,7 +755,7 @@ export function getKennelTools(): ToolDef[] {
         {
             name: 'run_kennel',
             description:
-                'Runs a kennel and returns the full Waves payload — every dog\'s yield, code, vmContext, errors and timing. WARNING: this can be megabytes per call (5–20 MB on rich kennels). Prefer refresh_kennel_snapshot + the get_snapshot_* / get_kennel_snapshot_* tools for granular access. Use run_kennel only when you truly need every dog\'s details in one shot. Dogs you may not read come without code and context; if you may only run the kennel (run-only), you get just its shape: {ok, waves:[{dogCount}], leadResult, durationMs, dogs:[{status}]}. Optional `vmTimeoutMs` overrides the per-dog VM execution budget for this single run (resolution: vmTimeoutMs > SLOPDOGS_VM_TIMEOUT_MS env > 10000ms default, capped at SLOPDOGS_VM_TIMEOUT_MAX_MS, default 60000) -- not persisted. Runs share the server run queue: too many concurrent runs or too many runs per minute from you are refused (429), a full queue answers 503.',
+                "Runs a kennel and returns the full Waves payload — every dog's yield, code, vmContext, errors and timing. WARNING: this can be megabytes per call (5–20 MB on rich kennels). Prefer refresh_kennel_snapshot + the get_snapshot_* / get_kennel_snapshot_* tools for granular access. Use run_kennel only when you truly need every dog's details in one shot. Dogs you may not read come without code and context; if you may only run the kennel (run-only), you get just its shape: {ok, waves:[{dogCount}], leadResult, durationMs, dogs:[{status}]}. Optional `vmTimeoutMs` overrides the per-dog VM execution budget for this single run (resolution: vmTimeoutMs > SLOPDOGS_VM_TIMEOUT_MS env > 10000ms default, capped at SLOPDOGS_VM_TIMEOUT_MAX_MS, default 60000) -- not persisted. Runs share the server run queue: too many concurrent runs or too many runs per minute from you are refused (429), a full queue answers 503.",
             inputSchema: {
                 type: 'object',
                 required: ['id'],
@@ -735,7 +771,8 @@ export function getKennelTools(): ToolDef[] {
                     vmTimeoutMs: {
                         type: 'number',
                         minimum: 1,
-                        description: 'Per-run VM timeout in ms. Overrides SLOPDOGS_VM_TIMEOUT_MS (default 10000); capped at SLOPDOGS_VM_TIMEOUT_MAX_MS (default 60000). Run-time-only, not persisted.',
+                        description:
+                            'Per-run VM timeout in ms. Overrides SLOPDOGS_VM_TIMEOUT_MS (default 10000); capped at SLOPDOGS_VM_TIMEOUT_MAX_MS (default 60000). Run-time-only, not persisted.',
                     },
                 },
             },
@@ -744,22 +781,17 @@ export function getKennelTools(): ToolDef[] {
                 if (!config) return fail(`Kennel ${args.id} not found`);
                 const access = accessOf(config as any, ctx);
                 if (access === 'none') return fail(`Kennel ${args.id} not found`);
-                const query = deps.kennelRunHandler.mergeQueryParams(
-                    config.defaultQuery,
-                    (args.query as Record<string, any>) ?? {},
-                );
+                const query = deps.kennelRunHandler.mergeQueryParams(config.defaultQuery, (args.query as Record<string, any>) ?? {});
                 const body = args.body !== undefined ? args.body : config.defaultBody;
-                const vmTimeoutMs = typeof args.vmTimeoutMs === 'number' && args.vmTimeoutMs > 0
-                    ? args.vmTimeoutMs
-                    : undefined;
+                const vmTimeoutMs = typeof args.vmTimeoutMs === 'number' && args.vmTimeoutMs > 0 ? args.vmTimeoutMs : undefined;
                 // Dieselbe Zulassung wie HTTP (Heavy-Topf + Sperre je Quelle) — wartet seriell, 429/503 als Tool-Fehler.
                 const admitted = await McpRunAdmission.request(deps, ctx).granted();
                 if (!admitted.ok) return admitted.result;
                 const startedAt = Date.now();
                 try {
-                    const waves = await deps.kennelRunHandler.runKennel(
-                        config, query, body, authCtxToCapabilityCtx(ctx), vmTimeoutMs, { source: 'mcp-run' },
-                    );
+                    const waves = await deps.kennelRunHandler.runKennel(config, query, body, authCtxToCapabilityCtx(ctx), vmTimeoutMs, {
+                        source: 'mcp-run',
+                    });
                     // Kennel-RUN (W3, W17 Stufe 1): only the run's shape, the lead status and the lead result.
                     if (access === 'run') return ok(kennelRunView(waves, config, Date.now() - startedAt));
                     // SECURITY (2026-09-13): strip code/runtime of nodes this caller may not read.
@@ -769,6 +801,8 @@ export function getKennelTools(): ToolDef[] {
                         lead: { status: lead.status, ...(lead.error !== undefined ? { error: lead.error } : {}) },
                         waves: safeWaves,
                         kennelConfig: withMyRights(config as any, ctx),
+                        // P2.5: Paket-Versionen der Base-Dogs dieses Laufs.
+                        dogVersions: dogVersionsOf(waves),
                     });
                 } catch (err: any) {
                     return fail(runErrorText(err, access));
@@ -780,7 +814,9 @@ export function getKennelTools(): ToolDef[] {
         {
             name: 'execute_kennel',
             description:
-                'Runs a kennel and returns ONLY the lead dog\'s result — the public-facing payload, identical to `GET ' + KENNEL_PUBLIC_PREFIX + '/<kennelId>`. Use this when you want the spoils, not the diagnostic. The lead is the first entry in dogIds. Optional `vmTimeoutMs` overrides the per-dog VM execution budget for this run (resolution: vmTimeoutMs > SLOPDOGS_VM_TIMEOUT_MS env > 10000ms default, capped at SLOPDOGS_VM_TIMEOUT_MAX_MS, default 60000) -- not persisted. Runs share the server run queue: too many concurrent runs or too many runs per minute from you are refused (429), a full queue answers 503.',
+                "Runs a kennel and returns ONLY the lead dog's result — the public-facing payload, identical to `GET " +
+                KENNEL_PUBLIC_PREFIX +
+                '/<kennelId>`. Use this when you want the spoils, not the diagnostic. The lead is the first entry in dogIds. Optional `vmTimeoutMs` overrides the per-dog VM execution budget for this run (resolution: vmTimeoutMs > SLOPDOGS_VM_TIMEOUT_MS env > 10000ms default, capped at SLOPDOGS_VM_TIMEOUT_MAX_MS, default 60000) -- not persisted. Runs share the server run queue: too many concurrent runs or too many runs per minute from you are refused (429), a full queue answers 503.',
             inputSchema: {
                 type: 'object',
                 required: ['id'],
@@ -795,7 +831,8 @@ export function getKennelTools(): ToolDef[] {
                     vmTimeoutMs: {
                         type: 'number',
                         minimum: 1,
-                        description: 'Per-run VM timeout in ms. Overrides SLOPDOGS_VM_TIMEOUT_MS (default 10000); capped at SLOPDOGS_VM_TIMEOUT_MAX_MS (default 60000). Run-time-only, not persisted.',
+                        description:
+                            'Per-run VM timeout in ms. Overrides SLOPDOGS_VM_TIMEOUT_MS (default 10000); capped at SLOPDOGS_VM_TIMEOUT_MAX_MS (default 60000). Run-time-only, not persisted.',
                     },
                 },
             },
@@ -807,20 +844,15 @@ export function getKennelTools(): ToolDef[] {
                 if (access === 'none') return fail(`Kennel ${args.id} not found`);
                 const dogIds = config.dogIds ?? [];
                 if (dogIds.length === 0) return fail('Kennel has no dogs');
-                const query = deps.kennelRunHandler.mergeQueryParams(
-                    config.defaultQuery,
-                    (args.query as Record<string, any>) ?? {},
-                );
+                const query = deps.kennelRunHandler.mergeQueryParams(config.defaultQuery, (args.query as Record<string, any>) ?? {});
                 const body = args.body !== undefined ? args.body : config.defaultBody;
-                const vmTimeoutMs = typeof args.vmTimeoutMs === 'number' && args.vmTimeoutMs > 0
-                    ? args.vmTimeoutMs
-                    : undefined;
+                const vmTimeoutMs = typeof args.vmTimeoutMs === 'number' && args.vmTimeoutMs > 0 ? args.vmTimeoutMs : undefined;
                 const admitted = await McpRunAdmission.request(deps, ctx).granted();
                 if (!admitted.ok) return admitted.result;
                 try {
-                    const waves = await deps.kennelRunHandler.runKennel(
-                        config, query, body, authCtxToCapabilityCtx(ctx), vmTimeoutMs, { source: 'mcp-execute' },
-                    );
+                    const waves = await deps.kennelRunHandler.runKennel(config, query, body, authCtxToCapabilityCtx(ctx), vmTimeoutMs, {
+                        source: 'mcp-execute',
+                    });
                     // Derselbe Ausgang wie GET /k/<id> (LeadOutcome): ok -> Ergebnis; empty -> null (kein Fehler);
                     // failed -> Tool-Fehler (Speicher-Waechter: "Server busy", voruebergehend); not_run -> Tool-Fehler.
                     const lead = LeadOutcome.of(waves, dogIds[0]);
@@ -828,21 +860,30 @@ export function getKennelTools(): ToolDef[] {
                     if (lead.status === 'empty') {
                         return ok({
                             result: null,
-                            hint: 'The lead ran without an error and returned no value (null or undefined) — GET ' + KENNEL_PUBLIC_PREFIX + '/<kennelId> answers 200 with the JSON body null. Make the lead return a value if you expect one.',
+                            hint:
+                                'The lead ran without an error and returned no value (null or undefined) — GET ' +
+                                KENNEL_PUBLIC_PREFIX +
+                                '/<kennelId> answers 200 with the JSON body null. Make the lead return a value if you expect one.',
                         });
                     }
                     if (lead.memoryPressure) {
-                        return fail('Server busy: not enough memory to run this kennel right now. Retry shortly.'
-                            + (access === 'read' ? ` Lead error: ${lead.error}` : ''));
+                        return fail(
+                            'Server busy: not enough memory to run this kennel right now. Retry shortly.' +
+                                (access === 'read' ? ` Lead error: ${lead.error}` : ''),
+                        );
                     }
                     if (lead.status === 'failed') {
-                        return fail(access === 'read'
-                            ? `Lead failed: ${lead.error} — GET ${KENNEL_PUBLIC_PREFIX}/<kennelId> answers 502 lead_failed.`
-                            : 'lead_failed: the lead dog of this kennel failed.');
+                        return fail(
+                            access === 'read'
+                                ? `Lead failed: ${lead.error} — GET ${KENNEL_PUBLIC_PREFIX}/<kennelId> answers 502 lead_failed.`
+                                : 'lead_failed: the lead dog of this kennel failed.',
+                        );
                     }
-                    return fail(access === 'read'
-                        ? `Lead did not run: dog ${dogIds[0]} never started (its parents were not ready, or it may not run in this kennel). get_snapshot_errors shows what went wrong upstream.`
-                        : 'lead_failed: the lead dog of this kennel did not run.');
+                    return fail(
+                        access === 'read'
+                            ? `Lead did not run: dog ${dogIds[0]} never started (its parents were not ready, or it may not run in this kennel). get_snapshot_errors shows what went wrong upstream.`
+                            : 'lead_failed: the lead dog of this kennel did not run.',
+                    );
                 } catch (err: any) {
                     return fail(runErrorText(err, access));
                 } finally {
@@ -896,10 +937,7 @@ interface DogSpec {
  *   baseDogsMap).
  * - raw lineageId GUID → passed through unchanged.
  */
-function resolveParentRef(
-    ref: string,
-    siblingMap: Map<string, string>,
-): string {
+function resolveParentRef(ref: string, siblingMap: Map<string, string>): string {
     if (typeof ref !== 'string' || ref.length === 0) {
         throw new Error(`Invalid parent ref: ${JSON.stringify(ref)}`);
     }
@@ -938,7 +976,7 @@ function previewLeadResult(value: unknown): unknown {
 async function reuseHintsFor(built: BuiltDog[], ctx: AuthCtx, deps: ToolDeps): Promise<ReuseHint[]> {
     try {
         const listed = await deps.nodesController.listLatest();
-        const stored: ReuseCandidate[] = filterRunnable(listed.ok ? listed.data ?? [] : [], ctx).map((d: any) => ({
+        const stored: ReuseCandidate[] = filterRunnable(listed.ok ? (listed.data ?? []) : [], ctx).map((d: any) => ({
             id: d.id,
             lineageId: d.lineageId,
             displayName: d.displayName ?? null,
@@ -951,18 +989,17 @@ async function reuseHintsFor(built: BuiltDog[], ctx: AuthCtx, deps: ToolDeps): P
             .map((b) => ({ id: b.id, displayName: b.name, description: b.description ?? null, ownerId: null }));
         const candidates = [...bases, ...stored];
         await deps.dogStats.attach(candidates as any[]);
-        return new DogReuseAdvisor().hintsFor(built.filter((b) => b.lineageId), candidates);
+        return new DogReuseAdvisor().hintsFor(
+            built.filter((b) => b.lineageId),
+            candidates,
+        );
     } catch (err) {
         console.warn('[build_kennel] reuse hints skipped:', err instanceof Error ? err.message : err);
         return [];
     }
 }
 
-async function buildKennel(
-    args: Record<string, any>,
-    ctx: AuthCtx,
-    deps: ToolDeps,
-) {
+async function buildKennel(args: Record<string, any>, ctx: AuthCtx, deps: ToolDeps) {
     const kennelId = typeof args.id === 'string' ? args.id.trim() : '';
     if (!kennelId) return fail('id is required');
     const rawDogs = Array.isArray(args.dogs) ? (args.dogs as DogSpec[]) : null;
@@ -1013,16 +1050,13 @@ async function buildKennel(
     // The Lead is the dog whose result is served at /k/<kennelId>. In a pipeline the renderer
     // sits at the end, so making the last entry the Lead matches the caller's typical intent
     // (and frees them from having to reorder Renderer-before-Producer just to satisfy lead = dogs[0]).
-    const leadDisplayName: string | null =
-        typeof args.lead === 'string' && args.lead.trim().length > 0 ? args.lead.trim() : null;
+    const leadDisplayName: string | null = typeof args.lead === 'string' && args.lead.trim().length > 0 ? args.lead.trim() : null;
     let leadIndex = rawDogs.length - 1; // default: last entry
     if (leadDisplayName) {
         const idx = rawDogs.findIndex((d) => d.displayName === leadDisplayName);
         if (idx < 0) {
             return fail(
-                `lead "${leadDisplayName}" does not match any dog in dogs[] (available: ${rawDogs
-                    .map((d) => d.displayName)
-                    .join(', ')})`,
+                `lead "${leadDisplayName}" does not match any dog in dogs[] (available: ${rawDogs.map((d) => d.displayName).join(', ')})`,
             );
         }
         leadIndex = idx;
@@ -1054,7 +1088,11 @@ async function buildKennel(
                 }
                 // Fallback: try by lineageId directly in case getVersions found nothing.
                 if (versions.length === 0) {
-                    try { await deps.nodesController.delete(lineageId); } catch { /* swallow */ }
+                    try {
+                        await deps.nodesController.delete(lineageId);
+                    } catch {
+                        /* swallow */
+                    }
                 }
             } catch (err) {
                 console.error(`[build_kennel rollback] failed to enumerate versions for ${lineageId}:`, err);
@@ -1094,9 +1132,7 @@ async function buildKennel(
             const created = await deps.nodesController.create(withDefaults);
             if (!created.ok) {
                 await rollback(`create_node failed for "${spec.displayName}": ${created.error}`);
-                return fail(
-                    `create_node failed for "${spec.displayName}": ${created.error ?? 'unknown error'}`,
-                );
+                return fail(`create_node failed for "${spec.displayName}": ${created.error ?? 'unknown error'}`);
             }
             const lineageId = (created.data as any)?.lineageId;
             if (!lineageId || typeof lineageId !== 'string') {
@@ -1150,15 +1186,11 @@ async function buildKennel(
             return siblingMap.get(key) ?? rawId;
         };
         if (Array.isArray(args.nodes)) {
-            kennelInput.nodes = args.nodes.map((n: any) =>
-                n && typeof n === 'object' ? { ...n, id: resolveTraceId(n.id) } : n,
-            );
+            kennelInput.nodes = args.nodes.map((n: any) => (n && typeof n === 'object' ? { ...n, id: resolveTraceId(n.id) } : n));
         }
         if (Array.isArray(args.edges)) {
             kennelInput.edges = args.edges.map((e: any) =>
-                e && typeof e === 'object'
-                    ? { ...e, fromId: resolveTraceId(e.fromId), toId: resolveTraceId(e.toId) }
-                    : e,
+                e && typeof e === 'object' ? { ...e, fromId: resolveTraceId(e.fromId), toId: resolveTraceId(e.toId) } : e,
             );
         }
         kennelInput.nodes = pflicht.kommentiere(kennelInput.nodes);
@@ -1206,9 +1238,79 @@ async function buildKennel(
                     leadResultPreview: null,
                     error: admitted.message,
                 };
-            } else try {
-                const freshConfig = await deps.kennelRunHandler.loadKennelConfig(kennelLineageId);
-                if (!freshConfig) {
+            } else
+                try {
+                    const freshConfig = await deps.kennelRunHandler.loadKennelConfig(kennelLineageId);
+                    if (!freshConfig) {
+                        firstRun = {
+                            status: 'failed',
+                            leadOk: false,
+                            durationMs: Date.now() - startedAt,
+                            errorCount: 0,
+                            leadDogId: null,
+                            leadResultPreview: null,
+                            error: 'kennel vanished between create and refresh',
+                        };
+                    } else {
+                        const mergedQuery = deps.kennelRunHandler.mergeQueryParams(freshConfig.defaultQuery, {});
+                        const buildVmTimeoutMs =
+                            typeof args.vmTimeoutMs === 'number' && args.vmTimeoutMs > 0 ? args.vmTimeoutMs : undefined;
+                        const waves = await deps.kennelRunHandler.runKennel(
+                            freshConfig,
+                            mergedQuery,
+                            freshConfig.defaultBody,
+                            authCtxToCapabilityCtx(ctx),
+                            buildVmTimeoutMs,
+                            { source: 'mcp-build' },
+                        );
+
+                        // Cache the snapshot so subsequent get_snapshot_* calls work directly — for the
+                        // builder: the run carried his capabilities, the snapshot is his.
+                        deps.snapshotCache.startJob(
+                            kennelLineageId,
+                            KennelSnapshotCache.viewerOf(ctx),
+                            freshConfig.id,
+                            mergedQuery,
+                            freshConfig.defaultBody,
+                            ctx.user?.id ?? null,
+                        );
+
+                        const leadRef = freshConfig.dogIds?.[0];
+                        const lead = leadRef ? findDogInWaves(waves, leadRef) : null;
+                        const flat: any[] = (waves as any[]).flat();
+                        const errorCount = flat.filter((d) => d?.error).length;
+                        const leadOk = !!lead && !(lead as any)?.error;
+
+                        deps.snapshotCache.markOk(kennelLineageId, KennelSnapshotCache.viewerOf(ctx), {
+                            waves: waves as any,
+                            kennelConfig: freshConfig,
+                            leadDogId: lead ? (leadRef ?? undefined) : undefined,
+                            leadResult: lead?.result,
+                        });
+
+                        let status: 'ok' | 'lead-ok-with-side-errors' | 'lead-failed';
+                        if (errorCount === 0) {
+                            status = 'ok';
+                        } else if (leadOk) {
+                            status = 'lead-ok-with-side-errors';
+                        } else {
+                            status = 'lead-failed';
+                        }
+
+                        firstRun = {
+                            status,
+                            leadOk,
+                            durationMs: Date.now() - startedAt,
+                            errorCount,
+                            leadDogId: leadRef ?? null,
+                            leadResultPreview: previewLeadResult(lead?.result),
+                        };
+                    }
+                } catch (err: any) {
+                    // The kennel was created successfully — a failed first hunt is
+                    // not a build failure, it's just the dogs telling us the code
+                    // needs work. Surface it, don't roll back.
+                    deps.snapshotCache.markFailed(kennelLineageId, KennelSnapshotCache.viewerOf(ctx), err?.message ?? String(err));
                     firstRun = {
                         status: 'failed',
                         leadOk: false,
@@ -1216,84 +1318,11 @@ async function buildKennel(
                         errorCount: 0,
                         leadDogId: null,
                         leadResultPreview: null,
-                        error: 'kennel vanished between create and refresh',
+                        error: err?.message ?? String(err),
                     };
-                } else {
-                    const mergedQuery = deps.kennelRunHandler.mergeQueryParams(
-                        freshConfig.defaultQuery,
-                        {},
-                    );
-                    const buildVmTimeoutMs = typeof args.vmTimeoutMs === 'number' && args.vmTimeoutMs > 0
-                        ? args.vmTimeoutMs
-                        : undefined;
-                    const waves = await deps.kennelRunHandler.runKennel(
-                        freshConfig,
-                        mergedQuery,
-                        freshConfig.defaultBody,
-                        authCtxToCapabilityCtx(ctx),
-                        buildVmTimeoutMs,
-                        { source: 'mcp-build' },
-                    );
-
-                    // Cache the snapshot so subsequent get_snapshot_* calls work directly — for the
-                    // builder: the run carried his capabilities, the snapshot is his.
-                    deps.snapshotCache.startJob(
-                        kennelLineageId,
-                        KennelSnapshotCache.viewerOf(ctx),
-                        freshConfig.id,
-                        mergedQuery,
-                        freshConfig.defaultBody,
-                        ctx.user?.id ?? null,
-                    );
-
-                    const leadRef = freshConfig.dogIds?.[0];
-                    const lead = leadRef ? findDogInWaves(waves, leadRef) : null;
-                    const flat: any[] = (waves as any[]).flat();
-                    const errorCount = flat.filter((d) => d?.error).length;
-                    const leadOk = !!lead && !(lead as any)?.error;
-
-                    deps.snapshotCache.markOk(kennelLineageId, KennelSnapshotCache.viewerOf(ctx), {
-                        waves: waves as any,
-                        kennelConfig: freshConfig,
-                        leadDogId: lead ? leadRef ?? undefined : undefined,
-                        leadResult: lead?.result,
-                    });
-
-                    let status: 'ok' | 'lead-ok-with-side-errors' | 'lead-failed';
-                    if (errorCount === 0) {
-                        status = 'ok';
-                    } else if (leadOk) {
-                        status = 'lead-ok-with-side-errors';
-                    } else {
-                        status = 'lead-failed';
-                    }
-
-                    firstRun = {
-                        status,
-                        leadOk,
-                        durationMs: Date.now() - startedAt,
-                        errorCount,
-                        leadDogId: leadRef ?? null,
-                        leadResultPreview: previewLeadResult(lead?.result),
-                    };
+                } finally {
+                    admitted.lease.release();
                 }
-            } catch (err: any) {
-                // The kennel was created successfully — a failed first hunt is
-                // not a build failure, it's just the dogs telling us the code
-                // needs work. Surface it, don't roll back.
-                deps.snapshotCache.markFailed(kennelLineageId, KennelSnapshotCache.viewerOf(ctx), err?.message ?? String(err));
-                firstRun = {
-                    status: 'failed',
-                    leadOk: false,
-                    durationMs: Date.now() - startedAt,
-                    errorCount: 0,
-                    leadDogId: null,
-                    leadResultPreview: null,
-                    error: err?.message ?? String(err),
-                };
-            } finally {
-                admitted.lease.release();
-            }
         }
 
         // Waechter: build_kennel legt die Dogs selbst an (nicht ueber das create_node-Tool),
@@ -1309,7 +1338,11 @@ async function buildKennel(
         // Wiederverwenden vor Schreiben (Feature-Runde, 10-0: "wiederverwenden wenn gefunden und toll"):
         // gleicht ein neuer Dog einem bewaehrten, ausfuehrbaren, steht dessen lineageId als Vorschlag da.
         const hints = await reuseHintsFor(
-            rawDogs.map((spec) => ({ displayName: spec.displayName, lineageId: siblingMap.get(spec.displayName) ?? '', description: spec.description ?? null })),
+            rawDogs.map((spec) => ({
+                displayName: spec.displayName,
+                lineageId: siblingMap.get(spec.displayName) ?? '',
+                description: spec.description ?? null,
+            })),
             ctx,
             deps,
         );

@@ -4,15 +4,17 @@
 //
 // MCP_AUTH_REQUIRED=false  -> ctx.isSuperUser=true, all access granted
 // MCP_AUTH_REQUIRED=true   -> ctx.user set if Bearer or session resolves, anon otherwise
+// SLOPDOGS_MODE=local      -> ctx.user = der feste lokale Nutzer, kein Super-User (Spur L3)
 
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import type { PrismaClient } from '../../store/generated/prisma-auth-client';
 import { tryResolveBearerUser } from './bearer';
+import { LocalMode, detectContainer, type ContainerProbe } from '../../server-app/LocalMode';
 
 export interface AuthCtx {
     user: { id: string; email: string; name: string | null } | null;
     isSuperUser: boolean;
-    via?: 'bearer' | 'session';
+    via?: 'bearer' | 'session' | 'local';
 }
 
 declare global {
@@ -40,8 +42,17 @@ export const EX_CONFIG = 78;
 export function authModeBootError(
     env: NodeJS.ProcessEnv,
     onOpen: (line: string) => void = () => undefined,
+    probe: ContainerProbe = detectContainer,
 ): string | null {
     const nodeEnv = (env.NODE_ENV || 'development').trim();
+    // Lokaler Modus (Spur L): production ohne Login nur hinter seinem eigenen Guard (Exit 79, main.ts
+    // ruft ihn zuerst). Hier noch einmal, damit dieser Guard auch allein nie einen offenen Dienst durchlaesst.
+    if (LocalMode.isEnabled(env)) {
+        const localError = LocalMode.bootError(env, probe);
+        if (localError) return localError;
+        onOpen('[boot] local mode (SLOPDOGS_MODE=local): no login, LAN clients only, one shared local user');
+        return null;
+    }
     if (env.MCP_AUTH_REQUIRED === 'true') return null;
     if (nodeEnv === 'production' || nodeEnv === 'integration') {
         return '[boot] MCP_AUTH_REQUIRED must be true in production/integration';
@@ -50,9 +61,23 @@ export function authModeBootError(
     return null;
 }
 
-export function createAuthContextMiddleware(prisma: PrismaClient): RequestHandler {
+export type AuthContextOptions = {
+    /** Lokaler Modus: jede Anfrage laeuft mit diesem Nutzer — Bearer und Session werden nicht angesehen. */
+    localUser?: NonNullable<AuthCtx['user']>;
+};
+
+export function createAuthContextMiddleware(prisma: PrismaClient, options: AuthContextOptions = {}): RequestHandler {
+    const { localUser } = options;
     return async (req: Request, _res: Response, next: NextFunction) => {
         try {
+            // Lokaler Modus: ein gemeinsamer Nutzer statt Super-User — Besitz, "mine", jsonStore,
+            // Key-Store und Favoriten haengen an einer echten id. Die Netzgrenze davor laesst nur das LAN herein.
+            if (localUser) {
+                req.ctx = { user: localUser, isSuperUser: false, via: 'local' };
+                next();
+                return;
+            }
+
             // Dev mode: skip auth entirely, every request is super-user.
             if (!isAuthRequired()) {
                 req.ctx = { user: null, isSuperUser: true };

@@ -52,7 +52,10 @@ export interface BetaKeyTx {
     user: {
         create(args: { data: GoogleProfile }): Promise<BetaUserRow>;
         update(args: { where: { id: string }; data: Partial<GoogleProfile> }): Promise<BetaUserRow>;
-        findMany(args: { where: { id: { in: string[] } }; select: { id: true; email: true } }): Promise<Array<{ id: string; email: string }>>;
+        findMany(args: {
+            where: { id: { in: string[] } };
+            select: { id: true; email: true };
+        }): Promise<Array<{ id: string; email: string }>>;
     };
 }
 
@@ -94,11 +97,18 @@ export class BetaKeys {
         revoked: 'That beta key has been revoked.',
     };
 
-    constructor(private readonly prisma: BetaKeyPrisma, private readonly now: () => Date = () => new Date()) {}
+    constructor(
+        private readonly prisma: BetaKeyPrisma,
+        private readonly now: () => Date = () => new Date(),
+    ) {}
 
     /** SLOPDOGS_STAGE, normalisiert (Kleinbuchstaben, nur [a-z0-9-]) — sicher fuer ein HTML-Attribut. */
     static stage(env: NodeJS.ProcessEnv = process.env): string {
-        return (env.SLOPDOGS_STAGE ?? '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 32);
+        return (env.SLOPDOGS_STAGE ?? '')
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9-]/g, '')
+            .slice(0, 32);
     }
 
     /** Keys werden verlangt: Stage beta UND Auth an. Lokal ohne Auth nie. */
@@ -110,7 +120,11 @@ export class BetaKeys {
     static isAdminEmail(email: string | null | undefined, env: NodeJS.ProcessEnv = process.env): boolean {
         const wanted = email?.trim().toLowerCase();
         if (!wanted) return false;
-        return (env.BETA_ADMIN_EMAILS ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean).includes(wanted);
+        return (env.BETA_ADMIN_EMAILS ?? '')
+            .split(',')
+            .map((e) => e.trim().toLowerCase())
+            .filter(Boolean)
+            .includes(wanted);
     }
 
     /** Wer Keys verwaltet: BETA_ADMIN_EMAILS, lokal zusaetzlich der Super-User. */
@@ -210,7 +224,7 @@ export class BetaKeys {
             createdAt: new Date(r.createdAt).toISOString(),
             revokedAt: iso(r.revokedAt),
             usedAt: iso(r.usedAt),
-            usedBy: r.usedByUserId ? emails.get(r.usedByUserId) ?? r.usedByUserId : null,
+            usedBy: r.usedByUserId ? (emails.get(r.usedByUserId) ?? r.usedByUserId) : null,
             state: r.usedByUserId ? 'used' : r.revokedAt ? 'revoked' : 'open',
         };
     }

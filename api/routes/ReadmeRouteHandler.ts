@@ -11,10 +11,7 @@ export class ReadmeRouteHandler {
     private candidatePaths: string[];
 
     constructor(rootDir: string) {
-        this.candidatePaths = [
-            path.join(rootDir, 'README.md'),
-            path.join(rootDir, '..', 'README.md'),
-        ];
+        this.candidatePaths = [path.join(rootDir, 'README.md'), path.join(rootDir, '..', 'README.md')];
     }
 
     registerRoutes(app: any): void {

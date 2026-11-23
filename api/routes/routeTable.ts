@@ -48,18 +48,28 @@ export const API_ROUTE = {
     kennelExecute: '/api/kennels/:id/execute',
     /** Sterne (P4): GET/PUT/DELETE. */
     kennelRating: '/api/kennels/:id/rating',
+    /** Favoriten je Nutzer (Spur U): PUT/DELETE. */
+    kennelFavorite: '/api/kennels/:id/favorite',
+    /** Spur K: Trockenlauf des Loeschens eines Seed-Kennels — welche Dogs mitfallen, welche bleiben (Maintainer). */
+    kennelDeletePreview: '/api/kennels/:id/delete-preview',
     /** Ranglisten fuer die Landing (P4), vor ConfigRouteHandler registriert. */
     landing: '/api/landing',
+    /** Spur K: liefert `/kennels` gerade den Kennel `slopdogs-kennels`? Das Signal fuer die Angular-Links. */
+    kennelListStatus: '/api/kennel-list',
     kennelExport: '/api/kennels/:id/export',
     kennelImport: '/api/kennels/import',
     nodesList: '/api/nodes',
     /** Wo ein Dog laeuft (P4b): Kennels, Abhaengige, Abhaengigkeiten — vor ConfigRouteHandler registriert. */
     nodeUsage: '/api/nodes/:id/usage',
     readme: '/api/readme',
+    /** Lebt der Dienst, welcher Stand laeuft (Version, Commit, Pakete) — oeffentlich, vor ConfigRouteHandler registriert. */
+    health: '/api/health',
     /** Key-Store (P4c): GET (maskiert) und POST — vor ConfigRouteHandler registriert. */
     keys: '/api/keys',
     /** Key-Store (P4c): DELETE; kein GET mit Wert. */
     keyByAlias: '/api/keys/:alias',
+    /** Eigene Seiten je Nutzer (Landing `/`, Liste `/kennels`): GET und PUT — vor ConfigRouteHandler registriert. */
+    myPages: '/api/my-pages',
     /** Beta (2026-09-26): Status fuer alle — vor ConfigRouteHandler registriert. */
     beta: '/api/beta',
     /** Beta-Keys: GET (maskiert) und POST (Klartext einmal) — nur Admins. */
@@ -85,6 +95,8 @@ export const API_ROUTES = [
     '/api/kennels/:id/run',
     '/api/kennels/:id/execute',
     '/api/kennels/:id/rating',
+    '/api/kennels/:id/favorite',
+    '/api/kennels/:id/delete-preview',
     '/api/nodes',
     '/api/nodes/:id',
     '/api/nodes/:id/versions',
@@ -95,9 +107,11 @@ export const API_ROUTES = [
     '/api/nodes/:id/unfreeze',
     '/api/nodes/:id/usage',
     '/api/readme',
+    '/api/health',
     '/api/landing',
     '/api/keys',
     '/api/keys/:alias',
+    '/api/my-pages',
     '/api/beta',
     '/api/beta/keys',
     '/api/beta/keys/:id',
@@ -116,6 +130,8 @@ export const LEGACY_308 = [LEGACY_ROUTE.docs, LEGACY_ROUTE.swagger, LEGACY_ROUTE
 /** Schaufenster und Legacy-POST auf App-Ebene. */
 export const ROOT_ROUTE = {
     landing: '/',
+    /** Spur K: die Kennel-Liste als Kennel (KennelListPage); faellt sie aus, die Angular-Liste (SPA_ROUTES). */
+    kennelList: '/kennels',
     robots: '/robots.txt',
     legacySave: '/save',
 } as const;
@@ -155,14 +171,19 @@ export const EXPRESS_APP_ROUTES = [
     API_ROUTE.kennelRun,
     API_ROUTE.kennelExecute,
     API_ROUTE.kennelRating,
+    API_ROUTE.kennelFavorite,
+    API_ROUTE.kennelDeletePreview,
     API_ROUTE.kennelExport,
     API_ROUTE.kennelImport,
     API_ROUTE.nodesList,
     API_ROUTE.nodeUsage,
     API_ROUTE.readme,
+    API_ROUTE.health,
     API_ROUTE.landing,
+    API_ROUTE.kennelListStatus,
     API_ROUTE.keys,
     API_ROUTE.keyByAlias,
+    API_ROUTE.myPages,
     API_ROUTE.beta,
     API_ROUTE.betaKeys,
     API_ROUTE.betaKeyById,
@@ -171,7 +192,7 @@ export const EXPRESS_APP_ROUTES = [
 ] as const;
 
 /** Frontend-Binder-Routen: erscheinen je nach Umgebung zusaetzlich im Stack. */
-export const FRONTEND_ROUTES = [ROOT_ROUTE.landing, ROOT_ROUTE.robots] as const;
+export const FRONTEND_ROUTES = [ROOT_ROUTE.landing, ROOT_ROUTE.robots, ROOT_ROUTE.kennelList] as const;
 
 /** Alle Pfade, die ein Text nennen darf (Doc-Lint). Alt-Pfade nur in Zeilen, die `308` oder `legacy` sagen. */
 export const DOCUMENTED_ROUTES = [

@@ -1,0 +1,3 @@
+# Reine Formatierungs-Commits; git blame ueberspringt sie (git config blame.ignoreRevsFile .git-blame-ignore-revs).
+# style: npm run format ueber alles (P1.3)
+2f676861ba7cf2729a53943564df8174ad0f525b

@@ -3,19 +3,15 @@
 // EINEM Memo fuer alle Lineages (zwei GROUP BY je Memo-Leben), nie je Kennel. Die Memo-Maps
 // enthalten auch private Lineages — sie verlassen den Prozess nur ueber attach(), und attach()
 // sieht nur, was der Aufrufer schon durch seinen Rechtefilter gelassen hat.
-import type {
-    IKennelStatsStore,
-    KennelCallAggregate,
-    KennelRatingHistogram,
-} from '../store/IKennelStatsStore';
+import type { IKennelStatsStore, KennelCallAggregate, KennelRatingHistogram } from '../store/IKennelStatsStore';
 import { KennelCallCounter, utcDay } from './KennelCallCounter';
 import type { AuthCtx } from '../mcp/auth/middleware';
 import { canRun, parseList, type AclEntity } from '../mcp/auth/visibility';
 
 export interface KennelStats {
     /** leadFailed ueber alle Tage, leadFailed30d in den letzten 30 Tagen (Aufruf-Filter usage=failing/never_worked). */
-    calls:  { total: number; last30d: number; leadFailed: number; leadFailed30d: number; ranked: number; ranked30d: number };
-    rating: { avg: number | null; count: number; score: number };   // avg null bei count 0; score 0 bei count 0
+    calls: { total: number; last30d: number; leadFailed: number; leadFailed30d: number; ranked: number; ranked30d: number };
+    rating: { avg: number | null; count: number; score: number }; // avg null bei count 0; score 0 bei count 0
 }
 
 export type KennelRatingView = KennelStats['rating'] & {
@@ -26,7 +22,11 @@ export type KennelRatingView = KennelStats['rating'] & {
 
 /** Eine abgelehnte Bewertung — Status und Code wie in der REST-Antwort (4.4.1). */
 export class RatingError extends Error {
-    constructor(readonly status: 400 | 401 | 403 | 404, readonly code: string, description?: string) {
+    constructor(
+        readonly status: 400 | 401 | 403 | 404,
+        readonly code: string,
+        description?: string,
+    ) {
         super(description ?? code);
         this.name = 'RatingError';
     }
@@ -75,7 +75,7 @@ export class KennelStatsService {
         private readonly counter: KennelCallCounter,
         private readonly memoMs = positiveIntFromEnv('KENNEL_STATS_MEMO_MS', 30_000),
         private readonly now: () => number = () => Date.now(),
-    ) { }
+    ) {}
 
     get memoLoads(): number {
         return this.memoLoadCount;
@@ -141,7 +141,8 @@ export class KennelStatsService {
         const userId = ctx?.user?.id;
         if (!userId) throw new RatingError(403, 'no_identity', 'Super-user mode has no user identity to rate with.');
         if (forWrite && kennel.ownerId === userId) throw new RatingError(403, 'owner_cannot_rate', 'Owners do not rate their own kennel.');
-        if (forWrite && parseList(kennel.editors).includes(userId)) throw new RatingError(403, 'editor_cannot_rate', 'Editors do not rate a kennel they edit.');
+        if (forWrite && parseList(kennel.editors).includes(userId))
+            throw new RatingError(403, 'editor_cannot_rate', 'Editors do not rate a kennel they edit.');
         return userId;
     }
 
@@ -165,7 +166,11 @@ export class KennelStatsService {
         this.loading = null;
         this.generation += 1;
         for (const listener of this.invalidationListeners) {
-            try { listener(); } catch { /* ein Zuhoerer darf die Invalidierung nicht brechen */ }
+            try {
+                listener();
+            } catch {
+                /* ein Zuhoerer darf die Invalidierung nicht brechen */
+            }
         }
     }
 

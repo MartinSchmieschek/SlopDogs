@@ -14,15 +14,26 @@ export class BetaRouteHandler {
     /** VOR ConfigRouteHandler registrieren — sonst antwortet `/api/:subpath` fuer `beta`. */
     registerRoutes(app: any): void {
         app.get(API_ROUTE.beta, (req: Request, res: Response) => this.handleStatus(req, res));
-        app.get(API_ROUTE.betaKeys, (req: Request, res: Response) => this.admin(req, res, async () => ({ keys: await this.betaKeys.list() })));
-        app.post(API_ROUTE.betaKeys, (req: Request, res: Response) => this.admin(req, res, async () => {
-            const createdBy = req.ctx?.user?.email ?? null;
-            return this.betaKeys.create(req.body ?? {}, createdBy);
-        }, 201));
-        app.delete(API_ROUTE.betaKeyById, (req: Request, res: Response) => this.admin(req, res, async () => {
-            const key = await this.betaKeys.revoke(paramString(req.params.id));
-            return key ? { key } : null;
-        }));
+        app.get(API_ROUTE.betaKeys, (req: Request, res: Response) =>
+            this.admin(req, res, async () => ({ keys: await this.betaKeys.list() })),
+        );
+        app.post(API_ROUTE.betaKeys, (req: Request, res: Response) =>
+            this.admin(
+                req,
+                res,
+                async () => {
+                    const createdBy = req.ctx?.user?.email ?? null;
+                    return this.betaKeys.create(req.body ?? {}, createdBy);
+                },
+                201,
+            ),
+        );
+        app.delete(API_ROUTE.betaKeyById, (req: Request, res: Response) =>
+            this.admin(req, res, async () => {
+                const key = await this.betaKeys.revoke(paramString(req.params.id));
+                return key ? { key } : null;
+            }),
+        );
     }
 
     /** Fuer alle: die Login-Seite fragt nach dem Key, die Account-Seite zeigt den Beta-Reiter. */
@@ -48,7 +59,10 @@ export class BetaRouteHandler {
         } catch (err) {
             // Nur die Klasse — ein Prisma-Fehler (etwa: Tabelle fehlt, prisma:sync vergessen) nennt Pfade.
             console.error('[BetaRouteHandler]', (err as Error)?.name ?? 'Error', (err as Error)?.message?.split('\n')[0]);
-            res.status(500).json({ error: 'internal_error', error_description: 'Beta keys unavailable — is the auth schema synced (npm run prisma:sync)?' });
+            res.status(500).json({
+                error: 'internal_error',
+                error_description: 'Beta keys unavailable — is the auth schema synced (npm run prisma:sync)?',
+            });
         }
     }
 }

@@ -1,4 +1,4 @@
-import { BASE_DOG_PREFIX } from '@slopdogs/core';
+import { BASE_DOG_PREFIX } from '@martinschmieschek/slopdogs-core/runtime';
 import type { IStore } from '../store/IStore';
 
 function parseDogIdsFromKennelRow(row: any): string[] {
@@ -14,10 +14,7 @@ function parseDogIdsFromKennelRow(row: any): string[] {
     }
     if (row?.serializedDogConfig) {
         try {
-            const cfg =
-                typeof row.serializedDogConfig === 'string'
-                    ? JSON.parse(row.serializedDogConfig)
-                    : row.serializedDogConfig;
+            const cfg = typeof row.serializedDogConfig === 'string' ? JSON.parse(row.serializedDogConfig) : row.serializedDogConfig;
             const ids = cfg?.dogIds;
             return Array.isArray(ids) ? ids.filter((x: unknown): x is string => typeof x === 'string') : [];
         } catch {

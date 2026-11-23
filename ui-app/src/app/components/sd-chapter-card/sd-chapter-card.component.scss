@@ -1,4 +1,5 @@
-// Chapter card: ink band, paper text, Bebas title, data right in #bfb595 (6.2).
+// Chapter card: ink band, paper text, Bebas title, data right in #bfb595 (6.2). Band tokens (Spur K): in the tape
+// shell the band turns cream and the muted text #5a5142 (6.27:1 instead of 1.64:1).
 :host {
   display: block;
   position: sticky;
@@ -12,8 +13,8 @@
   justify-content: space-between;
   gap: var(--s4);
   padding: var(--s3) var(--s4) var(--s3);
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--band-bg);
+  color: var(--band-fg);
 }
 
 .text {
@@ -22,7 +23,7 @@
 
 .kicker {
   margin-bottom: var(--s1);
-  color: var(--ink-soft);
+  color: var(--band-muted);
 }
 
 h1 {
@@ -32,7 +33,7 @@ h1 {
 .aside {
   flex: none;
   margin: 0;
-  color: var(--ink-soft);
+  color: var(--band-muted);
   text-align: right;
 }
 

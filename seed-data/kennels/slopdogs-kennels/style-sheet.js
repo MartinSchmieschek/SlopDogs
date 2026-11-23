@@ -1,0 +1,27 @@
+// SlopDogs kennel list · create sheet. A 480 px drawer on the right, a bottom sheet with a grip on a phone; the
+// emoji picker popover and the visibility radios of sd-kennel-sheet.
+return [
+    '.sheet{position:absolute;top:0;right:0;bottom:0;display:flex;flex-direction:column;width:min(480px,100%);margin:0;',
+    'background:var(--paper-2);border-left:2px solid var(--ink);box-shadow:-4px 4px 0 var(--ink);',
+    'animation:sd-sheet-in var(--dur-slow) var(--ease-out) backwards}',
+    '@keyframes sd-sheet-in{from{transform:translateX(24px);opacity:0}}@keyframes sd-sheet-up{from{transform:translateY(48px);opacity:0}}',
+    '.sheet .head,.dialog .head{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);',
+    'padding:var(--s2) var(--s2) var(--s2) var(--s4);background:var(--ink);color:var(--paper)}',
+    '.sheet .grip{display:none}.sheet .body{flex:1;overflow-y:auto;padding:var(--s4);display:flex;flex-direction:column;gap:var(--s4)}',
+    '.sheet .foot{display:flex;flex-wrap:wrap;gap:var(--s3);padding:var(--s3) var(--s4) calc(var(--s3) + env(safe-area-inset-bottom));',
+    'border-top:1px solid var(--line)}',
+    '.f{position:relative;margin:0;padding:0;border:0;min-width:0}',
+    '.pick{display:flex;align-items:center;gap:var(--s3);text-align:left;cursor:pointer}.pick .glyph{font-size:20px}',
+    '.pop{position:absolute;top:calc(100% + 4px);left:0;z-index:2;width:min(340px,100%);padding:var(--s3);background:var(--paper-2);',
+    'display:flex;flex-direction:column;gap:var(--s3)}',
+    '.pop .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:2px;max-height:200px;overflow-y:auto}',
+    '.pop .grid button{height:40px;border:2px solid transparent;background:none;font-size:20px;cursor:pointer}',
+    ".pop .grid button[aria-pressed='true']{border-color:var(--ink)}",
+    '.radio{display:flex;align-items:flex-start;gap:var(--s2);min-height:var(--touch);padding:var(--s1) 0;cursor:pointer}',
+    '.radio input{width:18px;height:18px;margin:2px 0 0;accent-color:var(--ink);flex:none}',
+    '@media (max-width:767px){',
+    '.sheet{top:auto;left:0;width:100%;max-height:92dvh;border-left:0;border-top:2px solid var(--ink);box-shadow:0 -4px 0 var(--ink);',
+    'animation-name:sd-sheet-up}',
+    '.sheet .grip{display:block;width:40px;height:4px;margin:var(--s2) auto 0;background:var(--ink-3)}.sheet .foot .sd-btn{flex:1}',
+    '}',
+].join('');

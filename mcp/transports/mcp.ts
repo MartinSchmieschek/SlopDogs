@@ -22,12 +22,14 @@ import { getNodeTools } from '../tools/nodes';
 import { getMetaTools, setMetaToolRegistry } from '../tools/meta';
 import { getAclTools } from '../tools/acl';
 import { getKeyTools } from '../tools/keys';
+import { getMyPagesTools } from '../tools/myPages';
 import { getSnapshotTools } from '../tools/snapshots';
 import { type ToolDeps, type ToolDef, unknownArgsRefusal } from '../tools/types';
 import type { AuthCtx } from '../auth/middleware';
 import { buildMcpInitializeInstructions } from '../spuren-brief';
 import { buildWerkzeugkasten } from '../werkzeugkasten';
-import { envFirst } from '@slopdogs/core';
+import { envFirst } from '@martinschmieschek/slopdogs-core/runtime';
+import { LocalMode } from '../../server-app/LocalMode';
 
 /**
  * Welle 11: tools/list token diet. The full long-form description is kept on
@@ -48,15 +50,14 @@ let cachedSkill: string | null = null;
 
 async function loadSkill(projectRoot: string): Promise<string> {
     if (cachedSkill !== null) return cachedSkill;
-    const candidates = [
-        path.join(projectRoot, 'mcp', 'skill.md'),
-        path.join(projectRoot, '..', 'mcp', 'skill.md'),
-    ];
+    const candidates = [path.join(projectRoot, 'mcp', 'skill.md'), path.join(projectRoot, '..', 'mcp', 'skill.md')];
     for (const p of candidates) {
         try {
             cachedSkill = await fs.readFile(p, 'utf-8');
             return cachedSkill;
-        } catch { /* try next */ }
+        } catch {
+            /* try next */
+        }
     }
     cachedSkill = '';
     return cachedSkill;
@@ -67,10 +68,7 @@ let cachedVersion: string | null = null;
 /** serverInfo.version folgt package.json statt eines Literals. */
 function loadPackageVersion(projectRoot: string): string {
     if (cachedVersion !== null) return cachedVersion;
-    const candidates = [
-        path.join(projectRoot, 'package.json'),
-        path.join(projectRoot, '..', 'package.json'),
-    ];
+    const candidates = [path.join(projectRoot, 'package.json'), path.join(projectRoot, '..', 'package.json')];
     for (const p of candidates) {
         try {
             const version = JSON.parse(readFileSync(p, 'utf-8')).version;
@@ -78,7 +76,9 @@ function loadPackageVersion(projectRoot: string): string {
                 cachedVersion = version;
                 return cachedVersion;
             }
-        } catch { /* try next */ }
+        } catch {
+            /* try next */
+        }
     }
     cachedVersion = '0.0.0';
     return cachedVersion;
@@ -89,21 +89,12 @@ const SKILL_RESOURCE_URI = 'slopdogs://skill';
 /** Frueherer Name (dataDogs) -- bleibt lesbar, bis alle Notizen und Skills umgestellt sind (P7). */
 const LEGACY_SKILL_RESOURCE_URI = 'datadogs://skill';
 
-function buildServer(
-    tools: ToolDef[],
-    ctx: AuthCtx,
-    deps: ToolDeps,
-    skillContent: string,
-    version: string,
-): Server {
+function buildServer(tools: ToolDef[], ctx: AuthCtx, deps: ToolDeps, skillContent: string, version: string): Server {
     const toolMap = new Map(tools.map((t) => [t.name, t]));
     // Welle 8 (P6): skill.md zusaetzlich als MCP-Resource exponieren. Wir behalten
     // die kurze `instructions`-Variante fuer MCP-Clients ohne Resource-Support;
     // der volle Inhalt ist ueber Resource `slopdogs://skill` abrufbar.
-    const shortInstructions = buildMcpInitializeInstructions(
-        Boolean(skillContent),
-        buildWerkzeugkasten(deps.baseDogsList),
-    );
+    const shortInstructions = buildMcpInitializeInstructions(Boolean(skillContent), buildWerkzeugkasten(deps.baseDogsList));
     const server = new Server(
         { name: 'slopdogs', version },
         {
@@ -194,6 +185,7 @@ export function createMcpRouter(deps: ToolDeps): Router {
         ...getSnapshotTools(),
         ...getAclTools(),
         ...getKeyTools(),
+        ...getMyPagesTools(),
         ...getMetaTools(),
     ];
     // Wire the registry into the meta module so describe_tool can resolve names
@@ -228,7 +220,10 @@ export function createMcpRouter(deps: ToolDeps): Router {
             res.status(500).json({ error: 'no auth context — middleware misordered' });
             return;
         }
-        if (!ctx.user && !ctx.isSuperUser) {
+        // /mcp nimmt nur Bearer an: das Session-Cookie meldet hier niemanden an. Kein Client nutzt es (UI, Skill,
+        // Tests sprechen /mcp mit Bearer), und so kann keine Seite im Browser des Nutzers mit dessen Session
+        // MCP-Werkzeuge aufrufen.
+        if ((!ctx.user && !ctx.isSuperUser) || (ctx.via === 'session' && !ctx.isSuperUser)) {
             const base = process.env.MCP_BASE_URL || `${req.protocol}://${req.get('host')}`;
             res.setHeader(
                 'WWW-Authenticate',
@@ -237,8 +232,8 @@ export function createMcpRouter(deps: ToolDeps): Router {
             res.status(401).json({
                 error: 'unauthorized',
                 error_description:
-                    'Bearer token required. Discover OAuth at /.well-known/oauth-authorization-server, then sign in with the '
-                    + 'required Google account. Closed beta: a beta key is required on first sign-in unless your account is a beta admin.',
+                    'Bearer token required. Discover OAuth at /.well-known/oauth-authorization-server, then sign in with the ' +
+                    'required Google account. Closed beta: a beta key is required on first sign-in unless your account is a beta admin.',
             });
             return;
         }
@@ -268,24 +263,42 @@ export function createMcpRouter(deps: ToolDeps): Router {
     // Account, Beta-Key). Ein MCP-Client, der hier GET probiert, liest so direkt den Weg zur Connection.
     router.get('/', (req: Request, res: Response) => {
         const base = process.env.MCP_BASE_URL || `${req.protocol}://${req.get('host')}`;
-        res.set('Allow', 'POST').status(405).json({
-            error: 'method_not_allowed',
-            error_description: 'This server speaks MCP over POST /mcp (JSON-RPC, stateless). It does not use GET/SSE.',
-            service: 'SlopDogs MCP',
-            message: 'Welcome. To use SlopDogs, connect with OAuth and sign in with the required account.',
-            how_to_connect: {
-                transport: 'streamable-http (stateless): send JSON-RPC to POST /mcp with an Authorization: Bearer <token> header.',
-                steps: [
-                    `Discover OAuth: GET ${base}/.well-known/oauth-authorization-server and ${base}/.well-known/oauth-protected-resource.`,
-                    'Register your client (RFC 7591 Dynamic Client Registration) at POST /auth/register. redirect_uri may be https://…, a loopback http://127.0.0.1:<port>/… or http://localhost:<port>/…, or your native app scheme such as cursor://anysphere.cursor-mcp/oauth/callback.',
-                    'Authorize with PKCE (S256) at /auth/authorize — the flow opens Google sign-in in the system browser.',
-                    'Sign in with the required Google account. Closed beta: a beta key is required on first sign-in unless your account is a beta admin.',
-                    'Exchange the authorization code for a Bearer token at /auth/token, then call POST /mcp with that token.',
-                ],
-                discovery: `${base}/.well-known/oauth-authorization-server`,
-                manage_tokens: `${base}/auth/tokens`,
-            },
-        });
+        // Lokaler Modus (Spur L): kein OAuth, kein Token — der Brief darf keinen Login-Weg beschreiben.
+        if (LocalMode.isEnabled(process.env)) {
+            res.set('Allow', 'POST')
+                .status(405)
+                .json({
+                    error: 'method_not_allowed',
+                    error_description: 'This server speaks MCP over POST /mcp (JSON-RPC, stateless). It does not use GET/SSE.',
+                    service: 'SlopDogs MCP (local mode)',
+                    message: 'Local network instance: no sign-in, no token. Every client in this network shares one local user.',
+                    how_to_connect: {
+                        transport: 'streamable-http (stateless): send JSON-RPC to POST /mcp without an Authorization header.',
+                        example: `claude mcp add --transport http slopdogs ${base}/mcp`,
+                    },
+                });
+            return;
+        }
+        res.set('Allow', 'POST')
+            .status(405)
+            .json({
+                error: 'method_not_allowed',
+                error_description: 'This server speaks MCP over POST /mcp (JSON-RPC, stateless). It does not use GET/SSE.',
+                service: 'SlopDogs MCP',
+                message: 'Welcome. To use SlopDogs, connect with OAuth and sign in with the required account.',
+                how_to_connect: {
+                    transport: 'streamable-http (stateless): send JSON-RPC to POST /mcp with an Authorization: Bearer <token> header.',
+                    steps: [
+                        `Discover OAuth: GET ${base}/.well-known/oauth-authorization-server and ${base}/.well-known/oauth-protected-resource.`,
+                        'Register your client (RFC 7591 Dynamic Client Registration) at POST /auth/register. redirect_uri may be https://…, a loopback http://127.0.0.1:<port>/… or http://localhost:<port>/…, or your native app scheme such as cursor://anysphere.cursor-mcp/oauth/callback.',
+                        'Authorize with PKCE (S256) at /auth/authorize — the flow opens Google sign-in in the system browser.',
+                        'Sign in with the required Google account. Closed beta: a beta key is required on first sign-in unless your account is a beta admin.',
+                        'Exchange the authorization code for a Bearer token at /auth/token, then call POST /mcp with that token.',
+                    ],
+                    discovery: `${base}/.well-known/oauth-authorization-server`,
+                    manage_tokens: `${base}/auth/tokens`,
+                },
+            });
     });
 
     return router;

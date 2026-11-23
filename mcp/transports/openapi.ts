@@ -14,6 +14,7 @@ import { getNodeTools } from '../tools/nodes';
 import { getMetaTools } from '../tools/meta';
 import { getAclTools } from '../tools/acl';
 import { getKeyTools } from '../tools/keys';
+import { getMyPagesTools } from '../tools/myPages';
 import { paramString } from '../../api/utils/routeParams';
 import { getSnapshotTools } from '../tools/snapshots';
 import { type ToolDeps, type ToolDef, unknownArgsRefusal } from '../tools/types';
@@ -29,9 +30,13 @@ function unwrapToolResult(result: { content: Array<{ type: string; text?: string
     status: number;
     body: any;
 } {
-    const text = result.content?.[0]?.type === 'text' ? result.content[0].text ?? '' : '';
+    const text = result.content?.[0]?.type === 'text' ? (result.content[0].text ?? '') : '';
     let parsed: any = text;
-    try { parsed = JSON.parse(text); } catch { /* leave as raw string */ }
+    try {
+        parsed = JSON.parse(text);
+    } catch {
+        /* leave as raw string */
+    }
     if (result.isError) {
         return { status: 400, body: { error: parsed } };
     }
@@ -42,15 +47,14 @@ let cachedSkill: string | null = null;
 
 async function loadSkill(projectRoot: string): Promise<string> {
     if (cachedSkill !== null) return cachedSkill;
-    const candidates = [
-        path.join(projectRoot, 'mcp', 'skill.md'),
-        path.join(projectRoot, '..', 'mcp', 'skill.md'),
-    ];
+    const candidates = [path.join(projectRoot, 'mcp', 'skill.md'), path.join(projectRoot, '..', 'mcp', 'skill.md')];
     for (const p of candidates) {
         try {
             cachedSkill = await fs.readFile(p, 'utf-8');
             return cachedSkill;
-        } catch { /* try next */ }
+        } catch {
+            /* try next */
+        }
     }
     cachedSkill = '';
     return cachedSkill;
@@ -64,6 +68,7 @@ export function createActionsRouter(deps: ToolDeps): Router {
         ...getSnapshotTools(),
         ...getAclTools(),
         ...getKeyTools(),
+        ...getMyPagesTools(),
         ...getMetaTools(),
     ];
     const toolMap = new Map(tools.map((t) => [t.name, t]));
@@ -76,8 +81,7 @@ export function createActionsRouter(deps: ToolDeps): Router {
             info: {
                 title: 'SlopDogs Actions',
                 version: '0.1.0',
-                description:
-                    'Build and call SlopDogs kennels — reusable hunting packs that fetch and combine data from external sources.',
+                description: 'Build and call SlopDogs kennels — reusable hunting packs that fetch and combine data from external sources.',
             },
             servers: [{ url: `${base}/actions` }],
             paths: {},
@@ -148,8 +152,7 @@ export function createActionsRouter(deps: ToolDeps): Router {
         const instructions = await loadSkill(deps.projectRoot);
         res.json({
             name: 'SlopDogs — Kennel Master',
-            description:
-                'Build and call SlopDogs kennels: hunting packs that fetch and combine data from external APIs.',
+            description: 'Build and call SlopDogs kennels: hunting packs that fetch and combine data from external APIs.',
             instructions,
             capabilities: { web_browsing: false, dalle: false, code_interpreter: false },
             actions: {
@@ -193,7 +196,8 @@ export function createActionsRouter(deps: ToolDeps): Router {
             res.status(500).json({ error: 'no auth context' });
             return;
         }
-        if (!ctx.user && !ctx.isSuperUser) {
+        // Wie /mcp: nur Bearer. Dieselben Werkzeuge, also auch hier keine Anmeldung per Session-Cookie.
+        if ((!ctx.user && !ctx.isSuperUser) || (ctx.via === 'session' && !ctx.isSuperUser)) {
             const base = baseUrl(req);
             res.setHeader(
                 'WWW-Authenticate',
@@ -221,10 +225,12 @@ export function createActionsRouter(deps: ToolDeps): Router {
 
     // GET on actions/* (other than the spec/template paths handled above) — not allowed.
     router.get('/:tool', (req: Request, res: Response) => {
-        res.set('Allow', 'POST').status(405).json({
-            error: 'method_not_allowed',
-            error_description: `POST /actions/${req.params.tool} with a JSON body.`,
-        });
+        res.set('Allow', 'POST')
+            .status(405)
+            .json({
+                error: 'method_not_allowed',
+                error_description: `POST /actions/${req.params.tool} with a JSON body.`,
+            });
     });
 
     return router;

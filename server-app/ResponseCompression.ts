@@ -19,7 +19,8 @@ type Encoding = 'br' | 'gzip';
 export class ResponseCompression {
     /** Unter dieser Groesse kostet das Packen mehr, als es spart. */
     static readonly THRESHOLD_BYTES = 1024;
-    private static readonly COMPRESSIBLE = /^(text\/(?!event-stream)[a-z0-9.+-]+|application\/(json|javascript|x-javascript|xml|manifest\+json|ld\+json|problem\+json|[a-z0-9.-]+\+json|[a-z0-9.-]+\+xml)|image\/svg\+xml)(\s*;|$)/i;
+    private static readonly COMPRESSIBLE =
+        /^(text\/(?!event-stream)[a-z0-9.+-]+|application\/(json|javascript|x-javascript|xml|manifest\+json|ld\+json|problem\+json|[a-z0-9.-]+\+json|[a-z0-9.-]+\+xml)|image\/svg\+xml)(\s*;|$)/i;
 
     constructor(
         private readonly brotliQuality = 5,

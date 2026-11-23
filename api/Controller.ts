@@ -22,7 +22,9 @@ export interface ControllerOptions {
     refIndex?: IDogReferenceSink;
 }
 
-export class Controller<T extends { id?: string; lineageId?: string; parentId?: string | null; displayName?: string; version?: number; [key: string]: any }> extends AbstractController<T> {
+export class Controller<
+    T extends { id?: string; lineageId?: string; parentId?: string | null; displayName?: string; version?: number; [key: string]: any },
+> extends AbstractController<T> {
     private enableVersioning: boolean;
     private readonly refIndex: IDogReferenceSink | null;
 
@@ -42,7 +44,12 @@ export class Controller<T extends { id?: string; lineageId?: string; parentId?: 
     private async syncParentRefs(lineageId: string | undefined, ownerId: unknown, cfg: any): Promise<void> {
         if (!this.refIndex || !lineageId) return;
         try {
-            await this.refIndex.replaceDogRefs(lineageId, typeof ownerId === 'string' ? ownerId : null, cfg?.parentsRequired, cfg?.parentsOptional);
+            await this.refIndex.replaceDogRefs(
+                lineageId,
+                typeof ownerId === 'string' ? ownerId : null,
+                cfg?.parentsRequired,
+                cfg?.parentsOptional,
+            );
         } catch (err) {
             console.warn(`[Controller] references of ${lineageId} not updated:`, err);
         }
@@ -104,7 +111,7 @@ export class Controller<T extends { id?: string; lineageId?: string; parentId?: 
      */
     async create(input: ICreateInput): Promise<IControllerResponse<T>> {
         try {
-            const id = this.enableVersioning ? generateVersionId() : (input.id || `${this.entityType.toLowerCase()}-${Date.now()}`);
+            const id = this.enableVersioning ? generateVersionId() : input.id || `${this.entityType.toLowerCase()}-${Date.now()}`;
             const lineageId = this.enableVersioning ? generateLineageId() : undefined;
 
             // Pull ACL fields off the input — they live on the outer row, not in the config.
@@ -212,18 +219,10 @@ export class Controller<T extends { id?: string; lineageId?: string; parentId?: 
             const inputViewers = (input as any).viewers;
             const inputRunners = (input as any).runners;
             const nextVisibility = normalizeVisibility(inputVisibility) ?? existingRow?.visibility ?? undefined;
-            const nextOwnerId = inputOwnerId !== undefined
-                ? inputOwnerId
-                : existingRow?.ownerId ?? undefined;
-            const nextEditors = inputEditors !== undefined
-                ? inputEditors
-                : existingRow?.editors ?? undefined;
-            const nextViewers = inputViewers !== undefined
-                ? inputViewers
-                : existingRow?.viewers ?? undefined;
-            const nextRunners = inputRunners !== undefined
-                ? inputRunners
-                : existingRow?.runners ?? undefined;
+            const nextOwnerId = inputOwnerId !== undefined ? inputOwnerId : (existingRow?.ownerId ?? undefined);
+            const nextEditors = inputEditors !== undefined ? inputEditors : (existingRow?.editors ?? undefined);
+            const nextViewers = inputViewers !== undefined ? inputViewers : (existingRow?.viewers ?? undefined);
+            const nextRunners = inputRunners !== undefined ? inputRunners : (existingRow?.runners ?? undefined);
             const visibilityChanged = (existingRow?.visibility ?? undefined) !== nextVisibility;
             const ownerChanged = (existingRow?.ownerId ?? undefined) !== nextOwnerId;
             const editorsChanged = JSON.stringify(existingRow?.editors ?? null) !== JSON.stringify(nextEditors ?? null);
@@ -234,9 +233,15 @@ export class Controller<T extends { id?: string; lineageId?: string; parentId?: 
             // land in serializedDogConfig as duplicates of the row columns. `frozen` never
             // travels with a save: only setFrozen touches it, on the head row.
             const {
-                id: _oldId, visibility: _vIn, ownerId: _oIn, editors: _eIn, viewers: _wIn, runners: _rIn, frozen: _fIn,
+                id: _oldId,
+                visibility: _vIn,
+                ownerId: _oIn,
+                editors: _eIn,
+                viewers: _wIn,
+                runners: _rIn,
+                frozen: _fIn,
                 ...inputCfgFields
-            } = (input as any);
+            } = input as any;
             const { id: _prevId, serializedDogConfig: _stripNested, ...priorCfg } = (existingInner || {}) as any;
             const nextCfg = {
                 ...priorCfg,
@@ -352,7 +357,18 @@ export class Controller<T extends { id?: string; lineageId?: string; parentId?: 
      * Only the fields that carry meaning are compared; metadata (id, lineageId, parentId, timestamps) is ignored.
      */
     private hasContentChanged(old: T, next: T): boolean {
-        const contentKeys = ['theRun', 'tsCode', 'code', 'icon', 'parentsRequired', 'parentsOptional', 'imitates', 'displayName', 'description', 'lineDocs'];
+        const contentKeys = [
+            'theRun',
+            'tsCode',
+            'code',
+            'icon',
+            'parentsRequired',
+            'parentsOptional',
+            'imitates',
+            'displayName',
+            'description',
+            'lineDocs',
+        ];
         for (const key of contentKeys) {
             const a = (old as any)[key];
             const b = (next as any)[key];

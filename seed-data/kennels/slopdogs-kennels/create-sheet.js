@@ -1,0 +1,28 @@
+// SlopDogs kennel list · create sheet. The <template> of the New kennel sheet (sd-kennel-sheet): ID with its live
+// rule and public address, name, description, emoji picker, visibility (filled from SlopdogsKennelsCopy.vis),
+// Create and Cancel. SlopdogsKennelsScriptCreate clones it.
+return [
+    '<template data-tpl="create"><div class="layer"><div class="scrim" data-close aria-hidden="true"></div>',
+    '<form class="sheet" role="dialog" aria-modal="true" aria-labelledby="nk-title" novalidate>',
+    '<span class="grip" aria-hidden="true"></span>',
+    '<header class="head"><h2 id="nk-title" class="sd-h1">New kennel</h2>',
+    '<button type="button" class="sd-btn sd-btn--ink sd-btn--icon" aria-label="Close" data-close>×</button></header>',
+    '<div class="body"><div class="banner danger" data-c="error" role="alert" hidden><span class="t"></span></div>',
+    '<div class="f"><label class="sd-label" for="nk-id">ID</label>',
+    '<input id="nk-id" class="sd-field" autocomplete="off" spellcheck="false" placeholder="race-map" aria-describedby="nk-id-hint" required>',
+    '<span id="nk-id-hint" class="sd-hint">One URL segment: letters, digits, . _ -</span></div>',
+    '<div class="f"><label class="sd-label" for="nk-name">Name</label>',
+    '<input id="nk-name" class="sd-field" autocomplete="off" placeholder="Race map"></div>',
+    '<div class="f"><label class="sd-label" for="nk-desc">Description</label>',
+    '<textarea id="nk-desc" class="sd-textarea" rows="3"></textarea></div>',
+    '<div class="f"><span class="sd-label" id="nk-emoji-label">Emoji</span>',
+    '<button type="button" class="sd-field pick" aria-haspopup="dialog" aria-expanded="false" ',
+    'aria-labelledby="nk-emoji-label nk-emoji-now" data-c="emoji"><span class="glyph" id="nk-emoji-now">🐕</span>',
+    '<span class="sd-small muted" data-c="emoji-note">default · pick one</span></button>',
+    '<div class="pop sd-lift" role="dialog" aria-label="Pick an emoji" data-c="pop" hidden><div class="grid" data-c="grid"></div>',
+    '<button type="button" class="sd-btn sd-btn--sm" data-c="noemoji">No emoji</button></div></div>',
+    '<fieldset class="f"><legend class="sd-label">Visibility</legend><div data-c="vis"></div></fieldset></div>',
+    '<footer class="foot"><button type="submit" class="sd-btn sd-btn--primary sd-btn--lg" data-c="submit" disabled>Create kennel</button>',
+    '<button type="button" class="sd-btn sd-btn--lg" data-close>Cancel</button></footer>',
+    '</form></div></template>',
+].join('');

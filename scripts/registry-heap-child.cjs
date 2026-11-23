@@ -1,6 +1,6 @@
 /**
  * Kindprozess: eine Registry laden, Instanzen wie main erzeugen, heapUsed ausgeben (eine Zeile JSON).
- * Aufruf: node -r ts-node/register -r tsconfig-paths/register scripts/registry-heap-child.cjs slim|full
+ * Aufruf: node -r ts-node/register scripts/registry-heap-child.cjs slim|full
  */
 const path = require('path');
 

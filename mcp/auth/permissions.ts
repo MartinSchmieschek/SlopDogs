@@ -27,10 +27,6 @@ import { AclEntity, canMutate } from './visibility';
  * @param _kennelStore Unused; retained so callers need not change. The kennel
  *                     manifest is deliberately NOT consulted (see security note above).
  */
-export async function canMutateNode(
-    node: AclEntity,
-    ctx: AuthCtx | undefined,
-    _kennelStore: IStore,
-): Promise<boolean> {
+export async function canMutateNode(node: AclEntity, ctx: AuthCtx | undefined, _kennelStore: IStore): Promise<boolean> {
     return canMutate(node, ctx);
 }

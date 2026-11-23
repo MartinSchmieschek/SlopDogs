@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      # postinstall (npm ci) laeuft durch scripts/load-env.cjs -> assertRequiredDbEnv; die CI hat keine .env.
+      # SQLite-Dateien neben den Schemas, nur fuer diesen Lauf. test:startup legt eigene an.
+      DATABASE_URL: file:./dev.db
+      CACHE_DATABASE_URL: file:./cache.db
+      JSON_STORAGE_DATABASE_URL: file:./json-storage.db
+      AUTH_DATABASE_URL: file:./auth.db
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            ui-app/package-lock.json
+
+      - name: npm ci
+        run: npm ci
+
+      - name: npm test
+        run: npm test
+
+      - name: npm run test:startup
+        run: npm run test:startup

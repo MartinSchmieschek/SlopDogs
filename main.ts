@@ -19,29 +19,33 @@ process.on('uncaughtException', (err) => {
     process.exit(1);
 });
 
-import { WebSocketChannelRetriever, registerVmGlobalCapability, setVmConsoleSink } from '@slopdogs/core';
+import { WebSocketChannelRetriever, registerVmGlobalCapability, setVmConsoleSink } from '@martinschmieschek/slopdogs-core/runtime';
 import http from 'http';
+import type { Application } from 'express';
 import fs from 'fs';
+import os from 'os';
 import { ChannelHub } from './services/ChannelHub';
+import { ChannelTickets } from './server-app/ChannelTickets';
 import { IStore } from './store/IStore';
 import { PrismaStore } from './store/PrismaStore';
 import { JsonStorageService } from './services/JsonStorageService';
 import path from 'path';
 import { runSeeds } from './seed-data/seed';
+import { SeedReseed } from './services/SeedReseed';
 import { TypeDefBuilder } from './services/TypeDefBuilder';
 import { CompilerCache } from './services/CompilerCache';
 import { createHttpApplication } from './server-app/createHttpApplication';
 import { EX_CONFIG, authModeBootError } from './mcp/auth/middleware';
+import { EX_LOCAL_MODE, LocalMode } from './server-app/LocalMode';
+import type { NetworkBoundary } from './server-app/NetworkBoundary';
 import { warnMissingEnv } from './server-app/startupEnvCheck';
 import { KennelCallCounter } from './services/KennelCallCounter';
 import { DogReferenceIndex } from './services/DogReferenceIndex';
 import { KeysCapability, scrubbingConsoleSink } from './services/keysCapability';
 import { logBootMemory } from './api/utils/memoryLog';
 import { Watchpost } from './services/Watchpost';
-import {
-    assertSlimRegistryCoversKennelDbRefs,
-    collectBaseDogNamesFromLatestKennels,
-} from './server-app/slimRegistryKennelCoverage';
+import type { TestResult } from './StartupTest';
+import { assertSlimRegistryCoversKennelDbRefs, collectBaseDogNamesFromLatestKennels } from './server-app/slimRegistryKennelCoverage';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const dbEnv = require(path.join(process.cwd(), 'scripts', 'dbEnv.cjs')) as {
@@ -52,14 +56,105 @@ const dbEnv = require(path.join(process.cwd(), 'scripts', 'dbEnv.cjs')) as {
 };
 
 // Cast off the moorings — if our vessel fails to launch, we sink into the deep and trouble no man further.
-start().catch(e => {
-    console.error('Failed to start', e);
-    process.exit(1);
-});
+// Nur als Einstiegspunkt: `npm run test:startup` laedt dieses Modul fuer bootApplication, ohne zu lauschen.
+if (require.main === module) {
+    start().catch((e) => {
+        console.error('Failed to start', e);
+        process.exit(1);
+    });
+}
+
+/** Ein hochgefahrener Server, der noch nicht lauscht — main.ts bindet ihn an den Port, der Startup-Runner nicht. */
+export type BootedApplication = {
+    app: Application;
+    serveBuiltAngular: boolean;
+    devUiOrigin: string;
+    channelHub: ChannelHub;
+    /** Netzgrenze (Spur L2) — auch fuer den WebSocket-Upgrade; null in integration/production ohne lokalen Modus. */
+    networkBoundary: NetworkBoundary | null;
+    refIndex: DogReferenceIndex;
+    callCounter: KennelCallCounter;
+    store: PrismaStore;
+    jsonStorageService: JsonStorageService;
+    disconnectHttpApplication: () => Promise<void>;
+    runStartupTests: () => Promise<void>;
+    runStartupSuite: () => Promise<TestResult[]>;
+};
+
+export type BootOptions = {
+    /**
+     * Boot-Waechter (Registry deckt alle base:-Referenzen der Kennels in der DB) auch mit der vollen
+     * Registry pruefen. Ohne die Option laeuft er wie bisher nur mit der schlanken Registry (production/integration).
+     */
+    enforceKennelCoverage?: boolean;
+};
 
 async function start() {
+    const booted = await bootApplication();
+    const {
+        app,
+        serveBuiltAngular,
+        devUiOrigin,
+        channelHub,
+        networkBoundary,
+        refIndex,
+        callCounter,
+        store,
+        jsonStorageService,
+        disconnectHttpApplication,
+        runStartupTests,
+    } = booted;
+
+    const port = Number(process.env.PORT) || 3000;
+
+    // Eigener http.Server, damit der ChannelHub seinen WebSocketServer per Upgrade-Handler anhaengen kann.
+    const httpServer = http.createServer(app);
+    await channelHub.attach(httpServer, networkBoundary ? { admitUpgrade: (req) => networkBoundary.admitsUpgrade(req) } : {});
+
+    registerGracefulShutdown({ httpServer, callCounter, store, jsonStorageService, disconnectHttpApplication });
+
+    console.log('App started.');
+    logBootMemory('App started');
+    // Render u. a.: öffentlich erreichbar nur bei Bind an 0.0.0.0; PORT kommt von der Plattform. Der lokale
+    // Modus lauscht dual-stack (`::`) im LAN, damit auch IPv6-Clients des Heimnetzes hereinkommen — die
+    // Netzgrenze (Socket-Adresse, Host, Origin) haelt alles andere draussen. Ohne IPv6 auf dem Geraet: 0.0.0.0.
+    const listenHost = LocalMode.isEnabled(process.env) ? '::' : '0.0.0.0';
+    httpServer.once('error', (err: NodeJS.ErrnoException) => {
+        if (listenHost !== '::' || (err.code !== 'EAFNOSUPPORT' && err.code !== 'EADDRNOTAVAIL')) throw err;
+        console.warn(`[local] kein IPv6 (${err.code}) — lausche nur auf 0.0.0.0`);
+        httpServer.listen(port, '0.0.0.0');
+    });
+    httpServer.listen(port, listenHost, () => {
+        const base = `http://localhost:${port}`;
+        if (!serveBuiltAngular) {
+            console.log(`API ${base} — Dev-UI-Redirect: ${base}/ → ${devUiOrigin}/`);
+        }
+        console.log(`Server läuft auf Port ${port}`);
+        if (LocalMode.isEnabled(process.env)) {
+            console.log(`[local] UI und MCP im LAN: http://${os.hostname().toLowerCase()}.local:${port}/ — MCP: /mcp, ohne Token`);
+        }
+        // ERST JETZT Referenzindex und Selbsttests: der Port ist offen, die Plattform sieht einen gesunden
+        // Dienst. Die Selbsttests warten auf den Rebuild — sie schreiben in dieselbe Referenztabelle.
+        // Beide fangen intern alles ab und werfen nie.
+        void rebuildReferenceIndex(refIndex).then(() => runStartupTests());
+    });
+}
+
+/**
+ * Faehrt Stores, Seeds, Registry, Typen, Boot-Waechter und die Express-App hoch — alles bis vor listen().
+ */
+export async function bootApplication(options: BootOptions = {}): Promise<BootedApplication> {
     // Vor allem anderen — vor der Datenbank und vor createHttpApplication: ein Dienst, in dem
     // jeder Besucher Super-User ist, darf ausserhalb von dev gar nicht erst hochkommen (P3.5).
+    // Zuerst der lokale Modus (Spur L1): ohne Login nie mit oeffentlicher Adresse, Proxy oder auf Render.
+    const localModeError = LocalMode.bootError(process.env);
+    if (localModeError) {
+        console.error(localModeError);
+        process.exit(EX_LOCAL_MODE);
+    }
+    const localMode = LocalMode.isEnabled(process.env);
+    const containerWarning = LocalMode.containerWarning(process.env);
+    if (containerWarning) console.warn(containerWarning);
     const bootError = authModeBootError(process.env, (line) => console.log(line));
     if (bootError) {
         console.error(bootError);
@@ -85,69 +180,72 @@ async function start() {
     // Rouse the store from its slumber lest the connection rot in the bilge.
     await store.init();
 
+    // Ein Prisma-Client statt vier (P1.4): JSON-Storage, Auth und Run-Cache nutzen den Store-Client
+    // mit, wo sie physisch in der Store-Datenbank liegen (scripts/dbEnv.cjs sharesStoreDatabase);
+    // nur getrennte Datenbanken bekommen eigene Clients. Besitzer bleibt der Store (store.disconnect()).
+    const prismaClients = store.sharedClients();
+
     // Plant the first bones in the earth — the seeds from which our pack shall grow.
     await runSeeds(nodesStore, kennelsStore);
     logBootMemory('Seeds');
 
     // Aufrufe je Kennel (P4): im Speicher gezaehlt, alle KENNEL_CALL_FLUSH_MS in einer Transaktion
-    // geschrieben. Die Tabellen haengen am Store-Client — kein fuenfter PrismaClient.
+    // geschrieben. Die Tabellen haengen am Store-Client — kein eigener PrismaClient.
     const callCounter = new KennelCallCounter(store);
     callCounter.start();
 
-    // Fachliche JSON-Ablage: eigene SQLite (JSON_STORAGE_DATABASE_URL), bewusst getrennt
-    // von Nodes/Kennels (DATABASE_URL) und Run-Cache (CACHE_DATABASE_URL).
+    // Fachliche JSON-Ablage (JSON_STORAGE_DATABASE_URL), fachlich getrennt von Nodes/Kennels
+    // (DATABASE_URL) und Run-Cache (CACHE_DATABASE_URL); physisch dieselbe Datenbank wie der
+    // Store (Single-DB) -> derselbe Client, sonst ein eigener.
     //
     // Welle 7: jsonStore ist VM-Infrastruktur, kein Daten-Pakt. Statt einen BaseDog
     // (JsonStorageRetriever) zu registrieren, legen wir die Bruecke direkt als VM-Global-
     // Capability beim Core ab. Jeder SerializedDog sieht `jsonStore` damit automatisch im
     // VM-Context, ohne einen Parent zu deklarieren -- so wie er auch `fetch` und `console`
     // sieht.
-    const jsonStorageService = new JsonStorageService(dbEnv.resolveJsonStorageDatabaseUrl());
+    const jsonStorageService = new JsonStorageService(prismaClients, dbEnv.resolveJsonStorageDatabaseUrl());
     // Die Doku reist mit der Registrierung: der MCP kuendigt jsonStore dadurch von
     // selbst an. Ohne das ist er im MCP unsichtbar (kein Dog, kein Node, kein Tool)
     // und ein Agent bastelt sich stattdessen eine eigene Ablage.
-    registerVmGlobalCapability('jsonStore', (ctx) => {
-        const userId = ctx?.userId ?? null;
-        const isSuper = ctx?.isSuperUser === true;
-        // SECURITY (2026-09-13): anonymous callers used to get the RAW, unprefixed
-        // store — so a public kennel run without a login could snapshot()/list()
-        // EVERY user's `user:<id>:*` keys and set() straight into them, overwriting
-        // other users' data. Keys must be tenant-scoped for everyone except the
-        // super-user (dev/admin). Logged-in users get `user:<id>:`; anonymous callers
-        // get a single shared, isolated `anon:` namespace — enough for public-kennel
-        // caches, but with no reach into any `user:` key. This is the isolation the
-        // MCP tool contract already promised ("Keys sind pro eingeloggtem User isoliert").
-        const prefix = isSuper
-            ? ''
-            : (typeof userId === 'string' && userId.length > 0 ? `user:${userId}:` : 'anon:');
-        const usePrefix = prefix !== '';
-        const wrap = (k: string) => prefix + k;
+    registerVmGlobalCapability(
+        'jsonStore',
+        (ctx) => {
+            const userId = ctx?.userId ?? null;
+            const isSuper = ctx?.isSuperUser === true;
+            // SECURITY (2026-09-13): anonymous callers used to get the RAW, unprefixed
+            // store — so a public kennel run without a login could snapshot()/list()
+            // EVERY user's `user:<id>:*` keys and set() straight into them, overwriting
+            // other users' data. Keys must be tenant-scoped for everyone except the
+            // super-user (dev/admin). Logged-in users get `user:<id>:`; anonymous callers
+            // get a single shared, isolated `anon:` namespace — enough for public-kennel
+            // caches, but with no reach into any `user:` key. This is the isolation the
+            // MCP tool contract already promised ("Keys sind pro eingeloggtem User isoliert").
+            const prefix = isSuper ? '' : typeof userId === 'string' && userId.length > 0 ? `user:${userId}:` : 'anon:';
+            const usePrefix = prefix !== '';
+            const wrap = (k: string) => prefix + k;
 
-        return {
-            get: (k: string) => jsonStorageService.get(wrap(k)),
-            set: (k: string, v: unknown) => jsonStorageService.set(wrap(k), v),
-            delete: (k: string) => jsonStorageService.delete(wrap(k)),
-            has: (k: string) => jsonStorageService.has(wrap(k)),
-            list: async () => {
-                const all = await jsonStorageService.list();
-                if (!usePrefix) return all;
-                return all
-                    .filter((k) => k.startsWith(prefix))
-                    .map((k) => k.substring(prefix.length));
-            },
-            snapshot: async () => {
-                const all = await jsonStorageService.snapshot();
-                if (!usePrefix) return all;
-                return all
-                    .filter((e) => e.key.startsWith(prefix))
-                    .map((e) => ({ ...e, key: e.key.substring(prefix.length) }));
-            },
-        };
-    },
-        'jsonStore.get(key) / .set(key, value) / .delete(key) / .has(key) / .list() / .snapshot() — '
-        + 'persistente JSON-Ablage, direkt als Global im Dog-Code verfuegbar (kein Parent noetig, alle Methoden async). '
-        + 'Keys sind pro eingeloggtem User isoliert. Nutze sie fuer Caches und Zustand, statt dir eine eigene Ablage zu bauen. '
-        + 'Die Ablage ist Klartext: API-Schluessel gehoeren nicht hierher, sondern in den Key-Store (set_key, dann keys.fetch).');
+            return {
+                get: (k: string) => jsonStorageService.get(wrap(k)),
+                set: (k: string, v: unknown) => jsonStorageService.set(wrap(k), v),
+                delete: (k: string) => jsonStorageService.delete(wrap(k)),
+                has: (k: string) => jsonStorageService.has(wrap(k)),
+                list: async () => {
+                    const all = await jsonStorageService.list();
+                    if (!usePrefix) return all;
+                    return all.filter((k) => k.startsWith(prefix)).map((k) => k.substring(prefix.length));
+                },
+                snapshot: async () => {
+                    const all = await jsonStorageService.snapshot();
+                    if (!usePrefix) return all;
+                    return all.filter((e) => e.key.startsWith(prefix)).map((e) => ({ ...e, key: e.key.substring(prefix.length) }));
+                },
+            };
+        },
+        'jsonStore.get(key) / .set(key, value) / .delete(key) / .has(key) / .list() / .snapshot() — ' +
+            'persistente JSON-Ablage, direkt als Global im Dog-Code verfuegbar (kein Parent noetig, alle Methoden async). ' +
+            'Keys sind pro eingeloggtem User isoliert. Nutze sie fuer Caches und Zustand, statt dir eine eigene Ablage zu bauen. ' +
+            'Die Ablage ist Klartext: API-Schluessel gehoeren nicht hierher, sondern in den Key-Store (set_key, dann keys.fetch).',
+    );
 
     // Lobby-Hub: In-Memory-Raeume fuer den WebSocketChannelRetriever.
     const channelHub = new ChannelHub({
@@ -158,10 +256,15 @@ async function start() {
         path: process.env.WS_PATH || undefined,
     });
     WebSocketChannelRetriever.initService(channelHub);
+    // Lobby-Tickets (fix/k-sandbox): Schluessel je Prozess. Ausgestellt wird nur, wo eine Netzgrenze sie prueft (unten).
+    const channelTickets = new ChannelTickets(channelHub.wsPath());
 
     const nodeEnvForRegistry = process.env.NODE_ENV || 'development';
-    /** Nur lokal (development): volle Dog-Registry. Production + Integration: schlanke Registry, weniger Imports/Heap. */
-    const useSlimBaseDogRegistry = nodeEnvForRegistry === 'production' || nodeEnvForRegistry === 'integration';
+    /**
+     * development und lokaler Modus: volle Dog-Registry (lokal mit dogs-hue und den anderen Heimnetz-Dogs).
+     * Production + Integration: schlanke Registry, weniger Imports/Heap.
+     */
+    const useSlimBaseDogRegistry = (nodeEnvForRegistry === 'production' || nodeEnvForRegistry === 'integration') && !localMode;
     const registryModule = useSlimBaseDogRegistry
         ? await import('./server-registries/slimDeployRegistry')
         : await import('./server-registries/fullRegistry');
@@ -169,7 +272,7 @@ async function start() {
 
     // Breathe life into each hound — those who lack their credentials perish in the constructor.
     // The survivors form the pack; the fallen are mourned in the logs.
-    const allBaseDogs: InstanceType<typeof allBaseDogClasses[number]>[] = [];
+    const allBaseDogs: InstanceType<(typeof allBaseDogClasses)[number]>[] = [];
     const baseDogsMap = new Map<string, new () => any>();
     // Dogs, deren Konstruktor wirft (z. B. fehlender API-Key), landen NICHT in
     // baseDogsMap. Ihren Klassennamen merken wir uns, damit der Coverage-Guard
@@ -189,7 +292,7 @@ async function start() {
     }
 
     // The Pacts — aus Registry-Modul (schlank unter production/integration, sonst volle Crew).
-    allPacts.forEach(PactClass => {
+    allPacts.forEach((PactClass) => {
         const instance = new PactClass();
         baseDogsMap.set(instance.name, PactClass);
     });
@@ -220,7 +323,7 @@ async function start() {
 
     TypeDefBuilder.registerPacts([...allPacts]);
 
-    if (useSlimBaseDogRegistry) {
+    if (useSlimBaseDogRegistry || options.enforceKennelCoverage) {
         const requiredFromDb = await collectBaseDogNamesFromLatestKennels(kennelsStore);
         assertSlimRegistryCoversKennelDbRefs(requiredFromDb, baseDogsMap, nodeEnvForRegistry, unavailableBaseDogNames);
     }
@@ -228,8 +331,18 @@ async function start() {
     const nodeEnv = process.env.NODE_ENV || 'development';
     const devUiOrigin = (process.env.DEV_UI_ORIGIN || 'http://localhost:4300').replace(/\/$/, '');
 
-    const { app, serveBuiltAngular, runStartupTests, disconnect: disconnectHttpApplication, keyStore } = await createHttpApplication({
+    const {
+        app,
+        serveBuiltAngular,
+        runStartupTests,
+        runStartupSuite,
+        disconnect: disconnectHttpApplication,
+        keyStore,
+        networkBoundary,
+        reseed,
+    } = await createHttpApplication({
         nodeEnv,
+        localMode,
         devUiOrigin,
         serverRootDir: __dirname,
         nodesStore,
@@ -237,11 +350,26 @@ async function start() {
         allBaseDogs,
         baseDogsMap,
         resolveCacheDatabaseUrl: dbEnv.resolveCacheDatabaseUrl,
+        prismaClients,
         callCounter,
         statsStore: store,
         refIndex,
         dogStatsStore: store,
+        userPageStore: store,
+        channelTickets,
     });
+
+    // Spur K: Landing und Kennel-Liste auf den Repo-Stand, wenn `--reseed` oder eine neue SLOPDOGS_RESEED-Marke es
+    // verlangt — derselbe Loeschweg wie ein Maintainer, danach der normale Seed. Scheitert er, startet der Dienst trotzdem;
+    // die Marke bleibt dann unvermerkt, der naechste Start versucht es wieder.
+    try {
+        await reseed(SeedReseed.triggerOf(process.argv, process.env));
+    } catch (err) {
+        console.error('[seed] reseed gescheitert -- der Dienst startet mit dem Stand davor:', err);
+    }
+
+    // Nur mit Netzgrenze (dev, lokal): dort weist sie `Origin: null` ohne Ticket ab. Deployed bleibt die wsUrl wie bisher.
+    WebSocketChannelRetriever.useTicketIssuer(networkBoundary ? channelTickets : undefined);
 
     // Key-Store (P4c): die zweite VM-Global-Capability neben jsonStore. Sie haengt am Auth-Client, den
     // createHttpApplication besitzt — deshalb erst hier. keys.fetch ersetzt `{{key:<alias>}}` auf dem
@@ -250,28 +378,23 @@ async function start() {
     new KeysCapability(keyStore).register();
     setVmConsoleSink(scrubbingConsoleSink);
 
-    const port = Number(process.env.PORT) || 3000;
+    // Eine Zeile im (Render-)Log: welche Teile den Store-Client teilen, welche eigene Clients haben.
+    console.log(prismaClients.describe());
 
-    // Eigener http.Server, damit der ChannelHub seinen WebSocketServer per Upgrade-Handler anhaengen kann.
-    const httpServer = http.createServer(app);
-    await channelHub.attach(httpServer);
-
-    registerGracefulShutdown({ httpServer, callCounter, store, jsonStorageService, disconnectHttpApplication });
-
-    console.log('App started.');
-    logBootMemory('App started');
-    // Render u. a.: öffentlich erreichbar nur bei Bind an 0.0.0.0; PORT kommt von der Plattform.
-    httpServer.listen(port, '0.0.0.0', () => {
-        const base = `http://localhost:${port}`;
-        if (!serveBuiltAngular) {
-            console.log(`API ${base} — Dev-UI-Redirect: ${base}/ → ${devUiOrigin}/`);
-        }
-        console.log(`Server läuft auf Port ${port}`);
-        // ERST JETZT Referenzindex und Selbsttests: der Port ist offen, die Plattform sieht einen gesunden
-        // Dienst. Die Selbsttests warten auf den Rebuild — sie schreiben in dieselbe Referenztabelle.
-        // Beide fangen intern alles ab und werfen nie.
-        void rebuildReferenceIndex(refIndex).then(() => runStartupTests());
-    });
+    return {
+        app,
+        serveBuiltAngular,
+        devUiOrigin,
+        channelHub,
+        networkBoundary,
+        refIndex,
+        callCounter,
+        store,
+        jsonStorageService,
+        disconnectHttpApplication,
+        runStartupTests,
+        runStartupSuite,
+    };
 }
 
 /**
@@ -281,11 +404,13 @@ async function start() {
  */
 const REFERENCE_REBUILD_DELAY_MS = 3_000;
 
-async function rebuildReferenceIndex(refIndex: DogReferenceIndex): Promise<void> {
-    await new Promise((resolve) => setTimeout(resolve, REFERENCE_REBUILD_DELAY_MS));
+export async function rebuildReferenceIndex(refIndex: DogReferenceIndex, delayMs: number = REFERENCE_REBUILD_DELAY_MS): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
     try {
         const rebuilt = await refIndex.rebuild();
-        console.log(`[DogReferenceIndex] rebuild: ${rebuilt.rows} Referenzen aus ${rebuilt.kennels} Kennels und ${rebuilt.dogs} Dogs in ${rebuilt.durationMs} ms`);
+        console.log(
+            `[DogReferenceIndex] rebuild: ${rebuilt.rows} Referenzen aus ${rebuilt.kennels} Kennels und ${rebuilt.dogs} Dogs in ${rebuilt.durationMs} ms`,
+        );
     } catch (err) {
         console.error('[DogReferenceIndex] rebuild gescheitert — Referenzzahlen leer bis zum naechsten Start:', err);
     }
@@ -332,6 +457,8 @@ function registerGracefulShutdown(targets: ShutdownTargets): void {
         // gezaehlt), der letzte Flush braucht den Store-Pool noch. stop() wirft nie.
         await targets.callCounter.stop();
 
+        // Der geteilte Prisma-Client (Single-DB) endet mit store.disconnect(); JSON-Storage und
+        // HTTP-App trennen nur ihre eigenen Clients (store/SharedPrismaClients.ts).
         await Promise.allSettled([
             targets.store.disconnect(),
             targets.jsonStorageService.disconnect(),

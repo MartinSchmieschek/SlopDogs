@@ -5,6 +5,7 @@ import type { KennelRunAttribution } from '../api/routes/KennelRunHandler';
 import { isHtmlResultString } from '../services/leadResultStringFormat';
 import { LandingKennels } from '../mcp/auth/landingKennels';
 import { BetaKeys } from '../mcp/auth/betaKeys';
+import { MyPagesRedirect } from './MyPagesRedirect';
 
 /** Wer die Lead-Ausgabe eines Kennels liefert — der KennelRunHandler (P5: `runLeadAsAnonymous`). */
 export interface LandingRunner {
@@ -57,7 +58,7 @@ function positiveIntFromEnv(name: string, fallback: number): number {
  * Hintergrund. Der Host (`‹host›` in der Ausgabe) kommt je Anfrage aus MCP_BASE_URL bzw. dem Request, nie ins Memo.
  */
 export class LandingPage {
-    static readonly DEFAULT_KENNEL_ID = 'slopdogs-landing';
+    static readonly DEFAULT_KENNEL_ID = LandingKennels.DEFAULT_KENNEL_ID;
     static readonly DEFAULT_MEMO_MS = 300_000;
     static readonly CACHE_CONTROL = 'public, max-age=300';
     /** Rotiert `/` zwischen mehreren Kennels, darf kein Cache einen Besuch fuer fuenf Minuten festhalten. */
@@ -97,15 +98,23 @@ export class LandingPage {
             kennelIds: LandingKennels.ids(),
             memoMs: positiveIntFromEnv('LANDING_HTML_MEMO_MS', LandingPage.DEFAULT_MEMO_MS),
         });
-        console.log(landing.kennelIds.length
-            ? `[LandingPage] / rotiert zwischen ${landing.kennelIds.join(', ')} (schreibgeschuetzt); Standard ${landing.defaultKennelId}`
-            : `[LandingPage] / liefert ${landing.defaultKennelId} (LANDING_KENNEL_IDS leer)`);
+        console.log(
+            landing.kennelIds.length
+                ? `[LandingPage] / rotiert zwischen ${landing.kennelIds.join(', ')} (schreibgeschuetzt); Standard ${landing.defaultKennelId}`
+                : `[LandingPage] / liefert ${landing.defaultKennelId} (LANDING_KENNEL_IDS leer)`,
+        );
         return landing;
     }
 
     /** Der Lauf-Lieferant kommt nach dem Montieren der Routen (createHttpApplication); bis dahin gilt der Fallback. */
     useRunner(runner: LandingRunner): void {
         this.runner = runner;
+    }
+
+    /** Der Kennel wurde geloescht: sein Memo faellt sofort, der naechste Besuch nimmt den naechsten Kandidaten. */
+    forget(kennelId: string): void {
+        const wanted = kennelId.toLowerCase();
+        for (const id of [...this.memo.keys()]) if (id.toLowerCase() === wanted) this.memo.delete(id);
     }
 
     /** Wie viele Kennel-Laeufe die Landing ausgeloest hat — Messpunkt fuer "kein Lauf je Besuch". */
@@ -118,10 +127,17 @@ export class LandingPage {
         return this.kennelIds.length > 1;
     }
 
+    /** Der Kennel, den `?landing=<id>` dieser Anfrage erzwingt — nur einer aus der Liste, sonst null. */
+    forcedIn(req: Request): string | null {
+        return this.forcedOf(req.query?.[LandingPage.FORCE_PARAM]);
+    }
+
     /** Ein erzwungener Kennel zaehlt nur, wenn er in der Liste steht — `?landing=` oeffnet keinen beliebigen Kennel. */
     forcedOf(raw: unknown): string | null {
-        const wanted = String(Array.isArray(raw) ? raw[0] : raw ?? '').trim().toLowerCase();
-        return wanted ? this.kennelIds.find((id) => id.toLowerCase() === wanted) ?? null : null;
+        const wanted = String(Array.isArray(raw) ? raw[0] : (raw ?? ''))
+            .trim()
+            .toLowerCase();
+        return wanted ? (this.kennelIds.find((id) => id.toLowerCase() === wanted) ?? null) : null;
     }
 
     /**
@@ -161,7 +177,7 @@ export class LandingPage {
     }
 
     async handleGet(req: Request, res: Response, next: NextFunction): Promise<void> {
-        const forced = this.forcedOf(req.query?.[LandingPage.FORCE_PARAM]);
+        const forced = this.forcedIn(req);
         let page: LandingPageResult | null;
         try {
             page = await this.page(forced);
@@ -179,7 +195,7 @@ export class LandingPage {
 
     /** HEAD / (Keepalive, ki-fruechte): nie ein Lauf — nur, was Memo oder Fallback schon haben. */
     handleHead(req: Request, res: Response, next: NextFunction): void {
-        const forced = this.forcedOf(req.query?.[LandingPage.FORCE_PARAM]);
+        const forced = this.forcedIn(req);
         const kennelId = this.candidates(forced).find((id) => this.memo.get(id)?.html);
         const page = kennelId ? { html: this.memo.get(kennelId)!.html!, source: 'kennel' as const, kennelId } : this.fallbackResult();
         if (!page) {
@@ -215,7 +231,9 @@ export class LandingPage {
 
     private setHeaders(res: Response, page: LandingPageResult, forced: boolean): void {
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('Cache-Control', this.rotates && !forced ? LandingPage.ROTATION_CACHE_CONTROL : LandingPage.CACHE_CONTROL);
+        // An Eingeloggte (Marke des Glieds vor `/`) `private, no-cache`, sonst wie bisher.
+        const anonymous = this.rotates && !forced ? LandingPage.ROTATION_CACHE_CONTROL : LandingPage.CACHE_CONTROL;
+        res.setHeader('Cache-Control', MyPagesRedirect.cacheControlFor(res, anonymous));
         res.setHeader('X-Landing-Source', page.source);
         if (page.kennelId) res.setHeader('X-Landing-Kennel', page.kennelId);
     }
@@ -267,7 +285,9 @@ export class LandingPage {
         const result = await this.runner.runLeadAsAnonymous(kennelId, {}, { source: 'landing' });
         const html = typeof result === 'string' && isHtmlResultString(result) ? result : null;
         const mb = (bytes: number) => Math.round(bytes / 1048576);
-        console.log(`[LandingPage] ${kennelId}: ${html ? `${Buffer.byteLength(html)} B` : 'keine HTML-Ausgabe (uebersprungen)'} in ${Date.now() - startedAt} ms, RSS ${mb(rssBefore)} -> ${mb(process.memoryUsage().rss)} MB`);
+        console.log(
+            `[LandingPage] ${kennelId}: ${html ? `${Buffer.byteLength(html)} B` : 'keine HTML-Ausgabe (uebersprungen)'} in ${Date.now() - startedAt} ms, RSS ${mb(rssBefore)} -> ${mb(process.memoryUsage().rss)} MB`,
+        );
         return html;
     }
 }

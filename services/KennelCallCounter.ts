@@ -17,10 +17,10 @@ import { RANKED_CALL_SOURCES } from '../store/IKennelStatsStore';
 import { isCacheInfraError } from './resilientCacheHandler';
 
 export interface KennelCallCounterOptions {
-    flushIntervalMs?: number;   // Default env KENNEL_CALL_FLUSH_MS, sonst 30_000; 0 = kein Timer (Tests)
-    maxPending?: number;        // Default env KENNEL_CALL_MAX_PENDING, sonst 10_000 Schluessel
-    now?: () => Date;           // Testhaken fuer die Tagesgrenze
-    onFlushed?: () => void;     // StatsService.invalidate()
+    flushIntervalMs?: number; // Default env KENNEL_CALL_FLUSH_MS, sonst 30_000; 0 = kein Timer (Tests)
+    maxPending?: number; // Default env KENNEL_CALL_MAX_PENDING, sonst 10_000 Schluessel
+    now?: () => Date; // Testhaken fuer die Tagesgrenze
+    onFlushed?: () => void; // StatsService.invalidate()
 }
 
 const DEFAULT_FLUSH_INTERVAL_MS = 30_000;
@@ -84,7 +84,10 @@ export class KennelCallCounter {
     private dropped = 0;
     private lastFlushError: string | null = null;
 
-    constructor(private readonly store: IKennelStatsStore, options: KennelCallCounterOptions = {}) {
+    constructor(
+        private readonly store: IKennelStatsStore,
+        options: KennelCallCounterOptions = {},
+    ) {
         this.flushIntervalMs = options.flushIntervalMs ?? intFromEnv('KENNEL_CALL_FLUSH_MS', DEFAULT_FLUSH_INTERVAL_MS, true);
         this.maxPending = options.maxPending ?? intFromEnv('KENNEL_CALL_MAX_PENDING', DEFAULT_MAX_PENDING, false);
         this.now = options.now ?? (() => new Date());
@@ -168,8 +171,16 @@ export class KennelCallCounter {
         const out = new Map<string, PendingDogAggregate>();
         for (const d of this.pendingDogs.values()) {
             const agg = out.get(d.dogKey) ?? {
-                total: 0, last30d: 0, ranked30d: 0, failures: 0, failures30d: 0, cached30d: 0,
-                durationMsSum30d: 0, count30d: 0, durationMsMax30d: 0, kennels: new Set<string>(),
+                total: 0,
+                last30d: 0,
+                ranked30d: 0,
+                failures: 0,
+                failures30d: 0,
+                cached30d: 0,
+                durationMsSum30d: 0,
+                count30d: 0,
+                durationMsMax30d: 0,
+                kennels: new Set<string>(),
             };
             agg.total += d.count;
             agg.failures += d.errors + d.timeouts + d.oom;
@@ -239,7 +250,9 @@ export class KennelCallCounter {
     /** Idempotent, serialisiert, wirft nie; Fehler landet in lastFlushError, Deltas bleiben. */
     flush(): Promise<void> {
         if (!this.flushing) {
-            this.flushing = this.flushOnce().finally(() => { this.flushing = null; });
+            this.flushing = this.flushOnce().finally(() => {
+                this.flushing = null;
+            });
         }
         return this.flushing;
     }
@@ -260,10 +273,15 @@ export class KennelCallCounter {
             this.lastFlushError = (err as Error)?.message ?? String(err);
             const line = `[KennelCallCounter] flush failed, ${batch.length + dogBatch.length} deltas retained: ${this.lastFlushError.slice(0, 160)}`;
             // Eine belegte/traege DB ist Betrieb, kein Defekt — wie beim Cache nur eine Warnung.
-            if (isCacheInfraError(err)) console.warn(line); else console.error(line);
+            if (isCacheInfraError(err)) console.warn(line);
+            else console.error(line);
             return;
         }
-        try { this.onFlushed?.(); } catch { /* die Invalidierung darf den Flush nicht werfen lassen */ }
+        try {
+            this.onFlushed?.();
+        } catch {
+            /* die Invalidierung darf den Flush nicht werfen lassen */
+        }
     }
 
     /** Einen gescheiterten Batch zurueckmergen — unter demselben Deckel wie record(). */
@@ -296,7 +314,9 @@ export class KennelCallCounter {
     /** setInterval + unref: der Timer haelt den Prozess nicht am Leben. 0 = kein Timer. */
     start(): void {
         if (this.timer || this.flushIntervalMs <= 0) return;
-        this.timer = setInterval(() => { void this.flush(); }, this.flushIntervalMs);
+        this.timer = setInterval(() => {
+            void this.flush();
+        }, this.flushIntervalMs);
         this.timer.unref?.();
     }
 
@@ -311,6 +331,11 @@ export class KennelCallCounter {
     }
 
     status(): { pending: number; pendingDogs: number; dropped: number; lastFlushError: string | null } {
-        return { pending: this.pending.size, pendingDogs: this.pendingDogs.size, dropped: this.dropped, lastFlushError: this.lastFlushError };
+        return {
+            pending: this.pending.size,
+            pendingDogs: this.pendingDogs.size,
+            dropped: this.dropped,
+            lastFlushError: this.lastFlushError,
+        };
     }
 }
