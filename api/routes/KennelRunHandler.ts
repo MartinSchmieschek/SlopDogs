@@ -762,16 +762,13 @@ export class KennelRunHandler {
     }
 
     /**
-     * `/k/:id` eines vertrauten Kennels (TrustedKennels: Landing) laeuft ohne Sandbox — nur die Kopfversion:
-     * mit `?version=` liefe eine alte Fassung, die vor der Sperre jeder aendern konnte.
+     * `/k/:id` eines vertrauten Kennels (TrustedKennels: Landing) laeuft ohne Sandbox, wenn die ausgelieferte Version
+     * die Kopfversion ihrer Lineage ist — gleich, ob per lineageId, per Versions-GUID im Pfad oder per `?version=`
+     * adressiert. Jede aeltere Version laeuft mit Sandbox.
      */
-    private trustIfTrustedKennel(
-        req: { query?: { version?: unknown } },
-        res: Parameters<typeof SecurityHeaders.trustKennelPage>[0],
-        config: IKennelConfig,
-    ): void {
-        if (req.query?.version !== undefined) return;
-        if (TrustedKennels.isTrusted(config)) SecurityHeaders.trustKennelPage(res);
+    private async trustIfTrustedKennel(res: Parameters<typeof SecurityHeaders.trustKennelPage>[0], config: IKennelConfig): Promise<void> {
+        if (!TrustedKennels.isTrusted(config)) return;
+        if (await this.deps.kennelsController.isHeadVersion(config)) SecurityHeaders.trustKennelPage(res);
     }
 
     /** Ein unbekannter oder unlesbarer Kennel sieht von aussen gleich aus: 404 JSON. */
@@ -825,7 +822,7 @@ export class KennelRunHandler {
                 this.sendKennelGateOrNotFound(req, res);
                 return;
             }
-            this.trustIfTrustedKennel(req, res, config);
+            await this.trustIfTrustedKennel(res, config);
 
             const dogIds = config.dogIds || [];
             if (dogIds.length === 0) {
@@ -855,7 +852,7 @@ export class KennelRunHandler {
                 this.sendKennelNotFound(res);
                 return;
             }
-            this.trustIfTrustedKennel(req, res, config);
+            await this.trustIfTrustedKennel(res, config);
 
             const dogIds = config.dogIds || [];
             if (dogIds.length === 0) {

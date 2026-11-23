@@ -42,6 +42,7 @@ import { KeyStoreService, type KeyStorePrisma } from './services/KeyStoreService
 import { PackageCandidateTests } from './test/startup/packageCandidates';
 import { SeededKennelTests } from './test/startup/seededKennelTests';
 import { HealthRouteTests } from './test/startup/healthTests';
+import { KennelTrustTests } from './test/startup/kennelTrustTests';
 import { LocalMode } from './server-app/LocalMode';
 import { authModeBootError } from './mcp/auth/middleware';
 import { AllowedHosts, NetworkBoundary } from './server-app/NetworkBoundary';
@@ -149,6 +150,22 @@ export class StartupTest {
             this.testLocalModeBootGuard();
             this.testLocalNetworkBoundary(app);
             await this.testKennelHardening(nodesStore, kennelsStore);
+            // Vertrauensweg gepflegter Kennels: ohne Sandbox nur die Kopfversion, eine gepflegte ID legt nur ein Maintainer an.
+            const trustRunHandler = new KennelRunHandler({
+                kennelsController: kennelsController as KennelController,
+                nodesStore,
+                baseDogsMap,
+                callCounter: this.testCallCounter,
+            });
+            await new KennelTrustTests((name, passed, error) => this.addResult(name, passed, error), {
+                nodesStore,
+                kennelsStore,
+                nodesController,
+                kennelsController: kennelsController as KennelController,
+                runHandler: trustRunHandler,
+                baseDogsMap,
+                toolDeps: this.toolDeps(nodesStore, kennelsStore, nodesController, kennelsController as KennelController, trustRunHandler),
+            }).run();
             // Spur K: Seed-Kennels nur wenn fehlend, Loeschen mit Nutzungspruefung, Reset = Loeschen + Neustart.
             await new SeededKennelTests(
                 (name, passed, error) => this.addResult(name, passed, error),

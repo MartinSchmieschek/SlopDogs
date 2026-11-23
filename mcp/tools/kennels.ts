@@ -12,6 +12,7 @@ import {
     rightsOf,
     isFrozen,
     landingRefuses,
+    landingRefusesCreate,
     canManageAcl,
     withMyRights,
     VISIBILITIES,
@@ -243,13 +244,16 @@ function visibilityChangeRefused(existing: any, requested: unknown, ctx: AuthCtx
     return canManageAcl(existing, ctx) ? null : 'Only the owner may change visibility';
 }
 
+/** Die Ablehnung der Landing-Sperre als Werkzeug-Text: Code und Grund. */
+const LANDING_LOCKED = `${LandingKennels.LOCK_CODE}: ${LandingKennels.LOCK_MESSAGE}`;
+
 /**
  * Warum eine Kennel-Mutation abgewiesen wird: wer nicht lesen darf, erfaehrt nichts (not found); ein Landing-Kennel
  * (LANDING_KENNEL_IDS) nennt Code und Grund — fuer jeden, auch Owner und Super-User; frozen; sonst keine Rechte.
  */
 function kennelMutationRefusal(kennel: any, ctx: AuthCtx, id: string): string {
     if (!canRead(kennel, ctx)) return `Kennel ${id} not found`;
-    if (landingRefuses(kennel, ctx)) return `${LandingKennels.LOCK_CODE}: ${LandingKennels.LOCK_MESSAGE}`;
+    if (landingRefuses(kennel, ctx)) return LANDING_LOCKED;
     if (isFrozen(kennel)) return `Kennel ${id} is frozen — unfreeze it first`;
     return 'Not authorized';
 }
@@ -519,6 +523,7 @@ export function getKennelTools(): ToolDef[] {
             },
             handler: async (args, ctx, deps) => {
                 if (!canMutate(null, ctx)) return fail('Login required to create kennels');
+                if (landingRefusesCreate(args.id, ctx)) return fail(LANDING_LOCKED);
                 const offending = await firstUnreferenceableDog(args.dogIds, ctx, deps);
                 if (offending) return fail(offending);
                 const pflicht = new PflichtEltern(Array.isArray(args.dogIds) ? args.dogIds : [], deps.baseDogsList);
@@ -642,6 +647,7 @@ export function getKennelTools(): ToolDef[] {
             argHints: { dogIds: 'extraDogIds' },
             handler: async (args, ctx, deps) => {
                 if (!canMutate(null, ctx)) return fail('Login required to build kennels');
+                if (landingRefusesCreate(args.id, ctx)) return fail(LANDING_LOCKED);
                 return await buildKennel(args, ctx, deps);
             },
         },

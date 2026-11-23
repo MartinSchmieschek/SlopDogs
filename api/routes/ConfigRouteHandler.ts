@@ -10,6 +10,7 @@ import {
     canMutate,
     isFrozen,
     landingRefuses,
+    landingRefusesCreate,
     normalizeVisibility,
     filterRunnable,
     applyCreateDefaults,
@@ -350,6 +351,11 @@ export class ConfigRouteHandler {
             // Both kennels and nodes: require login + apply visibility/ownerId defaults.
             if (!canMutate(null, req.ctx)) {
                 res.status(401).json({ error: `Login required to create ${subpath}` });
+                return;
+            }
+            // Gepflegte Kennel-IDs (Landing, Seed-Pflege-Kennels) legt nur ein Maintainer an, wie er sie auch allein aendert.
+            if (subpath === 'kennels' && landingRefusesCreate(input?.id, req.ctx)) {
+                res.status(403).json({ error: LandingKennels.LOCK_CODE, error_description: LandingKennels.LOCK_MESSAGE });
                 return;
             }
             // Kennels: reject references to dogs the caller can't run; pin run-only foreign dogs.

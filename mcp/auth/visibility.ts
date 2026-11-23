@@ -212,6 +212,11 @@ export function landingRefuses(k: AclEntity | null | undefined, ctx: AuthCtx | u
     return isLandingLocked(k) && !isMaintainer(ctx);
 }
 
+/** Weist die Landing-Sperre das Anlegen dieser Kennel-ID ab? Eine gepflegte ID (LandingKennels.isProtected) legt nur ein Maintainer an. */
+export function landingRefusesCreate(kennelId: unknown, ctx: AuthCtx | undefined): boolean {
+    return LandingKennels.isProtected(kennelId) && !isMaintainer(ctx);
+}
+
 /** Der Sperrgrund einer Entitaet oder null (unabhaengig vom Aufrufer — fuer Maintainer steht `landing` als Hinweis). */
 export function lockOf(k: AclEntity | null | undefined): LockReason | null {
     if (isLandingLocked(k)) return 'landing';

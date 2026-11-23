@@ -666,6 +666,16 @@ export class KennelController extends AbstractController<IKennelConfig> {
     }
 
     /**
+     * Ist `config` die Kopfversion ihrer Lineage — dieselbe Wahl wie die Aufloesung per lineageId
+     * (pickLatestKennelStoreRow)? Ohne Zeilen der Lineage: nein.
+     */
+    async isHeadVersion(config: IKennelConfig): Promise<boolean> {
+        const lineageId = (config as IKennelConfig & { lineageId?: string }).lineageId || config.id;
+        const rows = await this.store.findByLineage(this.KENNEL_TYPE, lineageId);
+        return rows.length > 0 && this.pickLatestKennelStoreRow(rows).id === config.id;
+    }
+
+    /**
      * Overrides getById — uses 2-stage resolution: version GUID first, then lineageId → latest.
      */
     async getById(id: string): Promise<IControllerResponse<IKennelConfig | null>> {

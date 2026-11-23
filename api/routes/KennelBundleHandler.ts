@@ -13,7 +13,8 @@ import { KennelController } from '../KennelController';
 import { IStore } from '../../store/IStore';
 import { generateVersionId, generateLineageId } from '../utils/versioning';
 import { KennelRunHandler } from './KennelRunHandler';
-import { canRead, applyCreateDefaults, normalizeVisibility } from '../../mcp/auth/visibility';
+import { canRead, applyCreateDefaults, normalizeVisibility, landingRefusesCreate } from '../../mcp/auth/visibility';
+import { LandingKennels } from '../../mcp/auth/landingKennels';
 import { DogAclIndex } from '../../services/dogAccess';
 
 /**
@@ -264,6 +265,11 @@ export class KennelBundleHandler {
             const idErr = kennelIdBlockedReason(kennelId);
             if (idErr) {
                 res.status(400).json({ error: idErr });
+                return;
+            }
+            // Gepflegte Kennel-IDs (Landing, Seed-Pflege-Kennels) legt nur ein Maintainer an — vor jedem geschriebenen Dog.
+            if (landingRefusesCreate(kennelId, req.ctx)) {
+                res.status(403).json({ error: LandingKennels.LOCK_CODE, error_description: LandingKennels.LOCK_MESSAGE });
                 return;
             }
 

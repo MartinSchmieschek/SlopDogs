@@ -6,7 +6,7 @@ Server cut: core and the base dogs live in their own repos (slopdogs-core, slopd
 
 ### Breaking
 - `create_kennel` / `build_kennel` / import with an ID that already exists answer 409 `id_taken`; new versions go through `update_kennel`.
-- Landing and maintained kennels (`slopdogs-landing`, `slopdogs-kennels`) and their ownerless dogs can only be changed by `SLOPDOGS_MAINTAINER_EMAILS`; without the variable nobody can.
+- Landing and maintained kennels (`slopdogs-landing`, `slopdogs-kennels`) and their ownerless dogs can only be changed by `SLOPDOGS_MAINTAINER_EMAILS`, and only they create a kennel under one of these ids; without the variable nobody can.
 - No `packages/` workspace any more: core (`@martinschmieschek/slopdogs-core`, entries `.`, `/runtime`, `/swaggrid`), typedefs and the 52 dog packages come as release tarballs.
 
 ### Added
