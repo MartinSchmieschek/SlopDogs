@@ -14,6 +14,7 @@ import { getNodeTools } from '../tools/nodes';
 import { getMetaTools } from '../tools/meta';
 import { getAclTools } from '../tools/acl';
 import { getKeyTools } from '../tools/keys';
+import { getMyPagesTools } from '../tools/myPages';
 import { paramString } from '../../api/utils/routeParams';
 import { getSnapshotTools } from '../tools/snapshots';
 import { type ToolDeps, type ToolDef, unknownArgsRefusal } from '../tools/types';
@@ -67,6 +68,7 @@ export function createActionsRouter(deps: ToolDeps): Router {
         ...getSnapshotTools(),
         ...getAclTools(),
         ...getKeyTools(),
+        ...getMyPagesTools(),
         ...getMetaTools(),
     ];
     const toolMap = new Map(tools.map((t) => [t.name, t]));

@@ -355,6 +355,7 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
         statsStore: store,
         refIndex,
         dogStatsStore: store,
+        userPageStore: store,
         channelTickets,
     });
 

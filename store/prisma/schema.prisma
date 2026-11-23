@@ -91,6 +91,18 @@ model KennelFavorite {
   @@index([userId])                  // Liste: alle Favoriten eines Nutzers
 }
 
+// Eigene Seiten je Nutzer: eine Landing (`/`) und eine Liste (`/kennels`), je ein Kennel. userId = Auth-User.id
+// (andere DB, keine FK); lineageId = die Lineage des gewaehlten Kennels. Ein Kennel-Delete nimmt seine Zeilen mit.
+model UserPage {
+  userId    String
+  kind      String   // 'landing' | 'list'
+  lineageId String
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, kind])
+  @@index([lineageId])               // Kennel-Delete: alle Seiten, die auf ihn zeigen
+}
+
 // Dog-Laeufe je Dog-Schluessel, Kennel-Lineage, Tag (UTC) und Quelle (P4b). dogKey = Dog-lineageId oder 'base:<Klasse>'.
 model DogCallDaily {
   dogKey          String

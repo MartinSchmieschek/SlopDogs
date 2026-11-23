@@ -18,10 +18,11 @@ import {
     type KennelRatingAggregate,
     type KennelRatingHistogram,
 } from './IKennelStatsStore';
+import { USER_PAGE_KINDS, isUserPageKind, type IUserPageStore, type UserPageChanges, type UserPages } from './IUserPageStore';
 import path from 'path';
 import { SharedPrismaClients } from './SharedPrismaClients';
 
-export class PrismaStore implements IStore, IKennelStatsStore, IDogStatsStore {
+export class PrismaStore implements IStore, IKennelStatsStore, IDogStatsStore, IUserPageStore {
     private prisma: PrismaClient;
     /** Postgres oder SQLite — aus der URL wie scripts/dbEnv.cjs. Nur die MAX/GREATEST-Weiche (P4b) braucht es. */
     private readonly isPostgres: boolean;
@@ -1044,12 +1045,61 @@ export class PrismaStore implements IStore, IKennelStatsStore, IDogStatsStore {
         return (await this.prisma.kennelFavorite.deleteMany({ where: { lineageId, userId } })).count > 0;
     }
 
+    /** Zaehler, Bewertungen und Favoriten in einer Transaktion; danach, unabhaengig davon, die eigenen Seiten auf die Lineage. */
     public async deleteKennelStats(lineageId: string): Promise<void> {
-        await this.prisma.$transaction([
-            this.prisma.kennelCallDaily.deleteMany({ where: { lineageId } }),
-            this.prisma.kennelRating.deleteMany({ where: { lineageId } }),
-            this.prisma.kennelFavorite.deleteMany({ where: { lineageId } }),
-        ]);
+        try {
+            await this.prisma.$transaction([
+                this.prisma.kennelCallDaily.deleteMany({ where: { lineageId } }),
+                this.prisma.kennelRating.deleteMany({ where: { lineageId } }),
+                this.prisma.kennelFavorite.deleteMany({ where: { lineageId } }),
+            ]);
+        } finally {
+            await this.forgetUserPagesOf(lineageId);
+        }
+    }
+
+    public async readUserPages(userId: string): Promise<UserPages> {
+        const rows = await this.prisma.userPage.findMany({ where: { userId }, select: { kind: true, lineageId: true } });
+        const pages: UserPages = {};
+        for (const row of rows) if (isUserPageKind(row.kind)) pages[row.kind] = row.lineageId;
+        return pages;
+    }
+
+    public async writeUserPages(userId: string, changes: UserPageChanges): Promise<void> {
+        const writes: Prisma.PrismaPromise<unknown>[] = [];
+        for (const kind of USER_PAGE_KINDS) {
+            const lineageId = changes[kind];
+            if (lineageId === undefined) continue;
+            writes.push(
+                lineageId === null
+                    ? this.prisma.userPage.deleteMany({ where: { userId, kind } })
+                    : this.prisma.userPage.upsert({
+                          where: { userId_kind: { userId, kind } },
+                          create: { userId, kind, lineageId },
+                          update: { lineageId },
+                      }),
+            );
+        }
+        if (writes.length > 0) await this.prisma.$transaction(writes);
+    }
+
+    public async deleteUserPagesOf(lineageId: string): Promise<void> {
+        await this.prisma.userPage.deleteMany({ where: { lineageId } });
+    }
+
+    /**
+     * Wirft nie: fehlt die Tabelle oder scheitert die DB, bleibt die Zeile stehen. Sie greift nicht mehr, weil jede
+     * Umleitung den Kennel neu prueft — das Loeschen des Kennels haengt nie daran.
+     */
+    private async forgetUserPagesOf(lineageId: string): Promise<void> {
+        try {
+            await this.deleteUserPagesOf(lineageId);
+        } catch (err) {
+            const code = (err as { code?: unknown })?.code;
+            console.warn(
+                `[PrismaStore] eigene Seiten auf ${lineageId} nicht entfernt (${typeof code === 'string' ? code : (err as Error)?.name})`,
+            );
+        }
     }
 
     /** Sever the connection to the deep — the anchor is raised, the voyage is done. */

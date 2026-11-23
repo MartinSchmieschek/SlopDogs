@@ -45,6 +45,9 @@ const REQUIRED_TOOLS = [
     'set_key',
     'list_keys',
     'delete_key',
+    // Eigene Seiten je Nutzer (Landing und Liste)
+    'get_my_pages',
+    'set_my_pages',
 ];
 
 /**

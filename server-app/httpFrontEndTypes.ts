@@ -1,5 +1,6 @@
 import type { LandingPage } from './LandingPage';
 import type { KennelListPage } from './KennelListPage';
+import type { MyPagesRedirect } from './MyPagesRedirect';
 
 /** Kontext für die umgebungsabhängige Express-Frontend-Schicht (Static / Redirect / SPA). */
 export type HttpFrontEndContext = {
@@ -12,6 +13,8 @@ export type HttpFrontEndContext = {
     landingPage: LandingPage | null;
     /** `/kennels` = Lead-Ausgabe des Kennels `slopdogs-kennels` (Spur K), sonst der Rueckfall (Angular-Liste). */
     kennelListPage?: KennelListPage | null;
+    /** Eigene Seiten: das erste Glied vor `/` und `/kennels` (Umleitung eingeloggter Nutzer); ohne gilt fuer alle der Default. */
+    myPages?: MyPagesRedirect | null;
 };
 
 export type HttpFrontEndBinder = {

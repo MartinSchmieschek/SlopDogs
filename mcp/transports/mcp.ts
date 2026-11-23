@@ -22,6 +22,7 @@ import { getNodeTools } from '../tools/nodes';
 import { getMetaTools, setMetaToolRegistry } from '../tools/meta';
 import { getAclTools } from '../tools/acl';
 import { getKeyTools } from '../tools/keys';
+import { getMyPagesTools } from '../tools/myPages';
 import { getSnapshotTools } from '../tools/snapshots';
 import { type ToolDeps, type ToolDef, unknownArgsRefusal } from '../tools/types';
 import type { AuthCtx } from '../auth/middleware';
@@ -184,6 +185,7 @@ export function createMcpRouter(deps: ToolDeps): Router {
         ...getSnapshotTools(),
         ...getAclTools(),
         ...getKeyTools(),
+        ...getMyPagesTools(),
         ...getMetaTools(),
     ];
     // Wire the registry into the meta module so describe_tool can resolve names

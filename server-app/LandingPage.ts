@@ -5,6 +5,7 @@ import type { KennelRunAttribution } from '../api/routes/KennelRunHandler';
 import { isHtmlResultString } from '../services/leadResultStringFormat';
 import { LandingKennels } from '../mcp/auth/landingKennels';
 import { BetaKeys } from '../mcp/auth/betaKeys';
+import { MyPagesRedirect } from './MyPagesRedirect';
 
 /** Wer die Lead-Ausgabe eines Kennels liefert — der KennelRunHandler (P5: `runLeadAsAnonymous`). */
 export interface LandingRunner {
@@ -126,6 +127,11 @@ export class LandingPage {
         return this.kennelIds.length > 1;
     }
 
+    /** Der Kennel, den `?landing=<id>` dieser Anfrage erzwingt — nur einer aus der Liste, sonst null. */
+    forcedIn(req: Request): string | null {
+        return this.forcedOf(req.query?.[LandingPage.FORCE_PARAM]);
+    }
+
     /** Ein erzwungener Kennel zaehlt nur, wenn er in der Liste steht — `?landing=` oeffnet keinen beliebigen Kennel. */
     forcedOf(raw: unknown): string | null {
         const wanted = String(Array.isArray(raw) ? raw[0] : (raw ?? ''))
@@ -171,7 +177,7 @@ export class LandingPage {
     }
 
     async handleGet(req: Request, res: Response, next: NextFunction): Promise<void> {
-        const forced = this.forcedOf(req.query?.[LandingPage.FORCE_PARAM]);
+        const forced = this.forcedIn(req);
         let page: LandingPageResult | null;
         try {
             page = await this.page(forced);
@@ -189,7 +195,7 @@ export class LandingPage {
 
     /** HEAD / (Keepalive, ki-fruechte): nie ein Lauf — nur, was Memo oder Fallback schon haben. */
     handleHead(req: Request, res: Response, next: NextFunction): void {
-        const forced = this.forcedOf(req.query?.[LandingPage.FORCE_PARAM]);
+        const forced = this.forcedIn(req);
         const kennelId = this.candidates(forced).find((id) => this.memo.get(id)?.html);
         const page = kennelId ? { html: this.memo.get(kennelId)!.html!, source: 'kennel' as const, kennelId } : this.fallbackResult();
         if (!page) {
@@ -225,7 +231,9 @@ export class LandingPage {
 
     private setHeaders(res: Response, page: LandingPageResult, forced: boolean): void {
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('Cache-Control', this.rotates && !forced ? LandingPage.ROTATION_CACHE_CONTROL : LandingPage.CACHE_CONTROL);
+        // An Eingeloggte (Marke des Glieds vor `/`) `private, no-cache`, sonst wie bisher.
+        const anonymous = this.rotates && !forced ? LandingPage.ROTATION_CACHE_CONTROL : LandingPage.CACHE_CONTROL;
+        res.setHeader('Cache-Control', MyPagesRedirect.cacheControlFor(res, anonymous));
         res.setHeader('X-Landing-Source', page.source);
         if (page.kennelId) res.setHeader('X-Landing-Kennel', page.kennelId);
     }

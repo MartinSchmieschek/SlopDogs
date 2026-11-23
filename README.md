@@ -522,6 +522,15 @@ The MCP server returns **Spuren rules + a pointer to the full guide** as the `in
 
 Login required. Keys are AES-256-GCM encrypted in the auth database and never returned; dogs use them through `keys.fetch(url, opts)` with `{{key:<alias>}}` — substituted on the server, only to the key's `allowedDomains` (https, no private networks, no redirects), with the keys of whoever runs the kennel. `kennelGrants` (opt-in, needs `quotaPerDay`) lets runs of your own listed kennels use the key for any runner. A database reset deletes the key store. MCP: `set_key`, `list_keys`, `delete_key` — no `get_key`. The `/account?tab=keys` screen manages these.
 
+### Your pages
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `GET` | `/api/my-pages` | Your own landing and kennel list: `{ok, landing, list}` — kennel ids, `null` where the default shows |
+| `PUT` | `/api/my-pages` | Set them `{landing?, list?}` — a kennel id or version GUID (the kennel id is stored), `null` or `""` resets; only the keys you send change. `400 kennel_has_no_dogs\|invalid_request`, `403 no_identity` (super-user without user), `404 kennel_not_found` (missing and not visible to you answer the same), `503 my_pages_unavailable`. With the browser session only from SlopDogs pages (`403 cross_origin_refused`, the rule of `/auth/tokens`); bearer tokens and local mode as for `/api/keys` |
+
+Login required, `Cache-Control: no-store`. Any kennel you can see qualifies — yours, shared with you or public — as long as it has a dog. One row per user and page in the store table `UserPage` (user id without a foreign key, like the favourites); deleting a kennel drops the rows that point to it. Signed in with a page set, `/` and `/kennels` redirect you to `/k/<id>` (see [Landing](#landing)). MCP: `get_my_pages`, `set_my_pages`; in the app the profile tab of `/account`.
+
 ### Public
 
 | Method | Endpoint | Purpose |
@@ -545,13 +554,14 @@ Calls: every kennel run is counted once, per day (UTC) and source; `stats.calls.
 `/` is a kennel: the lead output of one of the kennels listed in `LANDING_KENNEL_IDS` (comma-separated), or, behind them, of the seeded `slopdogs-landing` — one content dog, the Mixtape skin and a lead, no look switcher. The same page is reachable as a kennel at `/k/slopdogs-landing`.
 
 - **Rotation:** each visit picks one listed kennel uniformly at random; `?landing=<id>` forces one **from the list** (other ids are ignored). A listed kennel that is missing, not public, throws or yields no HTML is skipped for the memo window. `slopdogs-landing` takes over when the list is empty or none of the listed kennels runs. The old single `LANDING_KENNEL_ID` is still read as a one-entry alias (with a log line).
+- **Your own pages:** signed in, a user can make any kennel they can see their own landing and their own kennel list (`/account`, profile tab; `PUT /api/my-pages`; MCP `set_my_pages`). `/` and `/kennels` then answer them with `302` to `/k/<id>`, the query rides along; the page runs there like any kennel page. Before every redirect the server checks again, without a run: kennel there, visible to the user, with a dog — otherwise the default page shows, silently. `?landing=<id>` from the rotation still wins. Signed out, or signed in without a setting, everyone sees the default. In local mode the one local user is everyone on the network, so the setting holds for every device there; in super-user mode (no `MCP_AUTH_REQUIRED`) there is no user and no own page.
 - **Locked while listed:** every kennel in `LANDING_KENNEL_IDS` is read-only for everyone — owner and super-user included — as long as it is listed: `myRights {edit: false, own: false, locked: 'landing'}`; `PUT`, rename, `DELETE`, `/acl`, `/freeze`, `/unfreeze` and the MCP mutations answer `403 {"error":"locked_landing"}`. Runs, stars, reading and copying keep working. `slopdogs-landing` is only locked when it is listed itself.
 - **Source:** `seed-data/kennels/slopdogs-landing/` (content, skin C, lead) — seeded at boot when the kennel is missing (public, community-owned). The seed never overwrites: changes in the repo reach an existing instance only after a maintainer deletes the kennel and the server restarts, or with a **reseed start** — `npm run start:local:reseed` / `npm run dev:reseed` (every time), deployed `SLOPDOGS_RESEED=<marker>` (any text, e.g. a date; applied once per new marker, the last one is kept in the database, so a forgotten variable does not wipe live changes on each restart). A reseed takes the maintainer's delete path for `slopdogs-landing` and `slopdogs-kennels` (unused dogs go, dogs used elsewhere stay) and seeds both fresh; the log says `[seed] reseed <marker>: landing 3 Dogs geloescht, 0 behalten; kennels …`. The former skins a, b and d are archived under `docs/slopdogs/landing/archive/`.
 - **Version:** the footer shows `v<version> · core <core> · <commit>` from `GET /api/health`; when the request fails, the line stays empty. `/kennels` (the kennel and the Angular list) shows the same line under the list.
 - **No run per visit:** `GET /` serves the lead output from an HTML memo per kennel (`LANDING_HTML_MEMO_MS`, default 300000). When the window is over, the visitor gets the remembered page at once and the kennel runs again in the background. The run counts with source `landing` — in `total`, never in `ranked`/`ranked30d`. `HEAD /` never runs the kennel.
 - **Fallback:** if the kennel is missing or its run fails, `/` serves `public/landing/index.html` — the Mixtape page rendered from the same sources at build time (`node scripts/build-landing.cjs`, part of `npm run build`). The page is never empty, not even on a cold start.
 - **Host:** the page shows `‹host›` where the address goes; `/` puts in the host of `MCP_BASE_URL` (else the request's host), the page script does the same from `location` on any other address.
-- **Headers:** `Content-Type: text/html; charset=utf-8`, `Cache-Control: public, max-age=300` (`no-cache` while more than one kennel rotates), `X-Landing-Source: kennel|fallback`, `X-Landing-Kennel: <id>`, no cookie. Like every text response, the page goes out brotli- or gzip-compressed when the client accepts it (`HTTP_COMPRESSION=0` turns that off). `/robots.txt` lives in `public/landing/`.
+- **Headers:** `Content-Type: text/html; charset=utf-8`, `Cache-Control: public, max-age=300` (`no-cache` while more than one kennel rotates), `X-Landing-Source: kennel|fallback`, `X-Landing-Kennel: <id>`, no cookie. `/` and `/kennels` always send `Vary: Cookie`; every answer to a signed-in visitor — the redirect to an own page or the default page — goes out with `Cache-Control: private, no-cache`. Like every text response, the page goes out brotli- or gzip-compressed when the client accepts it (`HTTP_COMPRESSION=0` turns that off). `/robots.txt` lives in `public/landing/`.
 - **Fonts:** self-hosted Latin subsets under `/static/landing/*.woff2` (OFL, `public/landing/OFL.txt`); no font CDN.
 
 "Already out there" loads `GET /api/landing?limit=6` — the page's one data request, next to `GET /api/health` for the footer line — and renders `topByCalls30d`, `topByRating` and `provenDogs` (links: kennel `url`, dogs to `/kennels?q=<name>`; numbers en-US, `ranked30d` shown, total in the tooltip, no stars when `avg` is null). States on `#sd-live[data-state]`:
@@ -608,11 +618,11 @@ The Angular app (`SPA_ROUTES` in `api/routes/routeTable.ts`; Express serves `ind
 
 | Route | Screen |
 |---|---|
-| `/kennels` | Kennel list (side A): `?q=`, `?sort=`, `?dir=`, `?mine=1`, `?favorites=1`, `?new=1`. A click anywhere on a row opens the public page `/k/:id` (with its default query) in a new tab; the flag marks a favourite (signed in; anonymous visitors are sent to the login); `⋯` → Edit opens the kennel page |
+| `/kennels` | Kennel list (side A): `?q=`, `?sort=`, `?dir=`, `?mine=1`, `?favorites=1`, `?new=1`. A click anywhere on a row opens the public page `/k/:id` (with its default query) in a new tab; the flag marks a favourite (signed in; anonymous visitors are sent to the login); `⋯` → Edit opens the kennel page. Signed in with your own list set, the server sends `/kennels` to `/k/<id>` instead |
 | `/kennels/:id` | Kennel page: canvas, inspector (`?panel=brief\|versions\|rating\|stats`), run |
 | `/kennels/:id/edit` | The same page with the settings drawer open — name, access, freeze, dog order, defaults (there is no separate edit page) |
 | `/dogs` | Dog browser (side B): `?q=&sort=&group=&pack=&owner=`; `?dog=<lineageId>` opens the preview — a dog is never a page of its own |
-| `/account` | Profile, personal tokens, keys: `?tab=profile\|tokens\|keys` |
+| `/account` | Profile, personal tokens, keys: `?tab=profile\|tokens\|keys`. The profile tab carries *Your pages*: a kennel id each for your own landing (`/`) and kennel list (`/kennels`), suggestions from your kennels, save and reset to default |
 | `/login` | One button, one verse: `?returnTo=` (a path on this site) |
 
 Keys in the app: `?` shows them all; `/` search; `Esc` closes the top panel; on the kennel page `Ctrl/⌘+Enter` runs and `Ctrl/⌘+S` saves the open editor. Leaving with unsaved changes asks first.

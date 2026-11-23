@@ -3,6 +3,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { isHtmlResultString } from '../services/leadResultStringFormat';
 import { BetaKeys } from '../mcp/auth/betaKeys';
 import { LandingPage, type LandingRunner } from './LandingPage';
+import { MyPagesRedirect } from './MyPagesRedirect';
 
 /** Die Kopfversion eines Dogs, soweit der Fingerabdruck sie braucht. */
 export interface KennelListDogHead {
@@ -157,7 +158,7 @@ export class KennelListPage {
         }
         const body = LandingPage.withHost(html, LandingPage.baseOf(req), BetaKeys.stage());
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('Cache-Control', KennelListPage.CACHE_CONTROL);
+        res.setHeader('Cache-Control', MyPagesRedirect.cacheControlFor(res, KennelListPage.CACHE_CONTROL));
         res.setHeader('ETag', `"kl-${createHash('sha1').update(body).digest('base64url').slice(0, 27)}"`);
         res.setHeader('X-Kennel-List', this.kennelId);
         // Express antwortet 304, wenn If-None-Match dieses ETag traegt (req.fresh in res.send).
@@ -171,7 +172,7 @@ export class KennelListPage {
             return;
         }
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('Cache-Control', KennelListPage.CACHE_CONTROL);
+        res.setHeader('Cache-Control', MyPagesRedirect.cacheControlFor(res, KennelListPage.CACHE_CONTROL));
         res.setHeader('X-Kennel-List', this.kennelId);
         res.status(200).end();
     }

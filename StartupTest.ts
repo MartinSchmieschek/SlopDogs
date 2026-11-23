@@ -53,6 +53,8 @@ import { TrustedKennels } from './mcp/auth/trustedKennels';
 import { LandingKennels } from './mcp/auth/landingKennels';
 import { Maintainers } from './mcp/auth/maintainers';
 import { SLOPDOGS_KENNELS_KENNEL_ID, seedSlopdogsKennelsKennel } from './seed-data/kennels/slopdogs-kennels';
+import { MyPagesTests } from './test/startup/myPagesTests';
+import type { IUserPageStore } from './store/IUserPageStore';
 
 /**
  * Arr, the testament of a single trial endured upon the eldritch seas —
@@ -124,6 +126,8 @@ export class StartupTest {
         baseDogsMap: Map<string, any>,
         /** Die fertig montierte Express-App — fuer den Abgleich Routentabelle <-> Stack. */
         app: any,
+        /** Eigene Seiten je Nutzer (Tabelle UserPage) — derselbe Store wie im Server. */
+        userPageStore: IUserPageStore,
     ): Promise<TestResult[]> {
         if (isRuntimeLogVerbose()) {
             console.log('\n🧪 Starte Startup-Tests...\n');
@@ -175,6 +179,21 @@ export class StartupTest {
                 kennelsController as KennelController,
                 baseDogsMap,
             ).run();
+            // Eigene Seiten je Nutzer: Umleitung von / und /kennels, Kopfzeilen, REST, MCP, Aufraeumen beim Kennel-Delete.
+            const pagesRunHandler = new KennelRunHandler({
+                kennelsController: kennelsController as KennelController,
+                nodesStore,
+                baseDogsMap,
+                callCounter: this.testCallCounter,
+            });
+            await new MyPagesTests((name, passed, error) => this.addResult(name, passed, error), {
+                nodesStore,
+                kennelsController: kennelsController as KennelController,
+                runHandler: pagesRunHandler,
+                userPageStore,
+                toolDeps: this.toolDeps(nodesStore, kennelsStore, nodesController, kennelsController as KennelController, pagesRunHandler),
+                app,
+            }).run();
 
             // Block 2 — Paket-Kandidaten: wandern in P4 als Paket-Tests nach slopdogs-core bzw. slopdogs-base-dogs.
             await new PackageCandidateTests((name, passed, error) => this.addResult(name, passed, error)).run(baseDogsMap);

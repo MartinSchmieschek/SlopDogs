@@ -70,7 +70,7 @@ End with one line: *"What shall we hunt?"* or similar.
 
 The greeting is for the **opening**, not every turn.
 
-## What you can do — 54 tools
+## What you can do — 56 tools
 
 **Start here — discovery, not guessing.** `list_nodes` is the inventory: every entry carries its `description`, its wiring contract `parentsRequired` / `parentsOptional` (bare class names, exactly the syntax `build_kennel` wants) and, for Pacts, `isPact: true` plus the demanded shape in `pactTypeDef`. Some entries also carry a `guidance` field — a binding instruction straight from the dog class, for infrastructure you must **not** re-implement. Search it by keyword (name, displayName and description are matched) instead of inventing class names. `describe_tool` gives you any tool's full schema. Every tool rejects arguments its schema doesn't know — nothing runs, and the error names the field and the likely meant one (`dogIds` on `build_kennel` -> `extraDogIds`).
 
@@ -94,9 +94,11 @@ The greeting is for the **opening**, not every turn.
 
 **Keys:** `set_key`, `list_keys` (masked), `delete_key` — no tool reads a key back. Agents may set keys, never read them; dogs use `keys.fetch` with `{{key:alias}}` (see "Keys" below).
 
+**Your pages:** `get_my_pages`, `set_my_pages` — the user's own landing (`/`) and kennel list (`/kennels`): any kennel they can see, `null` resets to the default (see "The landing is a kennel" below).
+
 **Meta:** `get_readme` (call once at start), `health_check`, `describe_tool`.
 
-**The landing is a kennel:** `/` serves the lead output of one of the kennels in the server env `LANDING_KENNEL_IDS` (comma-separated; each visit picks one at random, `?landing=<id>` forces a listed one; a listed kennel that is missing or yields no HTML is skipped). Behind them stands the seeded `slopdogs-landing` — a content dog, the Mixtape skin and a lead, no look switcher. Its rankings come from `GET /api/landing`. Runs for `/` count with source `landing`, never in `ranked*`. Read it like any kennel (`get_kennel {id:'slopdogs-landing'}`). **A kennel listed in `LANDING_KENNEL_IDS` is locked for everyone** — owner and super-user included — while it is listed: `myRights.locked: 'landing'`, and every change (update, rename, delete, access, freeze) answers `locked_landing`. Runs, stars, reading and copying still work; to build on it, copy it.
+**The landing is a kennel:** `/` serves the lead output of one of the kennels in the server env `LANDING_KENNEL_IDS` (comma-separated; each visit picks one at random, `?landing=<id>` forces a listed one; a listed kennel that is missing or yields no HTML is skipped). Behind them stands the seeded `slopdogs-landing` — a content dog, the Mixtape skin and a lead, no look switcher. Its rankings come from `GET /api/landing`. Runs for `/` count with source `landing`, never in `ranked*`. Read it like any kennel (`get_kennel {id:'slopdogs-landing'}`). **A kennel listed in `LANDING_KENNEL_IDS` is locked for everyone** — owner and super-user included — while it is listed: `myRights.locked: 'landing'`, and every change (update, rename, delete, access, freeze) answers `locked_landing`. Runs, stars, reading and copying still work; to build on it, copy it. **Own pages:** a signed-in user can make any kennel they can see their own landing and their own kennel list — `set_my_pages {landing, list}` (kennel id or version GUID; the kennel id is stored and the kennel needs a dog), or in the app under `/account` (profile tab, "Your pages"). `/` and `/kennels` then redirect that user to `/k/<id>`, the query rides along; `?landing=<id>` from the rotation still wins. Signed out, or without a setting, everyone sees the default. In local mode the one local user is everyone on the network, so the setting holds for every device there.
 
 ## Cold start — the machine sleeps (MANDATORY handling)
 

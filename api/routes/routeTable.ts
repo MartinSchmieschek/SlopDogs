@@ -68,6 +68,8 @@ export const API_ROUTE = {
     keys: '/api/keys',
     /** Key-Store (P4c): DELETE; kein GET mit Wert. */
     keyByAlias: '/api/keys/:alias',
+    /** Eigene Seiten je Nutzer (Landing `/`, Liste `/kennels`): GET und PUT — vor ConfigRouteHandler registriert. */
+    myPages: '/api/my-pages',
     /** Beta (2026-09-26): Status fuer alle — vor ConfigRouteHandler registriert. */
     beta: '/api/beta',
     /** Beta-Keys: GET (maskiert) und POST (Klartext einmal) — nur Admins. */
@@ -109,6 +111,7 @@ export const API_ROUTES = [
     '/api/landing',
     '/api/keys',
     '/api/keys/:alias',
+    '/api/my-pages',
     '/api/beta',
     '/api/beta/keys',
     '/api/beta/keys/:id',
@@ -180,6 +183,7 @@ export const EXPRESS_APP_ROUTES = [
     API_ROUTE.kennelListStatus,
     API_ROUTE.keys,
     API_ROUTE.keyByAlias,
+    API_ROUTE.myPages,
     API_ROUTE.beta,
     API_ROUTE.betaKeys,
     API_ROUTE.betaKeyById,

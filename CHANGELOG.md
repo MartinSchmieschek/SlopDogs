@@ -19,8 +19,10 @@ Server cut: core and the base dogs live in their own repos (slopdogs-core, slopd
 - Auth-free local mode for a home network (`build:local`, `start:local`, systemd example).
 - Lobby ticket for WebSocket channels in dev/local.
 - CI: GitHub Actions with `npm ci`, `npm test`, `test:startup`; ESLint and Prettier.
+- Own pages per user: signed in, any kennel you can see becomes your landing (`/`) and your kennel list (`/kennels`) — in `/account` (profile), via `GET`/`PUT /api/my-pages` or the MCP tools `get_my_pages`/`set_my_pages`. `/` and `/kennels` redirect you to `/k/<id>`; `GET /api/kennel-list` says `source: user|default`. New store table `UserPage` (needs the schema push; without the table the feature stays off and everything else runs).
 
 ### Changed
+- `/` and `/kennels` send `Vary: Cookie`; answers to signed-in visitors go out with `Cache-Control: private, no-cache`.
 - Kennel pages under `/k/` run sandboxed with stricter headers.
 - One Prisma client when the parts share the store database.
 - StartupTests reduced to a minimal set; dog packages test themselves.

@@ -13,6 +13,7 @@ import type { KennelStatsService } from '../../services/KennelStatsService';
 import type { KennelCallCounter } from '../../services/KennelCallCounter';
 import type { DogStatsService } from '../../services/DogStatsService';
 import type { KeyStoreService } from '../../services/KeyStoreService';
+import type { MyPagesService } from '../../services/MyPagesService';
 import type { SeededKennelDelete } from '../../services/SeededKennelDelete';
 import type { ServerVersion } from '../../services/ServerVersion';
 import type { PendingAdmission, RunGates } from '../../server-app/runAdmission';
@@ -72,6 +73,8 @@ export interface ToolDeps {
     dogStats: DogStatsService;
     /** P4c: set_key/list_keys/delete_key — derselbe Key-Store wie /api/keys. */
     keyStore: KeyStoreService;
+    /** Eigene Seiten: get_my_pages/set_my_pages — derselbe Dienst wie /api/my-pages. Ohne (Tests): my_pages_unavailable. */
+    myPages?: MyPagesService;
     /**
      * Lauf-Zulassung (Heavy-Topf + Sperre je Quelle), geteilt mit der HTTP-Schleuse. Ohne (Tests):
      * jeder Lauf ist sofort zugelassen.

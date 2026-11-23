@@ -245,6 +245,9 @@ POST   /save?id=:versionId             — save code (new version)
 GET    /api/nodes/:id/versions         — version history
 
 GET    /api/readme                     — current README (always read first)
+
+GET    /api/my-pages                   — your own landing (/) and kennel list (/kennels): { landing, list }, null = default
+PUT    /api/my-pages                   — set them: { landing?, list? } — kennel id or version GUID, null resets
 ```
 
 ## Workflow: Summoning a Kennel

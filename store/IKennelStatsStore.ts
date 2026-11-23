@@ -62,7 +62,10 @@ export interface IKennelStatsStore {
     addKennelFavorite(lineageId: string, userId: string): Promise<void>;
     /** Vergisst den Favoriten; true, wenn es ihn gab. */
     deleteKennelFavorite(lineageId: string, userId: string): Promise<boolean>;
-    /** Loescht alle Zaehler, Bewertungen und Favoriten der Lineage (Kennel-Delete). */
+    /**
+     * Loescht alle Zaehler, Bewertungen und Favoriten der Lineage (Kennel-Delete); im PrismaStore auch die eigenen Seiten,
+     * die auf sie zeigen (IUserPageStore) — deren Fehler bleibt im Log und laesst das Loeschen nie scheitern.
+     */
     deleteKennelStats(lineageId: string): Promise<void>;
 }
 

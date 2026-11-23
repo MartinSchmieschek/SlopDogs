@@ -1,6 +1,7 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
+import { KennelListPageService } from '../../services/kennel-list-page.service';
 import { escapeLayerWhile } from '../../utils/escape-layers';
 
 /**
@@ -18,6 +19,7 @@ import { escapeLayerWhile } from '../../utils/escape-layers';
 export class AuthBadgeComponent implements OnInit {
     private auth = inject(AuthService);
     private router = inject(Router);
+    private kennelListPage = inject(KennelListPageService);
 
     readonly user = this.auth.user;
     readonly isReady = this.auth.isReady;
@@ -51,6 +53,8 @@ export class AuthBadgeComponent implements OnInit {
 
     async onLogout(): Promise<void> {
         await this.auth.logout();
+        // Signed out, /kennels is the default again — the cached answer may still say "your list".
+        this.kennelListPage.reset();
         this.menuOpen.set(false);
         if (this.router.url.startsWith('/account')) void this.router.navigate(['/kennels']);
     }

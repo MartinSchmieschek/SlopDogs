@@ -17,6 +17,9 @@ import { HealthRouteHandler } from '../api/routes/HealthRouteHandler';
 import { ServerVersion } from '../services/ServerVersion';
 import { API_ROUTE } from '../api/routes/routeTable';
 import { KeysRouteHandler } from '../api/routes/KeysRouteHandler';
+import { MyPagesRouteHandler } from '../api/routes/MyPagesRouteHandler';
+import { MyPagesService } from '../services/MyPagesService';
+import type { IUserPageStore } from '../store/IUserPageStore';
 import { BetaRouteHandler } from '../api/routes/BetaRouteHandler';
 import { BetaKeys, type BetaKeyPrisma } from '../mcp/auth/betaKeys';
 import { KeyStoreService } from '../services/KeyStoreService';
@@ -49,6 +52,7 @@ import type { BaseDogInfo } from '../mcp/tools/types';
 import type { HttpFrontEndBinder, HttpFrontEndContext } from './httpFrontEndTypes';
 import { LandingPage } from './LandingPage';
 import { KennelListPage } from './KennelListPage';
+import { MyPagesRedirect } from './MyPagesRedirect';
 import { ResponseCompression } from './ResponseCompression';
 import { LOCAL_USER } from './LocalMode';
 import { NetworkBoundary } from './NetworkBoundary';
@@ -90,6 +94,8 @@ export type CreateHttpApplicationInput = {
     refIndex: DogReferenceIndex;
     /** Dog-Laeufe und Referenzen (P4b) — derselbe Store-Client. */
     dogStatsStore: IDogStatsStore;
+    /** Eigene Seiten je Nutzer (Tabelle UserPage) — derselbe Store-Client. */
+    userPageStore: IUserPageStore;
     /** Lobby-Tickets fuer Kennel-Seiten unter der Sandbox; die Netzgrenze prueft sie am Hub-Pfad. */
     channelTickets?: ChannelTickets;
 };
@@ -172,7 +178,16 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     const landingPage = LandingPage.fromEnv(publicDir);
     // Spur K: `/kennels` = Lead-Ausgabe des Kennels `slopdogs-kennels`; Lauf und Fingerabdruck bekommt sie unten.
     const kennelListPage = KennelListPage.fromEnv();
-    const frontCtx: HttpFrontEndContext = { devUiOrigin, angularBrowserDir, publicDir, landingPage, kennelListPage };
+    // Eigene Seiten: das erste Glied vor `/` und `/kennels`; den Dienst bekommt es, sobald der KennelController steht.
+    const myPagesRedirect = new MyPagesRedirect();
+    const frontCtx: HttpFrontEndContext = {
+        devUiOrigin,
+        angularBrowserDir,
+        publicDir,
+        landingPage,
+        kennelListPage,
+        myPages: myPagesRedirect,
+    };
 
     const app = express();
 
@@ -284,8 +299,9 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     app.use(express.urlencoded({ extended: false, limit: '1mb' }));
     app.use(createSessionMiddleware());
     app.use(createAuthContextMiddleware(authPrisma, { localUser }));
-    // PAT-Ausgabe/-Widerruf und OAuth-Zustimmung nur von eigenen Seiten — dieselbe Origin-Regel wie CORS oben.
-    app.use('/auth', createAuthRouter(authPrisma, new SameOriginGuard((req) => allowedOriginForRequest(req)), { localMode }));
+    // PAT-Ausgabe/-Widerruf, OAuth-Zustimmung und PUT /api/my-pages mit Session nur von eigenen Seiten — die Origin-Regel von CORS.
+    const sameOriginGuard = new SameOriginGuard((req) => allowedOriginForRequest(req));
+    app.use('/auth', createAuthRouter(authPrisma, sameOriginGuard, { localMode }));
     // Lokal keine OAuth-Discovery: ein MCP-Client soll keinen Login-Weg finden, den es dort nicht gibt.
     if (!localMode) app.use('/.well-known', createDiscoveryRouter());
 
@@ -312,6 +328,9 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     const kennelsController = new KennelController(kennelsStore, { refIndex: input.refIndex });
     registry.register('nodes', nodesController);
     registry.register('kennels', kennelsController);
+    // Eigene Seiten (Landing und Liste je Nutzer): ein Dienst fuer REST, MCP, die Umleitung und /api/kennel-list.
+    const myPages = new MyPagesService(input.userPageStore, kennelsController);
+    myPagesRedirect.use(myPages);
 
     // P4: stats an jeder Kennel-Antwort. Ein Flush und ein Kennel-Delete machen das Memo ungueltig.
     const kennelStats = new KennelStatsService(input.statsStore, input.callCounter);
@@ -390,7 +409,15 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
         // Erst hier geladen: die Suite samt ihrem Modulgraphen liegt sonst in jedem Prozess im Heap,
         // auch dort, wo sie nie laeuft (integration ohne RUN_STARTUP_TESTS).
         const { StartupTest } = await import('../StartupTest');
-        return new StartupTest().runAllTests(nodesStore, kennelsStore, nodesController, kennelsController, baseDogsMap, app);
+        return new StartupTest().runAllTests(
+            nodesStore,
+            kennelsStore,
+            nodesController,
+            kennelsController,
+            baseDogsMap,
+            app,
+            input.userPageStore,
+        );
     };
     const runStartupTests = async (): Promise<void> => {
         if (!shouldRunStartupTests(input.nodeEnv)) {
@@ -422,15 +449,12 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     }).registerRoutes(app);
     // Spur K: liefert /kennels gerade den Kennel? Das Signal, mit dem die Angular-App ihre Links auf /kennels zur
     // Vollseiten-Navigation macht — ohne Signal bleibt sie bei ihrer Liste (kein Neuladen im Kreis). VOR /api/:subpath.
-    app.get(API_ROUTE.kennelListStatus, (_req, res) => {
-        res.setHeader('Cache-Control', 'no-store');
-        kennelListPage.status().then(
-            (status) => res.json({ ok: true, ...status }),
-            () => res.json({ ok: true, active: false, kennelId: kennelListPage.kennelId }),
-        );
-    });
+    // Je Anfrage: die eigene Liste des Aufrufers (`source: 'user'`), sonst der Status des Defaults (`source: 'default'`).
+    app.get(API_ROUTE.kennelListStatus, myPagesRedirect.listStatus(kennelListPage));
     // Key-Store (P4c): /api/keys und /api/keys/:alias — ebenfalls VOR /api/:subpath.
     new KeysRouteHandler(keyStore).registerRoutes(app);
+    // Eigene Seiten: /api/my-pages — ebenfalls VOR /api/:subpath.
+    new MyPagesRouteHandler(myPages, sameOriginGuard).registerRoutes(app);
     // Beta (SLOPDOGS_STAGE=beta, Beta-Keys): /api/beta, /api/beta/keys, /api/beta/keys/:id — ebenfalls VOR /api/:subpath.
     new BetaRouteHandler(new BetaKeys(authPrisma as unknown as BetaKeyPrisma)).registerRoutes(app);
     const stage = BetaKeys.stage();
@@ -596,6 +620,7 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
         callCounter: input.callCounter,
         dogStats,
         keyStore,
+        myPages,
         runGates,
         seededKennelDelete,
         serverVersion,
