@@ -59,6 +59,23 @@ import { TransitTripRetriever, TransitTripQueryPact } from '@martinschmieschek/s
 import { AstronomyRetriever, AstronomyQueryPact } from '@martinschmieschek/slopdogs-dogs-astronomy';
 import { WaterRetriever, WaterQueryPact } from '@martinschmieschek/slopdogs-dogs-water';
 import { HistoricalWeatherRetriever, HistoricalWeatherQueryPact } from '@martinschmieschek/slopdogs-dogs-historical-weather';
+import {
+    SolarRadiationRetriever,
+    SolarRadiationQueryPact,
+    SolarRadiationHistoryRetriever,
+    SolarRadiationHistoryQueryPact,
+    SatelliteRadiationRetriever,
+    SatelliteRadiationQueryPact,
+} from '@martinschmieschek/slopdogs-dogs-solar';
+import { WindProfileRetriever, WindProfileQueryPact } from '@martinschmieschek/slopdogs-dogs-wind';
+import {
+    SoilRetriever,
+    SoilQueryPact,
+    EvapotranspirationRetriever,
+    EvapotranspirationQueryPact,
+} from '@martinschmieschek/slopdogs-dogs-soil';
+import { SnowRetriever, SnowQueryPact } from '@martinschmieschek/slopdogs-dogs-snow';
+import { ThunderstormRetriever, ThunderstormQueryPact } from '@martinschmieschek/slopdogs-dogs-storm';
 import { ChargingStationRetriever, ChargingQueryPact } from '@martinschmieschek/slopdogs-dogs-charging';
 import { CurrencyRetriever, CurrencyQueryPact } from '@martinschmieschek/slopdogs-dogs-currency';
 import { HolidayRetriever, HolidayQueryPact } from '@martinschmieschek/slopdogs-dogs-holidays';
@@ -202,6 +219,14 @@ export const allBaseDogClasses = [
     AstronomyRetriever,
     WaterRetriever,
     HistoricalWeatherRetriever,
+    SolarRadiationRetriever,
+    SolarRadiationHistoryRetriever,
+    SatelliteRadiationRetriever,
+    WindProfileRetriever,
+    SoilRetriever,
+    EvapotranspirationRetriever,
+    SnowRetriever,
+    ThunderstormRetriever,
     ChargingStationRetriever,
     NoiseRetriever,
     ParkingRetriever,
@@ -298,6 +323,14 @@ export const allPacts = [
     AstronomyQueryPact,
     WaterQueryPact,
     HistoricalWeatherQueryPact,
+    SolarRadiationQueryPact,
+    SolarRadiationHistoryQueryPact,
+    SatelliteRadiationQueryPact,
+    WindProfileQueryPact,
+    SoilQueryPact,
+    EvapotranspirationQueryPact,
+    SnowQueryPact,
+    ThunderstormQueryPact,
     ChargingQueryPact,
     NoiseQueryPact,
     ParkingQueryPact,

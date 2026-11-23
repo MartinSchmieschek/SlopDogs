@@ -32,6 +32,23 @@ import { AirQualityRetriever, AirQualityQueryPact } from '@martinschmieschek/slo
 import { GeocodingRetriever, GeocodingQueryPact, ElevationRetriever, ElevationQueryPact } from '@martinschmieschek/slopdogs-dogs-geocoding';
 import { WikiNearbyRetriever, WikiNearbyQueryPact } from '@martinschmieschek/slopdogs-dogs-wikipedia';
 import { SunRetriever, SunQueryPact } from '@martinschmieschek/slopdogs-dogs-sun';
+import {
+    SolarRadiationRetriever,
+    SolarRadiationQueryPact,
+    SolarRadiationHistoryRetriever,
+    SolarRadiationHistoryQueryPact,
+    SatelliteRadiationRetriever,
+    SatelliteRadiationQueryPact,
+} from '@martinschmieschek/slopdogs-dogs-solar';
+import { WindProfileRetriever, WindProfileQueryPact } from '@martinschmieschek/slopdogs-dogs-wind';
+import {
+    SoilRetriever,
+    SoilQueryPact,
+    EvapotranspirationRetriever,
+    EvapotranspirationQueryPact,
+} from '@martinschmieschek/slopdogs-dogs-soil';
+import { SnowRetriever, SnowQueryPact } from '@martinschmieschek/slopdogs-dogs-snow';
+import { ThunderstormRetriever, ThunderstormQueryPact } from '@martinschmieschek/slopdogs-dogs-storm';
 import { SpeciesRetriever, BiodiversityQueryPact } from '@martinschmieschek/slopdogs-dogs-biodiversity';
 import { BirdRetriever, BirdQueryPact } from '@martinschmieschek/slopdogs-dogs-birds';
 import { PhenologyRetriever, PhenologyQueryPact } from '@martinschmieschek/slopdogs-dogs-phenology';
@@ -56,6 +73,14 @@ export const allBaseDogClasses = [
     GeocodingRetriever,
     WikiNearbyRetriever,
     SunRetriever,
+    SolarRadiationRetriever,
+    SolarRadiationHistoryRetriever,
+    SatelliteRadiationRetriever,
+    WindProfileRetriever,
+    SoilRetriever,
+    EvapotranspirationRetriever,
+    SnowRetriever,
+    ThunderstormRetriever,
     SpeciesRetriever,
     BirdRetriever,
     PhenologyRetriever,
@@ -78,6 +103,14 @@ export const allPacts = [
     GeocodingQueryPact,
     WikiNearbyQueryPact,
     SunQueryPact,
+    SolarRadiationQueryPact,
+    SolarRadiationHistoryQueryPact,
+    SatelliteRadiationQueryPact,
+    WindProfileQueryPact,
+    SoilQueryPact,
+    EvapotranspirationQueryPact,
+    SnowQueryPact,
+    ThunderstormQueryPact,
     BiodiversityQueryPact,
     BirdQueryPact,
     PhenologyQueryPact,
