@@ -1,6 +1,6 @@
 {
   "name": "slopdogs",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "SlopDogs — dogs hunt data: Kennels, Waves, Serialized TypeScript in the void. Express, Angular, Prisma.",
   "main": "main.ts",
   "repository": {
@@ -79,6 +79,7 @@
     "@martinschmieschek/slopdogs-dogs-historical-weather": "https://github.com/MartinSchmieschek/slopdogs-base-dogs/releases/download/%40martinschmieschek%2Fslopdogs-dogs-historical-weather%400.3.0/martinschmieschek-slopdogs-dogs-historical-weather-0.3.0.tgz",
     "@martinschmieschek/slopdogs-dogs-holidays": "https://github.com/MartinSchmieschek/slopdogs-base-dogs/releases/download/%40martinschmieschek%2Fslopdogs-dogs-holidays%400.3.0/martinschmieschek-slopdogs-dogs-holidays-0.3.0.tgz",
     "@martinschmieschek/slopdogs-dogs-hue": "https://github.com/MartinSchmieschek/slopdogs-base-dogs/releases/download/%40martinschmieschek%2Fslopdogs-dogs-hue%400.3.0/martinschmieschek-slopdogs-dogs-hue-0.3.0.tgz",
+    "@martinschmieschek/slopdogs-dogs-humidity": "https://github.com/MartinSchmieschek/slopdogs-base-dogs/releases/download/%40martinschmieschek%2Fslopdogs-dogs-humidity%400.3.0/martinschmieschek-slopdogs-dogs-humidity-0.3.0.tgz",
     "@martinschmieschek/slopdogs-dogs-humor": "https://github.com/MartinSchmieschek/slopdogs-base-dogs/releases/download/%40martinschmieschek%2Fslopdogs-dogs-humor%400.3.0/martinschmieschek-slopdogs-dogs-humor-0.3.0.tgz",
     "@martinschmieschek/slopdogs-dogs-images": "https://github.com/MartinSchmieschek/slopdogs-base-dogs/releases/download/%40martinschmieschek%2Fslopdogs-dogs-images%400.3.0/martinschmieschek-slopdogs-dogs-images-0.3.0.tgz",
     "@martinschmieschek/slopdogs-dogs-ip-geo": "https://github.com/MartinSchmieschek/slopdogs-base-dogs/releases/download/%40martinschmieschek%2Fslopdogs-dogs-ip-geo%400.3.0/martinschmieschek-slopdogs-dogs-ip-geo-0.3.0.tgz",
