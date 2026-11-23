@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.2 (2026-11-23)
+
+### Changed
+- Open-Meteo dogs 0.4.0 on the shared cell store (`slopdogs-openmeteo` 0.4.0): one cache entry per 1 km cell and API holds every variable fetched there, each with its own freshness; concurrent requests of one wave are batched into a single upstream call; forecasts always span 7 days and dogs slice. Measured with a mocked upstream: the energy forecast (solar, humidity, snow) costs 1.6 weighted calls instead of 3.0, all ten forecast dogs at one cell 5.7 instead of 10.2.
+- Forecast dogs accept `days` 1–7 (was up to 16); larger values are clamped.
+- A per-process budget guard stays below the free Open-Meteo quota and serves stored values with `stale: true` when the budget is spent or the upstream returns 429/5xx.
+
 ## 0.3.1 (2026-11-23)
 
 ### Added
