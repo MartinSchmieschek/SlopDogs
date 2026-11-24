@@ -13,6 +13,15 @@ export interface TestKennel {
     versionId: string;
 }
 
+/** Die Rechte eines Test-Dogs, wie sie auf der Zeile stehen. */
+export interface TestDogAcl {
+    visibility: 'public' | 'run-only' | 'private';
+    ownerId: string | null;
+    editors?: string;
+    viewers?: string;
+    runners?: string;
+}
+
 export class TestKennels {
     private readonly dogVersions: string[] = [];
     private readonly kennelIds: string[] = [];
@@ -24,14 +33,26 @@ export class TestKennels {
 
     /** Ein oeffentlicher SerializedDog ohne Besitzer, der `html` liefert; gibt die lineageId zurueck. */
     async htmlDog(displayName: string, html: string): Promise<string> {
+        return (await this.codeDog(displayName, `return ${JSON.stringify(html)};`)).lineageId;
+    }
+
+    /**
+     * Ein SerializedDog mit eigenem Code und Rechten (Default: oeffentlich, ohne Besitzer). Mit `lineageId` entsteht
+     * eine neue Version dieser Lineage (ein Tick spaeter, damit sie die neueste ist).
+     */
+    async codeDog(
+        displayName: string,
+        theRun: string,
+        acl: TestDogAcl = { visibility: 'public', ownerId: null },
+        lineageId: string = generateLineageId(),
+    ): Promise<{ lineageId: string; versionId: string }> {
         const versionId = generateVersionId();
-        const lineageId = generateLineageId();
         const config: ISerializedDogConfig = {
             id: versionId,
             lineageId,
             parentId: null,
             displayName,
-            theRun: `return ${JSON.stringify(html)};`,
+            theRun,
             parentsRequired: [],
             parentsOptional: [],
         };
@@ -42,12 +63,11 @@ export class TestKennels {
             parentId: null,
             displayName,
             serializedDogConfig: JSON.stringify(config),
-            visibility: 'public',
-            ownerId: null,
-            createdAt: new Date(),
+            ...acl,
+            createdAt: new Date(Date.now() + this.dogVersions.length),
         });
         this.dogVersions.push(versionId);
-        return lineageId;
+        return { lineageId, versionId };
     }
 
     /** Legt den Kennel ueber den Controller an (ohne die Pruefungen der Anlege-Wege). */

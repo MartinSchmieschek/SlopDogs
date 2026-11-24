@@ -51,7 +51,7 @@
   },
   "api/routes/KennelBundleHandler.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 29
+      "count": 28
     }
   },
   "api/routes/KennelFavoriteHandler.ts": {
@@ -278,7 +278,7 @@
   },
   "server-app/createHttpApplication.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 21
+      "count": 18
     }
   },
   "server-app/heavyRequestLimiter.ts": {

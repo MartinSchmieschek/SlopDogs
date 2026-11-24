@@ -27,7 +27,7 @@ const ROOT = path.join(__dirname, '..');
 const TAG = '[check-env-catalog]';
 
 /** Server-Code: Wurzeln relativ zum Repo. Verzeichnisse rekursiv, Dateien einzeln. */
-const SCAN_ROOTS = ['main.ts', 'api', 'mcp', 'server-app', 'services', 'store', 'server-registries', 'seed-data', 'scripts'];
+const SCAN_ROOTS = ['main.ts', 'api', 'mcp', 'server-app', 'services', 'store', 'config', 'seed-data', 'scripts'];
 
 /** Installierte Pakete, die zur Server-Laufzeit gehoeren: ihr gebautes dist/ wird mitgelesen. */
 const SERVER_SIDE_PACKAGES = ['@martinschmieschek/slopdogs-core'];

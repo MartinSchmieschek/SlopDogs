@@ -17,6 +17,7 @@ import {
     withMyRights,
     VISIBILITIES,
     type Access,
+    type AclEntity,
 } from '../auth/visibility';
 import { LandingKennels } from '../auth/landingKennels';
 import { type BaseDogInfo, type ToolDef, type ToolDeps, ok, fail, resolveTsCode, codeHinweise, McpRunAdmission } from './types';
@@ -25,11 +26,13 @@ import {
     BASE_DOG_PREFIX,
     KENNEL_PUBLIC_PREFIX,
     checkSerializedDogCode,
+    isRuntimeLogVerbose,
     publicKennelDocsPath,
     publicKennelOpenApiPath,
     publicKennelPath,
     sanitizeLineDocs,
     type ILineDoc,
+    type IKennelConfig,
 } from '@martinschmieschek/slopdogs-core/runtime';
 import type { AuthCtx } from '../auth/middleware';
 import { SPUREN_NODES_FIELD_HINT, SPUREN_TASK_FIELD_HINT } from '../spuren-brief';
@@ -38,6 +41,9 @@ import { KennelSnapshotCache } from '../snapshots/KennelSnapshotCache';
 import { dogVersionsOf } from '../../services/dogVersions';
 import { firstRefusedDogRef, refusedDogRefMessage } from '../../services/dogAccess';
 import { ListQuery, USAGE_FILTERS, USAGE_FILTER_HELP } from '../../api/routes/ListQuery';
+import { KennelCacheClassifier, type CacheClassView } from '../../services/kennelCache/KennelCacheClassifier';
+import { KennelResultCache } from '../../services/kennelCache/KennelResultCache';
+import { RESULT_CACHE_INFINITE, ResultCacheTtl } from '../../services/kennelCache/ResultCacheTtl';
 import { DogReuseAdvisor, type BuiltDog, type ReuseCandidate, type ReuseHint } from '../../services/DogReuseAdvisor';
 
 /** Status notebook — see mcp/skill.md § Spuren & Rechtfertigung */
@@ -70,6 +76,20 @@ const KENNEL_TRACE_EDGE_SCHEMA = {
         comment: { type: 'string', description: 'Optional — grobe Wunsch-Kette (z.B. „Ort → Kandidaten“), kein Feld-Mapping' },
     },
 } as const;
+
+/**
+ * Ergebnis-Cache (P2): die TTL des Lead-Ergebnisses. Nur der Besitzer setzt sie; erlaubt ist, was die Cache-Klasse
+ * des Kennels zulaesst (get_kennel zeigt sie unter cacheClass.erlaubt).
+ */
+const RESULT_CACHE_TTL_FIELD = {
+    resultCacheTtl: {
+        anyOf: [
+            { type: 'integer', minimum: 0 },
+            { type: 'string', enum: [RESULT_CACHE_INFINITE] },
+        ],
+        description: `Result cache for the lead result (owner only). 0 = off (default), N = seconds (up to the server maximum, default 7 days), "${RESULT_CACHE_INFINITE}" = until a dog, the kennel or the server changes. Allowed values depend on the kennel's cache class: rein (pure) 0 | N | "${RESULT_CACHE_INFINITE}", fluechtig (fetch, clock) and persoenlich (jsonStore, keys) 0 | N, live (random, lobby) only 0. A cached call answers with header X-SlopDogs-Cache: hit and does not start a run.`,
+    },
+};
 
 const KENNEL_TRACE_FIELDS = {
     task: {
@@ -244,6 +264,17 @@ function visibilityChangeRefused(existing: any, requested: unknown, ctx: AuthCtx
     return canManageAcl(existing, ctx) ? null : 'Only the owner may change visibility';
 }
 
+/**
+ * OWN setzt die Ergebnis-TTL (P2), wie die Sichtbarkeit: ein Editor aendert den Inhalt, nicht wie lange ein Ergebnis
+ * fuer alle gilt. Dieselbe TTL noch einmal zu schicken ist keine Aenderung.
+ */
+function resultCacheTtlChangeRefused(existing: AclEntity, requested: unknown, ctx: AuthCtx): string | null {
+    if (requested === undefined) return null;
+    const parsed = ResultCacheTtl.parse(requested);
+    if (parsed.ok && parsed.ttl.equals(ResultCacheTtl.ofKennel(existing))) return null;
+    return canManageAcl(existing, ctx) ? null : 'Only the owner may change resultCacheTtl';
+}
+
 /** Die Ablehnung der Landing-Sperre als Werkzeug-Text: Code und Grund. */
 const LANDING_LOCKED = `${LandingKennels.LOCK_CODE}: ${LandingKennels.LOCK_MESSAGE}`;
 
@@ -309,11 +340,46 @@ function kennelHeader(k: any, ctx: AuthCtx) {
         hasTask: typeof k.task === 'string' && k.task.length > 0,
         hasNodes: Array.isArray(k.nodes) && k.nodes.length > 0,
         hasEdges: Array.isArray(k.edges) && k.edges.length > 0,
+        resultCacheTtl: ResultCacheTtl.fromValue(k.resultCacheTtl).value,
         frozen: isFrozen(k),
         myRights: rightsOf(k, ctx),
         createdAt: k.createdAt,
         updatedAt: k.updatedAt,
     };
+}
+
+/**
+ * Die Cache-Klasse eines Kennels fuer seine Leser (Ergebnis-Cache P1): Klasse und Gruende; die Code-Fundstelle eines
+ * Dogs nur, wenn der Aufrufer den Dog lesen darf. Ein Fehler der Klassifizierung nimmt der Antwort nur dieses Feld.
+ */
+async function cacheClassOf(
+    kennel: { dogIds?: unknown; resultCacheTtl?: unknown },
+    ctx: AuthCtx,
+    deps: ToolDeps,
+): Promise<{ cacheClass?: CacheClassView }> {
+    try {
+        const classification = await deps.kennelRunHandler.cacheClasses.classify(kennel);
+        const ttl = ResultCacheTtl.fromValue(kennel.resultCacheTtl);
+        return { cacheClass: KennelCacheClassifier.view(classification.redactedFor(ctx), ttl) };
+    } catch (err) {
+        if (isRuntimeLogVerbose()) console.warn('[kennels] Cache-Klasse nicht bestimmt:', (err as Error)?.message ?? err);
+        return {};
+    }
+}
+
+/** Wie cacheClassOf, mit den Aufrufzahlen: der Besitzer bekommt Herabstufung und Hinweis dazu. */
+async function cacheReportOf(
+    kennel: IKennelConfig,
+    ctx: AuthCtx,
+    deps: ToolDeps,
+    calls: { last30d: number; cached30d?: number },
+): Promise<{ cacheClass?: CacheClassView }> {
+    try {
+        return { cacheClass: (await deps.kennelRunHandler.resultCacheReport(kennel, ctx, calls)).cacheClass };
+    } catch (err) {
+        if (isRuntimeLogVerbose()) console.warn('[kennels] Cache-Auskunft nicht bestimmt:', (err as Error)?.message ?? err);
+        return {};
+    }
 }
 
 export function getKennelTools(): ToolDef[] {
@@ -404,8 +470,10 @@ export function getKennelTools(): ToolDef[] {
                 if (!result.ok || !result.data) return fail(result.error ?? 'not found');
                 const access = accessOf(result.data as any, ctx);
                 if (access === 'none') return fail(`Kennel ${args.id} not found`);
-                const header = access === 'run' ? kennelRunHeader(result.data, ctx) : kennelHeader(result.data, ctx);
-                return ok(await deps.kennelStats.attachOne(header));
+                if (access === 'run') return ok(await deps.kennelStats.attachOne(kennelRunHeader(result.data, ctx)));
+                // Der Besitzer sieht in cacheClass zusaetzlich Herabstufung und Hinweis aus der Statistik (Ergebnis-Cache P4).
+                const withStats = await deps.kennelStats.attachOne(kennelHeader(result.data, ctx));
+                return ok({ ...withStats, ...(await cacheReportOf(result.data, ctx, deps, withStats.stats.calls)) });
             },
         },
         {
@@ -518,6 +586,7 @@ export function getKennelTools(): ToolDef[] {
                     defaultQuery: { type: 'object', additionalProperties: { type: 'string' } },
                     defaultBody: {},
                     visibility: { type: 'string', enum: [...VISIBILITIES] },
+                    ...RESULT_CACHE_TTL_FIELD,
                     ...KENNEL_TRACE_FIELDS,
                 },
             },
@@ -539,6 +608,8 @@ export function getKennelTools(): ToolDef[] {
                     dogCount: Array.isArray(d?.dogIds) ? d.dogIds.length : 0,
                     visibility: d?.visibility ?? 'public',
                     spuren: spurenReport(d?.task, d?.nodes, d?.dogIds),
+                    resultCacheTtl: ResultCacheTtl.fromValue(d?.resultCacheTtl).value,
+                    ...(await cacheClassOf(d, ctx, deps)),
                 });
             },
         },
@@ -565,6 +636,7 @@ export function getKennelTools(): ToolDef[] {
                     visibility: { type: 'string', enum: [...VISIBILITIES] },
                     defaultQuery: { type: 'object', additionalProperties: { type: 'string' } },
                     defaultBody: {},
+                    ...RESULT_CACHE_TTL_FIELD,
                     ...KENNEL_TRACE_FIELDS,
                     dogs: {
                         type: 'array',
@@ -668,6 +740,7 @@ export function getKennelTools(): ToolDef[] {
                     defaultQuery: { type: 'object', additionalProperties: { type: 'string' } },
                     defaultBody: {},
                     visibility: { type: 'string', enum: [...VISIBILITIES] },
+                    ...RESULT_CACHE_TTL_FIELD,
                     ...KENNEL_TRACE_FIELDS,
                 },
             },
@@ -678,6 +751,8 @@ export function getKennelTools(): ToolDef[] {
                 if (!canMutate(existing.data as any, ctx)) return fail(kennelMutationRefusal(existing.data, ctx, id));
                 const visibilityRefused = visibilityChangeRefused(existing.data, args.visibility, ctx);
                 if (visibilityRefused) return fail(visibilityRefused);
+                const ttlRefused = resultCacheTtlChangeRefused(existing.data, args.resultCacheTtl, ctx);
+                if (ttlRefused) return fail(ttlRefused);
                 // SECURITY (2026-09-13): validate only dogIds ADDED in this update, so a
                 // pre-existing (possibly legacy) reference never blocks a legitimate edit,
                 // but a newly injected foreign private dog is rejected.
@@ -706,6 +781,8 @@ export function getKennelTools(): ToolDef[] {
                     dogCount: Array.isArray(d?.dogIds) ? d.dogIds.length : 0,
                     visibility: d?.visibility ?? 'public',
                     spuren: spurenReport(d?.task, d?.nodes, d?.dogIds),
+                    resultCacheTtl: ResultCacheTtl.fromValue(d?.resultCacheTtl).value,
+                    ...(await cacheClassOf(d, ctx, deps)),
                 });
             },
         },
@@ -816,7 +893,7 @@ export function getKennelTools(): ToolDef[] {
             description:
                 "Runs a kennel and returns ONLY the lead dog's result — the public-facing payload, identical to `GET " +
                 KENNEL_PUBLIC_PREFIX +
-                '/<kennelId>`. Use this when you want the spoils, not the diagnostic. The lead is the first entry in dogIds. Optional `vmTimeoutMs` overrides the per-dog VM execution budget for this run (resolution: vmTimeoutMs > SLOPDOGS_VM_TIMEOUT_MS env > 10000ms default, capped at SLOPDOGS_VM_TIMEOUT_MAX_MS, default 60000) -- not persisted. Runs share the server run queue: too many concurrent runs or too many runs per minute from you are refused (429), a full queue answers 503.',
+                '/<kennelId>`. Use this when you want the spoils, not the diagnostic. The lead is the first entry in dogIds. Optional `vmTimeoutMs` overrides the per-dog VM execution budget for this run (resolution: vmTimeoutMs > SLOPDOGS_VM_TIMEOUT_MS env > 10000ms default, capped at SLOPDOGS_VM_TIMEOUT_MAX_MS, default 60000) -- not persisted. Runs share the server run queue: too many concurrent runs or too many runs per minute from you are refused (429), a full queue answers 503. If the kennel has a resultCacheTtl, a still-valid cached lead result is returned without a run (same payload); the owner can force a fresh run with bypassCache.',
             inputSchema: {
                 type: 'object',
                 required: ['id'],
@@ -834,6 +911,11 @@ export function getKennelTools(): ToolDef[] {
                         description:
                             'Per-run VM timeout in ms. Overrides SLOPDOGS_VM_TIMEOUT_MS (default 10000); capped at SLOPDOGS_VM_TIMEOUT_MAX_MS (default 60000). Run-time-only, not persisted.',
                     },
+                    bypassCache: {
+                        type: 'boolean',
+                        description:
+                            'Owner only: ignore a cached result, run the kennel and replace the cache entry. Same as the header Cache-Control: no-cache on GET /k/<kennelId>.',
+                    },
                 },
             },
             handler: async (args, ctx, deps) => {
@@ -847,25 +929,33 @@ export function getKennelTools(): ToolDef[] {
                 const query = deps.kennelRunHandler.mergeQueryParams(config.defaultQuery, (args.query as Record<string, any>) ?? {});
                 const body = args.body !== undefined ? args.body : config.defaultBody;
                 const vmTimeoutMs = typeof args.vmTimeoutMs === 'number' && args.vmTimeoutMs > 0 ? args.vmTimeoutMs : undefined;
+                // Ergebnis-Cache (0.4.0): erst nach der Zugriffspruefung; ein Treffer startet keinen Lauf und nimmt keinen Platz.
+                const bypass = args.bypassCache === true;
+                if (bypass && !canManageAcl(config as AclEntity, ctx)) return fail('Only the owner may bypass the result cache');
+                const lookup = await deps.kennelRunHandler.lookupResult({ config, ctx, query, body, bypass });
+                if (lookup.state === 'hit') {
+                    const denial = deps.kennelRunHandler.cacheHitDenial(ctx);
+                    if (denial) return fail(`${denial.message} (HTTP ${denial.status}, retry after ${denial.retryAfterSec} s)`);
+                    deps.kennelRunHandler.recordCacheHit(config, 'mcp-execute');
+                    const cached = KennelResultCache.valueOf(lookup.entry);
+                    return cached.status === 'ok' ? ok(cached.result) : ok({ result: null, hint: EMPTY_LEAD_HINT });
+                }
+                const ticket = lookup.state === 'off' ? null : lookup.ticket;
                 const admitted = await McpRunAdmission.request(deps, ctx).granted();
-                if (!admitted.ok) return admitted.result;
+                if (!admitted.ok) {
+                    ticket?.abandon();
+                    return admitted.result;
+                }
                 try {
                     const waves = await deps.kennelRunHandler.runKennel(config, query, body, authCtxToCapabilityCtx(ctx), vmTimeoutMs, {
                         source: 'mcp-execute',
                     });
+                    if (ticket) await ticket.settle(waves, dogIds[0]);
                     // Derselbe Ausgang wie GET /k/<id> (LeadOutcome): ok -> Ergebnis; empty -> null (kein Fehler);
                     // failed -> Tool-Fehler (Speicher-Waechter: "Server busy", voruebergehend); not_run -> Tool-Fehler.
                     const lead = LeadOutcome.of(waves, dogIds[0]);
                     if (lead.status === 'ok') return ok(lead.result);
-                    if (lead.status === 'empty') {
-                        return ok({
-                            result: null,
-                            hint:
-                                'The lead ran without an error and returned no value (null or undefined) — GET ' +
-                                KENNEL_PUBLIC_PREFIX +
-                                '/<kennelId> answers 200 with the JSON body null. Make the lead return a value if you expect one.',
-                        });
-                    }
+                    if (lead.status === 'empty') return ok({ result: null, hint: EMPTY_LEAD_HINT });
                     if (lead.memoryPressure) {
                         return fail(
                             'Server busy: not enough memory to run this kennel right now. Retry shortly.' +
@@ -887,12 +977,18 @@ export function getKennelTools(): ToolDef[] {
                 } catch (err: any) {
                     return fail(runErrorText(err, access));
                 } finally {
+                    ticket?.abandon();
                     admitted.lease.release();
                 }
             },
         },
     ];
 }
+
+const EMPTY_LEAD_HINT =
+    'The lead ran without an error and returned no value (null or undefined) — GET ' +
+    KENNEL_PUBLIC_PREFIX +
+    '/<kennelId> answers 200 with the JSON body null. Make the lead return a value if you expect one.';
 
 function findDogInWaves(waves: any, dogId: string): { result: any; error?: string } | null {
     if (!waves || !Array.isArray(waves)) return null;
@@ -997,6 +1093,12 @@ async function reuseHintsFor(built: BuiltDog[], ctx: AuthCtx, deps: ToolDeps): P
         console.warn('[build_kennel] reuse hints skipped:', err instanceof Error ? err.message : err);
         return [];
     }
+}
+
+/** Der gebaute Kennel nach dem ersten Lauf — der Lauf kann Mimics in die dogIds geheilt haben. */
+async function builtKennelOf(deps: ToolDeps, kennelId: string, dogIds: string[]): Promise<{ dogIds?: unknown; resultCacheTtl?: unknown }> {
+    const reloaded = await deps.kennelsController.getById(kennelId).catch(() => null);
+    return reloaded?.ok && reloaded.data ? reloaded.data : { dogIds };
 }
 
 async function buildKennel(args: Record<string, any>, ctx: AuthCtx, deps: ToolDeps) {
@@ -1175,6 +1277,7 @@ async function buildKennel(args: Record<string, any>, ctx: AuthCtx, deps: ToolDe
             kennelInput.defaultBody = args.defaultBody;
         }
         if (typeof args.task === 'string') kennelInput.task = args.task;
+        if (args.resultCacheTtl !== undefined) kennelInput.resultCacheTtl = args.resultCacheTtl;
         // Spuren-ids aufloesen: bei build_kennel entstehen die Hunde ERST in diesem Aufruf -- der
         // Agent kann ihre lineageIds unmoeglich kennen, sein einziger Griff ist der displayName
         // (wie bei parentsRequired auch, dort per "@Name"). Ohne diese Aufloesung landen die
@@ -1362,6 +1465,7 @@ async function buildKennel(args: Record<string, any>, ctx: AuthCtx, deps: ToolDe
             runUrl: `/api/kennels/${kennelId}/run`,
             dogs: builtDogs,
             spuren: spurenReport(kennelInput.task, kennelInput.nodes, dogIds),
+            ...(await cacheClassOf(await builtKennelOf(deps, kennelId, dogIds), ctx, deps)),
             ...(firstRun ? { firstRun } : {}),
         });
     } catch (err: any) {

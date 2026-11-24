@@ -1,3 +1,4 @@
+import { ResultCacheTtl } from '../../services/kennelCache/ResultCacheTtl';
 import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
@@ -96,6 +97,9 @@ export async function seedSlopdogsLandingKennel(
         description: 'The SlopDogs landing page, served by SlopDogs itself at /. Mixtape only.',
         emoji: '🐕',
         visibility: 'public',
+        // Die Seite aendert sich nur mit ihren Dogs (Daten laedt der Browser selbst): Ergebnis halten, bis ein Dog,
+        // der Kennel oder der Server sich aendert.
+        ...ResultCacheTtl.INFINITE.columns,
         dogIds: [leadId, contentId, skinCId],
         nodes: JSON.stringify([
             { id: leadId, comment: 'Lead: nimmt Skin C als Seite, haengt /api/landing und den Host an.' },

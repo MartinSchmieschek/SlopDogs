@@ -11,10 +11,21 @@ datasource db {
 }
 
 model CacheEntry {
-  key       String @id
+  key       String  @id
   value     String
+  // Unix-Zeit in ms — Prisma BigInt
   expiresAt BigInt
+  // Ab 0.4.0 eine Tabelle fuer jeden Cache (config/cache/DbCacheStore.ts): Gruppe zum Loeschen/Zaehlen/Kappen
+  // (Ergebnis-Cache: Kennel-Lineage), kleine Zusatzfelder als JSON-Text, Groesse und letzter Treffer.
+  groupKey  String?
+  meta      String?
+  sizeBytes Int     @default(0)
+  lastHitAt BigInt  @default(0)
+
+  @@index([groupKey])
+  @@index([expiresAt])
 }
+
 
 model GeoFeature {
   dogType      String

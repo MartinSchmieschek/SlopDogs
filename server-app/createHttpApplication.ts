@@ -25,7 +25,9 @@ import { BetaKeys, type BetaKeyPrisma } from '../mcp/auth/betaKeys';
 import { KeyStoreService } from '../services/KeyStoreService';
 import { NodesRouteHandler } from '../api/routes/NodesRouteHandler';
 import { ReadmeRouteHandler } from '../api/routes/ReadmeRouteHandler';
-import { PrismaCacheHandler } from '../services/PrismaCacheHandler';
+import { StoreCacheHandler, type PrunableTileFeatureCache } from '../services/StoreCacheHandler';
+import type { ICacheStore } from '../config/cache/ICacheStore';
+import { CacheStoreKennelResultStore } from '../services/kennelCache/KennelResultStore';
 import { withResilientCacheInfra } from '../services/resilientCacheHandler';
 import { createPrismaAuthClient, openPrismaAuthClient } from '../store/createPrismaAuthClient';
 import type { SharedPrismaClients } from '../store/SharedPrismaClients';
@@ -39,6 +41,9 @@ import { KennelSnapshotCache } from '../mcp/snapshots/KennelSnapshotCache';
 import { resolveAngularBrowserDir, resolvePublicDir } from './expressPaths';
 import { HeavyRequestLimiter } from './heavyRequestLimiter';
 import { RunGates } from './runAdmission';
+import { KennelResultCache } from '../services/kennelCache/KennelResultCache';
+import { KennelResultCacheHandler } from '../api/routes/KennelResultCacheHandler';
+import { KennelFingerprints } from '../services/kennelCache/KennelFingerprint';
 import type { KennelCallCounter } from '../services/KennelCallCounter';
 import { KennelStatsService } from '../services/KennelStatsService';
 import { KennelFavoriteService } from '../services/KennelFavoriteService';
@@ -54,6 +59,7 @@ import { LandingPage } from './LandingPage';
 import { KennelListPage } from './KennelListPage';
 import { MyPagesRedirect } from './MyPagesRedirect';
 import { ResponseCompression } from './ResponseCompression';
+import { CorsHeaders } from './CorsHeaders';
 import { LOCAL_USER } from './LocalMode';
 import { NetworkBoundary } from './NetworkBoundary';
 import type { ChannelTickets } from './ChannelTickets';
@@ -80,7 +86,10 @@ export type CreateHttpApplicationInput = {
     kennelsStore: IStore;
     allBaseDogs: any[];
     baseDogsMap: Map<string, new () => any>;
-    resolveCacheDatabaseUrl: () => string;
+    /** Der Cache-Speicher aus der App-Config (Default: RAM vor Cache-DB) — fuer Base-Dogs und den Ergebnis-Cache. */
+    cacheStore: ICacheStore;
+    /** Der Tile-Feature-Cache aus der App-Config. */
+    tileCache: PrunableTileFeatureCache;
     /**
      * Der Store-Client fuer Auth und Run-Cache, soweit sie in der Store-Datenbank liegen (P1.4);
      * sonst entstehen hier eigene Clients. Besitzer des Store-Clients bleibt main.ts (store.disconnect()).
@@ -260,26 +269,7 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     // Kopfzeilen fuer jede Antwort und die Sandbox der Kennel-Seiten (SecurityHeaders) — vor allem anderen.
     app.use(new SecurityHeaders().middleware());
 
-    app.use((req: any, res: any, next: any) => {
-        const allow = allowedOriginForRequest(req);
-        if (allow) {
-            res.setHeader('Access-Control-Allow-Origin', allow);
-            res.setHeader('Vary', 'Origin');
-        } else if (SecurityHeaders.isKennelPath(req.path)) {
-            // Kennel-Seiten laufen unter Sandbox mit opakem Origin (`Origin: null`) — ihre Aufrufe an `/k/…` (eigener
-            // Kennel, Lesespur, Spec der Doku) sind damit cross-origin. `/k/` ist ohnehin oeffentlich und ohne Cookie
-            // gleich dem anonymen Lauf: `*` ohne Allow-Credentials, der Browser gibt keine Antwort mit Cookie frei.
-            res.setHeader('Access-Control-Allow-Origin', '*');
-            res.setHeader('Vary', 'Origin');
-        }
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-        if (req.method === 'OPTIONS') {
-            res.sendStatus(204);
-            return;
-        }
-        next();
-    });
+    app.use(new CorsHeaders(allowedOriginForRequest).middleware());
 
     // Kompression (brotli/gzip) fuer alles Textartige — vor /static, der Landing, der SPA und jeder Route.
     // SSE (/mcp) und der WebSocket-Hub bleiben ungepackt; HTTP_COMPRESSION=0 schaltet ab.
@@ -417,6 +407,8 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
             baseDogsMap,
             app,
             input.userPageStore,
+            kennelResultStore,
+            input.cacheStore,
         );
     };
     const runStartupTests = async (): Promise<void> => {
@@ -470,10 +462,11 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     const aclRouteHandler = new AclRouteHandler(kennelsController, nodesController, authPrisma);
     aclRouteHandler.registerRoutes(app);
 
-    // Die rohe Referenz bleibt erhalten: die Resilienz-Huelle reicht disconnect() nicht
-    // durch, und nur der Handler selbst kennt seinen Pool und seinen Prune-Timer.
-    const prismaCacheHandler = new PrismaCacheHandler(input.prismaClients, input.resolveCacheDatabaseUrl());
-    const cacheHandler: ICacheHandler = withResilientCacheInfra(prismaCacheHandler);
+    // Die rohe Referenz bleibt erhalten: die Resilienz-Huelle reicht disconnect() nicht durch, und nur der Handler
+    // kennt seinen Prune-Timer. Den Speicher selbst schliesst main.ts (er gehoert der Config).
+    const storeCacheHandler = new StoreCacheHandler(input.cacheStore, input.tileCache);
+    const cacheHandler: ICacheHandler = withResilientCacheInfra(storeCacheHandler);
+    const kennelResultStore = new CacheStoreKennelResultStore(input.cacheStore);
 
     const kennelRunHandler = new KennelRunHandler({
         kennelsController,
@@ -481,6 +474,25 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
         baseDogsMap,
         cacheHandler,
         callCounter: input.callCounter,
+        runGates,
+    });
+    // Ergebnis-Cache P2: jede angefragte TTL wird gegen die Cache-Klasse der Crew geprueft (REST, MCP, Import).
+    kennelsController.setResultCacheTtlGate(kennelRunHandler.cacheClasses);
+    // Ergebnis-Cache P3: Ablage in der Cache-DB; der Fingerabdruck traegt den Server-Stand (kein Eintrag ueberlebt den
+    // Deploy). Jede neue Dog- oder Kennel-Version verwirft das Fingerabdruck-Memo; ein geloeschter Kennel nimmt seine
+    // Eintraege mit.
+    let serverStamp: string | null = null; // erst beim ersten Lauf — dann stehen alle Dog-Pakete fest
+    const resultCache = new KennelResultCache(
+        kennelResultStore,
+        new KennelFingerprints(kennelRunHandler.cacheClasses, () => (serverStamp ??= JSON.stringify(serverVersion.block()))),
+    );
+    kennelRunHandler.useResultCache(resultCache);
+    input.refIndex.onChange(() => resultCache.fingerprints.invalidate());
+    kennelsController.setStatsJanitor({
+        forgetKennel: async (lineageId) => {
+            await kennelStats.forgetKennel(lineageId);
+            await resultCache.forgetKennel(lineageId);
+        },
     });
     landingPage.useRunner(kennelRunHandler);
     kennelListPage.use(kennelRunHandler, {
@@ -635,6 +647,8 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     new KennelRatingHandler(kennelsController, kennelStats).registerRoutes(app);
     // Favoriten (Spur U): /api/kennels/:id/favorite — eigenes Literal, keine Kollision.
     new KennelFavoriteHandler(kennelsController, kennelFavorites).registerRoutes(app);
+    // Ergebnis-Cache (P4): /api/kennels/:id/result-cache — eigenes Literal, keine Kollision.
+    new KennelResultCacheHandler(kennelsController, kennelRunHandler, kennelStats).registerRoutes(app);
 
     frontBinder.afterKennelRoutes(app, frontCtx);
 
@@ -644,7 +658,7 @@ export async function createHttpApplication(input: CreateHttpApplicationInput): 
     // Jeder Disconnect fuer sich gekapselt: ein sterbender Pool darf den naechsten
     // nicht mit in die Tiefe ziehen. Geliehene Store-Clients bleiben verbunden (release trennt nur eigene).
     const disconnect = async (): Promise<void> => {
-        await Promise.allSettled([prismaCacheHandler.disconnect(), authLease.release()]);
+        await Promise.allSettled([storeCacheHandler.disconnect(), authLease.release()]);
     };
 
     const reseed = (trigger: ReseedTrigger | null): Promise<ReseedOutcome> => seedReseed.run(trigger);

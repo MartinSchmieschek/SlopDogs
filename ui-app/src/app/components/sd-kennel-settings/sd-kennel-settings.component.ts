@@ -4,16 +4,18 @@ import { KennelService } from '../../services/kennel.service';
 import { AclService } from '../../services/acl.service';
 import { KENNEL_EMOJI_PRESETS } from '../../data/kennel-emoji-presets';
 import { publicKennelPath } from '../../config/public-paths';
-import type { IKennelConfig, KennelVisibility } from '../../models/kennel-config.model';
+import type { IKennelConfig, KennelResultCacheInfo, KennelVisibility } from '../../models/kennel-config.model';
 import type { DogEntry } from '../../models/dog-entry.model';
 import { graphNodeIdMatchesKennelDogId } from '../../utils/kennel-dog-id-match';
 import {
   bodyProblem,
+  cacheTtlOf,
   reorderDogIds,
   settingsFormOf,
   settingsDirty,
   settingsPayload,
   settingsView,
+  type CacheTtlMode,
   type QueryRow,
   type SettingsForm,
   type SettingsRights,
@@ -86,6 +88,10 @@ export class SdKennelSettingsComponent {
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
   readonly unfreezing = signal(false);
+  /** Result cache (0.4.0): TTL as typed, and what the server says about the crew. */
+  readonly ttlMode = signal<CacheTtlMode>('off');
+  readonly ttlSeconds = signal('');
+  readonly cacheInfo = signal<KennelResultCacheInfo | null>(null);
 
   readonly view = computed(() => settingsView(this.rights(), this.frozen(), this.landingLocked()));
   readonly editable = computed(() => this.view() === 'edit');
@@ -93,6 +99,14 @@ export class SdKennelSettingsComponent {
   readonly lineage = computed(() => this.kennel()?.lineageId || this.kennelId());
   readonly publicPath = computed(() => publicKennelPath(this.lineage()));
   readonly bodyError = computed(() => bodyProblem(this.body()));
+  readonly ttlError = computed(() => {
+    const ttl = cacheTtlOf({ ttlMode: this.ttlMode(), ttlSeconds: this.ttlSeconds() });
+    return ttl.ok ? null : ttl.error;
+  });
+  /** Only the owner changes the TTL; the server says so (`canChange`), the drawer must be editable too. */
+  readonly ttlEditable = computed(() => this.editable() && !!this.cacheInfo()?.canChange);
+  readonly infiniteAllowed = computed(() => !!this.cacheInfo()?.cacheClass.erlaubt.includes('unendlich'));
+  readonly secondsAllowed = computed(() => (this.cacheInfo()?.cacheClass.erlaubt.length ?? 0) > 1);
   readonly dogRows = computed<DogOrderRow[]>(() => this.dogIds().map((ref) => this.dogRow(ref)));
   /** Typed but not saved (U8): closing asks first. */
   readonly dirty = computed(() => this.open() && this.editable() && settingsDirty(this.kennel(), this.form()));
@@ -102,8 +116,25 @@ export class SdKennelSettingsComponent {
     effect(() => {
       if (!this.open()) return;
       const cfg = this.kennel();
-      untracked(() => this.reset(cfg));
+      untracked(() => {
+        this.reset(cfg);
+        this.loadCacheInfo();
+      });
     }, { allowSignalWrites: true });
+  }
+
+  /** The result cache section: class, reasons, allowed TTLs. A server before 0.4.0 has none — the section stays away. */
+  private loadCacheInfo(): void {
+    this.cacheInfo.set(null);
+    if (this.view() === 'none') return;
+    this.kennels.getResultCache(this.lineage()).subscribe({
+      next: (info) => this.cacheInfo.set(info?.ok ? info : null),
+      error: () => this.cacheInfo.set(null),
+    });
+  }
+
+  setTtlMode(mode: string): void {
+    if (mode === 'off' || mode === 'seconds' || mode === 'unendlich') this.ttlMode.set(mode);
   }
 
   private form(): SettingsForm {
@@ -114,6 +145,8 @@ export class SdKennelSettingsComponent {
       dogIds: this.dogIds(),
       query: this.query(),
       body: this.body(),
+      ttlMode: this.ttlMode(),
+      ttlSeconds: this.ttlSeconds(),
     };
   }
 
@@ -125,6 +158,8 @@ export class SdKennelSettingsComponent {
     this.dogIds.set(f.dogIds);
     this.query.set(f.query);
     this.body.set(f.body);
+    this.ttlMode.set(f.ttlMode);
+    this.ttlSeconds.set(f.ttlSeconds);
     this.error.set(null);
     this.emojiOpen.set(false);
   }

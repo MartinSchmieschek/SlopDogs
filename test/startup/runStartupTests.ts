@@ -41,7 +41,8 @@ class StartupTestRun {
     /** Gibt Pools, Zaehler und den Wachposten frei; ein Fehler hier aendert das Testergebnis nicht. */
     private static async release(booted: BootedApplication): Promise<void> {
         await booted.callCounter.stop();
-        await Promise.allSettled([booted.store.disconnect(), booted.jsonStorageService.disconnect(), booted.disconnectHttpApplication()]);
+        await Promise.allSettled([booted.jsonStorageService.disconnect(), booted.disconnectHttpApplication()]);
+        await booted.disconnectData();
         await Watchpost.stopShared();
     }
 }

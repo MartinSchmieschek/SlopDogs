@@ -36,6 +36,9 @@ model Dog {
   viewers              String?  // Comma-separated User.id list — additional users with read rights on private entities.
   runners              String?  // CSV User.id — duerfen ausfuehren/referenzieren, nicht lesen (P3.5)
   frozen               Boolean  @default(false)   // 8.16: Owner (bei Community der Superuser) friert ein; EDIT fuer alle gesperrt, RUN/READ/Export unveraendert (8.25)
+  // Ergebnis-Cache (PLAN-KENNEL-CACHE E6): TTL in Sekunden (0/NULL = aus) und Schalter fuer "unendlich" — kein Sentinel.
+  resultCacheTtlSec    Int?
+  resultCacheInfinite  Boolean  @default(false)
   createdAt            DateTime? @default(now())
   updatedAt            DateTime?
 
@@ -64,6 +67,7 @@ model KennelCallDaily {
   source     String   // public | api-execute | mcp-execute | api-run | mcp-run | mcp-snapshot | mcp-build | swagger | unknown | landing
   count      Int      @default(0)
   leadFailed Int      @default(0)   // Laeufe, deren Lead-Dog ein error-Brandzeichen trug
+  cached     Int      @default(0)   // davon aus dem Ergebnis-Cache beantwortet (kein Lauf, keine Dog-Zeilen)
 
   @@id([lineageId, day, source])
   @@index([day])                    // 30-Tage-Fenster
@@ -162,11 +166,21 @@ model DogReference {
 // --- 1:1 mit store/prisma-cache/schema.prisma ---
 
 model CacheEntry {
-  key       String @id
+  key       String  @id
   value     String
   // Unix-Zeit in ms — Prisma BigInt
   expiresAt BigInt
+  // Ab 0.4.0 eine Tabelle fuer jeden Cache (config/cache/DbCacheStore.ts): Gruppe zum Loeschen/Zaehlen/Kappen
+  // (Ergebnis-Cache: Kennel-Lineage), kleine Zusatzfelder als JSON-Text, Groesse und letzter Treffer.
+  groupKey  String?
+  meta      String?
+  sizeBytes Int     @default(0)
+  lastHitAt BigInt  @default(0)
+
+  @@index([groupKey])
+  @@index([expiresAt])
 }
+
 
 // Tile-Feature-Cache: atomarer Geo-Feature-Store.
 // Jedes OSM-Feature genau einmal pro (dogType, osmType, osmId).

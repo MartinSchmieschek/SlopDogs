@@ -214,6 +214,15 @@ export class SourceRunGate {
     }
 
     /**
+     * Das eigene Budget der Cache-Treffer je Quelle (Ergebnis-Cache D3/E7): ein Treffer startet keinen Lauf, kostet
+     * aber DB-Abfragen. Stoss = ein Sechstel der Minute, gleichzeitig hoechstens so viele wie pro Minute.
+     */
+    static cacheHitsFromEnv(): SourceRunGate {
+        const perMinute = positiveIntFromEnv('CACHE_HITS_PER_SOURCE_PER_MINUTE', 600);
+        return new SourceRunGate({ maxInflight: perMinute, perMinute, burst: Math.max(1, Math.ceil(perMinute / 6)) });
+    }
+
+    /**
      * Darf diese Quelle einen Lauf beginnen? Erst die Gleichzeitigkeit (kostet kein Token), dann der
      * Bucket. Der Pass zaehlt, bis der Lauf endet — aktiv ODER wartend.
      */
@@ -555,6 +564,8 @@ export class RunGates {
         readonly heavy: RunAdmission,
         readonly publicRuns: RunAdmission,
         readonly sources: SourceRunGate,
+        /** Treffer des Ergebnis-Caches: eigenes Budget, kein Lauf-Platz (E7). */
+        readonly cacheHits: SourceRunGate = SourceRunGate.cacheHitsFromEnv(),
     ) {}
 
     static fromEnv(): RunGates {
@@ -572,6 +583,7 @@ export class RunGates {
                 queueMax: positiveIntFromEnv('PUBLIC_RUN_QUEUE_MAX', 50),
             }),
             SourceRunGate.fromEnv(),
+            SourceRunGate.cacheHitsFromEnv(),
         );
     }
 

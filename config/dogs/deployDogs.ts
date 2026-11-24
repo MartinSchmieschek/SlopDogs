@@ -1,8 +1,7 @@
 /**
- * Schlanke Base-Dog- und Pact-Registry für NODE_ENV=production und integration (weniger RAM/Imports).
- * Lädt nur Pakete, die Seeds + StartupTest + die DB-Kennel-Abdeckung brauchen.
- * Lokal unter NODE_ENV=development wird stattdessen fullRegistry geladen.
- * @see server-registries/fullRegistry.ts für die volle Liste.
+ * Base-Dogs und Pacts des Betriebs (production, integration) — die Liste der Default-Config (config/default.config.ts).
+ * Nur Pakete, die Seeds, StartupTest und die Kennels in der DB brauchen: was hier fehlt, wird nicht importiert (RAM).
+ * Bis 0.3.x: server-registries/slimDeployRegistry.ts. Volle Liste: config/dogs/allDogs.ts.
  */
 import {
     QueryRetriever,

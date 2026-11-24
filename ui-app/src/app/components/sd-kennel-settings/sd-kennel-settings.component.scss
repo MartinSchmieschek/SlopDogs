@@ -221,3 +221,21 @@
     padding-bottom: max(var(--s3), env(safe-area-inset-bottom));
   }
 }
+
+// Result cache (0.4.0): class chip, reasons, the TTL row.
+.cache {
+  .reasons {
+    margin: 0;
+    padding-left: 1.1em;
+  }
+
+  .ttl {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .secs {
+    width: 9ch;
+  }
+}

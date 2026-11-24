@@ -3,7 +3,14 @@
 // this class is the sole keeper of persistence, and it answers to no one but Prisma.
 // Now the lineage branches like cursed coral — lineageId binds incarnations, parentId traces ancestry.
 import { PrismaClient, Prisma } from '@prisma/client';
-import { IStore, type MimicHeadRow, type ReferenceHeadRow, type ReferenceTargetRow, type VersionHeaderRow } from './IStore';
+import {
+    IStore,
+    type DogVersionRefRow,
+    type MimicHeadRow,
+    type ReferenceHeadRow,
+    type ReferenceTargetRow,
+    type VersionHeaderRow,
+} from './IStore';
 import {
     IKennelStatsStore,
     IDogStatsStore,
@@ -130,6 +137,9 @@ export class PrismaStore implements IStore, IKennelStatsStore, IDogStatsStore, I
             updateData.runners = Array.isArray(d.runners) ? (d.runners.length ? d.runners.join(',') : null) : d.runners;
         }
         if (d.frozen !== undefined) updateData.frozen = Boolean(d.frozen);
+        // Ergebnis-Cache (E6): Sekunden und Schalter fuer unendlich — fehlen sie (heal, Dogs), bleibt die Zeile, wie sie ist.
+        if (d.resultCacheTtlSec !== undefined) updateData.resultCacheTtlSec = d.resultCacheTtlSec;
+        if (d.resultCacheInfinite !== undefined) updateData.resultCacheInfinite = Boolean(d.resultCacheInfinite);
         if (d.createdAt !== undefined) updateData.createdAt = d.createdAt;
         if (d.updatedAt !== undefined) updateData.updatedAt = d.updatedAt;
 
@@ -174,6 +184,8 @@ export class PrismaStore implements IStore, IKennelStatsStore, IDogStatsStore, I
                 viewers: row.viewers,
                 runners: row.runners,
                 frozen: Boolean(row.frozen),
+                resultCacheTtlSec: row.resultCacheTtlSec ?? null,
+                resultCacheInfinite: Boolean(row.resultCacheInfinite),
                 lineageId: row.lineageId,
                 parentId: row.parentId,
                 displayName: row.displayName,
@@ -514,6 +526,8 @@ export class PrismaStore implements IStore, IKennelStatsStore, IDogStatsStore, I
                 runners: r.runners,
                 // $queryRaw liefert SQLite-Booleans als 0/1 — Boolean() macht beide Wege gleich.
                 frozen: Boolean(r.frozen),
+                resultCacheTtlSec: r.resultCacheTtlSec ?? null,
+                resultCacheInfinite: Boolean(r.resultCacheInfinite),
                 lineageId: r.lineageId,
                 parentId: r.parentId,
                 displayName: r.displayName,
@@ -604,6 +618,62 @@ export class PrismaStore implements IStore, IKennelStatsStore, IDogStatsStore, I
             }
         }
 
+        return result;
+    }
+
+    public async findVersionRefsByType(type: string, ids: string[]): Promise<DogVersionRefRow[]> {
+        if (ids.length === 0) return [];
+        const select = (where: Prisma.Sql) =>
+            this.prisma.$queryRaw<DogVersionRefRow[]>(Prisma.sql`
+      SELECT "id", "type", "lineageId", "displayName", "createdAt", "visibility", "ownerId", "editors", "viewers", "runners", "frozen",
+        ${this.cfgString('lineageId')} AS "cfgLineageId"
+      FROM "Dog" WHERE "type" = ${type} AND ${where}
+    `);
+        // Dieselben zwei Wege wie findCandidatesForIds: erst id/lineageId, der displayName nur fuer den Rest.
+        const indexed = await select(Prisma.sql`("id" IN (${Prisma.join(ids)}) OR "lineageId" IN (${Prisma.join(ids)}))`);
+        const resolved = new Set<string>();
+        for (const row of indexed) {
+            resolved.add(row.id);
+            if (row.lineageId) resolved.add(row.lineageId);
+        }
+        const unresolved = ids.filter((id) => !resolved.has(id));
+        const byName = unresolved.length > 0 ? await select(Prisma.sql`"displayName" IN (${Prisma.join(unresolved)})`) : [];
+        const seen = new Set(indexed.map((r) => r.id));
+        const rows = indexed.concat(byName.filter((r) => !seen.has(r.id)));
+        return PrismaStore.pickRequested(rows, ids).map((r) => ({
+            id: r.id,
+            type: r.type,
+            lineageId: r.lineageId ?? null,
+            cfgLineageId: r.cfgLineageId ?? null,
+            displayName: r.displayName ?? null,
+            createdAt: r.createdAt ?? null,
+            visibility: r.visibility ?? null,
+            ownerId: r.ownerId ?? null,
+            editors: r.editors ?? null,
+            viewers: r.viewers ?? null,
+            runners: r.runners ?? null,
+            frozen: Boolean(r.frozen),
+        }));
+    }
+
+    /**
+     * Die Rangfolge von findLatestVersionsByType fuer schmale Zeilen: je angefragter ID hoechstens eine Zeile, zuerst
+     * die Version-GUID, dann die lineageId (neuestes createdAt), dann der displayName (neuestes createdAt).
+     */
+    private static pickRequested<R extends { id: string; lineageId?: string | null; displayName?: string | null; createdAt?: unknown }>(
+        rows: R[],
+        ids: string[],
+    ): R[] {
+        const time = (r: R) => (r.createdAt ? new Date(r.createdAt as string).getTime() : 0);
+        const newest = (candidates: R[]): R | undefined => candidates.sort((a, b) => time(b) - time(a))[0];
+        const result: R[] = [];
+        for (const requestedId of ids) {
+            const picked =
+                rows.find((r) => r.id === requestedId) ??
+                newest(rows.filter((r) => r.lineageId === requestedId)) ??
+                newest(rows.filter((r) => r.displayName === requestedId));
+            if (picked) result.push(picked);
+        }
         return result;
     }
 
@@ -711,6 +781,8 @@ export class PrismaStore implements IStore, IKennelStatsStore, IDogStatsStore, I
             viewers: r.viewers ?? null,
             runners: r.runners ?? null,
             frozen: Boolean(r.frozen),
+            resultCacheTtlSec: r.resultCacheTtlSec ?? null,
+            resultCacheInfinite: Boolean(r.resultCacheInfinite),
             createdAt: r.createdAt ?? null,
             updatedAt: r.updatedAt ?? null,
             serializedDogConfig: r.serializedDogConfig,
@@ -762,6 +834,8 @@ export class PrismaStore implements IStore, IKennelStatsStore, IDogStatsStore, I
                     viewers: r.viewers ?? null,
                     runners: r.runners ?? null,
                     frozen: Boolean(r.frozen),
+                    resultCacheTtlSec: r.resultCacheTtlSec ?? null,
+                    resultCacheInfinite: Boolean(r.resultCacheInfinite),
                     updatedAt: r.updatedAt ?? null,
                 };
             })
@@ -823,11 +897,12 @@ export class PrismaStore implements IStore, IKennelStatsStore, IDogStatsStore, I
         await this.prisma.$transaction([
             ...deltas.map((d) =>
                 this.prisma.$executeRaw(Prisma.sql`
-      INSERT INTO "KennelCallDaily" ("lineageId", "day", "source", "count", "leadFailed")
-      VALUES (${d.lineageId}, ${d.day}, ${d.source}, ${d.count}, ${d.leadFailed})
+      INSERT INTO "KennelCallDaily" ("lineageId", "day", "source", "count", "leadFailed", "cached")
+      VALUES (${d.lineageId}, ${d.day}, ${d.source}, ${d.count}, ${d.leadFailed}, ${d.cached ?? 0})
       ON CONFLICT ("lineageId", "day", "source") DO UPDATE SET
         "count"      = "KennelCallDaily"."count"      + excluded."count",
-        "leadFailed" = "KennelCallDaily"."leadFailed" + excluded."leadFailed"
+        "leadFailed" = "KennelCallDaily"."leadFailed" + excluded."leadFailed",
+        "cached"     = "KennelCallDaily"."cached"     + excluded."cached"
     `),
             ),
             ...this.dogCallStatements(dogDeltas),
@@ -964,7 +1039,8 @@ export class PrismaStore implements IStore, IKennelStatsStore, IDogStatsStore, I
              CAST(SUM("leadFailed") AS INTEGER)                                                     AS "leadFailed",
              CAST(SUM(CASE WHEN "day" >= ${sinceDay} THEN "leadFailed" ELSE 0 END) AS INTEGER)      AS "leadFailed30d",
              CAST(SUM(CASE WHEN "source" IN (${ranked}) THEN "count" ELSE 0 END) AS INTEGER)        AS "rankedTotal",
-             CAST(SUM(CASE WHEN "source" IN (${ranked}) AND "day" >= ${sinceDay} THEN "count" ELSE 0 END) AS INTEGER) AS "ranked30d"
+             CAST(SUM(CASE WHEN "source" IN (${ranked}) AND "day" >= ${sinceDay} THEN "count" ELSE 0 END) AS INTEGER) AS "ranked30d",
+             CAST(SUM(CASE WHEN "day" >= ${sinceDay} THEN "cached" ELSE 0 END) AS INTEGER)           AS "cached30d"
       FROM "KennelCallDaily"
       ${where}
       GROUP BY "lineageId"
@@ -977,6 +1053,7 @@ export class PrismaStore implements IStore, IKennelStatsStore, IDogStatsStore, I
             leadFailed30d: Number(r.leadFailed30d ?? 0),
             rankedTotal: Number(r.rankedTotal ?? 0),
             ranked30d: Number(r.ranked30d ?? 0),
+            cached30d: Number(r.cached30d ?? 0),
         }));
     }
 

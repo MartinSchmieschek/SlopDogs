@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.4.0 (2026-11-24)
+
+Result cache for whole kennel runs (#21): a kennel can keep its lead result and answer repeated calls without a run.
+App config as code: the data access, the cache store and the loaded base dogs are described in `config/`, and another config is one env variable away.
+
+### Added
+- Code the dog only hands to the browser does not count for the cache class: a function used only as text (`String(f)`, `f.toString()`, `'(' + f + ')()'`, `${f}`) and never called on the server is skipped, so a page with client-side `fetch`, `Date` or `Math.random` can still be `rein`. Any other use of the function keeps it in.
+- Cache class per kennel: `rein` < `fluechtig` < `persoenlich` < `live`, the strictest dog decides. Own dogs are classified from their code (syntax tree, per version), base dogs by a static `cacheClass` or a fallback table; unknown counts as `fluechtig`. `get_kennel`, `create_kennel`, `update_kennel` and `build_kennel` show `cacheClass {klasse, gruende, erlaubt, ruht?}`.
+- Kennel property `resultCacheTtl`: `0` (off, default), seconds (up to `KENNEL_RESULT_CACHE_MAX_TTL_SEC`, default 7 days) or `"unendlich"` (until a dog, the kennel or the server changes; `rein` only). Only the owner sets it (MCP, REST `POST`/`PUT /api/kennels`, bundle export/import); a value the class does not allow is refused with the reasons. Changing only the TTL makes a new version.
+- Cached answers on `GET`/`POST /k/:id`, `/api/kennels/:id/execute` and MCP `execute_kennel`, with the headers `X-SlopDogs-Cache: hit|miss|bypass` and `Age`. The owner forces a fresh run with `Cache-Control: no-cache` (MCP: `bypassCache`). Not cached: `/api/kennels/:id/run`, `run_kennel`, `refresh_kennel_snapshot`, the first run of `build_kennel`, `/k/:id/openapi.json` and `/k/:id/docs`.
+- Personal and private kennels are cached per user, never shared; a run that turns out to use personal data is not stored. Only the cleaned lead result is stored, at most 2 MB (`KENNEL_RESULT_CACHE_MAX_ENTRY_BYTES`) and 500 entries per kennel; `"unendlich"` entries leave after 30 days without a hit.
+- MCP guide (`skill.md`, server instructions) and README explain the result cache: when to set a TTL, what a hit costs, what the cache class allows.
+- Landing (`slopdogs-landing`) and kennel list (`slopdogs-kennels`) are seeded with `resultCacheTtl: "unendlich"`: their pages change only with their dogs (the browser loads the data itself), so `/`, `/kennels` and their `/k/` links stay cached until a dog, the kennel or the server changes. An existing database gets it with a new `SLOPDOGS_RESEED` mark, or a maintainer sets it with `update_kennel`.
+- `GET /api/kennels/:id/result-cache` (read right): class, reasons, allowed TTLs; the owner also gets why the last run was not cached and a hint from the call statistics. The kennel settings show it, with the TTL field for the owner.
+- App config (`config/default.config.ts` for production and integration, `config/local.config.ts` for development and the local mode): `database` (how the server gets its data — Prisma today; credentials stay in the env), `cache` (the cache store), `tiles` (the OSM tile feature cache), `dogs` and `pacts` (which base dogs are loaded; the lists moved from `server-registries/` to `config/dogs/deployDogs.ts` and `allDogs.ts`) and `requireKennelCoverage`. `SLOPDOGS_CONFIG=<path>` loads another config; a malformed one stops the start with exit 78 and a clear message.
+- One interface for every cache store, `ICacheStore` (`config/cache/ICacheStore.ts`): get, set, touch, delete, deleteByPrefix, groups (delete, count, trim) and prune. Base dogs (`getOrFetch`) and the result cache both store through it; anyone can plug in another store through their own config.
+- Two-level cache in the default config: the last calls in memory (`RamCacheStore`: 500 entries, 8 MB, at most 30 s; holds text, not objects; empties itself when RSS passes the memory guard's soft limit), behind it the cache database (`DbCacheStore`). Hits from the database move into memory, writes and deletes go to both, `touch` writes through at most once per 30 s. Measured locally (SQLite, 20 KB result, 90 sequential hits): median 3.6 ms instead of 4.7 ms per hit.
+- Cache database: table `CacheEntry` gains `groupKey`, `meta`, `sizeBytes`, `lastHitAt` (indexes on `groupKey` and `expiresAt`); the result cache uses it with the kennel lineage as group. Columns `resultCacheTtlSec`/`resultCacheInfinite` on `KennelConfig`, `cached` on `KennelCallDaily` — schema push needed (all additions, nothing dropped).
+
+### Changed
+- `PrismaCacheHandler` is now `StoreCacheHandler`: the same logic (bundling of running fetches, 60 s negative cache, prune timer) on any `ICacheStore`. Base dogs are unchanged.
+- Cache hits are answered before the run queue and the per-source run limit: they cost no run slot and no run token, only their own budget `CACHE_HITS_PER_SOURCE_PER_MINUTE` (default 600). A miss is admitted as before, now inside the handler after the access check — an unknown or forbidden kennel answers 404/403 before a 429.
+- Landing and kennel list render through the result cache (scope `landing`, the kennel's TTL or `LANDING_HTML_MEMO_MS`): after a restart or on a second instance they show without a run.
+- Statistics: a cache hit counts as a call of its source and in `stats.calls.cached30d`, never as a dog run. Runs for `/k/:id/openapi.json` no longer count as calls or dog runs.
+
+### Fixed
+- CORS: `Access-Control-Expose-Headers: Retry-After, X-SlopDogs-Cache, Age`, so browser code on another origin can read how long to wait after a 429/503 and whether an answer came from the cache (#24, item 18).
+- Kennel pages may lock the screen orientation: the sandbox now includes `allow-orientation-lock`, so `screen.orientation.lock('landscape')` works in fullscreen on phones instead of being refused.
+- Kennel pages may capture the mouse: the sandbox now includes `allow-pointer-lock`. Before, `requestPointerLock()` failed with `pointerlockerror` (Chrome names the missing flag), so games had to run without mouse look. It needs a user gesture and the browser offers Esc to leave; the page still gets no origin, cookies or storage.
+
 ## 0.3.3 (2026-11-23)
 
 ### Added

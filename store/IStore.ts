@@ -45,6 +45,25 @@ export interface MimicHeadRow {
 }
 
 /**
+ * Eine Dog-Version ohne Konfig-Blob — was die Aufloesung eines Kennel-Laufs braucht (Ergebnis-Cache D1):
+ * Identitaet, Zeitpunkt, die Lineage aus der Konfig und die ACL-Spalten.
+ */
+export interface DogVersionRefRow {
+    id: string;
+    type: string;
+    lineageId: string | null;
+    cfgLineageId: string | null;
+    displayName: string | null;
+    createdAt: Date | string | null;
+    visibility: string | null;
+    ownerId: string | null;
+    editors: string | null;
+    viewers: string | null;
+    runners: string | null;
+    frozen: boolean;
+}
+
+/**
  * The eldritch contract of the Store — a pact sealed between our ship and the deep.
  * All who dare persist data in this realm must honour these rites.
  * Corporeal laws are unwritten as suns and love retreat;
@@ -145,6 +164,12 @@ export interface IStore {
 
     /** Die neueste Version je MimicDog-Lineage, ohne Konfig: id, Lineage, createdAt, ACL, imitates. */
     findMimicHeads(): Promise<MimicHeadRow[]>;
+
+    /**
+     * Dieselbe Aufloesung wie findLatestVersionsByType(type, ids) — Version-GUID vor Lineage (neuestes createdAt)
+     * vor displayName —, aber schmal: ohne tsCode, ohne Kennel-Spalten. Fuer den Fingerabdruck des Ergebnis-Caches.
+     */
+    findVersionRefsByType(type: string, ids: string[]): Promise<DogVersionRefRow[]>;
 
     /**
      * Freeze or unfreeze one row in place — no new version (P3.5, 8.25). Callers pass the

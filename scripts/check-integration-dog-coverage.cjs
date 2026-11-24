@@ -1,7 +1,7 @@
 /**
  * Prüft, ob alle in seed-data vorkommenden `BASE_DOG_PREFIX + '…'`-Namen in der schlanken Registry stehen
  * (dieselbe Datei wie unter NODE_ENV=production | integration).
- * Exit 1 bei Lücken — nach neuen Seed-Kennels `server-registries/slimDeployRegistry.ts` erweitern.
+ * Exit 1 bei Lücken — nach neuen Seed-Kennels `config/dogs/deployDogs.ts` erweitern.
  *
  * Aufruf (Repo-Root): node -r ts-node/register scripts/check-integration-dog-coverage.cjs
  */
@@ -16,7 +16,7 @@ require('ts-node').register({
     project: path.join(root, 'tsconfig.json'),
 });
 
-const { SLIM_DEPLOY_BASE_DOG_NAMES } = require(path.join(root, 'server-registries', 'slimDeployRegistry.ts'));
+const { SLIM_DEPLOY_BASE_DOG_NAMES } = require(path.join(root, 'config', 'dogs', 'deployDogs.ts'));
 
 const allowed = new Set(SLIM_DEPLOY_BASE_DOG_NAMES);
 const re = /BASE_DOG_PREFIX\s*\+\s*['"]([A-Za-z0-9_]+)['"]/g;
@@ -56,7 +56,7 @@ if (missing.size > 0) {
         console.error(`  - ${name}`);
         for (const f of [...new Set(files)]) console.error(`      ${f}`);
     }
-    console.error('\nErgänze die Klasse in server-registries/slimDeployRegistry.ts (und ggf. allPacts).');
+    console.error('\nErgänze die Klasse in config/dogs/deployDogs.ts (und ggf. allPacts).');
     process.exit(1);
 }
 

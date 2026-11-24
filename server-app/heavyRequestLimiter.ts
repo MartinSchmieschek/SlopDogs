@@ -18,8 +18,12 @@
  * spaeter den Platz, antwortete ins Leere (kein 'finish', 'close' schon vorbei) und gab ihn nie zurueck.
  *
  * Zwei Instanzen, zwei Toepfe: `heavy()` fuer UI-Listen und Runs der Werkstatt,
- * `publicRuns()` fuer oeffentliche Kennel-Laeufe (`/k/:id`, `/k/:id/openapi.json`).
- * Getrennt, damit die UI nicht hinter einer Besucherwelle wartet.
+ * `publicRuns()` fuer oeffentliche Kennel-Laeufe. Getrennt, damit die UI nicht hinter einer Besucherwelle wartet.
+ *
+ * Ergebnis-Cache (0.4.0, E7/D3): `/k/:id` und `/api/kennels/:id/execute` haengen NICHT mehr an der Middleware. Ihr
+ * Handler schlaegt erst im Cache nach; ein Treffer kostet keinen Lauf-Platz und kein Lauf-Token, nur das eigene
+ * Treffer-Budget (`admitCacheHit`). Erst ein Fehlschlag fragt — mit denselben Toepfen und derselben Sperre je Quelle
+ * wie bisher — `admit()` im Handler.
  */
 
 import type { Application, Request, RequestHandler, Response } from 'express';
@@ -57,17 +61,17 @@ export class HeavyRequestLimiter {
     private static readonly HEAVY_PATHS: readonly RegExp[] = [
         /^\/api\/kennels\/?$/,
         /^\/api\/nodes\/?$/,
-        /^\/api\/kennels\/[^/]+\/(run|execute)\/?$/,
+        /^\/api\/kennels\/[^/]+\/run\/?$/,
     ];
 
     /** Darunter die Kennel-LAEUFE — nur sie zaehlen gegen die Sperre je Quelle, die UI-Listen nicht. */
-    private static readonly HEAVY_RUN_PATHS: readonly RegExp[] = [/^\/api\/kennels\/[^/]+\/(run|execute)\/?$/];
+    private static readonly HEAVY_RUN_PATHS: readonly RegExp[] = [/^\/api\/kennels\/[^/]+\/run\/?$/];
 
     /**
-     * Die oeffentlichen Laeufe: `/k/:id` und die Spec-Erzeugung `/k/:id/openapi.json`.
-     * `/k/:id/docs` liefert nur statisches HTML und bleibt ungebremst. Disjunkt zu HEAVY_PATHS.
+     * Die oeffentlichen Laeufe an der Middleware: nur noch die Spec-Erzeugung `/k/:id/openapi.json` (nie aus dem Cache,
+     * D8). `/k/:id` laesst sein Handler zu (nach dem Nachschlagen). `/k/:id/docs` liefert nur statisches HTML.
      */
-    private static readonly PUBLIC_PATHS: readonly RegExp[] = [/^\/k\/[^/]+\/?$/, /^\/k\/[^/]+\/openapi\.json\/?$/];
+    private static readonly PUBLIC_PATHS: readonly RegExp[] = [/^\/k\/[^/]+\/openapi\.json\/?$/];
 
     /** UI-Listen und Runs der Werkstatt. Mit `gates` teilt die Schleuse Topf und Quellen-Sperre mit MCP. */
     public static heavy(gates?: RunGates): HeavyRequestLimiter {
@@ -173,6 +177,46 @@ export class HeavyRequestLimiter {
     /** Gilt fuer diesen Pfad die Sperre je Quelle? Oeffentlich fuer den StartupTest. */
     public isSourceLimited(path: string): boolean {
         return this.sourceGate !== null && this.sourcePaths.some((pattern) => pattern.test(path));
+    }
+
+    /**
+     * Zulassung im Handler — dieselbe Regel wie die Middleware (Topf, Schlange, Sperre je Quelle, Platz haengt an der
+     * Verbindung), nur spaeter: nach dem Nachschlagen im Ergebnis-Cache. true = der Lauf darf starten (der Platz geht
+     * mit 'finish'/'close' zurueck); false = abgewiesen, die Antwort ist schon geschrieben (oder der Aufrufer ist weg).
+     */
+    public static async admit(req: Request, res: Response, admission: RunAdmission, sourceGate: SourceRunGate | null): Promise<boolean> {
+        if (HeavyRequestLimiter.isGone(res)) return false;
+        const pending = admission.request(sourceGate ? RunSource.ofRequest(req) : null, sourceGate);
+        const done = (): void => pending.close();
+        res.once('close', done);
+        res.once('finish', done);
+        const outcome = await pending.outcome;
+        if (!outcome.granted) {
+            if (outcome.denial.reason !== 'cancelled' && !HeavyRequestLimiter.isGone(res))
+                HeavyRequestLimiter.sendDenial(res, outcome.denial);
+            return false;
+        }
+        if (HeavyRequestLimiter.isGone(res)) {
+            pending.close();
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Ein Cache-Treffer gegen das eigene Budget je Quelle (E7): kein Lauf-Platz, kein Lauf-Token. false = 429 ist
+     * geschrieben. Der Pass geht mit der Antwort zurueck.
+     */
+    public static admitCacheHit(req: Request, res: Response, gate: SourceRunGate): boolean {
+        const entered = gate.enter(RunSource.ofRequest(req));
+        if (!entered.ok) {
+            HeavyRequestLimiter.sendDenial(res, entered.denial);
+            return false;
+        }
+        const leave = (): void => entered.pass.leave();
+        res.once('close', leave);
+        res.once('finish', leave);
+        return true;
     }
 
     /** Antwort zerstoert oder geschlossen — dann schreibt niemand mehr hinein. */

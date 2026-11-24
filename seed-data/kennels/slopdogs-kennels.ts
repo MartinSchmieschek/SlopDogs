@@ -1,3 +1,4 @@
+import { ResultCacheTtl } from '../../services/kennelCache/ResultCacheTtl';
 import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
@@ -371,6 +372,9 @@ export async function seedSlopdogsKennelsKennel(
         description: 'The kennel list, served by SlopDogs itself at /kennels. Built from small dogs; maintainers change it live.',
         emoji: '🎛️',
         visibility: 'public',
+        // Die Seite aendert sich nur mit ihren Dogs (Daten laedt der Browser selbst): Ergebnis halten, bis ein Dog,
+        // der Kennel oder der Server sich aendert.
+        ...ResultCacheTtl.INFINITE.columns,
         dogIds,
         nodes: JSON.stringify(DOGS.map((d) => ({ id: lineageOf.get(d.displayName), comment: d.description }))),
         task:

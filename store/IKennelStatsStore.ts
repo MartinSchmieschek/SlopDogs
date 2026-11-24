@@ -24,6 +24,8 @@ export interface KennelCallDelta {
     source: KennelCallSource;
     count: number;
     leadFailed: number;
+    /** Davon aus dem Ergebnis-Cache beantwortet (0.4.0) — ohne Lauf, ohne Dog-Zeilen. */
+    cached: number;
 }
 /** leadFailed zaehlt ueber alle Tage, leadFailed30d im selben Fenster wie last30d (Filter usage=failing). */
 export interface KennelCallAggregate {
@@ -34,6 +36,8 @@ export interface KennelCallAggregate {
     leadFailed30d: number;
     rankedTotal: number;
     ranked30d: number;
+    /** Aufrufe der letzten 30 Tage, die der Ergebnis-Cache beantwortet hat. */
+    cached30d: number;
 }
 export interface KennelRatingAggregate {
     lineageId: string;

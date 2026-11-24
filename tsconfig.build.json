@@ -12,7 +12,7 @@
     "api/**/*.ts",
     "store/**/*.ts",
     "services/**/*.ts",
-    "server-registries/**/*.ts",
+    "config/**/*.ts",
     "server-app/**/*.ts",
     "mcp/**/*.ts",
     "test/**/*.ts"
