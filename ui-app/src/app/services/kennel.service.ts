@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { IKennelConfig, KennelVersionEntry, type KennelVisibility } from '../models/kennel-config.model';
+import { IKennelConfig, KennelVersionEntry, type KennelResultCacheInfo, type KennelVisibility } from '../models/kennel-config.model';
 import { Waves } from '../models/dog-entry.model';
 import { apiAbsoluteUrl } from '../config/api-base';
 import { publicKennelPath } from '../config/public-paths';
@@ -165,6 +165,11 @@ export class KennelService {
 
   delete(id: string): Observable<ApiResponse & SeededKennelDeleteReport> {
     return this.http.delete<ApiResponse & SeededKennelDeleteReport>(`${this.baseUrl}/${encodeURIComponent(id)}`);
+  }
+
+  /** Result cache (0.4.0): class, reasons, allowed TTLs — readers; owner notes for the owner. */
+  getResultCache(id: string): Observable<KennelResultCacheInfo> {
+    return this.http.get<KennelResultCacheInfo>(`${this.baseUrl}/${encodeURIComponent(id)}/result-cache`);
   }
 
   /** Seeded kennels only (Spur K): which dogs a delete takes along and which stay, without deleting. */

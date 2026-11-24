@@ -73,6 +73,16 @@ A Kennel is a covenant. It binds:
 - Default query parameters -- scent markers for the hunt
 - Default body data -- provisions, fed to BodyRetriever
 - Name and description
+- Optionally a result cache TTL (`resultCacheTtl`) -- see [Result cache](#result-cache)
+
+#### Result cache
+
+A kennel can keep its lead result and answer repeated calls without a run. The owner sets `resultCacheTtl`: `0` (off, default), seconds (up to `KENNEL_RESULT_CACHE_MAX_TTL_SEC`, default 7 days) or `"unendlich"` (until a dog, the kennel or the server changes).
+
+- **What is allowed** follows the kennel's cache class, decided by its strictest dog: `rein` (pure) allows every TTL; `fluechtig` (fetch, clock) and `persoenlich` (jsonStore, keys) only seconds -- personal and private kennels are cached per user, never shared; `live` (random, lobby) none. `get_kennel` and `GET /api/kennels/:id/result-cache` show the class, the reasons and the allowed values.
+- **A hit** is answered before the run queue: no run, no run token, only its own budget (`CACHE_HITS_PER_SOURCE_PER_MINUTE`, default 600). Headers `X-SlopDogs-Cache: hit|miss|bypass` and `Age`, readable cross-origin.
+- **Cached:** `GET`/`POST /k/:id`, `/api/kennels/:id/execute`, MCP `execute_kennel`. **Never cached:** `/api/kennels/:id/run`, `run_kennel`, `refresh_kennel_snapshot`, `/k/:id/openapi.json`, `/k/:id/docs`.
+- **Fresh on demand:** the owner sends `Cache-Control: no-cache` (MCP: `bypassCache: true`). Saving a dog of the kennel or the kennel itself invalidates its entries.
 
 ### Lead Dog
 
@@ -473,6 +483,7 @@ The MCP server returns **Spuren rules + a pointer to the full guide** as the `in
 | `GET/POST` | `/api/kennels/:id/run` | Unleash the hunt, return Waves + config |
 | `GET/POST` | `/api/kennels/:id/execute` | Unleash the hunt, return the lead's yield |
 | `GET` | `/api/kennels/:id/versions` | List all versions of a Kennel's lineage |
+| `GET` | `/api/kennels/:id/result-cache` | [Result cache](#result-cache): class, reasons, allowed TTLs, current `resultCacheTtl`; the owner also gets why the last run was not cached and a hint from the call statistics (read right needed) |
 | `GET` | `/api/kennels/:id/rating` | Stars: `{avg, count, score, histogram, mine}` (run right needed; `mine` null when anonymous or unrated) |
 | `PUT` | `/api/kennels/:id/rating` | Rate 1-5 (`{ "stars": 4 }`) — logged in, not the owner, not an editor |
 | `DELETE` | `/api/kennels/:id/rating` | Take your rating back (idempotent) |
@@ -671,7 +682,7 @@ If you ever see a `.js` file inside `api/`, `mcp/`, `services/`, or `store/` -- 
 
 Typical flow: configure `.env.integration` with your hosted URLs, run `npm run prisma:sync:integration` to align schemas, build the backend with **`npm run build:prod`**, the frontend with **`npm run ui:build:integration`** (injects `PUBLIC_API_BASE_URL` using `NODE_ENV=integration`), then start locally with **`npm run start:integration`** (runs `main.ts` via ts-node). On a host that serves **compiled** output only (e.g. **Render**), use **Build Command** **`npm run render:integration:build`** (runs `npm ci`, then `build:prod`, then `ui:build:integration`) and **Start Command** **`npm run start:integration:dist`** — it runs `dist/main.js` with `NODE_ENV=integration`. Use this as a **pre-release** checkpoint before going fully online.
 
-**Production** and **integration** both load the **reduced Base-Dog registry** (`server-registries/slimDeployRegistry.ts`); only **`NODE_ENV=development`** and the local mode on the Pi (`SLOPDOGS_MODE=local`) use the full set (`fullRegistry.ts`). On slim profiles, startup **fails fast** if any **latest** Kennel row in the DB references a `base:…` dog that is not registered — so RAM stays minimal without silently breaking existing kennels. After adding seed kennels that reference new `BASE_DOG_PREFIX + '…'` names, extend that slim registry (or keep **`npm run check:integration-dogs`** green — it scans `seed-data/**/*.ts` against `SLIM_DEPLOY_BASE_DOG_NAMES`).
+**Production** and **integration** load the **default app config** (`config/default.config.ts`) with the reduced Base-Dog list (`config/dogs/deployDogs.ts`); **`NODE_ENV=development`** and the local mode on the Pi (`SLOPDOGS_MODE=local`) load `config/local.config.ts` with the full set (`config/dogs/allDogs.ts`). `SLOPDOGS_CONFIG=<path>` loads another config — it also decides the data access and the cache store (`ICacheStore`; default: last calls in memory, behind them the cache database). On slim profiles, startup **fails fast** if any **latest** Kennel row in the DB references a `base:…` dog that is not registered — so RAM stays minimal without silently breaking existing kennels. After adding seed kennels that reference new `BASE_DOG_PREFIX + '…'` names, extend that slim registry (or keep **`npm run check:integration-dogs`** green — it scans `seed-data/**/*.ts` against `SLIM_DEPLOY_BASE_DOG_NAMES`).
 
 ### Quick Hunt
 
@@ -765,7 +776,7 @@ This repository holds the server and the UI only. The engine and the BaseDogs li
 
 **New releases.** `npm run update:dogs` looks up the newest stable tags (`git ls-remote`), raises the pins in `package.json` and refreshes the lockfile (`npm install`). `npm run update:dogs -- --dry-run` only lists what would change; `-- --no-install` writes `package.json` without installing.
 
-**Changing core or a Dog** happens in its repository and ships as a release there (changeset, tag, release workflow — see its README); afterwards `npm run update:dogs` here. A new BaseDog package is created in slopdogs-base-dogs the same way; once released, add its pin to `package.json` here, register its classes and Pacts in [`server-registries/fullRegistry.ts`](server-registries/fullRegistry.ts) (and in [`slimDeployRegistry.ts`](server-registries/slimDeployRegistry.ts) if production and integration need it), and optionally seed a Kennel in `seed.ts`.
+**Changing core or a Dog** happens in its repository and ships as a release there (changeset, tag, release workflow — see its README); afterwards `npm run update:dogs` here. A new BaseDog package is created in slopdogs-base-dogs the same way; once released, add its pin to `package.json` here, register its classes and Pacts in [`config/dogs/allDogs.ts`](config/dogs/allDogs.ts) (and in [`deployDogs.ts`](config/dogs/deployDogs.ts) if production and integration need it), and optionally seed a Kennel in `seed.ts`.
 
 **One copy of core, `geo-pact` and `dogs-demo` (F1).** Parents are matched by class identity (`instanceof`), and core keeps singletons (slot gate, capability registry): a second copy matches no parent and doubles the slot cap without a word. The Dog packages declare these as `peerDependencies`, so they resolve to the server's copy. `npm ls @martinschmieschek/slopdogs-core` must list one version, deduped everywhere else.
 
@@ -826,7 +837,7 @@ services/
   swaggridAdapter.ts          Maps Kennel runs to @martinschmieschek/slopdogs-core/swaggrid
   CacheHandler.ts             KV cache with TTL and in-flight deduplication
   AreaCacheStrategy.ts        Geographic area cache (Haversine containment)
-server-registries/            Which BaseDog classes and Pacts the server registers (full / slim)
+config/                       App config as code: data access, cache store (ICacheStore), base dog lists (dogs/)
 ui-app/                       Angular frontend (see ui-app/README.md)
 ```
 

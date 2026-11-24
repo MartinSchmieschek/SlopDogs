@@ -1,7 +1,7 @@
 // BaseDogPacks — which package a base dog comes from (P6 U5, `pack` in GET /api/nodes) and in which
 // version (PLAN-DOG-PAKETE P2.5, `packageName`/`packageVersion`, `dogVersions` of a run).
 //
-// The registries (server-registries/*Registry.ts) import every base dog from its package
+// The dog lists of the app config (config/dogs/*.ts) import every base dog from its package
 // (`@martinschmieschek/slopdogs-dogs-weather`, `@martinschmieschek/slopdogs-core`, ...) and hand out a flat
 // list of classes. The package is not written anywhere else, and a second hand-kept table would rot. So it is
 // read from the module graph the registry has just loaded: every module whose nearest package.json names a

@@ -150,6 +150,48 @@
       }
     </section>
 
+    @if (cacheInfo(); as cache) {
+      <section class="grp cache">
+        <h2 class="sd-h2 cap">Result cache</h2>
+        <p class="text">
+          <span class="sd-chip" [class.sd-chip--soft]="cache.cacheClass.klasse === 'rein'">{{ cache.cacheClass.klasse }}</span>
+          <span class="sd-small sd-muted">How cacheable the crew is — the strictest dog decides.</span>
+        </p>
+        @if (cache.cacheClass.gruende.length) {
+          <ul class="reasons sd-small" role="list">
+            @for (reason of cache.cacheClass.gruende; track reason) { <li class="sd-data">{{ reason }}</li> }
+          </ul>
+        }
+        @if (ttlEditable()) {
+          <label class="sd-label" for="sd-ks-ttl">Keep the lead result</label>
+          <div class="ttl">
+            <select id="sd-ks-ttl" class="sd-field" [value]="ttlMode()" (change)="setTtlMode($any($event.target).value)">
+              <option value="off">Off — every call runs</option>
+              @if (secondsAllowed()) { <option value="seconds">For N seconds</option> }
+              @if (infiniteAllowed()) { <option value="unendlich">Until a dog, the kennel or the server changes</option> }
+            </select>
+            @if (ttlMode() === 'seconds') {
+              <input class="sd-field sd-field--code secs" inputmode="numeric" aria-label="Seconds" placeholder="600"
+                [value]="ttlSeconds()" (input)="ttlSeconds.set($any($event.target).value)" [attr.aria-invalid]="!!ttlError()" />
+              <span class="sd-small sd-muted">s</span>
+            }
+          </div>
+          @if (ttlError()) { <span class="sd-hint sd-hint--error">{{ ttlError() }}</span> }
+          <p class="sd-small sd-muted">Allowed for this crew: {{ cache.cacheClass.erlaubt.join(' · ') }}. The owner can force a fresh run with the header Cache-Control: no-cache.</p>
+        } @else {
+          <p class="text sd-data">
+            @if (cache.resultCacheTtl === 'unendlich') { Kept until a dog, the kennel or the server changes. }
+            @else if (cache.resultCacheTtl) { Kept for {{ cache.resultCacheTtl }} s. }
+            @else { Off — every call runs. }
+          </p>
+          @if (editable()) { <p class="sd-small sd-muted">Only the owner changes the result cache.</p> }
+        }
+        @if (cache.cacheClass.ruht) { <span class="sd-hint sd-hint--error">Resting: {{ cache.cacheClass.ruht }}</span> }
+        @if (cache.cacheClass.herabgestuft) { <span class="sd-hint">Last run not cached: {{ cache.cacheClass.herabgestuft }}</span> }
+        @if (cache.cacheClass.hinweis) { <span class="sd-hint">{{ cache.cacheClass.hinweis }}</span> }
+      </section>
+    }
+
     <section class="grp ver">
       <span class="sd-label">Versions</span>
       <p class="text sd-data">
@@ -166,7 +208,7 @@
 
   @if (editable()) {
     <footer class="foot">
-      <button type="button" class="sd-btn sd-btn--primary" [disabled]="saving() || !!bodyError()"
+      <button type="button" class="sd-btn sd-btn--primary" [disabled]="saving() || !!bodyError() || (ttlEditable() && !!ttlError())"
         [attr.aria-busy]="saving()" (click)="save()">{{ saving() ? 'Saving…' : 'Save' }}</button>
       <button type="button" class="sd-btn" [disabled]="saving()" (click)="requestClose()">Cancel</button>
       <span class="sp"></span>

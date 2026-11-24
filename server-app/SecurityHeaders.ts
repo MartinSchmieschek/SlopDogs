@@ -27,6 +27,10 @@ export class SecurityHeaders {
      *   allow-popups-to-escape-sandbox   die geoeffnete fremde Seite laeuft normal, nicht mit geerbter Sandbox.
      *   allow-modals                     alert/confirm/prompt und window.print() ("Als PDF speichern").
      *   allow-downloads                  Download-Links (Export, Bilder, Daten).
+     *   allow-pointer-lock               Maus fangen fuer Spiele (requestPointerLock; ohne: pointerlockerror). Nur nach
+     *                                    Nutzergeste, der Browser zeigt "Esc zum Beenden" — kein Zugriff auf Origin oder Daten.
+     *   allow-orientation-lock           Querformat erzwingen auf dem Handy (screen.orientation.lock; ohne: Ablehnung).
+     *                                    Wirkt nur im Vollbild und nur fuer diese Seite — kein Zugriff auf Origin oder Daten.
      */
     static readonly KENNEL_SANDBOX: readonly string[] = [
         'allow-scripts',
@@ -35,6 +39,8 @@ export class SecurityHeaders {
         'allow-popups-to-escape-sandbox',
         'allow-modals',
         'allow-downloads',
+        'allow-pointer-lock',
+        'allow-orientation-lock',
     ];
     static readonly FRAME_ANCESTORS = "frame-ancestors 'self'";
     static readonly REFERRER_POLICY = 'strict-origin-when-cross-origin';

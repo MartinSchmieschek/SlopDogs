@@ -1,5 +1,6 @@
 // The ConfigRouteHandler — the ship's navigator, mapping all HTTP requests to their captains.
 // In luminous space, blackened stars: each subpath is a star, each controller its light.
+import { ResultCacheTtl } from '../../services/kennelCache/ResultCacheTtl';
 import { Request, Response } from 'express';
 import { isRuntimeLogVerbose, sanitizeLineDocs } from '@martinschmieschek/slopdogs-core/runtime';
 import { AbstractController, IControllerResponse, IEntity } from '../AbstractController';
@@ -374,6 +375,8 @@ export class ConfigRouteHandler {
             } else if (result.code === KennelController.ID_TAKEN) {
                 // Doppelte Kennel-ID ist ein Konflikt, kein Serverfehler — Liste und Kennel zeigen den Text am Feld.
                 res.status(409).json({ error: KennelController.ID_TAKEN, error_description: 'That ID is taken.' });
+            } else if (result.code === KennelController.TTL_REFUSED) {
+                res.status(400).json({ error: KennelController.TTL_REFUSED, error_description: result.error });
             } else {
                 res.status(500).json({ error: result.error });
             }
@@ -519,6 +522,15 @@ export class ConfigRouteHandler {
                 res.status(403).json({ error: 'Only the owner may change visibility' });
                 return;
             }
+            // Die Ergebnis-TTL setzt nur der Besitzer (P2) — dieselbe TTL im vollen Rumpf der UI ist keine Aenderung.
+            if (subpath === 'kennels' && body.resultCacheTtl !== undefined) {
+                const requested = ResultCacheTtl.parse(body.resultCacheTtl);
+                const unchanged = requested.ok && requested.ttl.equals(ResultCacheTtl.ofKennel(existing.data));
+                if (!unchanged && !canManageAcl(existing.data, req.ctx)) {
+                    res.status(403).json({ error: 'Only the owner may change resultCacheTtl' });
+                    return;
+                }
+            }
 
             // Kennels: validate only NEWLY added dogIds so a pre-existing reference never
             // blocks a legit edit, but a freshly injected foreign private dog is rejected.
@@ -535,6 +547,8 @@ export class ConfigRouteHandler {
             const result = await controller.save({ ...body, id });
             if (result.ok) {
                 res.status(200).json({ ok: true, id: result.id, data: result.data });
+            } else if (result.code === KennelController.TTL_REFUSED) {
+                res.status(400).json({ error: KennelController.TTL_REFUSED, error_description: result.error });
             } else {
                 res.status(400).json({ error: result.error });
             }

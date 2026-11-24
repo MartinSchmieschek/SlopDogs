@@ -261,6 +261,15 @@ const SERVER_ENV_CATALOG: readonly EnvVarSpec[] = [
         consequence: 'Live-Aenderungen bleiben, Repo-Aenderungen erreichen eine bestehende DB nicht',
     },
     {
+        name: 'SLOPDOGS_CONFIG',
+        section: 'operations',
+        since: '0.4.0',
+        purpose:
+            'Pfad (relativ zum Arbeitsverzeichnis) zu einer eigenen App-Config: Datenzugang, Cache-Speicher (ICacheStore), Base-Dogs; Vorlage config/default.config.ts',
+        defaultValue: 'leer = config/default.config (production/integration), sonst config/local.config',
+        consequence: 'mitgelieferte Config',
+    },
+    {
         name: 'SLOPDOGS_MODE',
         section: 'operations',
         since: 'Spur L',
@@ -405,6 +414,30 @@ const SERVER_ENV_CATALOG: readonly EnvVarSpec[] = [
         since: 'P9',
         purpose: 'Token-Bucket je Quelle: so viele Laeufe duerfen direkt hintereinander starten',
         defaultValue: '6',
+        consequence: 'Default',
+    },
+    {
+        name: 'KENNEL_RESULT_CACHE_MAX_TTL_SEC',
+        section: 'operations',
+        since: '0.4.0',
+        purpose: 'Ergebnis-Cache: hoechste resultCacheTtl in Sekunden, die ein Besitzer setzen darf ("unendlich" ausgenommen)',
+        defaultValue: '604800',
+        consequence: 'Default',
+    },
+    {
+        name: 'KENNEL_RESULT_CACHE_MAX_ENTRY_BYTES',
+        section: 'operations',
+        since: '0.4.0',
+        purpose: 'Ergebnis-Cache: groesstes Lead-Ergebnis in Bytes, das abgelegt wird; darueber laeuft der Kennel jedes Mal',
+        defaultValue: '2097152',
+        consequence: 'Default',
+    },
+    {
+        name: 'CACHE_HITS_PER_SOURCE_PER_MINUTE',
+        section: 'operations',
+        since: '0.4.0',
+        purpose: 'Ergebnis-Cache: Treffer je Quelle und Minute (eigenes Budget, kein Lauf-Platz); Stoss = ein Sechstel',
+        defaultValue: '600',
         consequence: 'Default',
     },
     {

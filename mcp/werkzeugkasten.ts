@@ -54,6 +54,12 @@ export function buildWerkzeugkasten(baseDogsList: BaseDogInfo[]): string {
             'je Welle spuerbar Laufzeit und Speicher und hat keinen Zugang zu diesem Cache.',
         '- **Jeder Kennel-Lauf zaehlt** gegen das Laufkontingent des Aufrufers, auch wenn alle Daten darunter schon gecacht sind. ' +
             'Zehn kleine Kennels nacheinander abzufragen kostet zehn Laeufe.',
+        '- **Das ganze Ergebnis cachen, wenn es eine Weile alt sein darf:** `resultCacheTtl` am Kennel (nur der Besitzer): ' +
+            'Sekunden, `0` = aus (Default), oder `"unendlich"` (bis sich ein Dog, der Kennel oder der Server aendert). Ein Treffer ' +
+            'startet keinen Lauf und zaehlt nicht gegen das Laufkontingent (Kopfzeilen `X-SlopDogs-Cache: hit`, `Age`). ' +
+            '`get_kennel` zeigt unter `cacheClass.erlaubt`, was die Dogs zulassen (`live` mit Zufall oder Lobby gar nichts). ' +
+            'Fuer Kennels, die andere regelmaessig abfragen (Wetter, Feeds, Dashboards), eine TTL passend zur noetigen Frische ' +
+            'setzen, z. B. 300. Selbst frisch sehen: `execute_kennel` mit `bypassCache: true`.',
         '- **Orchestrierung ist deshalb die Kernaufgabe:** Buendle, was ein Abnehmer zusammen braucht, in EINEN Kennel aus Base-Dogs, ' +
             'Pact-Mimics und einem schlanken Lead. Eigene Dogs nur als Klebstoff (Parameter pruefen, zusammensetzen, darstellen), ' +
             'nie fuer Daten, die ein Base-Dog schon liefert, und kein eigenes `fetch` auf eine Quelle, die ein Base-Dog abdeckt.',

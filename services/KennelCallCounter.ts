@@ -101,6 +101,18 @@ export class KennelCallCounter {
 
     /** Synchron, O(1), wirft nie. day = utcDay(now()). */
     record(lineageId: string, source: KennelCallSource, leadFailed: boolean): void {
+        this.add(lineageId, source, leadFailed, false);
+    }
+
+    /**
+     * Ein Aufruf, den der Ergebnis-Cache beantwortet hat: zaehlt als Aufruf seiner Quelle (rankt wie ein Lauf) und in
+     * `cached`. Dog-Zeilen gibt es dafuer keine — kein Dog ist gelaufen.
+     */
+    recordHit(lineageId: string, source: KennelCallSource, leadFailed: boolean): void {
+        this.add(lineageId, source, leadFailed, true);
+    }
+
+    private add(lineageId: string, source: KennelCallSource, leadFailed: boolean, cached: boolean): void {
         try {
             const day = utcDay(this.now());
             const key = `${lineageId}\u0000${day}\u0000${source}`;
@@ -108,6 +120,7 @@ export class KennelCallCounter {
             if (delta) {
                 delta.count += 1;
                 if (leadFailed) delta.leadFailed += 1;
+                if (cached) delta.cached += 1;
                 return;
             }
             // Deckel: ein NEUER Schluessel ueber dem Deckel wird verworfen — nie ein alter.
@@ -115,7 +128,7 @@ export class KennelCallCounter {
                 this.dropped += 1;
                 return;
             }
-            this.pending.set(key, { lineageId, day, source, count: 1, leadFailed: leadFailed ? 1 : 0 });
+            this.pending.set(key, { lineageId, day, source, count: 1, leadFailed: leadFailed ? 1 : 0, cached: cached ? 1 : 0 });
         } catch {
             // Zaehlen darf keinen Lauf stoeren.
         }
@@ -223,7 +236,15 @@ export class KennelCallCounter {
     pendingAggregates(sinceDay: string): Map<string, Omit<KennelCallAggregate, 'lineageId'>> {
         const out = new Map<string, Omit<KennelCallAggregate, 'lineageId'>>();
         for (const d of this.pending.values()) {
-            const agg = out.get(d.lineageId) ?? { total: 0, last30d: 0, leadFailed: 0, leadFailed30d: 0, rankedTotal: 0, ranked30d: 0 };
+            const agg = out.get(d.lineageId) ?? {
+                total: 0,
+                last30d: 0,
+                leadFailed: 0,
+                leadFailed30d: 0,
+                rankedTotal: 0,
+                ranked30d: 0,
+                cached30d: 0,
+            };
             const inWindow = d.day >= sinceDay;
             const ranked = RANKED.has(d.source);
             agg.total += d.count;
@@ -232,6 +253,7 @@ export class KennelCallCounter {
             if (inWindow) agg.leadFailed30d += d.leadFailed;
             if (ranked) agg.rankedTotal += d.count;
             if (ranked && inWindow) agg.ranked30d += d.count;
+            if (inWindow) agg.cached30d += d.cached;
             out.set(d.lineageId, agg);
         }
         return out;
@@ -292,6 +314,7 @@ export class KennelCallCounter {
             if (existing) {
                 existing.count += d.count;
                 existing.leadFailed += d.leadFailed;
+                existing.cached += d.cached;
             } else if (this.isFull()) {
                 this.dropped += d.count;
             } else {

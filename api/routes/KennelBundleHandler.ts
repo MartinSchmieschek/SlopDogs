@@ -9,13 +9,14 @@ import {
     isKennelNameTakenInList,
     type KennelIdNameListEntry,
 } from '@martinschmieschek/slopdogs-core/runtime';
-import { KennelController } from '../KennelController';
+import { KennelController, type ICreateKennelInput } from '../KennelController';
 import { IStore } from '../../store/IStore';
 import { generateVersionId, generateLineageId } from '../utils/versioning';
 import { KennelRunHandler } from './KennelRunHandler';
 import { canRead, applyCreateDefaults, normalizeVisibility, landingRefusesCreate } from '../../mcp/auth/visibility';
 import { LandingKennels } from '../../mcp/auth/landingKennels';
 import { DogAclIndex } from '../../services/dogAccess';
+import { ResultCacheTtl } from '../../services/kennelCache/ResultCacheTtl';
 
 /**
  * Export-Scan (P4c, L10): rohe Schluessel-Muster in Dog-Code und Kennel-Defaults. Eine Obermenge von
@@ -54,6 +55,12 @@ export class RawKeyScan {
  *    remap parent refs accordingly. No history restore — a single fresh version.
  */
 export class KennelBundleHandler {
+    /** Das Export-Feld der Ergebnis-TTL: nur gesetzt, wenn der Kennel cacht. */
+    private static ttlField(kennel: unknown): { resultCacheTtl?: number | string } {
+        const ttl = ResultCacheTtl.ofKennel(kennel);
+        return ttl.enabled ? { resultCacheTtl: ttl.value } : {};
+    }
+
     constructor(
         private runHandler: KennelRunHandler,
         private kennelsController: KennelController,
@@ -176,6 +183,8 @@ export class KennelBundleHandler {
                     task: config.task,
                     nodes: config.nodes,
                     edges: config.edges,
+                    // Ergebnis-Cache (P2): nur, wenn er an ist — Bundles ungecachter Kennels bleiben, wie sie waren.
+                    ...KennelBundleHandler.ttlField(config),
                 },
                 dogs: dogs.map((d: any) => (d.config ? { ...d, config: scan.redact(d.config) } : d)),
                 ...(scan.hits > 0
@@ -376,7 +385,7 @@ export class KennelBundleHandler {
                       toId: remap(e.toId),
                   }))
                 : undefined;
-            const createResult = await this.kennelsController.create({
+            const kennelInput: ICreateKennelInput = {
                 id: kennelId,
                 name: kennelName,
                 description: bundle.kennel.description,
@@ -387,7 +396,14 @@ export class KennelBundleHandler {
                 edges: remappedEdges,
                 visibility: kennelAcl.visibility,
                 ownerId: kennelAcl.ownerId,
-            } as any);
+            };
+            // Die Ergebnis-TTL reist mit; passt sie nicht (Form, oder die Klasse der importierten Crew laesst sie nicht
+            // zu), entsteht der Kennel ohne Cache und die Antwort sagt warum — der Import scheitert daran nicht.
+            let createResult = await this.kennelsController.create({ ...kennelInput, resultCacheTtl: bundle.kennel.resultCacheTtl });
+            if (!createResult.ok && createResult.code === KennelController.TTL_REFUSED) {
+                hinweise.push(`resultCacheTtl not imported, the kennel runs without result cache: ${createResult.error}`);
+                createResult = await this.kennelsController.create(kennelInput);
+            }
             if (!createResult.ok) {
                 res.status(500).json({ error: createResult.error });
                 return;

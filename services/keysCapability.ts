@@ -46,6 +46,7 @@ export class KeyRunState {
     private readonly variants = new Set<string>();
     private readonly memo = new Map<string, Promise<ResolvedKey | null>>();
     private ordered: string[] | null = null;
+    private readonly personal = new Set<string>();
 
     /** Der Laufzustand eines Capability-Kontexts, falls der Server einen angelegt hat. */
     static of(ctx: VmGlobalCapabilityContext | undefined | null): KeyRunState | null {
@@ -73,6 +74,18 @@ export class KeyRunState {
 
     get hasSecrets(): boolean {
         return this.variants.size > 0;
+    }
+
+    /**
+     * Ein Dog dieses Laufs hat eine persoenliche Kapazitaet benutzt (jsonStore, keys) — das Ergebnis haengt dann am
+     * Ausfuehrenden. Das Tor des Ergebnis-Caches legt einen solchen Lauf nur in einem persoenlichen Scope ab.
+     */
+    notePersonalUse(capability: string): void {
+        this.personal.add(capability);
+    }
+
+    get personalUses(): string[] {
+        return [...this.personal];
     }
 
     /** Jeden bekannten Wert in einem Text ersetzen. */
@@ -256,8 +269,14 @@ export class KeysCapability {
     } {
         const run = KeyRunState.of(ctx) ?? new KeyRunState();
         return {
-            fetch: (url: unknown, opts?: unknown) => this.fetch(ctx, run, url, opts),
-            list: () => this.list(ctx),
+            fetch: (url: unknown, opts?: unknown) => {
+                run.notePersonalUse('keys');
+                return this.fetch(ctx, run, url, opts);
+            },
+            list: () => {
+                run.notePersonalUse('keys');
+                return this.list(ctx);
+            },
         };
     }
 

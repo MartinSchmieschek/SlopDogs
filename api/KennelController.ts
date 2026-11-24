@@ -11,6 +11,7 @@ import {
 } from '@martinschmieschek/slopdogs-core/runtime';
 import { generateVersionId } from './utils/versioning';
 import { aclOf, normalizeVisibility, type Visibility } from '../mcp/auth/visibility';
+import { ResultCacheTtl, type ResultCacheTtlValue } from '../services/kennelCache/ResultCacheTtl';
 
 /**
  * Cargo manifest for raising a new kennel from the void.
@@ -32,6 +33,8 @@ export interface ICreateKennelInput extends ICreateInput {
     editors?: string[] | string | null;
     viewers?: string[] | string | null;
     runners?: string[] | string | null;
+    /** Ergebnis-Cache: 0 (aus), Sekunden oder "unendlich" — nur der Besitzer setzt sie (Pruefung an den Eingaengen). */
+    resultCacheTtl?: ResultCacheTtlValue | null;
 }
 
 /**
@@ -53,6 +56,16 @@ export interface ISaveKennelInput extends IUpdateInput {
     editors?: string[] | string | null;
     viewers?: string[] | string | null;
     runners?: string[] | string | null;
+    /** Ergebnis-Cache: 0 (aus), Sekunden oder "unendlich"; fehlt sie, bleibt die gespeicherte. */
+    resultCacheTtl?: ResultCacheTtlValue | null;
+}
+
+/**
+ * Prueft eine angefragte Ergebnis-TTL gegen die Cache-Klasse der Crew (P2): null = erlaubt, sonst der Grund.
+ * Gesetzt von createHttpApplication (KennelCacheClassifier); ohne Pruefer gilt nur die Form der TTL.
+ */
+export interface IResultCacheTtlGate {
+    ttlRefusal(ttl: ResultCacheTtl, dogIds: unknown): Promise<string | null>;
 }
 
 /**
@@ -77,6 +90,9 @@ export interface KennelControllerOptions {
 export class KennelController extends AbstractController<IKennelConfig> {
     /** Code der Ablehnung, wenn die Kennel-ID (ohne Gross-/Kleinschreibung) schon vergeben ist — REST antwortet 409. */
     static readonly ID_TAKEN = 'id_taken';
+    /** Code der Ablehnung einer Ergebnis-TTL (Form oder Klasse) — REST antwortet 400. */
+    static readonly TTL_REFUSED = 'result_cache_ttl_refused';
+    private ttlGate: IResultCacheTtlGate | null = null;
     private readonly KENNEL_TYPE = 'KennelConfig';
     private statsJanitor: IKennelStatsJanitor | null = null;
     private readonly refIndex: IKennelReferenceSink | null;
@@ -97,6 +113,23 @@ export class KennelController extends AbstractController<IKennelConfig> {
         } catch (err) {
             console.warn(`[KennelController] references of ${lineageId} not updated:`, err);
         }
+    }
+
+    /** Per Setter, weil der Klassifizierer erst mit dem Lauf-Handler entsteht (createHttpApplication). */
+    setResultCacheTtlGate(gate: IResultCacheTtlGate | null): void {
+        this.ttlGate = gate;
+    }
+
+    /**
+     * Die TTL einer Eingabe: Form pruefen, dann — nur wenn sie Ergebnisse cachen soll — gegen die Klasse der Crew.
+     * Liefert die TTL oder die Ablehnung als Controller-Antwort.
+     */
+    private async admitTtl(requested: unknown, dogIds: unknown): Promise<{ ttl: ResultCacheTtl } | IControllerResponse<IKennelConfig>> {
+        const parsed = ResultCacheTtl.parse(requested);
+        if (!parsed.ok) return { ok: false, code: KennelController.TTL_REFUSED, error: parsed.error };
+        const refusal = parsed.ttl.enabled && this.ttlGate ? await this.ttlGate.ttlRefusal(parsed.ttl, dogIds) : null;
+        if (refusal) return { ok: false, code: KennelController.TTL_REFUSED, error: refusal };
+        return { ttl: parsed.ttl };
     }
 
     /** Per Setter, weil der Stats-Dienst erst nach dem Controller entsteht (createHttpApplication). */
@@ -127,6 +160,10 @@ export class KennelController extends AbstractController<IKennelConfig> {
                     };
                 }
             }
+
+            const admitted = await this.admitTtl(input.resultCacheTtl, input.dogIds || []);
+            if (!('ttl' in admitted)) return admitted;
+            const ttl = admitted.ttl;
 
             const lineageId = input.id || `kennel-${Date.now()}`;
             const versionId = generateVersionId();
@@ -182,6 +219,7 @@ export class KennelController extends AbstractController<IKennelConfig> {
                 ...(editors !== undefined ? { editors } : {}),
                 ...(viewers !== undefined ? { viewers } : {}),
                 ...(runners !== undefined ? { runners } : {}),
+                ...ttl.columns,
                 createdAt: config.createdAt?.toISOString(),
                 updatedAt: config.updatedAt?.toISOString(),
             });
@@ -199,6 +237,7 @@ export class KennelController extends AbstractController<IKennelConfig> {
                 ...(editors !== undefined ? { editors } : {}),
                 ...(viewers !== undefined ? { viewers } : {}),
                 ...(runners !== undefined ? { runners } : {}),
+                resultCacheTtl: ttl.value,
                 frozen: false,
             } as any;
 
@@ -261,7 +300,23 @@ export class KennelController extends AbstractController<IKennelConfig> {
                 updatedAt: new Date(),
             };
 
-            const contentChanged = this.hasContentChanged(existing, config);
+            // Ergebnis-TTL (D9): eine Aenderung allein ist eine neue Version — sie aendert den Cache-Schluessel.
+            // Geprueft wird nur eine angefragte Aenderung; ruht eine gespeicherte TTL, weil die Crew strenger wurde,
+            // cacht der Lauf nicht (Laufzeit-Tor), das Speichern bleibt frei.
+            const existingTtl = ResultCacheTtl.ofKennel(existing);
+            let nextTtl = existingTtl;
+            if (input.resultCacheTtl !== undefined) {
+                const parsed = ResultCacheTtl.parse(input.resultCacheTtl);
+                if (!parsed.ok) return { ok: false, code: KennelController.TTL_REFUSED, error: parsed.error };
+                if (!parsed.ttl.equals(existingTtl)) {
+                    const admitted = await this.admitTtl(input.resultCacheTtl, config.dogIds);
+                    if (!('ttl' in admitted)) return admitted;
+                }
+                nextTtl = parsed.ttl;
+            }
+            const ttlChanged = !nextTtl.equals(existingTtl);
+
+            const contentChanged = this.hasContentChanged(existing, config) || ttlChanged;
             // Normalize visibility: null/undefined are equivalent to the default 'public'
             // — a DB-stored null must not look "different" from a freshly-resolved 'public'.
             const visibilityChanged = (nextVisibility ?? 'public') !== (existingVisibility ?? 'public');
@@ -314,6 +369,7 @@ export class KennelController extends AbstractController<IKennelConfig> {
                 ...(nextEditors !== undefined ? { editors: nextEditors } : {}),
                 ...(nextViewers !== undefined ? { viewers: nextViewers } : {}),
                 ...(nextRunners !== undefined ? { runners: nextRunners } : {}),
+                ...nextTtl.columns,
                 createdAt: new Date().toISOString(),
                 updatedAt: config.updatedAt?.toISOString(),
             });
@@ -333,6 +389,7 @@ export class KennelController extends AbstractController<IKennelConfig> {
                 ...(nextEditors !== undefined ? { editors: nextEditors } : {}),
                 ...(nextViewers !== undefined ? { viewers: nextViewers } : {}),
                 ...(nextRunners !== undefined ? { runners: nextRunners } : {}),
+                resultCacheTtl: nextTtl.value,
                 frozen: false,
             } as any;
 
@@ -911,6 +968,8 @@ export class KennelController extends AbstractController<IKennelConfig> {
         if (data.viewers !== undefined) result.viewers = data.viewers;
         if (data.runners !== undefined) result.runners = data.runners;
         result.frozen = Boolean(data.frozen);
+        // Ergebnis-Cache (E6): zwei Spalten, nach aussen ein Feld — 0, Sekunden oder "unendlich".
+        result.resultCacheTtl = ResultCacheTtl.fromColumns(data.resultCacheTtlSec, data.resultCacheInfinite).value;
 
         return result as IKennelConfig;
     }

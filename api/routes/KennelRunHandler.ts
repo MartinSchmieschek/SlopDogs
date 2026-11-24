@@ -1,5 +1,6 @@
 // The KennelRunHandler — the huntmaster who unleashes the hounds.
 // Vome speaks: to cosmic madness laws submit — the waves obey the dependency graph.
+import type { Request, Response } from 'express';
 import { type ICacheHandler } from '@martinschmieschek/slopdogs-core';
 import {
     SerializedDog,
@@ -16,7 +17,7 @@ import { FIXED_TOP_LEVEL } from './spaRouteConstants';
 import { API_ROUTE, LEGACY_ROUTE, PUBLIC_ROUTE } from './routeTable';
 import { IStore, type MimicHeadRow } from '../../store/IStore';
 import { KennelController } from '../KennelController';
-import { accessOf, aclOf, withMyRights, type Access } from '../../mcp/auth/visibility';
+import { accessOf, aclOf, canManageAcl, withMyRights, type Access, type AclEntity } from '../../mcp/auth/visibility';
 import type { AuthCtx } from '../../mcp/auth/middleware';
 import { convertSeasonToWaves, Waves } from '../../services/WavesConverter';
 import { REDACTED_TEXT, kennelRunView, redactWavesForCtx } from '../../services/wavesRedaction';
@@ -27,6 +28,14 @@ import { dogStatsKeyOf } from '../../services/dogStatsKey';
 import type { KennelCallSource } from '../../store/IKennelStatsStore';
 import { KeyRunState } from '../../services/keysCapability';
 import { LeadOutcome } from '../../services/LeadOutcome';
+import { KennelCacheClassifier, type CacheClassView } from '../../services/kennelCache/KennelCacheClassifier';
+import { KennelRunTrace } from '../../services/kennelCache/KennelRunTrace';
+import { KennelResultCache, type CacheLookup, type CacheLookupInput } from '../../services/kennelCache/KennelResultCache';
+import type { KennelResultEntry } from '../../services/kennelCache/KennelResultStore';
+import { HeavyRequestLimiter } from '../../server-app/heavyRequestLimiter';
+import { RunSource, positiveIntFromEnv, type RunGates } from '../../server-app/runAdmission';
+import { ResultCacheTtl, type ResultCacheTtlValue } from '../../services/kennelCache/ResultCacheTtl';
+import { ResultCacheAdvice, type ResultCacheOwnerNotes } from '../../services/kennelCache/ResultCacheAdvice';
 
 /** Lead-Yield mit { snapshot, live } — Lobby-Konvention fuer den Socket-Dog. */
 function isLobbyLeadShape(v: any): boolean {
@@ -73,6 +82,29 @@ export interface IKennelRunDeps {
     cacheHandler?: ICacheHandler;
     /** Zaehlt jeden begonnenen Lauf (P4) — synchron, im Speicher. */
     callCounter: KennelCallCounter;
+    /** Ergebnis-Cache (0.4.0). Ohne: jeder Aufruf laeuft wie bisher. */
+    resultCache?: KennelResultCache;
+    /**
+     * Die Toepfe des Prozesses. /k/ und /execute lassen ihre Laeufe im Handler zu — nach dem Nachschlagen im Cache (E7).
+     * Ohne (Tests): keine Zulassung.
+     */
+    runGates?: RunGates;
+}
+
+/** Die Auskunft ueber den Ergebnis-Cache: TTL, Klasse und fuer den Besitzer Herabstufung und Hinweis. */
+export interface ResultCacheReport {
+    resultCacheTtl: ResultCacheTtlValue;
+    cacheClass: CacheClassView & ResultCacheOwnerNotes;
+}
+
+/** Wie ein Lauf zugelassen wird, wenn der Cache nicht antwortet: Topf und Quelle der Zaehlung. */
+interface LeadRunPlan {
+    config: IKennelConfig;
+    access: Access;
+    query: Record<string, string>;
+    body: unknown;
+    source: KennelCallSource;
+    pot: 'public' | 'heavy';
 }
 
 /** Ein Besucher ohne Login — die Landing laeuft immer so (P5), unabhaengig vom Request-Kontext. */
@@ -85,9 +117,21 @@ export interface KennelRunAttribution {
 
 export class KennelRunHandler {
     private deps: IKennelRunDeps;
+    /** Die Cache-Klasse eines Kennels (Ergebnis-Cache P1) — dieselbe Aufloesung wie der Lauf, ohne tsCode. */
+    readonly cacheClasses: KennelCacheClassifier;
 
     constructor(deps: IKennelRunDeps) {
         this.deps = deps;
+        this.cacheClasses = KennelCacheClassifier.over(deps.nodesStore, deps.baseDogsMap);
+    }
+
+    /** Der Ergebnis-Cache haengt am Klassifizierer dieses Handlers — darum erst nach dem Konstruktor (createHttpApplication). */
+    useResultCache(cache: KennelResultCache | undefined): void {
+        this.deps.resultCache = cache;
+    }
+
+    get resultCache(): KennelResultCache | undefined {
+        return this.deps.resultCache;
     }
 
     /**
@@ -106,6 +150,11 @@ export class KennelRunHandler {
         if (KennelRunHandler.legacyRedirectEnabled()) {
             app.all(LEGACY_ROUTE.kennel, (req: any, res: any, next: any) => this.legacyRedirect(req, res, next));
         }
+    }
+
+    /** Zaehlt ein Lauf dieser Quelle in die Kennel- und Dog-Statistik? Die Doku-Laeufe (openapi.json) nicht (D8). */
+    static countsInStats(source: KennelCallSource): boolean {
+        return source !== 'swagger';
     }
 
     /** LEGACY_KENNEL_REDIRECT: Default an; nur `0`/`false` schaltet die Alt-Weiche ab. */
@@ -153,17 +202,37 @@ export class KennelRunHandler {
         if (!config || accessOf(config as any, ANONYMOUS) === 'none') return null;
         const leadRef = config.dogIds?.[0];
         if (!leadRef) return null;
-        const waves = await this.runKennel(
+        const merged = this.mergeQueryParams(config.defaultQuery, query);
+        // Ergebnis-Cache, Scope `landing` (D10): ein Neustart oder eine zweite Instanz rendert ohne Lauf.
+        const lookup = await this.lookupResult({
             config,
-            this.mergeQueryParams(config.defaultQuery, query),
-            config.defaultBody,
-            undefined,
-            undefined,
-            attribution,
-        );
-        const outcome = LeadOutcome.of(waves, leadRef);
-        if (outcome.status !== 'ok') return null;
-        return KeyRunState.forResult(waves).scrubValue(outcome.result);
+            ctx: undefined,
+            query: merged,
+            body: config.defaultBody,
+            bypass: false,
+            landing: { fallbackTtl: KennelRunHandler.landingFallbackTtl() },
+        });
+        if (lookup.state === 'hit') {
+            this.recordCacheHit(config, attribution.source);
+            const cached = KennelResultCache.valueOf(lookup.entry);
+            return cached.status === 'ok' ? cached.result : null;
+        }
+        const ticket = lookup.state === 'off' ? null : lookup.ticket;
+        try {
+            const waves = await this.runKennel(config, merged, config.defaultBody, undefined, undefined, attribution);
+            if (ticket) await ticket.settle(waves, leadRef);
+            const outcome = LeadOutcome.of(waves, leadRef);
+            if (outcome.status !== 'ok') return null;
+            return KeyRunState.forResult(waves).scrubValue(outcome.result);
+        } finally {
+            ticket?.abandon();
+        }
+    }
+
+    /** Ohne eigene TTL haelt der Cache Landing und Liste so lange wie ihr altes Memo (LANDING_HTML_MEMO_MS). */
+    static landingFallbackTtl(): ResultCacheTtl {
+        const ms = positiveIntFromEnv('LANDING_HTML_MEMO_MS', 300_000);
+        return ResultCacheTtl.fromValue(Math.max(1, Math.ceil(ms / 1000)));
     }
 
     /**
@@ -197,6 +266,8 @@ export class KennelRunHandler {
         let waveCount: number | undefined;
         let leadFailed = false;
         const keyRun = new KeyRunState();
+        const counted = KennelRunHandler.countsInStats(source);
+        const trace = new KennelRunTrace();
         try {
             const policy = new DogRunPolicy(config, capabilityCtx);
             const mimicAdopter = await this.createMimicAdopter(config, policy);
@@ -212,7 +283,7 @@ export class KennelRunHandler {
             const kennelRun = new KennelRun(
                 config,
                 this.deps.baseDogsMap,
-                this.createSerializedDogFactory(policy),
+                this.createSerializedDogFactory(policy, trace),
                 query || {},
                 body,
                 [],
@@ -228,6 +299,8 @@ export class KennelRunHandler {
             const callCounter = this.deps.callCounter;
             kennelRun.setDogRunObserver({
                 onDogRun: (r) => {
+                    if (r.outcome !== 'ok') trace.noteDogFailure();
+                    if (!counted) return;
                     const dogKey = dogStatsKeyOf(r.dog);
                     if (!dogKey) return;
                     callCounter.recordDog({
@@ -243,13 +316,14 @@ export class KennelRunHandler {
                 },
             });
             const season = await kennelRun.run();
-            await this.persistNewMimics(config, season.exhausted, policy);
+            trace.noteChangedMimics(await this.persistNewMimics(config, season.exhausted, policy));
             // Pass config so onLeadDependencyPath is annotated — the lead-trail must be visible.
             // P4c: jeder im Lauf benutzte Schluessel-Wert faellt hier aus result, error und vmContext;
             // die Waves tragen ihren Lauf mit, damit Antwort und Snapshot noch einmal scrubben koennen.
             const waves = convertSeasonToWaves(season, config, keyRun);
             waveCount = (waves as any).wave?.length;
             KeyRunState.attach(waves, keyRun);
+            KennelRunTrace.attach(waves, trace);
             // Der Ausgang des Leads, einmal aus der Season entschieden und an die Waves gehaengt:
             // ok | empty (lief, lieferte nichts) | failed (Fehler, auch leerer Text) | not_run (lief nie).
             // Jeder Weg nach aussen liest ihn ueber LeadOutcome.of(waves) — kein 200 mit leerem Rumpf mehr.
@@ -262,7 +336,8 @@ export class KennelRunHandler {
             throw keyRun.scrubError(err); // P4c: kein Wert in Text oder Stack
         } finally {
             Watchpost.shared?.runEnded(watchToken);
-            this.deps.callCounter.record(lineageId, source, leadFailed); // genau ein record je begonnenem Lauf
+            // genau ein record je begonnenem Lauf — ausser fuer die Doku (openapi.json, D8): sie ist keine Nutzung.
+            if (counted) this.deps.callCounter.record(lineageId, source, leadFailed);
             logKennelRun({
                 kennelId: lineageId,
                 source,
@@ -442,6 +517,135 @@ export class KennelRunHandler {
         };
     }
 
+    // --- Ergebnis-Cache (0.4.0) ---
+
+    /**
+     * Nachschlagen im Ergebnis-Cache — der Aufrufer hat den Zugriff schon geprueft. Ohne Cache, oder wenn das
+     * Nachschlagen selbst scheitert: `off`, der Lauf geht wie bisher.
+     */
+    public async lookupResult(input: CacheLookupInput): Promise<CacheLookup> {
+        const cache = this.deps.resultCache;
+        if (!cache) return { state: 'off', reason: 'no result cache' };
+        try {
+            return await cache.lookup({ ...input, bypass: input.bypass && canManageAcl(input.config as AclEntity, input.ctx) });
+        } catch (err) {
+            console.warn('[KennelRunHandler] Ergebnis-Cache nicht befragt, Lauf wie ohne Cache:', (err as Error)?.message ?? err);
+            return { state: 'off', reason: 'lookup failed' };
+        }
+    }
+
+    /** Ein Treffer zaehlt als Aufruf seiner Quelle und in `cached` — Dog-Zeilen entstehen keine. */
+    public recordCacheHit(config: IKennelConfig, source: KennelCallSource): void {
+        this.deps.callCounter.recordHit(KennelResultCache.lineageOf(config), source, false);
+    }
+
+    /** Das eigene Treffer-Budget je Quelle fuer In-Process-Aufrufer (MCP): null = frei, sonst die Ablehnung. */
+    public cacheHitDenial(ctx: AuthCtx | undefined): { status: number; message: string; retryAfterSec: number } | null {
+        const gates = this.deps.runGates;
+        if (!gates) return null;
+        const entered = gates.cacheHits.enter(RunSource.of(ctx, null));
+        if (!entered.ok) return entered.denial;
+        entered.pass.leave();
+        return null;
+    }
+
+    /**
+     * Die Auskunft ueber den Ergebnis-Cache eines Kennels (get_kennel, GET /api/kennels/:id/result-cache): TTL und
+     * Klasse — die Gruende fuer `ctx` geschwaerzt wie in P1. Nur der Besitzer bekommt mit den Aufrufzahlen die
+     * Herabstufung und den Hinweis aus der Statistik.
+     */
+    public async resultCacheReport(
+        config: IKennelConfig,
+        ctx: AuthCtx | undefined,
+        calls: { last30d: number; cached30d?: number } | null,
+    ): Promise<ResultCacheReport> {
+        const ttl = ResultCacheTtl.ofKennel(config);
+        const classification = await this.cacheClasses.classify(config);
+        const view = KennelCacheClassifier.view(classification.redactedFor(ctx), ttl);
+        if (!calls || !canManageAcl(config as AclEntity, ctx)) return { resultCacheTtl: ttl.value, cacheClass: view };
+        const notes = ResultCacheAdvice.notes({
+            ttl,
+            view,
+            last30d: calls.last30d,
+            cached30d: calls.cached30d ?? 0,
+            downgrade: await this.downgradeOf(config),
+        });
+        return { resultCacheTtl: ttl.value, cacheClass: { ...view, ...notes } };
+    }
+
+    private async downgradeOf(config: IKennelConfig): Promise<string | null> {
+        const cache = this.deps.resultCache;
+        if (!cache) return null;
+        try {
+            const fingerprint = await cache.fingerprints.of(config);
+            return cache.downgradeOf(KennelResultCache.lineageOf(config), fingerprint.hash)?.reason ?? null;
+        } catch {
+            return null;
+        }
+    }
+
+    /** Der Besitzer will frisch: Cache-Control bzw. Pragma no-cache. */
+    private static wantsFresh(req: Request): boolean {
+        const header = (name: string) => String(req.get(name) ?? '').toLowerCase();
+        return header('cache-control').includes('no-cache') || header('pragma').includes('no-cache');
+    }
+
+    /**
+     * Lead-Ergebnis fuer /k/ und /execute (E7): erst der Cache — ein Treffer geht gegen das Treffer-Budget, nicht gegen
+     * Lauf-Platz und Lauf-Token —, erst ein Fehlschlag in die Zulassung und in den Lauf. Ein Lauf, den der Cache
+     * erwartet, wird danach durch das Tor abgelegt (oder nicht).
+     */
+    private async serveLead(req: Request, res: Response, plan: LeadRunPlan): Promise<void> {
+        const leadRef = plan.config.dogIds?.[0];
+        const lookup = await this.lookupResult({
+            config: plan.config,
+            ctx: req.ctx,
+            query: plan.query,
+            body: plan.body,
+            bypass: KennelRunHandler.wantsFresh(req),
+        });
+        if (lookup.state === 'hit') {
+            const gates = this.deps.runGates;
+            if (gates && !HeavyRequestLimiter.admitCacheHit(req, res, gates.cacheHits)) return;
+            this.recordCacheHit(plan.config, plan.source);
+            res.setHeader('X-SlopDogs-Cache', 'hit');
+            res.setHeader('Age', String(lookup.ageSec));
+            this.sendCached(req, res, lookup.entry);
+            return;
+        }
+        const ticket = lookup.state === 'off' ? null : lookup.ticket;
+        try {
+            if (!(await this.admitRun(req, res, plan.pot))) return;
+            if (ticket) res.setHeader('X-SlopDogs-Cache', lookup.state);
+            const waves = await this.runKennel(plan.config, plan.query, plan.body, this.toCapabilityCtx(req.ctx), undefined, {
+                source: plan.source,
+            });
+            this.sendLeadOutcome(req, res, waves, leadRef!, plan.access);
+            if (ticket) await ticket.settle(waves, leadRef);
+        } finally {
+            ticket?.abandon();
+        }
+    }
+
+    /** Ein Treffer als Antwort — derselbe Weg wie ein Lauf (Art, Lobby-Form, Sandbox), ohne KennelRun und Worker. */
+    private sendCached(req: Request, res: Response, entry: KennelResultEntry): void {
+        const cached = KennelResultCache.valueOf(entry);
+        if (cached.status === 'empty') {
+            SecurityHeaders.markKennelOutput(res);
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.status(200).send('null');
+            return;
+        }
+        this.sendResult(res, cached.result, req, null);
+    }
+
+    /** Zulassung eines Laufs im Handler; ohne Toepfe (Tests) immer frei. */
+    private async admitRun(req: Request, res: Response, pot: LeadRunPlan['pot']): Promise<boolean> {
+        const gates = this.deps.runGates;
+        if (!gates) return true;
+        return HeavyRequestLimiter.admit(req, res, pot === 'public' ? gates.publicRuns : gates.heavy, gates.sources);
+    }
+
     // --- Private internals ---
 
     /**
@@ -450,7 +654,7 @@ export class KennelRunHandler {
      * Lineage-Kopfes, nicht der gepinnten Version. Dem Aufrufer fremde Dogs laufen in einem
      * eigenen Kapazitaets-Namensraum (8.15: kein Owner-jsonStore, keine Keys).
      */
-    private createSerializedDogFactory(policy: DogRunPolicy) {
+    private createSerializedDogFactory(policy: DogRunPolicy, trace: KennelRunTrace) {
         const { nodesStore } = this.deps;
         return async (ids: string[]): Promise<Array<SerializedDog<unknown>>> => {
             const [serialized, mimics] = await Promise.all([
@@ -482,6 +686,7 @@ export class KennelRunHandler {
                     continue;
                 }
                 const config = typeof sd.serializedDogConfig === 'string' ? JSON.parse(sd.serializedDogConfig) : sd.serializedDogConfig;
+                trace.noteVersion(lineageId, sd.id);
                 dogs.push(policy.instantiate(config, sd.id, dogAcl!, lineageId));
             }
             return dogs;
@@ -492,7 +697,8 @@ export class KennelRunHandler {
      * Speichert frisch erzeugte Auto-Mimics und heilt adoptierte in die dogIds. Ein neuer Mimic
      * bekommt Owner und Sichtbarkeit aus seinem Kennel (DogRunPolicy.newMimicAcl).
      */
-    private async persistNewMimics(config: IKennelConfig, exhausted: any[], policy: DogRunPolicy): Promise<void> {
+    /** Liefert, wie viele Mimics der Lauf gespeichert oder in die dogIds geheilt hat (Tor des Ergebnis-Caches). */
+    private async persistNewMimics(config: IKennelConfig, exhausted: any[], policy: DogRunPolicy): Promise<number> {
         const { nodesStore } = this.deps;
         const mimicAcl = policy.newMimicAcl();
         const currentDogIds = new Set<string>(config.dogIds ?? []);
@@ -559,13 +765,15 @@ export class KennelRunHandler {
             // Keep the in-memory config in sync so the /run response reflects the heal.
             config.dogIds = updatedDogIds;
         }
+        return addedLineageIds.length;
     }
 
     /**
      * Das Lead-Ergebnis als Antwort. P4c: vorher noch einmal der Scrub des Laufs (`waves`) — die
      * Waves sind schon bereinigt, das hier ist die letzte Tuer vor dem Draht (Defense-in-Depth).
      */
-    private sendResult(res: any, rawResult: any, req: any, waves: Waves) {
+    /** Ohne Waves (Treffer des Ergebnis-Caches): der Wert ist schon bereinigt abgelegt, es gibt nichts zu scrubben. */
+    private sendResult(res: any, rawResult: any, req: any, waves: Waves | null) {
         const result = KeyRunState.forResult(waves).scrubValue(rawResult);
         // Kennel-Ausgabe ist Inhalt des Kennel-Besitzers: Sandbox, wo immer sie ausgeliefert wird (SecurityHeaders).
         SecurityHeaders.markKennelOutput(res);
@@ -680,10 +888,7 @@ export class KennelRunHandler {
 
             const queryData = this.mergeQueryParams(config.defaultQuery, req.query);
             const body = req.method === 'POST' && req.body !== undefined && req.body !== null ? req.body : config.defaultBody;
-            const waves = await this.runKennel(config, queryData, body, this.toCapabilityCtx(req.ctx), undefined, {
-                source: 'api-execute',
-            });
-            this.sendLeadOutcome(req, res, waves, dogIds[0], access);
+            await this.serveLead(req, res, { config, access, query: queryData, body, source: 'api-execute', pot: 'heavy' });
         } catch (err) {
             console.error('[KennelRunHandler.handleExecute]', err);
             res.status(500).json({ error: KennelRunHandler.errorText(err, access) });
@@ -832,10 +1037,7 @@ export class KennelRunHandler {
 
             const queryData = this.mergeQueryParams(config.defaultQuery, req.query);
             // Wie GET /api/…/run: ohne Request-Body die gespeicherte defaultBody-Konfiguration nutzen.
-            const waves = await this.runKennel(config, queryData, config.defaultBody, this.toCapabilityCtx(req.ctx), undefined, {
-                source: 'public',
-            });
-            this.sendLeadOutcome(req, res, waves, dogIds[0], access);
+            await this.serveLead(req, res, { config, access, query: queryData, body: config.defaultBody, source: 'public', pot: 'public' });
         } catch (err) {
             console.error(err);
             res.status(500).json({ error: KennelRunHandler.errorText(err, access) });
@@ -863,8 +1065,7 @@ export class KennelRunHandler {
             const queryData = this.mergeQueryParams(config.defaultQuery, req.query);
             const bodyData = req.body !== undefined && req.body !== null ? req.body : config.defaultBody;
 
-            const waves = await this.runKennel(config, queryData, bodyData, this.toCapabilityCtx(req.ctx), undefined, { source: 'public' });
-            this.sendLeadOutcome(req, res, waves, dogIds[0], access);
+            await this.serveLead(req, res, { config, access, query: queryData, body: bodyData, source: 'public', pot: 'public' });
         } catch (err) {
             console.error(err);
             res.status(500).json({ error: KennelRunHandler.errorText(err, access) });

@@ -35,6 +35,37 @@ export interface IKennelConfig {
   stats?: IKennelStats;
   /** List entries only: the signed-in caller marked this kennel as a favorite (anonymous: always false). */
   favorite?: boolean;
+  /**
+   * Result cache of the lead result (owner only): 0 = off, seconds, or 'unendlich' (until a dog, the kennel or the
+   * server changes). Missing on a server before the result cache (0.4.0).
+   */
+  resultCacheTtl?: KennelResultCacheTtl;
+}
+
+export type KennelResultCacheTtl = number | 'unendlich';
+
+/** How cacheable a kennel's crew is (strictest dog wins): rein < fluechtig < persoenlich < live. */
+export type KennelCacheClass = 'rein' | 'fluechtig' | 'persoenlich' | 'live';
+
+/** GET /api/kennels/:id/result-cache (0.4.0) — the settings' "Result cache" section. */
+export interface KennelResultCacheInfo {
+  ok: boolean;
+  resultCacheTtl: KennelResultCacheTtl;
+  cacheClass: {
+    klasse: KennelCacheClass;
+    /** Strictest first, "dog: class (detail)"; the detail is hidden for dogs the caller may not read. */
+    gruende: string[];
+    /** Allowed resultCacheTtl values for this class: '0', '1..N seconds', 'unendlich'. */
+    erlaubt: string[];
+    /** Set when the stored TTL no longer fits the crew: the kennel does not cache. */
+    ruht?: string;
+    /** Owner only: why the last run of this version was not cached. */
+    herabgestuft?: string;
+    /** Owner only: a hint from the call statistics. */
+    hinweis?: string;
+  };
+  /** Only the owner may change the TTL. */
+  canChange: boolean;
 }
 
 export type KennelVisibility = 'public' | 'run-only' | 'private';
@@ -61,7 +92,16 @@ export interface IMyRights {
  */
 export interface IKennelStats {
   /** leadFailed30d: Laeufe mit gescheitertem Lead in den letzten 30 Tagen (fehlt bei alten Servern). */
-  calls: { total: number; last30d: number; leadFailed: number; leadFailed30d?: number; ranked: number; ranked30d: number };
+  calls: {
+    total: number;
+    last30d: number;
+    leadFailed: number;
+    leadFailed30d?: number;
+    ranked: number;
+    ranked30d: number;
+    /** Calls of the last 30 days answered by the result cache (missing on servers before 0.4.0). */
+    cached30d?: number;
+  };
   rating: { avg: number | null; count: number; score: number };
 }
 

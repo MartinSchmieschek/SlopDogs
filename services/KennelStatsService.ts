@@ -10,7 +10,16 @@ import { canRun, parseList, type AclEntity } from '../mcp/auth/visibility';
 
 export interface KennelStats {
     /** leadFailed ueber alle Tage, leadFailed30d in den letzten 30 Tagen (Aufruf-Filter usage=failing/never_worked). */
-    calls: { total: number; last30d: number; leadFailed: number; leadFailed30d: number; ranked: number; ranked30d: number };
+    /** cached30d: Aufrufe der letzten 30 Tage, die der Ergebnis-Cache beantwortet hat (ohne Lauf). */
+    calls: {
+        total: number;
+        last30d: number;
+        leadFailed: number;
+        leadFailed30d: number;
+        ranked: number;
+        ranked30d: number;
+        cached30d: number;
+    };
     rating: { avg: number | null; count: number; score: number }; // avg null bei count 0; score 0 bei count 0
 }
 
@@ -46,7 +55,7 @@ interface StatsMemo {
 }
 
 const DAY_MS = 86_400_000;
-const NO_CALLS: CallCounts = { total: 0, last30d: 0, leadFailed: 0, leadFailed30d: 0, rankedTotal: 0, ranked30d: 0 };
+const NO_CALLS: CallCounts = { total: 0, last30d: 0, leadFailed: 0, leadFailed30d: 0, rankedTotal: 0, ranked30d: 0, cached30d: 0 };
 
 function positiveIntFromEnv(name: string, fallback: number): number {
     const parsed = Number.parseInt((process.env[name] || '').trim(), 10);
@@ -212,6 +221,7 @@ export class KennelStatsService {
                 leadFailed30d: stored.leadFailed30d + extra.leadFailed30d,
                 ranked: stored.rankedTotal + extra.rankedTotal,
                 ranked30d: stored.ranked30d + extra.ranked30d,
+                cached30d: stored.cached30d + extra.cached30d,
             },
             rating: this.ratingOf(memo.globalMean, rating.count, rating.sum),
         };

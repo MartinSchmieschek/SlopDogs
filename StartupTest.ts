@@ -42,6 +42,12 @@ import { KeyStoreService, type KeyStorePrisma } from './services/KeyStoreService
 import { PackageCandidateTests } from './test/startup/packageCandidates';
 import { SeededKennelTests } from './test/startup/seededKennelTests';
 import { HealthRouteTests } from './test/startup/healthTests';
+import { KennelCacheClassTests } from './test/startup/kennelCacheClassTests';
+import { KennelResultCacheTtlTests } from './test/startup/kennelResultCacheTtlTests';
+import { KennelResultCacheTests } from './test/startup/kennelResultCacheTests';
+import { CacheStoreTests } from './test/startup/cacheStoreTests';
+import type { ICacheStore } from './config/cache/ICacheStore';
+import type { IKennelResultStore } from './services/kennelCache/KennelResultStore';
 import { KennelTrustTests } from './test/startup/kennelTrustTests';
 import { LocalMode } from './server-app/LocalMode';
 import { authModeBootError } from './mcp/auth/middleware';
@@ -128,6 +134,10 @@ export class StartupTest {
         app: any,
         /** Eigene Seiten je Nutzer (Tabelle UserPage) — derselbe Store wie im Server. */
         userPageStore: IUserPageStore,
+        /** Ablage des Ergebnis-Caches (Cache-DB) — ohne: eine im Speicher. */
+        resultStore?: IKennelResultStore,
+        /** Der Cache-Speicher der App-Config (Default: RAM vor Cache-DB) — fuer den Vertragstest. */
+        cacheStore?: ICacheStore,
     ): Promise<TestResult[]> {
         if (isRuntimeLogVerbose()) {
             console.log('\n🧪 Starte Startup-Tests...\n');
@@ -170,6 +180,40 @@ export class StartupTest {
                 baseDogsMap,
                 toolDeps: this.toolDeps(nodesStore, kennelsStore, nodesController, kennelsController as KennelController, trustRunHandler),
             }).run();
+            // Ergebnis-Cache P1: Cache-Klassen eigener Dogs (Syntaxbaum), Base-Dogs (cacheClass/Ausweichtabelle) und Kennels.
+            const cacheRunHandler = new KennelRunHandler({
+                kennelsController: kennelsController as KennelController,
+                nodesStore,
+                baseDogsMap,
+                callCounter: this.testCallCounter,
+            });
+            await new KennelCacheClassTests((name, passed, error) => this.addResult(name, passed, error), {
+                nodesStore,
+                kennelsController: kennelsController as KennelController,
+                runHandler: cacheRunHandler,
+                baseDogsMap,
+                toolDeps: this.toolDeps(nodesStore, kennelsStore, nodesController, kennelsController as KennelController, cacheRunHandler),
+            }).run();
+            // Ergebnis-Cache P2: resultCacheTtl — Form, Klasse, neue Version, nur der Besitzer (MCP, REST).
+            await new KennelResultCacheTtlTests((name, passed, error) => this.addResult(name, passed, error), {
+                nodesStore,
+                kennelsStore,
+                nodesController,
+                kennelsController: kennelsController as KennelController,
+                runHandler: cacheRunHandler,
+                toolDeps: this.toolDeps(nodesStore, kennelsStore, nodesController, kennelsController as KennelController, cacheRunHandler),
+            }).run();
+            // Ergebnis-Cache P3: Treffer ohne Lauf, Fingerabdruck, Scopes, Tor, Schleusen, Statistik.
+            await new KennelResultCacheTests((name, passed, error) => this.addResult(name, passed, error), {
+                nodesStore,
+                kennelsController: kennelsController as KennelController,
+                baseDogsMap,
+                resultStore,
+                toolDepsFor: (handler) =>
+                    this.toolDeps(nodesStore, kennelsStore, nodesController, kennelsController as KennelController, handler),
+            }).run();
+            // App-Config: Vertrag jedes Cache-Speichers (RAM, zwei Stufen, Speicher der Config), Handler, Config-Lader.
+            await new CacheStoreTests((name, passed, error) => this.addResult(name, passed, error), cacheStore).run();
             // Spur K: Seed-Kennels nur wenn fehlend, Loeschen mit Nutzungspruefung, Reset = Loeschen + Neustart.
             await new SeededKennelTests(
                 (name, passed, error) => this.addResult(name, passed, error),
@@ -1032,6 +1076,14 @@ export class StartupTest {
             const foreignCsp = kennelPageCsp({ lineageId: 'startup-fremder-kennel' });
             if (!foreignCsp.includes(SecurityHeaders.kennelSandbox()) || foreignCsp.includes('allow-same-origin')) {
                 throw new Error(`fremder Kennel ohne Sandbox: "${foreignCsp}"`);
+            }
+            // Spiele fangen die Maus (Pointer Lock) und erzwingen Querformat; Fenster fortfuehren darf eine Kennel-Seite nie.
+            if (
+                !/\ballow-pointer-lock\b/.test(foreignCsp) ||
+                !/\ballow-orientation-lock\b/.test(foreignCsp) ||
+                /\ballow-top-navigation/.test(foreignCsp)
+            ) {
+                throw new Error(`Sandbox-Rechte falsch: "${foreignCsp}"`);
             }
             const trustedCsp = kennelPageCsp({ lineageId: LandingKennels.DEFAULT_KENNEL_ID });
             if (/\bsandbox\b/.test(trustedCsp)) throw new Error(`vertrauter Kennel mit Sandbox: "${trustedCsp}"`);

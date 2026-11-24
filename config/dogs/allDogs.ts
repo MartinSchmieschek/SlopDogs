@@ -1,6 +1,7 @@
 /**
- * Volle Base-Dog- und Pact-Registry für development/production.
- * Nur von fullRegistry.ts importieren — nicht in main.ts bündeln, damit Integration weniger Module lädt.
+ * Alle Base-Dogs und Pacts — die Liste der lokalen Config (config/local.config.ts: development, lokaler Modus).
+ * Nur ueber die Config laden, nie direkt aus main.ts: sonst kaemen alle Pakete auch im Betrieb in den Prozess.
+ * Bis 0.3.x: server-registries/fullRegistry.ts.
  */
 import {
     QueryRetriever,

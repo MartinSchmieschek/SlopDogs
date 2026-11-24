@@ -27,7 +27,9 @@ import os from 'os';
 import { ChannelHub } from './services/ChannelHub';
 import { ChannelTickets } from './server-app/ChannelTickets';
 import { IStore } from './store/IStore';
-import { PrismaStore } from './store/PrismaStore';
+import type { AppStore, ConfigContext } from './config/AppConfig';
+import { AppConfigError, AppConfigLoader } from './config/loadAppConfig';
+import type { ICacheStore } from './config/cache/ICacheStore';
 import { JsonStorageService } from './services/JsonStorageService';
 import path from 'path';
 import { runSeeds } from './seed-data/seed';
@@ -41,7 +43,7 @@ import type { NetworkBoundary } from './server-app/NetworkBoundary';
 import { warnMissingEnv } from './server-app/startupEnvCheck';
 import { KennelCallCounter } from './services/KennelCallCounter';
 import { DogReferenceIndex } from './services/DogReferenceIndex';
-import { KeysCapability, scrubbingConsoleSink } from './services/keysCapability';
+import { KeyRunState, KeysCapability, scrubbingConsoleSink } from './services/keysCapability';
 import { logBootMemory } from './api/utils/memoryLog';
 import { Watchpost } from './services/Watchpost';
 import type { TestResult } from './StartupTest';
@@ -74,9 +76,11 @@ export type BootedApplication = {
     networkBoundary: NetworkBoundary | null;
     refIndex: DogReferenceIndex;
     callCounter: KennelCallCounter;
-    store: PrismaStore;
+    store: AppStore;
     jsonStorageService: JsonStorageService;
     disconnectHttpApplication: () => Promise<void>;
+    /** Cache-Speicher und Datenzugang der Config freigeben, den Store zuletzt. Wirft nie. */
+    disconnectData: () => Promise<void>;
     runStartupTests: () => Promise<void>;
     runStartupSuite: () => Promise<TestResult[]>;
 };
@@ -99,9 +103,9 @@ async function start() {
         networkBoundary,
         refIndex,
         callCounter,
-        store,
         jsonStorageService,
         disconnectHttpApplication,
+        disconnectData,
         runStartupTests,
     } = booted;
 
@@ -111,7 +115,7 @@ async function start() {
     const httpServer = http.createServer(app);
     await channelHub.attach(httpServer, networkBoundary ? { admitUpgrade: (req) => networkBoundary.admitsUpgrade(req) } : {});
 
-    registerGracefulShutdown({ httpServer, callCounter, store, jsonStorageService, disconnectHttpApplication });
+    registerGracefulShutdown({ httpServer, callCounter, jsonStorageService, disconnectHttpApplication, disconnectData });
 
     console.log('App started.');
     logBootMemory('App started');
@@ -167,23 +171,38 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
     // wenn hier kein Timer mehr feuert — ab jetzt, damit Seeds und Referenzindex schon ueberwacht sind.
     Watchpost.startShared();
 
-    dbEnv.assertRequiredDbEnv();
-    const dbUrl = dbEnv.resolveStoreDatabaseUrl();
+    // Die App-Config (config/): Datenzugang, Cache-Speicher, Base-Dogs. SLOPDOGS_CONFIG verweist auf eine andere.
+    const nodeEnvForConfig = process.env.NODE_ENV || 'development';
+    let loaded: ReturnType<typeof AppConfigLoader.load>;
+    try {
+        loaded = AppConfigLoader.load(process.env, nodeEnvForConfig, localMode);
+    } catch (err) {
+        console.error(err instanceof AppConfigError ? err.message : err);
+        process.exit(EX_CONFIG);
+    }
+    const appConfig = loaded.config;
+    console.log(`[config] ${loaded.source} (${appConfig.name})`);
 
-    // One store, two anchor lines — hounds and kennels lie in the same hold (table `Dog`),
-    // so they share one grip on the deep. Zwei PrismaStore auf derselben URL waren zwei
-    // Connection-Pools fuer dieselbe Tabelle; einer genuegt.
-    const store = new PrismaStore(dbUrl);
+    dbEnv.assertRequiredDbEnv();
+    const configContext: ConfigContext = {
+        env: process.env,
+        nodeEnv: nodeEnvForConfig,
+        localMode,
+        urls: {
+            store: dbEnv.resolveStoreDatabaseUrl,
+            cache: dbEnv.resolveCacheDatabaseUrl,
+            jsonStorage: dbEnv.resolveJsonStorageDatabaseUrl,
+        },
+    };
+
+    // Datenzugang aus der Config (Default: config/database/prismaDatabase.ts) — der Store ist danach bereit.
+    // Ein Store fuer Hunde und Kennels (gleiche Tabelle `Dog`); JSON-Storage, Auth und Cache teilen seinen
+    // Prisma-Client, wo sie physisch in der Store-Datenbank liegen. Besitzer bleibt der Store (store.disconnect()).
+    const database = await appConfig.database(configContext);
+    const store = database.store;
     const nodesStore: IStore = store;
     const kennelsStore: IStore = store;
-
-    // Rouse the store from its slumber lest the connection rot in the bilge.
-    await store.init();
-
-    // Ein Prisma-Client statt vier (P1.4): JSON-Storage, Auth und Run-Cache nutzen den Store-Client
-    // mit, wo sie physisch in der Store-Datenbank liegen (scripts/dbEnv.cjs sharesStoreDatabase);
-    // nur getrennte Datenbanken bekommen eigene Clients. Besitzer bleibt der Store (store.disconnect()).
-    const prismaClients = store.sharedClients();
+    const prismaClients = database.clients;
 
     // Plant the first bones in the earth — the seeds from which our pack shall grow.
     await runSeeds(nodesStore, kennelsStore);
@@ -203,7 +222,7 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
     // Capability beim Core ab. Jeder SerializedDog sieht `jsonStore` damit automatisch im
     // VM-Context, ohne einen Parent zu deklarieren -- so wie er auch `fetch` und `console`
     // sieht.
-    const jsonStorageService = new JsonStorageService(prismaClients, dbEnv.resolveJsonStorageDatabaseUrl());
+    const jsonStorageService = new JsonStorageService(prismaClients, configContext.urls.jsonStorage());
     // Die Doku reist mit der Registrierung: der MCP kuendigt jsonStore dadurch von
     // selbst an. Ohne das ist er im MCP unsichtbar (kein Dog, kein Node, kein Tool)
     // und ein Agent bastelt sich stattdessen eine eigene Ablage.
@@ -222,7 +241,12 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
             // MCP tool contract already promised ("Keys sind pro eingeloggtem User isoliert").
             const prefix = isSuper ? '' : typeof userId === 'string' && userId.length > 0 ? `user:${userId}:` : 'anon:';
             const usePrefix = prefix !== '';
-            const wrap = (k: string) => prefix + k;
+            // Ergebnis-Cache: jede Benutzung macht den Lauf persoenlich (Tor D4) — vermerkt am Laufzustand.
+            const run = KeyRunState.of(ctx);
+            const wrap = (k: string) => {
+                run?.notePersonalUse('jsonStore');
+                return prefix + k;
+            };
 
             return {
                 get: (k: string) => jsonStorageService.get(wrap(k)),
@@ -230,11 +254,13 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
                 delete: (k: string) => jsonStorageService.delete(wrap(k)),
                 has: (k: string) => jsonStorageService.has(wrap(k)),
                 list: async () => {
+                    run?.notePersonalUse('jsonStore');
                     const all = await jsonStorageService.list();
                     if (!usePrefix) return all;
                     return all.filter((k) => k.startsWith(prefix)).map((k) => k.substring(prefix.length));
                 },
                 snapshot: async () => {
+                    run?.notePersonalUse('jsonStore');
                     const all = await jsonStorageService.snapshot();
                     if (!usePrefix) return all;
                     return all.filter((e) => e.key.startsWith(prefix)).map((e) => ({ ...e, key: e.key.substring(prefix.length) }));
@@ -259,20 +285,14 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
     // Lobby-Tickets (fix/k-sandbox): Schluessel je Prozess. Ausgestellt wird nur, wo eine Netzgrenze sie prueft (unten).
     const channelTickets = new ChannelTickets(channelHub.wsPath());
 
-    const nodeEnvForRegistry = process.env.NODE_ENV || 'development';
-    /**
-     * development und lokaler Modus: volle Dog-Registry (lokal mit dogs-hue und den anderen Heimnetz-Dogs).
-     * Production + Integration: schlanke Registry, weniger Imports/Heap.
-     */
-    const useSlimBaseDogRegistry = (nodeEnvForRegistry === 'production' || nodeEnvForRegistry === 'integration') && !localMode;
-    const registryModule = useSlimBaseDogRegistry
-        ? await import('./server-registries/slimDeployRegistry')
-        : await import('./server-registries/fullRegistry');
-    const { allBaseDogClasses, allPacts } = registryModule;
+    // Base-Dogs und Pacts aus der Config: Betrieb nur die Liste aus config/dogs/deployDogs.ts (weniger Imports und
+    // Heap), lokal alle aus config/dogs/allDogs.ts. Nur die gewaehlte Config wurde geladen, also nur ihre Pakete.
+    const allBaseDogClasses = appConfig.dogs;
+    const allPacts = appConfig.pacts;
 
     // Breathe life into each hound — those who lack their credentials perish in the constructor.
     // The survivors form the pack; the fallen are mourned in the logs.
-    const allBaseDogs: InstanceType<(typeof allBaseDogClasses)[number]>[] = [];
+    const allBaseDogs: { readonly name: string }[] = [];
     const baseDogsMap = new Map<string, new () => any>();
     // Dogs, deren Konstruktor wirft (z. B. fehlender API-Key), landen NICHT in
     // baseDogsMap. Ihren Klassennamen merken wir uns, damit der Coverage-Guard
@@ -291,7 +311,7 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
         }
     }
 
-    // The Pacts — aus Registry-Modul (schlank unter production/integration, sonst volle Crew).
+    // The Pacts — aus der Config (Betrieb schlank, lokal die volle Crew).
     allPacts.forEach((PactClass) => {
         const instance = new PactClass();
         baseDogsMap.set(instance.name, PactClass);
@@ -323,10 +343,15 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
 
     TypeDefBuilder.registerPacts([...allPacts]);
 
-    if (useSlimBaseDogRegistry || options.enforceKennelCoverage) {
+    if (appConfig.requireKennelCoverage || options.enforceKennelCoverage) {
         const requiredFromDb = await collectBaseDogNamesFromLatestKennels(kennelsStore);
-        assertSlimRegistryCoversKennelDbRefs(requiredFromDb, baseDogsMap, nodeEnvForRegistry, unavailableBaseDogNames);
+        assertSlimRegistryCoversKennelDbRefs(requiredFromDb, baseDogsMap, `${nodeEnvForConfig}, ${loaded.source}`, unavailableBaseDogNames);
     }
+
+    // Cache-Speicher und Tile-Cache aus der Config (Default: RAM vor Cache-DB).
+    const cacheStore: ICacheStore = appConfig.cache(configContext, database);
+    const tileCache = appConfig.tiles(configContext, database);
+    console.log(`[config] Cache-Speicher: ${cacheStore.name}`);
 
     const nodeEnv = process.env.NODE_ENV || 'development';
     const devUiOrigin = (process.env.DEV_UI_ORIGIN || 'http://localhost:4300').replace(/\/$/, '');
@@ -349,7 +374,8 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
         kennelsStore,
         allBaseDogs,
         baseDogsMap,
-        resolveCacheDatabaseUrl: dbEnv.resolveCacheDatabaseUrl,
+        cacheStore,
+        tileCache,
         prismaClients,
         callCounter,
         statsStore: store,
@@ -379,7 +405,14 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
     setVmConsoleSink(scrubbingConsoleSink);
 
     // Eine Zeile im (Render-)Log: welche Teile den Store-Client teilen, welche eigene Clients haben.
-    console.log(prismaClients.describe());
+    console.log(database.describe());
+
+    // Reihenfolge: erst der Cache-Speicher, dann eigene Clients des Datenzugangs, der Store (geteilter Pool) zuletzt.
+    const disconnectData = async (): Promise<void> => {
+        await Promise.allSettled([cacheStore.close()]);
+        await Promise.allSettled([database.close()]);
+        await Promise.allSettled([store.disconnect()]);
+    };
 
     return {
         app,
@@ -392,6 +425,7 @@ export async function bootApplication(options: BootOptions = {}): Promise<Booted
         store,
         jsonStorageService,
         disconnectHttpApplication,
+        disconnectData,
         runStartupTests,
         runStartupSuite,
     };
@@ -425,9 +459,9 @@ const SHUTDOWN_GRACE_MS = 10_000;
 type ShutdownTargets = {
     httpServer: http.Server;
     callCounter: KennelCallCounter;
-    store: PrismaStore;
     jsonStorageService: JsonStorageService;
     disconnectHttpApplication: () => Promise<void>;
+    disconnectData: () => Promise<void>;
 };
 
 /**
@@ -457,13 +491,10 @@ function registerGracefulShutdown(targets: ShutdownTargets): void {
         // gezaehlt), der letzte Flush braucht den Store-Pool noch. stop() wirft nie.
         await targets.callCounter.stop();
 
-        // Der geteilte Prisma-Client (Single-DB) endet mit store.disconnect(); JSON-Storage und
-        // HTTP-App trennen nur ihre eigenen Clients (store/SharedPrismaClients.ts).
-        await Promise.allSettled([
-            targets.store.disconnect(),
-            targets.jsonStorageService.disconnect(),
-            targets.disconnectHttpApplication(),
-        ]);
+        // JSON-Storage und HTTP-App trennen nur ihre eigenen Clients (store/SharedPrismaClients.ts); danach Cache,
+        // Datenzugang und zuletzt der Store — der geteilte Prisma-Client (Single-DB) endet mit store.disconnect().
+        await Promise.allSettled([targets.jsonStorageService.disconnect(), targets.disconnectHttpApplication()]);
+        await targets.disconnectData();
 
         await Watchpost.stopShared();
         console.log('[shutdown] Verbindungen freigegeben.');

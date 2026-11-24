@@ -1,4 +1,4 @@
-import type { IKennelConfig } from '../models/kennel-config.model';
+import type { IKennelConfig, KennelResultCacheTtl } from '../models/kennel-config.model';
 
 /** How the settings drawer shows itself (6.4 S3). `landing`: locked_landing (P5) — read-only, no unfreeze. */
 export type SettingsView = 'edit' | 'frozen' | 'landing' | 'readonly' | 'none';
@@ -59,6 +59,9 @@ export interface QueryRow {
   value: string;
 }
 
+/** The result cache field (0.4.0): off, N seconds, or until something changes ('unendlich'). */
+export type CacheTtlMode = 'off' | 'seconds' | 'unendlich';
+
 export interface SettingsForm {
   name: string;
   description: string;
@@ -66,11 +69,37 @@ export interface SettingsForm {
   dogIds: string[];
   query: QueryRow[];
   body: string;
+  ttlMode: CacheTtlMode;
+  /** The seconds as typed; only read when `ttlMode` is 'seconds'. */
+  ttlSeconds: string;
 }
 
 export type SettingsPayload =
   | { ok: true; patch: Partial<IKennelConfig> }
-  | { ok: false; field: 'body'; error: string };
+  | { ok: false; field: 'body' | 'ttl'; error: string };
+
+/** The form's TTL fields of a stored value. */
+export function cacheTtlFieldsOf(ttl: KennelResultCacheTtl | undefined | null): { ttlMode: CacheTtlMode; ttlSeconds: string } {
+  if (ttl === 'unendlich') return { ttlMode: 'unendlich', ttlSeconds: '' };
+  if (typeof ttl === 'number' && ttl > 0) return { ttlMode: 'seconds', ttlSeconds: String(ttl) };
+  return { ttlMode: 'off', ttlSeconds: '' };
+}
+
+/** The TTL the form asks for, or the problem with it. */
+export function cacheTtlOf(form: Pick<SettingsForm, 'ttlMode' | 'ttlSeconds'>): { ok: true; ttl: KennelResultCacheTtl } | { ok: false; error: string } {
+  if (form.ttlMode === 'off') return { ok: true, ttl: 0 };
+  if (form.ttlMode === 'unendlich') return { ok: true, ttl: 'unendlich' };
+  const text = form.ttlSeconds.trim();
+  const seconds = Number(text);
+  if (!/^\d+$/.test(text) || !Number.isSafeInteger(seconds) || seconds < 1) return { ok: false, error: 'Enter whole seconds, at least 1.' };
+  return { ok: true, ttl: seconds };
+}
+
+/** The stored TTL in the form's terms: 0 for off, so off and missing compare equal. */
+function storedTtl(cfg: IKennelConfig | null): KennelResultCacheTtl {
+  const ttl = cfg?.resultCacheTtl;
+  return ttl === 'unendlich' || (typeof ttl === 'number' && ttl > 0) ? ttl : 0;
+}
 
 /** The drawer's form as it starts from a config. */
 export function settingsFormOf(cfg: IKennelConfig | null): SettingsForm {
@@ -81,6 +110,7 @@ export function settingsFormOf(cfg: IKennelConfig | null): SettingsForm {
     dogIds: [...(cfg?.dogIds ?? [])],
     query: Object.entries(cfg?.defaultQuery ?? {}).map(([key, value]) => ({ key, value: String(value) })),
     body: cfg?.defaultBody !== undefined && cfg?.defaultBody !== null ? JSON.stringify(cfg.defaultBody, null, 2) : '',
+    ...cacheTtlFieldsOf(cfg?.resultCacheTtl),
   };
 }
 
@@ -93,7 +123,9 @@ export function settingsDirty(cfg: IKennelConfig | null, form: SettingsForm): bo
     || stored.emoji !== form.emoji
     || stored.dogIds.join('\n') !== form.dogIds.join('\n')
     || rows(stored.query) !== rows(form.query)
-    || stored.body.trim() !== form.body.trim();
+    || stored.body.trim() !== form.body.trim()
+    || stored.ttlMode !== form.ttlMode
+    || (form.ttlMode === 'seconds' && stored.ttlSeconds.trim() !== form.ttlSeconds.trim());
 }
 
 /** Why the body is not JSON, or null. An empty body means "no default body". */
@@ -110,10 +142,15 @@ export function bodyProblem(body: string): string | null {
 /**
  * The PUT for the drawer. Brief, layout and notes ride along unchanged (the server keeps the head's
  * fields, but a full config never loses one); visibility belongs to the access panel and is left out.
+ * The result cache TTL rides along only when it changed — only the owner may change it, an editor's save
+ * never carries it.
  */
 export function settingsPayload(cfg: IKennelConfig | null, form: SettingsForm): SettingsPayload {
   const problem = bodyProblem(form.body);
   if (problem) return { ok: false, field: 'body', error: problem };
+  const ttl = cacheTtlOf(form);
+  if (!ttl.ok) return { ok: false, field: 'ttl', error: ttl.error };
+  const ttlChanged = ttl.ttl !== storedTtl(cfg);
   const defaultQuery: Record<string, string> = {};
   for (const row of form.query) {
     const key = row.key.trim();
@@ -131,6 +168,7 @@ export function settingsPayload(cfg: IKennelConfig | null, form: SettingsForm): 
       task: cfg?.task,
       nodes: cfg?.nodes,
       edges: cfg?.edges,
+      ...(ttlChanged ? { resultCacheTtl: ttl.ttl } : {}),
     },
   };
 }
